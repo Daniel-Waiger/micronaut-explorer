@@ -2,6 +2,10 @@ import sys
 import os
 import streamlit.web.cli as stcli
 
+# AST hook for PyInstaller to discover dependencies without running them
+if False:
+    import app_streamlit
+
 # Fix for Streamlit when running in windowed mode (no console)
 if sys.stdout is None:
     sys.stdout = open(os.devnull, "w")

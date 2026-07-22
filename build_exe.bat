@@ -13,18 +13,18 @@ python -m PyInstaller --clean --noconfirm ^
   --windowed ^
   --paths src ^
   --add-data "app_streamlit.py;." ^
+  --add-data "src;src" ^
   --collect-all streamlit ^
   --collect-all bioio ^
-  --hidden-import "microscopy_naming_assistant" ^
+  --collect-all microscopy_naming_assistant ^
   --workpath "%TEMP_BUILD_DIR%\build" ^
   --distpath "%TEMP_BUILD_DIR%\dist" ^
   run_main.py
 
-echo Copying the final build back to the project folder...
-mkdir dist
-xcopy /E /I /Y "%TEMP_BUILD_DIR%\dist\run_main" "dist\run_main"
+echo Renaming executable in the temp folder...
+rename "%TEMP_BUILD_DIR%\dist\run_main\run_main.exe" MicroscopyNamingAssistant.exe
 
-echo Renaming executable...
-rename dist\run_main\run_main.exe MicroscopyNamingAssistant.exe
+echo Zipping the final build...
+powershell -Command "Compress-Archive -Path '%TEMP_BUILD_DIR%\dist\run_main' -DestinationPath 'MicroscopyNamingAssistant.zip' -Force"
 
-echo Build complete! The executable is in the dist/run_main folder.
+echo Build complete! You can find MicroscopyNamingAssistant.zip in your project folder.
