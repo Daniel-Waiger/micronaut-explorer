@@ -1,0 +1,31 @@
+{
+  "template": "{date}_{exptype}_{sample}_{magnification}_{markers}_{notes}{ext}",
+  "defaults": {
+    "date": "1970-01-01",
+    "exptype": "CT",
+    "sample": "E01",
+    "magnification": "X90",
+    "markers": "ARL",
+    "notes": "UNSPECIFIED"
+  },
+  "uppercase_fields": [
+    "exptype",
+    "sample",
+    "magnification",
+    "markers",
+    "notes"
+  ],
+  "field_separator": "_",
+  "marker_separator": "-",
+  "llm": {
+    "enabled": false,
+    "model": "auto",
+    "preferred_models": [
+      "llama3.1:8b",
+      "qwen2.5-coder:7b",
+      "phi3:mini"
+    ],
+    "endpoint": "http://localhost:11434/api/chat",
+    "timeout_seconds": 30
+  }
+}

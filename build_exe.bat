@@ -1,0 +1,1 @@
+REM This script is used to build the standalone executable using PyInstaller.
