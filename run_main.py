@@ -28,6 +28,7 @@ if __name__ == "__main__":
         "streamlit", 
         "run", 
         app_path, 
-        "--global.developmentMode=false"
+        "--global.developmentMode=false",
+        "--server.maxUploadSize=10240"
     ]
     sys.exit(stcli.main())
