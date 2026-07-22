@@ -92,9 +92,13 @@ def plan_batch(
             continue
 
         target = file_path.with_name(result.target_name)
-        if target in collisions:
-            skipped.append(f"{file_path.name}: duplicate target {target.name}")
-            continue
+        
+        counter = 1
+        original_stem = target.stem
+        ext = target.suffix
+        while target in collisions:
+            target = target.with_name(f"{original_stem}_{counter:02d}{ext}")
+            counter += 1
 
         collisions.add(target)
         planned.append((file_path, target))

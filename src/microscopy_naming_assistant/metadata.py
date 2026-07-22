@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+import logging
 from pathlib import Path
 import re
 
+logger = logging.getLogger(__name__)
 
 FORMAT_FIELD_HINTS: dict[str, dict[str, list[str]]] = {
     "OME-TIFF": {
@@ -204,8 +206,9 @@ def extract_metadata(file_path: Path) -> dict[str, str]:
             marker_tokens = [m for m in marker_tokens if m]
             if marker_tokens:
                 result["markers"] = "-".join(dict.fromkeys(marker_tokens))
-    except Exception:
-        # Keep graceful fallback behavior for unsupported formats/environments.
-        pass
+    except ImportError:
+        pass  # Graceful fallback if bioio is missing
+    except Exception as e:
+        logger.warning("Failed to extract metadata using bioio for %s: %s", file_path.name, e)
 
     return result

@@ -62,9 +62,11 @@ def test_plan_batch_detects_collisions(tmp_path: Path, monkeypatch) -> None:
         pattern="*.tif",
         config_path=config_path,
     )
-    assert len(result.planned) == 1
-    assert len(result.skipped) == 1
-    assert "duplicate target" in result.skipped[0]
+    assert len(result.planned) == 2
+    assert len(result.skipped) == 0
+    targets = [p[1].name for p in result.planned]
+    assert "DUPLICATE.tif" in targets
+    assert "DUPLICATE_01.tif" in targets
 
 
 def test_apply_batch_renames_files(tmp_path: Path) -> None:

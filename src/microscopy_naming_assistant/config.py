@@ -24,6 +24,7 @@ class NamingConfig:
     )
     field_separator: str = "_"
     marker_separator: str = "-"
+    safe_char_pattern: str = r"[^A-Za-z0-9_-]+"
     llm: dict[str, Any] = field(
         default_factory=lambda: {
             "enabled": False,
@@ -46,6 +47,7 @@ def save_config(path: Path, config: NamingConfig) -> None:
         "uppercase_fields": config.uppercase_fields,
         "field_separator": config.field_separator,
         "marker_separator": config.marker_separator,
+        "safe_char_pattern": config.safe_char_pattern,
         "llm": config.llm,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -61,5 +63,6 @@ def load_config(path: Path) -> NamingConfig:
         uppercase_fields=payload.get("uppercase_fields", base.uppercase_fields),
         field_separator=payload.get("field_separator", base.field_separator),
         marker_separator=payload.get("marker_separator", base.marker_separator),
+        safe_char_pattern=payload.get("safe_char_pattern", base.safe_char_pattern),
         llm={**base.llm, **payload.get("llm", {})},
     )

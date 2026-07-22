@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 import requests
 
+logger = logging.getLogger(__name__)
 
 DEFAULT_PREFERRED_MODELS = [
     "llama3.1:8b",
@@ -32,7 +34,11 @@ def list_local_ollama_models(endpoint: str, timeout_seconds: int = 5) -> list[st
         response = requests.get(tags_endpoint, timeout=timeout_seconds)
         response.raise_for_status()
         data = response.json()
-    except Exception:
+    except requests.exceptions.RequestException as e:
+        logger.warning("Failed to connect to Ollama at %s: %s", tags_endpoint, e)
+        return []
+    except Exception as e:
+        logger.warning("Unexpected error listing Ollama models: %s", e)
         return []
 
     models = data.get("models", [])
@@ -121,13 +127,18 @@ def suggest_fields_with_ollama(
         response = requests.post(endpoint, json=payload, timeout=timeout_seconds)
         response.raise_for_status()
         data = response.json()
-    except Exception:
+    except requests.exceptions.RequestException as e:
+        logger.warning("Failed to get suggestion from Ollama: %s", e)
+        return {}
+    except Exception as e:
+        logger.warning("Unexpected error communicating with Ollama: %s", e)
         return {}
 
     content = data.get("message", {}).get("content", "{}")
     try:
         parsed = json.loads(content)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.warning("Failed to parse JSON from Ollama: %s", e)
         return {}
 
     allowed = {"date", "exptype", "sample", "magnification", "markers", "notes"}

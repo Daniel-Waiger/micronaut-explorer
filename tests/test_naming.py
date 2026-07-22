@@ -7,8 +7,9 @@ from microscopy_naming_assistant.naming import build_filename, normalize_fields,
 
 
 def test_sanitize_token_removes_unsafe_chars() -> None:
-    assert sanitize_token(" GFP + DAPI ") == "GFP__DAPI"
-    assert sanitize_token("***") == "UNSPECIFIED"
+    config = NamingConfig()
+    assert sanitize_token(" GFP + DAPI ", config) == "GFP__DAPI"
+    assert sanitize_token("***", config) == "UNSPECIFIED"
 
 
 def test_normalize_fields_applies_uppercase_policy() -> None:
