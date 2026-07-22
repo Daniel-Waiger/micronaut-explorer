@@ -30,9 +30,12 @@ def build_filename(
     config: NamingConfig,
 ) -> str:
     merged = {**config.defaults, **extracted_fields}
-    merged["ext"] = source_path.suffix.lower() or ".tif"
+    ext = source_path.suffix.lower() or ".tif"
+    if not ext.startswith("."):
+        ext = f".{ext}"
 
     normalized = normalize_fields(merged, config)
+    normalized["ext"] = ext
     raw_name = config.template.format(**normalized)
 
     # Collapse duplicate separators and strip separator around extension.

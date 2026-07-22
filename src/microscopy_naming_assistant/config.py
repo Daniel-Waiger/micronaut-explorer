@@ -27,7 +27,8 @@ class NamingConfig:
     llm: dict[str, Any] = field(
         default_factory=lambda: {
             "enabled": False,
-            "model": "qwen2.5-coder:7b",
+            "model": "auto",
+            "preferred_models": ["llama3.1:8b", "qwen2.5-coder:7b", "phi3:mini"],
             "endpoint": "http://localhost:11434/api/chat",
             "timeout_seconds": 30,
         }

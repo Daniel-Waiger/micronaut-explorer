@@ -44,6 +44,7 @@ def cmd_suggest(args: argparse.Namespace) -> int:
         config_path=config_path,
         use_llm=args.llm,
         profile_path=profile_path,
+        llm_model_override=args.llm_model,
     )
 
     print(f"Source: {source.name}")
@@ -78,6 +79,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
         use_llm=args.llm,
         profile_path=profile_path,
         strict=args.strict,
+        llm_model_override=args.llm_model,
     )
 
     if not batch.suggestions:
@@ -131,6 +133,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_suggest.add_argument("--config", default="naming_scheme.json", help="Path to config JSON")
     p_suggest.add_argument("--profile", default=None, help="Optional profile JSON path")
     p_suggest.add_argument("--llm", action="store_true", help="Use Ollama if enabled in config")
+    p_suggest.add_argument(
+        "--llm-model",
+        default=None,
+        help="Optional Ollama model override (use 'auto' to auto-select local model)",
+    )
     p_suggest.add_argument("--strict", action="store_true", help="Fail on validation errors")
     p_suggest.set_defaults(func=cmd_suggest)
 
@@ -140,6 +147,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_batch.add_argument("--config", default="naming_scheme.json", help="Path to config JSON")
     p_batch.add_argument("--profile", default=None, help="Optional profile JSON path")
     p_batch.add_argument("--llm", action="store_true", help="Use Ollama if enabled in config")
+    p_batch.add_argument(
+        "--llm-model",
+        default=None,
+        help="Optional Ollama model override (use 'auto' to auto-select local model)",
+    )
     p_batch.add_argument("--strict", action="store_true", help="Skip files with validation errors")
     p_batch.add_argument("--apply", action="store_true", help="Actually rename files")
     p_batch.set_defaults(func=cmd_batch)

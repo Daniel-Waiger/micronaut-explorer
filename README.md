@@ -40,6 +40,10 @@ pip install -r requirements.txt
 
 pip install -e .
 
+4. Install test dependencies (recommended for contributors):
+
+pip install -e .[test]
+
 Note: Bio-Formats readers may require Java runtime depending on file formats and plugin internals.
 
 ## Optional local LLM (free tier)
@@ -55,6 +59,10 @@ ollama serve
 ollama pull qwen2.5-coder:7b
 
 3. Enable LLM in config (see below) and run commands with --llm.
+
+Notes:
+- No API key is required for local Ollama usage.
+- You can set `llm.model` to `auto` (default) to pick an installed local model automatically.
 
 ## Streamlit UI
 
@@ -102,6 +110,10 @@ mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.js
 
 mna suggest --input path/to/file.tif --config naming_scheme.json --llm
 
+6. Choose a specific local model without editing JSON:
+
+mna suggest --input path/to/file.tif --config naming_scheme.json --llm --llm-model llama3.1:8b
+
 ## Config format
 
 The generated naming_scheme.json is user-tailorable. Important fields:
@@ -110,7 +122,8 @@ The generated naming_scheme.json is user-tailorable. Important fields:
 - defaults: fallback values for missing metadata
 - uppercase_fields: fields to force uppercase
 - llm.enabled: true/false
-- llm.model: Ollama model name
+- llm.model: Ollama model name (or auto)
+- llm.preferred_models: priority order used when llm.model is auto
 - llm.endpoint: default http://localhost:11434/api/chat
 
 ## Profile format
@@ -131,7 +144,8 @@ Example LLM section:
 {
 	"llm": {
 		"enabled": true,
-		"model": "qwen2.5-coder:7b",
+		"model": "auto",
+		"preferred_models": ["llama3.1:8b", "qwen2.5-coder:7b", "phi3:mini"],
 		"endpoint": "http://localhost:11434/api/chat",
 		"timeout_seconds": 30
 	}
@@ -142,4 +156,10 @@ Example LLM section:
 - The CLI is safe by default: batch mode is dry-run unless you add --apply.
 - If metadata readers are unavailable for a file, the tool falls back to timestamp and filename heuristics.
 - You can maintain multiple config files for different users, projects, or experiments.
+
+## Run tests
+
+Run the test suite:
+
+python -m pytest -q
 

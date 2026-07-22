@@ -31,17 +31,20 @@ def suggest_for_file(
     config_path: Path,
     use_llm: bool = False,
     profile_path: Path | None = None,
+    llm_model_override: str | None = None,
 ) -> SuggestionResult:
     config = load_config(config_path)
     extracted = extract_metadata(file_path)
 
     if use_llm and bool(config.llm.get("enabled", False)):
+        llm_model = llm_model_override or str(config.llm.get("model", "auto"))
         llm_fields = suggest_fields_with_ollama(
             current_fields=extracted,
             original_name=file_path.name,
             endpoint=str(config.llm["endpoint"]),
-            model=str(config.llm["model"]),
+            model=llm_model,
             timeout_seconds=int(config.llm.get("timeout_seconds", 30)),
+            preferred_models=[str(x) for x in config.llm.get("preferred_models", [])],
         )
         extracted = {**extracted, **llm_fields}
 
@@ -65,6 +68,7 @@ def plan_batch(
     use_llm: bool = False,
     profile_path: Path | None = None,
     strict: bool = False,
+    llm_model_override: str | None = None,
 ) -> BatchResult:
     files = [p for p in input_dir.rglob(pattern) if p.is_file()]
     collisions: set[Path] = set()
@@ -78,6 +82,7 @@ def plan_batch(
             config_path=config_path,
             use_llm=use_llm,
             profile_path=profile_path,
+            llm_model_override=llm_model_override,
         )
         suggestions.append(result)
 
