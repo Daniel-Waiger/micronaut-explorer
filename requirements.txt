@@ -1,0 +1,3 @@
+bioio>=1.1.0
+bioio-bioformats>=1.0.0
+requests>=2.32.0

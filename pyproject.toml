@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "microscopy-naming-assistant"
+version = "0.1.0"
+description = "Metadata-aware microscopy file naming assistant with optional local LLM suggestions"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "bioio>=1.1.0",
+  "bioio-bioformats>=1.0.0",
+  "requests>=2.32.0"
+]
+
+[project.scripts]
+mna = "microscopy_naming_assistant.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
