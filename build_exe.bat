@@ -7,7 +7,7 @@ rmdir /s /q build
 rmdir /s /q dist
 
 echo Building executable...
-python -m PyInstaller --noconfirm ^
+python -m PyInstaller --clean --noconfirm ^
   --onedir ^
   --windowed ^
   --paths src ^
@@ -16,5 +16,8 @@ python -m PyInstaller --noconfirm ^
   --collect-all bioio ^
   --hidden-import "microscopy_naming_assistant" ^
   run_main.py
+
+echo Renaming executable...
+rename dist\run_main\run_main.exe MicroscopyNamingAssistant.exe
 
 echo Build complete! The executable is in the dist/run_main folder.
