@@ -1,2 +1,2 @@
 @echo off
-python app_streamlit.py
+streamlit run app_streamlit.py
