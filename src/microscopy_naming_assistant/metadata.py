@@ -56,6 +56,25 @@ def _guess_sample_from_name(stem: str) -> str | None:
     return None
 
 
+def _extract_date_from_name(stem: str) -> str | None:
+    # Look for YYYY-MM-DD or YYYY_MM_DD
+    match = re.search(r"((?:19|20)\d{2})[-_](0[1-9]|1[0-2])[-_](0[1-9]|[12]\d|3[01])", stem)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
+    
+    # Look for YYYYMMDD
+    match = re.search(r"(?<!\d)((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)", stem)
+    if match:
+        return f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
+        
+    # Look for YYMMDD (assuming 20YY)
+    match = re.search(r"(?<!\d)(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)", stem)
+    if match:
+        return f"20{match.group(1)}-{match.group(2)}-{match.group(3)}"
+        
+    return None
+
+
 def _detect_format(file_path: Path) -> str:
     name = file_path.name.lower()
     if name.endswith(".ome.tif") or name.endswith(".ome.tiff"):
@@ -166,6 +185,10 @@ def extract_metadata(file_path: Path) -> dict[str, str]:
     # Always derive date from file mtime as a reliable baseline.
     mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
     result["date"] = mtime.strftime("%Y-%m-%d")
+    
+    date_guess = _extract_date_from_name(file_path.stem)
+    if date_guess:
+        result["date"] = date_guess
 
     sample_guess = _guess_sample_from_name(file_path.stem)
     if sample_guess:

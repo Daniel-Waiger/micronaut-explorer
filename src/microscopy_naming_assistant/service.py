@@ -61,6 +61,45 @@ def suggest_for_file(
     return SuggestionResult(source=file_path, target_name=target_name, fields=normalized, issues=issues)
 
 
+def recalculate_batch(
+    input_dir: Path,
+    suggestions: list[SuggestionResult],
+    strict: bool = False,
+    conflict_strategy: str = "suffix",
+) -> BatchResult:
+    collisions: set[Path] = set()
+    planned: list[tuple[Path, Path]] = []
+    skipped: list[str] = []
+
+    for result in suggestions:
+        has_blocking = any(i.severity == "error" for i in result.issues)
+        if strict and has_blocking:
+            skipped.append(f"{result.source.name}: validation failed in strict mode")
+            continue
+
+        target = result.source.with_name(result.target_name)
+        
+        if target in collisions:
+            if conflict_strategy == "skip":
+                skipped.append(f"{result.source.name}: duplicate target {target.name}")
+                continue
+            elif conflict_strategy == "fail":
+                skipped.append(f"{result.source.name}: collision error, failing batch")
+                continue
+            else:
+                counter = 1
+                original_stem = target.stem
+                ext = target.suffix
+                while target in collisions:
+                    target = target.with_name(f"{original_stem}_{counter:02d}{ext}")
+                    counter += 1
+
+        collisions.add(target)
+        planned.append((result.source, target))
+
+    return BatchResult(planned=planned, suggestions=suggestions, skipped=skipped)
+
+
 def plan_batch(
     input_dir: Path,
     pattern: str,
@@ -69,12 +108,10 @@ def plan_batch(
     profile_path: Path | None = None,
     strict: bool = False,
     llm_model_override: str | None = None,
+    conflict_strategy: str = "suffix",
 ) -> BatchResult:
     files = [p for p in input_dir.rglob(pattern) if p.is_file()]
-    collisions: set[Path] = set()
-    planned: list[tuple[Path, Path]] = []
     suggestions: list[SuggestionResult] = []
-    skipped: list[str] = []
 
     for file_path in files:
         result = suggest_for_file(
@@ -86,31 +123,24 @@ def plan_batch(
         )
         suggestions.append(result)
 
-        has_blocking = any(i.severity == "error" for i in result.issues)
-        if strict and has_blocking:
-            skipped.append(f"{file_path.name}: validation failed in strict mode")
-            continue
-
-        target = file_path.with_name(result.target_name)
-        
-        counter = 1
-        original_stem = target.stem
-        ext = target.suffix
-        while target in collisions:
-            target = target.with_name(f"{original_stem}_{counter:02d}{ext}")
-            counter += 1
-
-        collisions.add(target)
-        planned.append((file_path, target))
-
-    return BatchResult(planned=planned, suggestions=suggestions, skipped=skipped)
+    return recalculate_batch(
+        input_dir=input_dir,
+        suggestions=suggestions,
+        strict=strict,
+        conflict_strategy=conflict_strategy,
+    )
 
 
-def apply_batch(planned: list[tuple[Path, Path]]) -> int:
+def apply_batch(input_dir: Path, planned: list[tuple[Path, Path]]) -> tuple[int, Path | None]:
+    from .manifest import save_manifest
     renamed = 0
+    actually_renamed = []
     for src, dst in planned:
         if src == dst:
             continue
         src.rename(dst)
+        actually_renamed.append((src, dst))
         renamed += 1
-    return renamed
+        
+    manifest_path = save_manifest(input_dir, actually_renamed)
+    return renamed, manifest_path

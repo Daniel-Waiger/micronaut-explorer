@@ -80,6 +80,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
         profile_path=profile_path,
         strict=args.strict,
         llm_model_override=args.llm_model,
+        conflict_strategy=args.conflict_strategy,
     )
 
     if not batch.suggestions:
@@ -103,12 +104,31 @@ def cmd_batch(args: argparse.Namespace) -> int:
                 )
 
     if args.apply:
-        renamed = apply_batch(batch.planned)
+        renamed, manifest = apply_batch(input_dir, batch.planned)
         print(f"Renamed {renamed} files.")
+        if manifest:
+            print(f"Manifest saved to: {manifest}")
     else:
         print("Dry-run only. Add --apply to perform renames.")
 
     return 0
+
+
+def cmd_rollback(args: argparse.Namespace) -> int:
+    from .manifest import rollback_manifest
+    manifest_path = Path(args.manifest)
+    input_dir = Path(args.input_dir)
+    
+    if not manifest_path.exists():
+        print(f"Manifest not found: {manifest_path}")
+        return 1
+        
+    reverted, errors = rollback_manifest(manifest_path, input_dir)
+    print(f"Successfully reverted {reverted} files.")
+    for err in errors:
+        print(f"Error: {err}")
+        
+    return 0 if not errors else 2
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -153,8 +173,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional Ollama model override (use 'auto' to auto-select local model)",
     )
     p_batch.add_argument("--strict", action="store_true", help="Skip files with validation errors")
+    p_batch.add_argument(
+        "--conflict-strategy",
+        choices=["suffix", "skip", "fail"],
+        default="suffix",
+        help="How to handle filename collisions",
+    )
     p_batch.add_argument("--apply", action="store_true", help="Actually rename files")
     p_batch.set_defaults(func=cmd_batch)
+
+    p_rollback = sub.add_parser("rollback", help="Revert a batch renaming using a manifest")
+    p_rollback.add_argument("--manifest", required=True, help="Path to JSON manifest")
+    p_rollback.add_argument("--input-dir", required=True, help="Folder containing the renamed files")
+    p_rollback.set_defaults(func=cmd_rollback)
 
     return parser
 

@@ -69,6 +69,7 @@ if profile_path is not None and not profile_path.exists():
     profile_path = None
 
 strict = st.sidebar.checkbox("Strict validation", value=True)
+conflict_strategy = st.sidebar.selectbox("Conflict strategy", ["suffix", "skip", "fail"], index=0)
 pattern = st.sidebar.text_input("Glob pattern", value="*.tif")
 
 config.llm["enabled"] = use_llm
@@ -97,40 +98,66 @@ if st.button("Preview Renames"):
                 profile_path=profile_path,
                 strict=strict,
                 llm_model_override=llm_model,
+                conflict_strategy=conflict_strategy,
             )
 
-            st.session_state["planned"] = [(str(src), str(dst)) for src, dst in batch.planned]
-            table_rows = [{"source": src.name, "suggested": dst.name} for src, dst in batch.planned]
-            st.session_state["table_rows"] = table_rows
-            st.session_state["skipped"] = batch.skipped
-            st.session_state["issues"] = [
-                {
-                    "source": s.source.name,
-                    "severity": issue.severity,
-                    "field": issue.field,
-                    "message": issue.message,
-                }
-                for s in batch.suggestions
-                for issue in s.issues
-            ]
+            st.session_state["suggestions"] = batch.suggestions
+            st.session_state["input_dir"] = input_dir
 
-if "table_rows" in st.session_state:
-    st.write("Planned renames")
-    st.dataframe(st.session_state["table_rows"], use_container_width=True)
+if "suggestions" in st.session_state:
+    input_dir = st.session_state["input_dir"]
+    suggestions = st.session_state["suggestions"]
+    
+    with_issues = [s for s in suggestions if s.issues]
+    
+    if with_issues:
+        st.warning(f"⚠️ {len(with_issues)} files have validation issues. Please fix the missing or invalid fields below:")
+        
+        data = []
+        for s in with_issues:
+            row = {"_source": str(s.source.name)}
+            row.update(s.fields)
+            data.append(row)
+            
+        edited_df = st.data_editor(data, num_rows="fixed", use_container_width=True)
+        
+        if st.button("Re-validate & Update Fields"):
+            from microscopy_naming_assistant.naming import build_filename, normalize_fields
+            from microscopy_naming_assistant.validation import validate_fields
+            from microscopy_naming_assistant.profiles import load_profile
+            
+            profile = load_profile(profile_path) if profile_path else None
+            
+            for row, s in zip(edited_df, with_issues):
+                new_fields = {k: v for k, v in row.items() if k != "_source"}
+                s.fields = normalize_fields(new_fields, config)
+                s.target_name = build_filename(s.source, s.fields, config)
+                if profile:
+                    s.issues = validate_fields(s.fields, profile)
+                else:
+                    s.issues = []
+            st.rerun()
 
-    if st.session_state.get("skipped"):
+    from microscopy_naming_assistant.service import recalculate_batch
+    batch = recalculate_batch(input_dir, suggestions, strict, conflict_strategy)
+
+    st.write("### Planned Renames")
+    table_rows = [{"source": src.name, "suggested": dst.name} for src, dst in batch.planned]
+    st.dataframe(table_rows, use_container_width=True)
+
+    if batch.skipped:
         st.warning("Skipped items")
-        for item in st.session_state["skipped"]:
+        for item in batch.skipped:
             st.write(f"- {item}")
 
-    if st.session_state.get("issues"):
-        st.info("Validation issues")
-        st.dataframe(st.session_state["issues"], use_container_width=True)
+    if batch.suggestions and not any(s.issues for s in batch.suggestions):
+        st.success("All clear! Ready to apply.")
 
     if st.button("Apply Renames", type="primary"):
-        planned = [(Path(src), Path(dst)) for src, dst in st.session_state.get("planned", [])]
-        renamed = apply_batch(planned)
-        st.success(f"Renamed {renamed} files.")
+        renamed, manifest = apply_batch(input_dir, batch.planned)
+        st.success(f"Successfully renamed {renamed} files.")
+        if manifest:
+            st.info(f"Manifest saved for rollback: `{manifest.name}`")
 
 st.subheader("Drag-and-Drop Mode (Suggestion Preview)")
 st.caption("Upload files to preview names. For safety, this mode does not modify original source files.")
@@ -164,3 +191,33 @@ if uploaded:
                 }
             )
     st.dataframe(preview_rows, use_container_width=True)
+
+st.divider()
+st.subheader("Rollback Manager")
+st.caption("Revert batch renames using saved JSON manifests.")
+rollback_dir = st.text_input("Target Directory (folder containing renamed files)", value="")
+manifest_file = st.file_uploader("Upload Manifest JSON", type=["json"])
+
+if st.button("Run Rollback"):
+    if not rollback_dir or not manifest_file:
+        st.error("Provide a target directory and upload a manifest.")
+    else:
+        from microscopy_naming_assistant.manifest import rollback_manifest
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+            tmp.write(manifest_file.getvalue())
+            tmp_path = Path(tmp.name)
+            
+        r_dir = Path(rollback_dir).expanduser()
+        if not r_dir.exists():
+            st.error(f"Directory not found: {r_dir}")
+        else:
+            reverted, errors = rollback_manifest(tmp_path, r_dir)
+            if reverted > 0:
+                st.success(f"Successfully reverted {reverted} files.")
+            if errors:
+                st.error("Some files could not be reverted:")
+                for e in errors:
+                    st.write(f"- {e}")
+        tmp_path.unlink(missing_ok=True)

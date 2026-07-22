@@ -74,10 +74,12 @@ def test_apply_batch_renames_files(tmp_path: Path) -> None:
     dst = tmp_path / "new.tif"
     src.write_bytes(b"x")
 
-    renamed = service.apply_batch([(src, dst)])
+    renamed, manifest_path = service.apply_batch(tmp_path, [(src, dst)])
     assert renamed == 1
     assert dst.exists()
     assert not src.exists()
+    assert manifest_path is not None
+    assert manifest_path.exists()
 
 
 def test_cli_parser_accepts_llm_model_option() -> None:
