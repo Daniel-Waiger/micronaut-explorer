@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import json
+from dataclasses import asdict
 from pathlib import Path
 
 from .config import default_config, save_config
@@ -47,6 +49,18 @@ def cmd_suggest(args: argparse.Namespace) -> int:
         llm_model_override=args.llm_model,
     )
 
+    strict_blocked = args.strict and any(i.severity == "error" for i in result.issues)
+
+    if args.json:
+        payload = {
+            "source": source.name,
+            "suggested": result.target_name,
+            "fields": result.fields,
+            "issues": [asdict(issue) for issue in result.issues],
+        }
+        print(json.dumps(payload))
+        return 2 if strict_blocked else 0
+
     print(f"Source: {source.name}")
     print(f"Suggested: {result.target_name}")
     print(f"Fields: {result.fields}")
@@ -56,7 +70,7 @@ def cmd_suggest(args: argparse.Namespace) -> int:
         for issue in result.issues:
             print(f"- {issue.severity.upper()} [{issue.field}] {issue.message}")
 
-        if args.strict and any(i.severity == "error" for i in result.issues):
+        if strict_blocked:
             print("Strict mode: suggestion blocked due to validation errors.")
             return 2
 
@@ -76,6 +90,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
         input_dir=input_dir,
         pattern=args.pattern,
         config_path=config_path,
+        recursive=args.recursive,
         use_llm=args.llm,
         profile_path=profile_path,
         strict=args.strict,
@@ -85,6 +100,29 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
     if not batch.suggestions:
         print("No matching files found.")
+        return 0
+
+    if args.json:
+        renamed = None
+        manifest = None
+        if args.apply:
+            renamed, manifest = apply_batch(input_dir, batch.planned)
+
+        payload = {
+            "planned": [
+                {"source": src.name, "target": dst.name} for src, dst in batch.planned
+            ],
+            "skipped": list(batch.skipped),
+            "issues": [
+                {"source": suggestion.source.name, **asdict(issue)}
+                for suggestion in batch.suggestions
+                for issue in suggestion.issues
+            ],
+            "applied": args.apply,
+            "renamed": renamed,
+            "manifest": str(manifest) if manifest else None,
+        }
+        print(json.dumps(payload))
         return 0
 
     for src, dst in batch.planned:
@@ -159,6 +197,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional Ollama model override (use 'auto' to auto-select local model)",
     )
     p_suggest.add_argument("--strict", action="store_true", help="Fail on validation errors")
+    p_suggest.add_argument(
+        "--json", action="store_true", help="Print machine-readable JSON instead of text"
+    )
     p_suggest.set_defaults(func=cmd_suggest)
 
     p_batch = sub.add_parser("batch", help="Batch rename files")
@@ -180,6 +221,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="How to handle filename collisions",
     )
     p_batch.add_argument("--apply", action="store_true", help="Actually rename files")
+    p_batch.add_argument(
+        "--recursive",
+        action="store_true",
+        help="Recurse into subfolders (default: top folder only)",
+    )
+    p_batch.add_argument(
+        "--json", action="store_true", help="Print machine-readable JSON instead of text"
+    )
     p_batch.set_defaults(func=cmd_batch)
 
     p_rollback = sub.add_parser("rollback", help="Revert a batch renaming using a manifest")

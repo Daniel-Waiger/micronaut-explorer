@@ -8,6 +8,7 @@ src_path = Path(__file__).parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
+import copy
 import os
 import tempfile
 
@@ -37,6 +38,13 @@ if not config_path.exists():
     st.sidebar.info(f"Created default config at {config_path}")
 
 config = load_config(config_path)
+
+# Snapshot the on-disk llm settings so we can tell, after the sidebar widgets
+# below have had their say, whether anything actually changed. The sidebar
+# only ever mutates config.llm[...] (see the assignments before "Folder
+# Mode"), so comparing this dict before/after is sufficient to decide
+# whether a rewrite of config_path is needed.
+loaded_llm_snapshot = copy.deepcopy(config.llm)
 
 llm_endpoint = st.sidebar.text_input(
     "Ollama endpoint",
@@ -98,10 +106,21 @@ config.llm["model"] = llm_model
 config.llm["endpoint"] = llm_endpoint
 config.llm["timeout_seconds"] = llm_timeout
 config.llm["preferred_models"] = preferred
-save_config(config_path, config)
+
+# Only rewrite naming_scheme.json when the widgets actually changed a value.
+# Without this check, every rerun (i.e. every widget interaction anywhere on
+# the page) would rewrite the file, even for unrelated actions like clicking
+# "Preview Renames".
+if config.llm != loaded_llm_snapshot:
+    save_config(config_path, config)
 
 st.subheader("Folder Mode (Preview + Apply)")
 folder_input = st.text_input("Input folder path", value="")
+recursive = st.checkbox(
+    "Search subfolders",
+    value=False,
+    help="Recurse into nested folders. Off = only the top folder.",
+)
 st.caption("Large or unreadable files fall back to filename/date heuristics after a timeout.")
 
 if st.button("Preview Renames"):
@@ -117,6 +136,7 @@ if st.button("Preview Renames"):
                     input_dir=input_dir,
                     pattern=pattern,
                     config_path=config_path,
+                    recursive=recursive,
                     use_llm=use_llm,
                     profile_path=profile_path,
                     strict=strict,
@@ -145,16 +165,16 @@ if "suggestions" in st.session_state:
         edited_df = st.data_editor(data, num_rows="fixed", use_container_width=True)
         
         if st.button("Re-validate & Update Fields"):
-            from microscopy_naming_assistant.naming import build_filename, normalize_fields
+            from microscopy_naming_assistant.naming import finalize_fields, render_name
             from microscopy_naming_assistant.validation import validate_fields
             from microscopy_naming_assistant.profiles import load_profile
-            
+
             profile = load_profile(profile_path) if profile_path else None
-            
+
             for row, s in zip(edited_df, with_issues):
                 new_fields = {k: v for k, v in row.items() if k != "_source"}
-                s.fields = normalize_fields(new_fields, config)
-                s.target_name = build_filename(s.source, s.fields, config)
+                s.fields = finalize_fields(s.source, new_fields, config)
+                s.target_name = render_name(s.fields, config)
                 if profile:
                     s.issues = validate_fields(s.fields, profile)
                 else:

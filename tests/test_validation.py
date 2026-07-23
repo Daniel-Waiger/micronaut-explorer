@@ -17,6 +17,19 @@ def test_validate_fields_happy_path() -> None:
     assert issues == []
 
 
+def test_validate_fields_allows_mixed_case_notes() -> None:
+    profile = default_profile()
+    fields = {
+        "exptype": "CT",
+        "sample": "E02",
+        "magnification": "X90",
+        "markers": "ARL-DAPI",
+        "notes": "Trial-1b",
+    }
+    issues = validate_fields(fields, profile)
+    assert not any(issue.field == "notes" for issue in issues)
+
+
 def test_validate_fields_reports_pattern_and_allowlist_errors() -> None:
     profile = default_profile()
     fields = {

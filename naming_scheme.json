@@ -12,11 +12,8 @@
     "exptype",
     "sample",
     "magnification",
-    "markers",
-    "notes"
+    "markers"
   ],
-  "field_separator": "_",
-  "marker_separator": "-",
   "safe_char_pattern": "[^A-Za-z0-9_-]+",
   "llm": {
     "enabled": false,

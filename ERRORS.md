@@ -12,7 +12,6 @@ Last updated: 2026-07-22
 ## What Faulted or Is Risky
 - No test suite means behavior is not yet regression-protected.
 - Rename apply path is not transactional; partial completion can occur if interrupted.
-- Profile/config mismatch risks: some configurable separators are defined but not fully enforced in filename assembly.
 - Metadata extraction relies on heuristics over heterogeneous vendor metadata, which may produce inconsistent fields.
 - LLM responses may be empty, malformed, or low quality for ambiguous filenames.
 

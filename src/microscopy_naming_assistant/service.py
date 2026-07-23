@@ -6,7 +6,7 @@ from pathlib import Path
 from .config import load_config
 from .llm import suggest_fields_with_ollama
 from .metadata import extract_metadata
-from .naming import build_filename, normalize_fields
+from .naming import finalize_fields, render_name
 from .profiles import load_profile
 from .validation import ValidationIssue, validate_fields
 
@@ -48,17 +48,15 @@ def suggest_for_file(
         )
         extracted = {**extracted, **llm_fields}
 
-    merged = {**config.defaults, **extracted}
-    merged["ext"] = file_path.suffix.lower() or ".tif"
-    normalized = normalize_fields(merged, config)
+    fields = finalize_fields(file_path, extracted, config)
 
     issues: list[ValidationIssue] = []
     if profile_path is not None:
         profile = load_profile(profile_path)
-        issues = validate_fields(normalized, profile)
+        issues = validate_fields(fields, profile)
 
-    target_name = build_filename(file_path, extracted, config)
-    return SuggestionResult(source=file_path, target_name=target_name, fields=normalized, issues=issues)
+    target_name = render_name(fields, config)
+    return SuggestionResult(source=file_path, target_name=target_name, fields=fields, issues=issues)
 
 
 def recalculate_batch(
@@ -104,13 +102,15 @@ def plan_batch(
     input_dir: Path,
     pattern: str,
     config_path: Path,
+    recursive: bool = False,
     use_llm: bool = False,
     profile_path: Path | None = None,
     strict: bool = False,
     llm_model_override: str | None = None,
     conflict_strategy: str = "suffix",
 ) -> BatchResult:
-    files = [p for p in input_dir.rglob(pattern) if p.is_file()]
+    matches = input_dir.rglob(pattern) if recursive else input_dir.glob(pattern)
+    files = [p for p in matches if p.is_file()]
     suggestions: list[SuggestionResult] = []
 
     for file_path in files:

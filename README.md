@@ -126,6 +126,9 @@ The generated naming_scheme.json is user-tailorable. Important fields:
 - llm.preferred_models: priority order used when llm.model is auto
 - llm.endpoint: default http://localhost:11434/api/chat
 
+Field separators are defined entirely by the `template` field (there is no
+separate separator setting); multiple markers are always joined with `-`.
+
 ## Profile format
 
 Profile JSON controls validation policy for each user or lab:

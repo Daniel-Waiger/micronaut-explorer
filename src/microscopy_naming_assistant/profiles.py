@@ -23,7 +23,7 @@ def default_profile() -> ProfileRules:
         allowed_markers=["ARL", "GFP", "DAPI", "SOX"],
         sample_pattern=r"^E\d{2}$",
         magnification_pattern=r"^X\d{2,3}$",
-        notes_pattern=r"^[A-Z0-9_-]+$",
+        notes_pattern=r"^[A-Za-z0-9_-]+$",
         unknown_marker_policy="warn",
     )
 
