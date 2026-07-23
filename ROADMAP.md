@@ -1,30 +1,35 @@
 # Roadmap
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
-## Phase 1: Reliability Baseline (Highest Priority)
-- Add unit tests for naming, validation, and config/profile loaders.
-- Add integration tests for CLI suggest/batch dry-run/apply flows.
-- Add deterministic fixtures for metadata extraction edge cases.
-- Define and enforce expected behavior for collisions and strict mode.
+The live, task-level execution plan is in [TASKS.md](TASKS.md). This file is the
+high-level phase summary; TASKS.md breaks each phase into session-sized units with
+acceptance criteria and dependencies.
 
-## Phase 2: Safer Batch Operations
-- Implement optional apply manifest/log file for every batch run.
-- Add rollback support using recorded original/target paths.
-- Add conflict strategy options: skip, fail, or auto-suffix.
+## Status of the original roadmap
 
-## Phase 3: Metadata and LLM Quality
-- Expand format-specific extraction logic with tested sample files.
-- Improve marker parsing/token normalization across separators.
-- Add optional confidence notes per extracted/suggested field.
-- Harden Ollama integration with timeout handling and clear fallback messaging.
+The earlier roadmap's Phase 2 (apply manifest/log, rollback, conflict strategies) is
+**already implemented** in code (`manifest.py`, `service.recalculate_batch`,
+`--conflict-strategy`, and the UI Rollback Manager). Phase 1's test items are partly
+done: pure-logic tests exist and pass, but the reader-dependent tests hang, so the
+reliability baseline is not actually met. The revised plan below reflects that.
 
-## Phase 4: UX and Operability
-- Add in-app config/profile creation and validation helpers in Streamlit.
-- Add exportable preview report (CSV/JSON) from UI and CLI.
-- Add richer CLI output modes (`--json`) for automation pipelines.
+## Phase 0 — Stop the hang and unbreak CI (highest priority)
+`extract_metadata` can block indefinitely on files bioio/Bio-Formats cannot parse,
+freezing the CLI, the Streamlit UI, and CI. Bound extraction with a process timeout
+and a heuristic fallback; make the default CI run fast and green; add UI feedback.
 
-## Phase 5: Release Readiness
-- Add CI pipeline (lint, tests, packaging checks).
-- Define versioning/release checklist and changelog process.
-- Publish usage examples with sample profiles and troubleshooting guide.
+## Phase 1 — Correctness & honesty
+Remove config fields that are advertised but unused; assemble/validate/name from a
+single field dict; make batch recursion explicit; add `--json` CLI output; stop
+rewriting config on every UI rerun; preserve `.ome.tif`; fix notes casing.
+
+## Phase 2 — Extraction quality (the core value)
+Structured OME-XML / per-format extraction with real sample fixtures; an externalized
+marker/fluorophore dictionary with word-boundary matching; per-field provenance so
+low-confidence guesses are surfaced for review instead of silently landing in names.
+
+## Phase 3 — Release & UX
+Robust data-editor round-trip; exportable preview report (CSV/JSON); first-run
+config/profile wizard; opt-in/flagged lab defaults; LICENSE, CHANGELOG, lint/format/
+type gates, and versioning discipline.
