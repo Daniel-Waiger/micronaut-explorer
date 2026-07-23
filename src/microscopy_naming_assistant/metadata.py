@@ -302,7 +302,13 @@ def extract_metadata_with_sources(
 
     if p.is_alive():
         p.terminate()
-        p.join()
+        p.join(5)
+        if p.is_alive():
+            # Child didn't die from terminate() (e.g. stuck in bioio/JVM
+            # startup on Windows spawn) -- escalate to a hard kill so this
+            # branch can never hang past a bounded worst case.
+            p.kill()
+            p.join(5)
         logger.warning(
             "bioio extraction for %s exceeded %ss timeout; using heuristics only",
             file_path.name,

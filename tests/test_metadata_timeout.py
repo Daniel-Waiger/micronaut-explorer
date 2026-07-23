@@ -23,6 +23,11 @@ def test_extract_metadata_bounds_bioio_with_timeout(tmp_path: Path) -> None:
     metadata = extract_metadata(file_path, timeout_seconds=3)
     elapsed = time.time() - start
 
-    assert elapsed < 6, f"extract_metadata took {elapsed:.1f}s; expected ~3s (timeout-bounded)"
+    # Bound is generous (not a tight ~6-10s window) because the timeout branch
+    # itself now escalates terminate() -> join(5) -> kill() -> join(5) on top
+    # of the initial timeout_seconds=3 wait, so the worst case is materially
+    # more than 3s; 20s stays comfortably under the 60s pytest-timeout safety
+    # net while still proving the call is bounded, not hung.
+    assert elapsed < 20, f"extract_metadata took {elapsed:.1f}s; expected well under 20s (timeout-bounded)"
     assert metadata["date"] == "2025-01-02"
     assert metadata["sample"] == "E03"
