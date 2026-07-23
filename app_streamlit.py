@@ -56,7 +56,14 @@ use_llm = st.sidebar.checkbox("Use Ollama suggestions", value=bool(config.llm.ge
 
 default_preferred = ["llama3.1:8b", "qwen2.5-coder:7b", "phi3:mini"]
 preferred = [str(x) for x in config.llm.get("preferred_models", default_preferred)]
-installed = list_local_ollama_models(endpoint=llm_endpoint, timeout_seconds=5)
+
+# Cache Ollama model discovery so a connection-timeout penalty (when Ollama is
+# not running) is paid at most once per minute instead of on every rerun.
+@st.cache_data(ttl=60, show_spinner=False)
+def _cached_ollama_models(endpoint: str) -> list[str]:
+    return list_local_ollama_models(endpoint=endpoint, timeout_seconds=2)
+
+installed = _cached_ollama_models(endpoint=llm_endpoint)
 
 llm_model_options = ["auto"] + preferred + installed
 llm_model_options = list(dict.fromkeys(llm_model_options))
