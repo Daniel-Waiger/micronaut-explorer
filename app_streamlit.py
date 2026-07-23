@@ -102,6 +102,7 @@ save_config(config_path, config)
 
 st.subheader("Folder Mode (Preview + Apply)")
 folder_input = st.text_input("Input folder path", value="")
+st.caption("Large or unreadable files fall back to filename/date heuristics after a timeout.")
 
 if st.button("Preview Renames"):
     if not folder_input:
@@ -111,16 +112,17 @@ if st.button("Preview Renames"):
         if not input_dir.exists():
             st.error(f"Folder does not exist: {input_dir}")
         else:
-            batch = plan_batch(
-                input_dir=input_dir,
-                pattern=pattern,
-                config_path=config_path,
-                use_llm=use_llm,
-                profile_path=profile_path,
-                strict=strict,
-                llm_model_override=llm_model,
-                conflict_strategy=conflict_strategy,
-            )
+            with st.spinner("Reading metadata and planning renames…"):
+                batch = plan_batch(
+                    input_dir=input_dir,
+                    pattern=pattern,
+                    config_path=config_path,
+                    use_llm=use_llm,
+                    profile_path=profile_path,
+                    strict=strict,
+                    llm_model_override=llm_model,
+                    conflict_strategy=conflict_strategy,
+                )
 
             st.session_state["suggestions"] = batch.suggestions
             st.session_state["input_dir"] = input_dir
@@ -192,25 +194,26 @@ if uploaded:
     preview_rows = []
     with tempfile.TemporaryDirectory(prefix="mna_upload_") as tmp:
         tmp_dir = Path(tmp)
-        for file_obj in uploaded:
-            tmp_path = tmp_dir / file_obj.name
-            tmp_path.write_bytes(file_obj.getbuffer())
-            result = suggest_for_file(
-                file_path=tmp_path,
-                config_path=config_path,
-                use_llm=use_llm,
-                profile_path=profile_path,
-                llm_model_override=llm_model,
-            )
-            preview_rows.append(
-                {
-                    "source": file_obj.name,
-                    "suggested": result.target_name,
-                    "issues": "; ".join(
-                        [f"{i.severity}:{i.field}" for i in result.issues]
-                    ),
-                }
-            )
+        with st.spinner("Reading metadata…"):
+            for file_obj in uploaded:
+                tmp_path = tmp_dir / file_obj.name
+                tmp_path.write_bytes(file_obj.getbuffer())
+                result = suggest_for_file(
+                    file_path=tmp_path,
+                    config_path=config_path,
+                    use_llm=use_llm,
+                    profile_path=profile_path,
+                    llm_model_override=llm_model,
+                )
+                preview_rows.append(
+                    {
+                        "source": file_obj.name,
+                        "suggested": result.target_name,
+                        "issues": "; ".join(
+                            [f"{i.severity}:{i.field}" for i in result.issues]
+                        ),
+                    }
+                )
     st.dataframe(preview_rows, use_container_width=True)
 
 st.divider()

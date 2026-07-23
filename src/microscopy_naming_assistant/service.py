@@ -34,7 +34,7 @@ def suggest_for_file(
     llm_model_override: str | None = None,
 ) -> SuggestionResult:
     config = load_config(config_path)
-    extracted = extract_metadata(file_path)
+    extracted = extract_metadata(file_path, timeout_seconds=int(config.extraction_timeout_seconds))
 
     if use_llm and bool(config.llm.get("enabled", False)):
         llm_model = llm_model_override or str(config.llm.get("model", "auto"))

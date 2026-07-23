@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 import logging
+import multiprocessing
 from pathlib import Path
+import queue
 import re
 
 logger = logging.getLogger(__name__)
@@ -174,26 +176,15 @@ def _extract_sample(text: str, hints: list[str]) -> str | None:
     return None
 
 
-def extract_metadata(file_path: Path) -> dict[str, str]:
-    """Extract naming-relevant metadata using bioio when available.
+def _extract_bioio_fields(file_path: Path) -> dict[str, str]:
+    """Extract markers/magnification/exptype/sample using bioio, if available.
 
-    Falls back to file timestamps and filename heuristics if scientific readers
-    are unavailable or cannot read the file.
+    Returns only the bioio-derived fields; date/sample-from-filename heuristics
+    live in `extract_metadata`. Must stay module-level and picklable (no
+    closures, no reliance on outer state) so it can later be run in a separate
+    process to bound its runtime (see P0-3).
     """
     result: dict[str, str] = {}
-
-    # Always derive date from file mtime as a reliable baseline.
-    mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
-    result["date"] = mtime.strftime("%Y-%m-%d")
-    
-    date_guess = _extract_date_from_name(file_path.stem)
-    if date_guess:
-        result["date"] = date_guess
-
-    sample_guess = _guess_sample_from_name(file_path.stem)
-    if sample_guess:
-        result["sample"] = sample_guess
-
     file_format = _detect_format(file_path)
 
     try:
@@ -233,5 +224,70 @@ def extract_metadata(file_path: Path) -> dict[str, str]:
         pass  # Graceful fallback if bioio is missing
     except Exception as e:
         logger.warning("Failed to extract metadata using bioio for %s: %s", file_path.name, e)
+
+    return result
+
+
+def _bioio_worker(file_path_str: str, q: multiprocessing.Queue) -> None:
+    """Top-level, picklable child-process entry point for `_extract_bioio_fields`.
+
+    Must stay module-level (spawn imports it by reference) and must never let
+    an exception escape uncaught — an uncaught exception would kill the child
+    without putting anything on the queue, leaving the parent to wait out the
+    full timeout for no reason.
+    """
+    try:
+        q.put(_extract_bioio_fields(Path(file_path_str)))
+    except Exception:
+        q.put({})
+
+
+def extract_metadata(file_path: Path, timeout_seconds: int = 20) -> dict[str, str]:
+    """Extract naming-relevant metadata using bioio when available.
+
+    Falls back to file timestamps and filename heuristics if scientific readers
+    are unavailable or cannot read the file. The bioio read itself runs in a
+    bounded child process: some files (e.g. ones the Bio-Formats/Java backend
+    cannot parse) make bioio hang indefinitely, so `_extract_bioio_fields` is
+    run in a `multiprocessing` child that is terminated after `timeout_seconds`.
+    The filename/mtime heuristics below always run in the parent, so a timeout
+    still yields a usable name instead of freezing the caller.
+    """
+    result: dict[str, str] = {}
+
+    # Always derive date from file mtime as a reliable baseline.
+    mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+    result["date"] = mtime.strftime("%Y-%m-%d")
+
+    date_guess = _extract_date_from_name(file_path.stem)
+    if date_guess:
+        result["date"] = date_guess
+
+    sample_guess = _guess_sample_from_name(file_path.stem)
+    if sample_guess:
+        result["sample"] = sample_guess
+
+    ctx = multiprocessing.get_context("spawn")
+    q = ctx.Queue()
+    p = ctx.Process(target=_bioio_worker, args=(str(file_path), q))
+    p.start()
+    p.join(timeout_seconds)
+
+    if p.is_alive():
+        p.terminate()
+        p.join()
+        logger.warning(
+            "bioio extraction for %s exceeded %ss timeout; using heuristics only",
+            file_path.name,
+            timeout_seconds,
+        )
+        return result
+
+    try:
+        bioio_fields = q.get(timeout=1)
+    except queue.Empty:
+        bioio_fields = {}
+
+    result.update(bioio_fields)
 
     return result

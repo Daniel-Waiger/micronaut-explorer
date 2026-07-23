@@ -1,5 +1,6 @@
 import sys
 import os
+import multiprocessing
 import streamlit.web.cli as stcli
 
 # AST hook for PyInstaller to discover dependencies without running them
@@ -21,6 +22,7 @@ def resolve_path(name):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     app_path = resolve_path("app_streamlit.py")
     
     # We want it to open the browser automatically, so no headless=true

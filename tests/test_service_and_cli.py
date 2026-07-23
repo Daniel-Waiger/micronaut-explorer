@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import microscopy_naming_assistant.service as service
 from microscopy_naming_assistant.cli import build_parser
 from microscopy_naming_assistant.config import default_config, save_config
@@ -100,6 +102,32 @@ def test_cli_parser_accepts_llm_model_option() -> None:
     assert args.llm_model == "llama3.1:8b"
 
 
+def test_suggest_for_file_forwards_configured_timeout(tmp_path: Path, monkeypatch) -> None:
+    config = default_config()
+    config.extraction_timeout_seconds = 7
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    captured_kwargs: dict = {}
+
+    def fake_extract_metadata(file_path, **kwargs):
+        captured_kwargs.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(service, "extract_metadata", fake_extract_metadata)
+
+    service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+    )
+
+    assert captured_kwargs.get("timeout_seconds") == 7
+
+
+@pytest.mark.integration
 def test_suggest_for_file_with_profile_generates_issues(tmp_path: Path) -> None:
     config = default_config()
     config.defaults["magnification"] = "90x"

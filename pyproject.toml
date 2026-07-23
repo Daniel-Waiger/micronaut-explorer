@@ -20,7 +20,8 @@ mna = "microscopy_naming_assistant.cli:main"
 
 [project.optional-dependencies]
 test = [
-  "pytest>=9.1.0"
+  "pytest>=9.1.0",
+  "pytest-timeout>=2.3.0"
 ]
 
 [tool.setuptools]
@@ -28,3 +29,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+timeout = 60
+markers = [
+  "integration: needs Java/real readers"
+]

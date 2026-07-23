@@ -3,9 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from microscopy_naming_assistant.metadata import extract_metadata
 
 
+@pytest.mark.integration
 def test_extract_metadata_fallback_includes_date_and_sample_guess(tmp_path: Path) -> None:
     file_path = tmp_path / "run_E3_trial.tif"
     file_path.write_bytes(b"dummy")
