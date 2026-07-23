@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 from dataclasses import asdict
 from pathlib import Path
 
 from .config import default_config, save_config
 from .profiles import default_profile, save_profile
-from .service import apply_batch, plan_batch, suggest_for_file
+from .service import BatchResult, apply_batch, plan_batch, suggest_for_file
 
 
 def cmd_init_config(args: argparse.Namespace) -> int:
@@ -78,6 +79,35 @@ def cmd_suggest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _batch_report_rows(batch: BatchResult) -> list[dict[str, str]]:
+    """Build source/target/issues rows for a planned batch (used by --report)."""
+    issues_by_source = {
+        suggestion.source.name: "; ".join(
+            f"{issue.severity}:{issue.field}" for issue in suggestion.issues
+        )
+        for suggestion in batch.suggestions
+    }
+    return [
+        {
+            "source": src.name,
+            "target": dst.name,
+            "issues": issues_by_source.get(src.name, ""),
+        }
+        for src, dst in batch.planned
+    ]
+
+
+def _write_batch_report(report_path: Path, batch: BatchResult) -> None:
+    rows = _batch_report_rows(batch)
+    if report_path.suffix.lower() == ".json":
+        report_path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    else:
+        with report_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=["source", "target", "issues"])
+            writer.writeheader()
+            writer.writerows(rows)
+
+
 def cmd_batch(args: argparse.Namespace) -> int:
     input_dir = Path(args.input_dir)
     config_path = Path(args.config)
@@ -102,6 +132,9 @@ def cmd_batch(args: argparse.Namespace) -> int:
     if not batch.suggestions:
         print("No matching files found.")
         return 0
+
+    if args.report:
+        _write_batch_report(Path(args.report), batch)
 
     if args.json:
         renamed = None
@@ -141,6 +174,9 @@ def cmd_batch(args: argparse.Namespace) -> int:
                     f"- {suggestion.source.name}: {issue.severity.upper()} "
                     f"[{issue.field}] {issue.message}"
                 )
+
+    if args.report:
+        print(f"Report written to: {args.report}")
 
     if args.apply:
         renamed, manifest = apply_batch(input_dir, batch.planned)
@@ -229,6 +265,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_batch.add_argument(
         "--json", action="store_true", help="Print machine-readable JSON instead of text"
+    )
+    p_batch.add_argument(
+        "--report",
+        default=None,
+        help="Write a source/target/issues report for the planned batch "
+        "(CSV, or JSON if the path ends in .json)",
     )
     p_batch.set_defaults(func=cmd_batch)
 

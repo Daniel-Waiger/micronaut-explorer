@@ -445,6 +445,131 @@ def test_cmd_batch_json_apply_reports_renamed_and_manifest(
     assert "->" not in captured.out
 
 
+def test_cmd_batch_report_csv_writes_source_target_issues(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "a.tif"
+    target = tmp_path / "A.tif"
+    report_path = tmp_path / "out.csv"
+
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name=target.name,
+        fields={"sample": "E01"},
+        issues=[ValidationIssue(field="sample", message="looks odd", severity="warning")],
+    )
+    fake_batch = service.BatchResult(
+        planned=[(source, target)],
+        suggestions=[suggestion],
+        skipped=[],
+    )
+
+    def fake_plan_batch(
+        input_dir,
+        pattern,
+        config_path,
+        recursive=False,
+        use_llm=False,
+        profile_path=None,
+        strict=False,
+        llm_model_override=None,
+        conflict_strategy="suffix",
+    ):
+        return fake_batch
+
+    monkeypatch.setattr(cli, "plan_batch", fake_plan_batch)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--report",
+            str(report_path),
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+    assert exit_code == 0
+
+    assert report_path.exists()
+    lines = report_path.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "source,target,issues"
+    assert len(lines) == 2
+    assert lines[1] == "a.tif,A.tif,warning:sample"
+
+    captured = capsys.readouterr()
+    assert f"Report written to: {report_path}" in captured.out
+
+
+def test_cmd_batch_report_json_parses_to_expected_list(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "a.tif"
+    target = tmp_path / "A.tif"
+    report_path = tmp_path / "out.json"
+
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name=target.name,
+        fields={"sample": "E01"},
+        issues=[],
+    )
+    fake_batch = service.BatchResult(
+        planned=[(source, target)],
+        suggestions=[suggestion],
+        skipped=[],
+    )
+
+    def fake_plan_batch(
+        input_dir,
+        pattern,
+        config_path,
+        recursive=False,
+        use_llm=False,
+        profile_path=None,
+        strict=False,
+        llm_model_override=None,
+        conflict_strategy="suffix",
+    ):
+        return fake_batch
+
+    monkeypatch.setattr(cli, "plan_batch", fake_plan_batch)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--report",
+            str(report_path),
+            "--json",
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+    assert exit_code == 0
+
+    assert report_path.exists()
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert isinstance(payload, list)
+    assert payload == [{"source": "a.tif", "target": "A.tif", "issues": ""}]
+
+    # --json mode suppresses the human-readable "Report written to" line.
+    captured = capsys.readouterr()
+    assert "Report written to" not in captured.out
+
+
 def test_suggest_for_file_forwards_configured_timeout(tmp_path: Path, monkeypatch) -> None:
     config = default_config()
     config.extraction_timeout_seconds = 7

@@ -82,35 +82,35 @@ UI includes:
 
 mna init-config --output naming_scheme.json
 
-1. Create default profile:
+2. Create default profile:
 
 mna init-profile --output profile.json
 
-2. Suggest a filename for one file:
+3. Suggest a filename for one file:
 
 mna suggest --input path/to/file.tif --config naming_scheme.json
 
-2. Suggest with profile validation (strict):
+4. Suggest with profile validation (strict):
 
 mna suggest --input path/to/file.tif --config naming_scheme.json --profile profiles/facsi_default.json --strict
 
-3. Batch preview (dry-run):
+5. Batch preview (dry-run):
 
 mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json
 
-3. Batch preview with validation profile:
+6. Batch preview with validation profile:
 
 mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json --profile profiles/facsi_default.json --strict
 
-4. Apply batch rename:
+7. Apply batch rename:
 
 mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json --apply
 
-5. Use Ollama-assisted suggestions:
+8. Use Ollama-assisted suggestions:
 
 mna suggest --input path/to/file.tif --config naming_scheme.json --llm
 
-6. Choose a specific local model without editing JSON:
+9. Choose a specific local model without editing JSON:
 
 mna suggest --input path/to/file.tif --config naming_scheme.json --llm --llm-model llama3.1:8b
 

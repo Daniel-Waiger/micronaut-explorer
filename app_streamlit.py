@@ -9,6 +9,9 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 import copy
+import csv
+import io
+import json
 import os
 import tempfile
 
@@ -22,6 +25,7 @@ import streamlit as st
 
 from microscopy_naming_assistant.config import default_config, load_config, save_config
 from microscopy_naming_assistant.llm import list_local_ollama_models
+from microscopy_naming_assistant.profiles import ProfileRules, save_profile
 from microscopy_naming_assistant.service import apply_batch, plan_batch, suggest_for_file
 
 
@@ -174,8 +178,8 @@ if "suggestions" in st.session_state:
             row.update(s.fields)
             data.append(row)
             
-        edited_df = st.data_editor(data, num_rows="fixed", use_container_width=True)
-        
+        edited_df = st.data_editor(data, num_rows="fixed", use_container_width=True, key="issue_editor")
+
         if st.button("Re-validate & Update Fields"):
             from microscopy_naming_assistant.naming import finalize_fields, render_name
             from microscopy_naming_assistant.validation import validate_fields
@@ -183,14 +187,15 @@ if "suggestions" in st.session_state:
 
             profile = load_profile(profile_path) if profile_path else None
 
-            for row, s in zip(edited_df, with_issues):
+            by_source = {s.source.name: s for s in with_issues}
+            for row in edited_df:
+                s = by_source.get(row["_source"])
+                if s is None:
+                    continue
                 new_fields = {k: v for k, v in row.items() if k != "_source"}
                 s.fields = finalize_fields(s.source, new_fields, config)
                 s.target_name = render_name(s.fields, config)
-                if profile:
-                    s.issues = validate_fields(s.fields, profile)
-                else:
-                    s.issues = []
+                s.issues = validate_fields(s.fields, profile) if profile else []
             st.rerun()
 
     from microscopy_naming_assistant.service import recalculate_batch
@@ -199,6 +204,38 @@ if "suggestions" in st.session_state:
     st.write("### Planned Renames")
     table_rows = [{"source": src.name, "suggested": dst.name} for src, dst in batch.planned]
     st.dataframe(table_rows, use_container_width=True)
+
+    issues_by_source = {
+        s.source.name: "; ".join(f"{i.severity}:{i.field}" for i in s.issues)
+        for s in batch.suggestions
+    }
+    report_rows = [
+        {
+            "source": src.name,
+            "target": dst.name,
+            "issues": issues_by_source.get(src.name, ""),
+        }
+        for src, dst in batch.planned
+    ]
+    csv_buffer = io.StringIO()
+    csv_writer = csv.DictWriter(csv_buffer, fieldnames=["source", "target", "issues"])
+    csv_writer.writeheader()
+    csv_writer.writerows(report_rows)
+
+    st.download_button(
+        "Download report (CSV)",
+        data=csv_buffer.getvalue(),
+        file_name="rename_report.csv",
+        mime="text/csv",
+        key="download_report_csv",
+    )
+    st.download_button(
+        "Download report (JSON)",
+        data=json.dumps(report_rows, indent=2),
+        file_name="rename_report.json",
+        mime="application/json",
+        key="download_report_json",
+    )
 
     if batch.skipped:
         st.warning("Skipped items")
@@ -279,3 +316,46 @@ if st.button("Run Rollback"):
                 for e in errors:
                     st.write(f"- {e}")
         tmp_path.unlink(missing_ok=True)
+
+st.divider()
+with st.expander("Create a validation profile", expanded=False):
+    st.caption("New here? Build a validation profile JSON without hand-editing the file.")
+    with st.form("profile_wizard"):
+        wizard_name = st.text_input("Profile name", value="my_lab")
+        wizard_experiment_types = st.text_input(
+            "Allowed experiment types (comma-separated)",
+            value="CT, G1G2, G1G2G3",
+        )
+        wizard_markers = st.text_input(
+            "Allowed markers (comma-separated)",
+            value="ARL, GFP, DAPI, SOX",
+        )
+        wizard_sample_pattern = st.text_input("Sample pattern (regex)", value=r"^E\d{2}$")
+        wizard_magnification_pattern = st.text_input(
+            "Magnification pattern (regex)", value=r"^X\d{2,3}$"
+        )
+        wizard_notes_pattern = st.text_input("Notes pattern (regex)", value=r"^[A-Za-z0-9_-]+$")
+        wizard_unknown_marker_policy = st.selectbox(
+            "Unknown marker policy", ["warn", "allow", "block"]
+        )
+        wizard_save_path = st.text_input("Save path", value="profiles/my_lab.json")
+
+        if st.form_submit_button("Create profile"):
+            try:
+                experiment_types = [
+                    item.strip() for item in wizard_experiment_types.split(",") if item.strip()
+                ]
+                markers = [item.strip() for item in wizard_markers.split(",") if item.strip()]
+                profile = ProfileRules(
+                    name=wizard_name,
+                    allowed_experiment_types=experiment_types,
+                    allowed_markers=markers,
+                    sample_pattern=wizard_sample_pattern,
+                    magnification_pattern=wizard_magnification_pattern,
+                    notes_pattern=wizard_notes_pattern,
+                    unknown_marker_policy=wizard_unknown_marker_policy,
+                )
+                save_profile(Path(wizard_save_path), profile)
+                st.success(f"Saved profile to {wizard_save_path}")
+            except Exception as exc:
+                st.error(f"Could not save profile: {exc}")
