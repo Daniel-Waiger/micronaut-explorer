@@ -143,9 +143,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
             renamed, manifest = apply_batch(input_dir, batch.planned)
 
         payload = {
-            "planned": [
-                {"source": src.name, "target": dst.name} for src, dst in batch.planned
-            ],
+            "planned": [{"source": src.name, "target": dst.name} for src, dst in batch.planned],
             "skipped": list(batch.skipped),
             "issues": [
                 {"source": suggestion.source.name, **asdict(issue)}
@@ -191,18 +189,19 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
 def cmd_rollback(args: argparse.Namespace) -> int:
     from .manifest import rollback_manifest
+
     manifest_path = Path(args.manifest)
     input_dir = Path(args.input_dir)
-    
+
     if not manifest_path.exists():
         print(f"Manifest not found: {manifest_path}")
         return 1
-        
+
     reverted, errors = rollback_manifest(manifest_path, input_dir)
     print(f"Successfully reverted {reverted} files.")
     for err in errors:
         print(f"Error: {err}")
-        
+
     return 0 if not errors else 2
 
 
@@ -276,7 +275,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_rollback = sub.add_parser("rollback", help="Revert a batch renaming using a manifest")
     p_rollback.add_argument("--manifest", required=True, help="Path to JSON manifest")
-    p_rollback.add_argument("--input-dir", required=True, help="Folder containing the renamed files")
+    p_rollback.add_argument(
+        "--input-dir", required=True, help="Folder containing the renamed files"
+    )
     p_rollback.set_defaults(func=cmd_rollback)
 
     return parser

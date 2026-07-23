@@ -57,7 +57,9 @@ def suggest_for_file(
 
     # A key present in the final fields but not in `extracted`/`llm` was
     # supplied by config.defaults inside `finalize_fields`.
-    sources: dict[str, str] = {key: ex_sources.get(key, "default") for key in fields if key != "ext"}
+    sources: dict[str, str] = {
+        key: ex_sources.get(key, "default") for key in fields if key != "ext"
+    }
 
     issues: list[ValidationIssue] = []
     if profile_path is not None:
@@ -91,7 +93,7 @@ def recalculate_batch(
             continue
 
         target = result.source.with_name(result.target_name)
-        
+
         if target in collisions:
             if conflict_strategy == "skip":
                 skipped.append(f"{result.source.name}: duplicate target {target.name}")
@@ -148,6 +150,7 @@ def plan_batch(
 
 def apply_batch(input_dir: Path, planned: list[tuple[Path, Path]]) -> tuple[int, Path | None]:
     from .manifest import save_manifest
+
     renamed = 0
     actually_renamed = []
     for src, dst in planned:
@@ -156,6 +159,6 @@ def apply_batch(input_dir: Path, planned: list[tuple[Path, Path]]) -> tuple[int,
         src.rename(dst)
         actually_renamed.append((src, dst))
         renamed += 1
-        
+
     manifest_path = save_manifest(input_dir, actually_renamed)
     return renamed, manifest_path

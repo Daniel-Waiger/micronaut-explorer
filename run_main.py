@@ -1,11 +1,12 @@
-import sys
-import os
 import multiprocessing
+import os
+import sys
+
 import streamlit.web.cli as stcli
 
 # AST hook for PyInstaller to discover dependencies without running them
 if False:
-    import app_streamlit
+    pass
 
 # Fix for Streamlit when running in windowed mode (no console)
 if sys.stdout is None:
@@ -13,24 +14,26 @@ if sys.stdout is None:
 if sys.stderr is None:
     sys.stderr = open(os.devnull, "w")
 
+
 def resolve_path(name):
     """Resolve the path to files bundled by PyInstaller."""
-    if hasattr(sys, '_MEIPASS'):
+    if hasattr(sys, "_MEIPASS"):
         # PyInstaller creates a temp folder and stores path in _MEIPASS
         # But in --onedir mode, it's just the executable folder.
         return os.path.join(sys._MEIPASS, name)
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
 
+
 if __name__ == "__main__":
     multiprocessing.freeze_support()
     app_path = resolve_path("app_streamlit.py")
-    
+
     # We want it to open the browser automatically, so no headless=true
     sys.argv = [
-        "streamlit", 
-        "run", 
-        app_path, 
+        "streamlit",
+        "run",
+        app_path,
         "--global.developmentMode=false",
-        "--server.maxUploadSize=10240"
+        "--server.maxUploadSize=10240",
     ]
     sys.exit(stcli.main())

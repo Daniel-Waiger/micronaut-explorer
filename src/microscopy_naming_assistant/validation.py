@@ -36,7 +36,9 @@ def validate_fields(fields: dict[str, str], profile: ProfileRules) -> list[Valid
         issues.append(
             ValidationIssue(
                 field="sample",
-                message=f"Value '{sample}' does not match sample_pattern '{profile.sample_pattern}'.",
+                message=(
+                    f"Value '{sample}' does not match sample_pattern '{profile.sample_pattern}'."
+                ),
                 severity="error",
             )
         )

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
 import logging
 import multiprocessing
-from pathlib import Path
 import queue
 import re
+from datetime import datetime
+from pathlib import Path
 
 from .markers import alias_map
 
@@ -53,17 +53,17 @@ def _extract_date_from_name(stem: str) -> str | None:
     match = re.search(r"((?:19|20)\d{2})[-_](0[1-9]|1[0-2])[-_](0[1-9]|[12]\d|3[01])", stem)
     if match:
         return f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
-    
+
     # Look for YYYYMMDD
     match = re.search(r"(?<!\d)((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)", stem)
     if match:
         return f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
-        
+
     # Look for YYMMDD (assuming 20YY)
     match = re.search(r"(?<!\d)(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)", stem)
     if match:
         return f"20{match.group(1)}-{match.group(2)}-{match.group(3)}"
-        
+
     return None
 
 
@@ -87,7 +87,9 @@ def _extract_text_chunks(metadata_obj: object) -> str:
 
 
 def _extract_near_key(text: str, key: str) -> str | None:
-    pattern = re.compile(rf"{re.escape(key)}[^A-Za-z0-9]{{0,8}}([A-Za-z0-9_. -]{{2,40}})", re.IGNORECASE)
+    pattern = re.compile(
+        rf"{re.escape(key)}[^A-Za-z0-9]{{0,8}}([A-Za-z0-9_. -]{{2,40}})", re.IGNORECASE
+    )
     match = pattern.search(text)
     if not match:
         return None
@@ -151,7 +153,9 @@ def _extract_magnification(text: str, hints: list[str]) -> str | None:
             value = int(float(match.group(1)))
             return f"X{value}"
 
-    fallback = re.search(r"(?:MAGNIFICATION|OBJECTIVE|ZOOM)[^0-9]{0,10}(\d{1,3}(?:\.\d+)?)", text, re.IGNORECASE)
+    fallback = re.search(
+        r"(?:MAGNIFICATION|OBJECTIVE|ZOOM)[^0-9]{0,10}(\d{1,3}(?:\.\d+)?)", text, re.IGNORECASE
+    )
     if fallback:
         value = int(float(fallback.group(1)))
         return f"X{value}"

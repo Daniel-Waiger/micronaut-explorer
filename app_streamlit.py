@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 # Add src to sys.path so we can run directly
 import sys
+from pathlib import Path
+
 src_path = Path(__file__).parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
@@ -18,7 +18,7 @@ import tempfile
 # ── Force upload limit to 10 GB (overrides the 200 MB default) ──
 # Environment variables are the lightest way to set Streamlit config;
 # they are read once during import with zero per-rerun overhead.
-os.environ.setdefault("STREAMLIT_SERVER_MAX_UPLOAD_SIZE", "10240")   # 10 GB
+os.environ.setdefault("STREAMLIT_SERVER_MAX_UPLOAD_SIZE", "10240")  # 10 GB
 os.environ.setdefault("STREAMLIT_SERVER_MAX_MESSAGE_SIZE", "10240")  # 10 GB
 
 import streamlit as st
@@ -27,7 +27,6 @@ from microscopy_naming_assistant.config import default_config, load_config, save
 from microscopy_naming_assistant.llm import list_local_ollama_models
 from microscopy_naming_assistant.profiles import ProfileRules, save_profile
 from microscopy_naming_assistant.service import apply_batch, plan_batch, suggest_for_file
-
 
 st.set_page_config(page_title="Microscopy Naming Assistant", page_icon="🔬", layout="wide")
 st.title("Microscopy Naming Assistant")
@@ -64,16 +63,20 @@ llm_timeout = int(
     )
 )
 
-use_llm = st.sidebar.checkbox("Use Ollama suggestions", value=bool(config.llm.get("enabled", False)))
+use_llm = st.sidebar.checkbox(
+    "Use Ollama suggestions", value=bool(config.llm.get("enabled", False))
+)
 
 default_preferred = ["llama3.1:8b", "qwen2.5-coder:7b", "phi3:mini"]
 preferred = [str(x) for x in config.llm.get("preferred_models", default_preferred)]
+
 
 # Cache Ollama model discovery so a connection-timeout penalty (when Ollama is
 # not running) is paid at most once per minute instead of on every rerun.
 @st.cache_data(ttl=60, show_spinner=False)
 def _cached_ollama_models(endpoint: str) -> list[str]:
     return list_local_ollama_models(endpoint=endpoint, timeout_seconds=2)
+
 
 installed = _cached_ollama_models(endpoint=llm_endpoint)
 
@@ -92,9 +95,13 @@ llm_model = st.sidebar.selectbox(
 )
 
 if use_llm and not installed:
-    st.sidebar.warning("No local Ollama models detected. The app will safely continue without LLM enrichment.")
+    st.sidebar.warning(
+        "No local Ollama models detected. The app will safely continue without LLM enrichment."
+    )
 
-profile_input = st.sidebar.text_input("Profile path (optional)", value="profiles/facsi_default.json").strip()
+profile_input = st.sidebar.text_input(
+    "Profile path (optional)", value="profiles/facsi_default.json"
+).strip()
 profile_path = Path(profile_input).expanduser() if profile_input else None
 
 if profile_path is not None and not profile_path.exists():
@@ -156,9 +163,7 @@ if "suggestions" in st.session_state:
     suggestions = st.session_state["suggestions"]
 
     defaulted_count = sum(
-        1
-        for s in suggestions
-        if any(v == "default" for k, v in s.sources.items() if k != "ext")
+        1 for s in suggestions if any(v == "default" for k, v in s.sources.items() if k != "ext")
     )
     if defaulted_count:
         st.info(
@@ -168,22 +173,27 @@ if "suggestions" in st.session_state:
         )
 
     with_issues = [s for s in suggestions if s.issues]
-    
+
     if with_issues:
-        st.warning(f"⚠️ {len(with_issues)} files have validation issues. Please fix the missing or invalid fields below:")
-        
+        st.warning(
+            f"⚠️ {len(with_issues)} files have validation issues. "
+            "Please fix the missing or invalid fields below:"
+        )
+
         data = []
         for s in with_issues:
             row = {"_source": str(s.source.name)}
             row.update(s.fields)
             data.append(row)
-            
-        edited_df = st.data_editor(data, num_rows="fixed", use_container_width=True, key="issue_editor")
+
+        edited_df = st.data_editor(
+            data, num_rows="fixed", use_container_width=True, key="issue_editor"
+        )
 
         if st.button("Re-validate & Update Fields"):
             from microscopy_naming_assistant.naming import finalize_fields, render_name
-            from microscopy_naming_assistant.validation import validate_fields
             from microscopy_naming_assistant.profiles import load_profile
+            from microscopy_naming_assistant.validation import validate_fields
 
             profile = load_profile(profile_path) if profile_path else None
 
@@ -199,6 +209,7 @@ if "suggestions" in st.session_state:
             st.rerun()
 
     from microscopy_naming_assistant.service import recalculate_batch
+
     batch = recalculate_batch(input_dir, suggestions, strict, conflict_strategy)
 
     st.write("### Planned Renames")
@@ -252,7 +263,9 @@ if "suggestions" in st.session_state:
             st.info(f"Manifest saved for rollback: `{manifest.name}`")
 
 st.subheader("Drag-and-Drop Mode (Suggestion Preview)")
-st.caption("Upload files to preview names. For safety, this mode does not modify original source files.")
+st.caption(
+    "Upload files to preview names. For safety, this mode does not modify original source files."
+)
 uploaded = st.file_uploader(
     "Drop microscopy files here",
     accept_multiple_files=True,
@@ -279,9 +292,7 @@ if uploaded:
                     {
                         "source": file_obj.name,
                         "suggested": result.target_name,
-                        "issues": "; ".join(
-                            [f"{i.severity}:{i.field}" for i in result.issues]
-                        ),
+                        "issues": "; ".join([f"{i.severity}:{i.field}" for i in result.issues]),
                         "review (defaulted)": ", ".join(defaulted),
                     }
                 )
@@ -297,13 +308,14 @@ if st.button("Run Rollback"):
     if not rollback_dir or not manifest_file:
         st.error("Provide a target directory and upload a manifest.")
     else:
-        from microscopy_naming_assistant.manifest import rollback_manifest
         import tempfile
-        
+
+        from microscopy_naming_assistant.manifest import rollback_manifest
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
             tmp.write(manifest_file.getvalue())
             tmp_path = Path(tmp.name)
-            
+
         r_dir = Path(rollback_dir).expanduser()
         if not r_dir.exists():
             st.error(f"Directory not found: {r_dir}")

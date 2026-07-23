@@ -22,7 +22,9 @@ def test_plan_batch_strict_skips_validation_errors(tmp_path: Path, monkeypatch) 
     f1.write_bytes(b"a")
     f2.write_bytes(b"b")
 
-    def fake_suggest(file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None):
+    def fake_suggest(
+        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+    ):
         return service.SuggestionResult(
             source=file_path,
             target_name="SAME.tif",
@@ -51,7 +53,9 @@ def test_plan_batch_detects_collisions(tmp_path: Path, monkeypatch) -> None:
     f1.write_bytes(b"a")
     f2.write_bytes(b"b")
 
-    def fake_suggest(file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None):
+    def fake_suggest(
+        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+    ):
         return service.SuggestionResult(
             source=file_path,
             target_name="DUPLICATE.tif",
@@ -84,7 +88,9 @@ def test_plan_batch_default_is_not_recursive(tmp_path: Path, monkeypatch) -> Non
     nested = nested_dir / "b.tif"
     nested.write_bytes(b"b")
 
-    def fake_suggest(file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None):
+    def fake_suggest(
+        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+    ):
         return service.SuggestionResult(
             source=file_path,
             target_name=f"{file_path.stem.upper()}.tif",
@@ -114,7 +120,9 @@ def test_plan_batch_recursive_true_includes_nested_files(tmp_path: Path, monkeyp
     nested = nested_dir / "b.tif"
     nested.write_bytes(b"b")
 
-    def fake_suggest(file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None):
+    def fake_suggest(
+        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+    ):
         return service.SuggestionResult(
             source=file_path,
             target_name=f"{file_path.stem.upper()}.tif",
@@ -179,9 +187,7 @@ def test_cli_parser_recursive_defaults_to_false() -> None:
 
 def test_cli_parser_accepts_json_flag() -> None:
     parser = build_parser()
-    args = parser.parse_args(
-        ["suggest", "--input", "x.tif", "--config", "cfg.json", "--json"]
-    )
+    args = parser.parse_args(["suggest", "--input", "x.tif", "--config", "cfg.json", "--json"])
     assert args.json is True
 
 
@@ -192,7 +198,9 @@ def test_cmd_suggest_json_prints_single_json_object(tmp_path: Path, monkeypatch,
     source = tmp_path / "test_E1.tif"
     source.write_bytes(b"x")
 
-    def fake_suggest_for_file(file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None):
+    def fake_suggest_for_file(
+        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+    ):
         return service.SuggestionResult(
             source=file_path,
             target_name="TEST_E01_GFP.tif",
@@ -215,9 +223,7 @@ def test_cmd_suggest_json_prints_single_json_object(tmp_path: Path, monkeypatch,
     assert payload["source"] == source.name
     assert payload["suggested"] == "TEST_E01_GFP.tif"
     assert payload["fields"] == {"sample": "E01", "markers": "GFP"}
-    assert payload["issues"] == [
-        {"field": "sample", "message": "looks odd", "severity": "warning"}
-    ]
+    assert payload["issues"] == [{"field": "sample", "message": "looks odd", "severity": "warning"}]
     # Human-readable output must be suppressed in JSON mode.
     assert "Source:" not in captured.out
     assert "Suggested:" not in captured.out
@@ -238,7 +244,9 @@ def test_cmd_suggest_json_includes_sources_map(tmp_path: Path, monkeypatch, caps
         "date": "metadata",
     }
 
-    def fake_suggest_for_file(file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None):
+    def fake_suggest_for_file(
+        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+    ):
         return service.SuggestionResult(
             source=file_path,
             target_name="TEST_E01_GFP.tif",
@@ -271,7 +279,9 @@ def test_cmd_suggest_json_strict_mode_blocks_without_human_line(
     source = tmp_path / "test_E1.tif"
     source.write_bytes(b"x")
 
-    def fake_suggest_for_file(file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None):
+    def fake_suggest_for_file(
+        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+    ):
         return service.SuggestionResult(
             source=file_path,
             target_name="TEST_E01.tif",
@@ -507,9 +517,7 @@ def test_cmd_batch_report_csv_writes_source_target_issues(
     assert f"Report written to: {report_path}" in captured.out
 
 
-def test_cmd_batch_report_json_parses_to_expected_list(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_cmd_batch_report_json_parses_to_expected_list(tmp_path: Path, monkeypatch, capsys) -> None:
     config_path = tmp_path / "naming_scheme.json"
     save_config(config_path, default_config())
 
@@ -585,7 +593,9 @@ def test_suggest_for_file_forwards_configured_timeout(tmp_path: Path, monkeypatc
         captured_kwargs.update(kwargs)
         return {}, {}
 
-    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
+    monkeypatch.setattr(
+        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
+    )
 
     service.suggest_for_file(
         file_path=source,
@@ -606,7 +616,9 @@ def test_suggest_for_file_unifies_fields_and_name(tmp_path: Path, monkeypatch) -
     def fake_extract_metadata_with_sources(file_path, **kwargs):
         return {"markers": "GFP", "sample": "E05"}, {"markers": "metadata", "sample": "metadata"}
 
-    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
+    monkeypatch.setattr(
+        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
+    )
 
     result = service.suggest_for_file(
         file_path=source,
@@ -630,7 +642,9 @@ def test_suggest_for_file_tags_defaulted_field_as_default(tmp_path: Path, monkey
     def fake_extract_metadata_with_sources(file_path, **kwargs):
         return {"date": "2025-01-02", "sample": "E03"}, {"date": "filename", "sample": "filename"}
 
-    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
+    monkeypatch.setattr(
+        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
+    )
 
     result = service.suggest_for_file(
         file_path=source,
@@ -643,7 +657,9 @@ def test_suggest_for_file_tags_defaulted_field_as_default(tmp_path: Path, monkey
     assert result.sources["notes"] == "default"
 
 
-def test_suggest_for_file_tags_filename_derived_date_as_filename(tmp_path: Path, monkeypatch) -> None:
+def test_suggest_for_file_tags_filename_derived_date_as_filename(
+    tmp_path: Path, monkeypatch
+) -> None:
     config_path = tmp_path / "naming_scheme.json"
     save_config(config_path, default_config())
 
@@ -653,7 +669,9 @@ def test_suggest_for_file_tags_filename_derived_date_as_filename(tmp_path: Path,
     def fake_extract_metadata_with_sources(file_path, **kwargs):
         return {"date": "2025-01-02", "sample": "E03"}, {"date": "filename", "sample": "filename"}
 
-    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
+    monkeypatch.setattr(
+        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
+    )
 
     result = service.suggest_for_file(
         file_path=source,
@@ -680,7 +698,9 @@ def test_suggest_for_file_tags_llm_overridden_field_as_llm(tmp_path: Path, monke
     def fake_suggest_fields_with_ollama(**kwargs):
         return {"markers": "GFP"}
 
-    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
+    monkeypatch.setattr(
+        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
+    )
     monkeypatch.setattr(service, "suggest_fields_with_ollama", fake_suggest_fields_with_ollama)
 
     result = service.suggest_for_file(

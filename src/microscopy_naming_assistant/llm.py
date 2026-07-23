@@ -105,7 +105,8 @@ def suggest_fields_with_ollama(
         return {}
 
     prompt = (
-        "You are helping standardize microscopy filenames. Return only JSON with any of these keys: "
+        "You are helping standardize microscopy filenames. "
+        "Return only JSON with any of these keys: "
         "date, exptype, sample, magnification, markers, notes. "
         "Use uppercase for exptype/sample/magnification/markers/notes. "
         "Do not invent values if uncertain.\n\n"

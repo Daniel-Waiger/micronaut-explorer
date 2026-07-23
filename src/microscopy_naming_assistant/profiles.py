@@ -46,7 +46,9 @@ def load_profile(path: Path) -> ProfileRules:
     base = default_profile()
     return ProfileRules(
         name=payload.get("name", base.name),
-        allowed_experiment_types=payload.get("allowed_experiment_types", base.allowed_experiment_types),
+        allowed_experiment_types=payload.get(
+            "allowed_experiment_types", base.allowed_experiment_types
+        ),
         allowed_markers=payload.get("allowed_markers", base.allowed_markers),
         sample_pattern=payload.get("sample_pattern", base.sample_pattern),
         magnification_pattern=payload.get("magnification_pattern", base.magnification_pattern),
