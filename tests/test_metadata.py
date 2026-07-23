@@ -5,7 +5,30 @@ from pathlib import Path
 
 import pytest
 
-from microscopy_naming_assistant.metadata import extract_metadata
+from microscopy_naming_assistant.metadata import _extract_markers, extract_metadata
+
+
+def test_extract_markers_word_boundary_avoids_false_positive() -> None:
+    result = _extract_markers("this is SCFPX region", [])
+    assert result is None or "CFP" not in result.split("-")
+
+
+def test_extract_markers_normalizes_alias_to_canonical() -> None:
+    result = _extract_markers("stained with Alexa Fluor 488 and DAPI", [])
+    assert result is not None
+    markers = result.split("-")
+    assert "ALEXA488" in markers
+    assert "DAPI" in markers
+
+
+def test_extract_markers_matches_real_token() -> None:
+    result = _extract_markers("channel: GFP", [])
+    assert result is not None
+    assert "GFP" in result.split("-")
+
+
+def test_extract_markers_orders_by_first_match_position() -> None:
+    assert _extract_markers("DAPI then GFP", []) == "DAPI-GFP"
 
 
 @pytest.mark.integration

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import load_config
 from .llm import suggest_fields_with_ollama
-from .metadata import extract_metadata
+from .metadata import extract_metadata_with_sources
 from .naming import finalize_fields, render_name
 from .profiles import load_profile
 from .validation import ValidationIssue, validate_fields
@@ -17,6 +17,7 @@ class SuggestionResult:
     target_name: str
     fields: dict[str, str]
     issues: list[ValidationIssue]
+    sources: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -34,7 +35,9 @@ def suggest_for_file(
     llm_model_override: str | None = None,
 ) -> SuggestionResult:
     config = load_config(config_path)
-    extracted = extract_metadata(file_path, timeout_seconds=int(config.extraction_timeout_seconds))
+    extracted, ex_sources = extract_metadata_with_sources(
+        file_path, timeout_seconds=int(config.extraction_timeout_seconds)
+    )
 
     if use_llm and bool(config.llm.get("enabled", False)):
         llm_model = llm_model_override or str(config.llm.get("model", "auto"))
@@ -47,8 +50,14 @@ def suggest_for_file(
             preferred_models=[str(x) for x in config.llm.get("preferred_models", [])],
         )
         extracted = {**extracted, **llm_fields}
+        for key in llm_fields:
+            ex_sources[key] = "llm"
 
     fields = finalize_fields(file_path, extracted, config)
+
+    # A key present in the final fields but not in `extracted`/`llm` was
+    # supplied by config.defaults inside `finalize_fields`.
+    sources: dict[str, str] = {key: ex_sources.get(key, "default") for key in fields if key != "ext"}
 
     issues: list[ValidationIssue] = []
     if profile_path is not None:
@@ -56,7 +65,13 @@ def suggest_for_file(
         issues = validate_fields(fields, profile)
 
     target_name = render_name(fields, config)
-    return SuggestionResult(source=file_path, target_name=target_name, fields=fields, issues=issues)
+    return SuggestionResult(
+        source=file_path,
+        target_name=target_name,
+        fields=fields,
+        issues=issues,
+        sources=sources,
+    )
 
 
 def recalculate_batch(

@@ -150,7 +150,19 @@ if st.button("Preview Renames"):
 if "suggestions" in st.session_state:
     input_dir = st.session_state["input_dir"]
     suggestions = st.session_state["suggestions"]
-    
+
+    defaulted_count = sum(
+        1
+        for s in suggestions
+        if any(v == "default" for k, v in s.sources.items() if k != "ext")
+    )
+    if defaulted_count:
+        st.info(
+            f"ℹ️ {defaulted_count} of {len(suggestions)} file(s) have one or more "
+            "fields that could not be extracted and fell back to defaults — "
+            "review those before applying."
+        )
+
     with_issues = [s for s in suggestions if s.issues]
     
     if with_issues:
@@ -225,6 +237,7 @@ if uploaded:
                     profile_path=profile_path,
                     llm_model_override=llm_model,
                 )
+                defaulted = [k for k, v in result.sources.items() if v == "default"]
                 preview_rows.append(
                     {
                         "source": file_obj.name,
@@ -232,6 +245,7 @@ if uploaded:
                         "issues": "; ".join(
                             [f"{i.severity}:{i.field}" for i in result.issues]
                         ),
+                        "review (defaulted)": ", ".join(defaulted),
                     }
                 )
     st.dataframe(preview_rows, use_container_width=True)

@@ -223,6 +223,45 @@ def test_cmd_suggest_json_prints_single_json_object(tmp_path: Path, monkeypatch,
     assert "Suggested:" not in captured.out
 
 
+def test_cmd_suggest_json_includes_sources_map(tmp_path: Path, monkeypatch, capsys) -> None:
+    """--json must surface per-field provenance so defaulted fields are visible (P2-3b)."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    known_sources = {
+        "sample": "filename",
+        "markers": "default",
+        "notes": "default",
+        "date": "metadata",
+    }
+
+    def fake_suggest_for_file(file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None):
+        return service.SuggestionResult(
+            source=file_path,
+            target_name="TEST_E01_GFP.tif",
+            fields={"sample": "E01", "markers": "GFP"},
+            issues=[],
+            sources=known_sources,
+        )
+
+    monkeypatch.setattr(cli, "suggest_for_file", fake_suggest_for_file)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        ["suggest", "--input", str(source), "--config", str(config_path), "--json"]
+    )
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+
+    payload = json.loads(captured.out)
+    assert payload["sources"] == known_sources
+
+
 def test_cmd_suggest_json_strict_mode_blocks_without_human_line(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
@@ -417,11 +456,11 @@ def test_suggest_for_file_forwards_configured_timeout(tmp_path: Path, monkeypatc
 
     captured_kwargs: dict = {}
 
-    def fake_extract_metadata(file_path, **kwargs):
+    def fake_extract_metadata_with_sources(file_path, **kwargs):
         captured_kwargs.update(kwargs)
-        return {}
+        return {}, {}
 
-    monkeypatch.setattr(service, "extract_metadata", fake_extract_metadata)
+    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
 
     service.suggest_for_file(
         file_path=source,
@@ -439,10 +478,10 @@ def test_suggest_for_file_unifies_fields_and_name(tmp_path: Path, monkeypatch) -
     source = tmp_path / "test_E1.tif"
     source.write_bytes(b"x")
 
-    def fake_extract_metadata(file_path, **kwargs):
-        return {"markers": "GFP", "sample": "E05"}
+    def fake_extract_metadata_with_sources(file_path, **kwargs):
+        return {"markers": "GFP", "sample": "E05"}, {"markers": "metadata", "sample": "metadata"}
 
-    monkeypatch.setattr(service, "extract_metadata", fake_extract_metadata)
+    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
 
     result = service.suggest_for_file(
         file_path=source,
@@ -453,6 +492,82 @@ def test_suggest_for_file_unifies_fields_and_name(tmp_path: Path, monkeypatch) -
     assert result.fields["sample"] == "E05"
     assert "GFP" in result.target_name
     assert "E05" in result.target_name
+
+
+def test_suggest_for_file_tags_defaulted_field_as_default(tmp_path: Path, monkeypatch) -> None:
+    """A field with no extracted/llm value falls back to config.defaults (P2-3a)."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    def fake_extract_metadata_with_sources(file_path, **kwargs):
+        return {"date": "2025-01-02", "sample": "E03"}, {"date": "filename", "sample": "filename"}
+
+    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
+
+    result = service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+    )
+
+    # markers/notes were never in `extracted`, so they must come from
+    # config.defaults inside finalize_fields and be tagged "default".
+    assert result.sources["markers"] == "default"
+    assert result.sources["notes"] == "default"
+
+
+def test_suggest_for_file_tags_filename_derived_date_as_filename(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    def fake_extract_metadata_with_sources(file_path, **kwargs):
+        return {"date": "2025-01-02", "sample": "E03"}, {"date": "filename", "sample": "filename"}
+
+    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
+
+    result = service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+    )
+
+    assert result.sources["date"] == "filename"
+    assert result.sources["sample"] == "filename"
+    assert "ext" not in result.sources
+
+
+def test_suggest_for_file_tags_llm_overridden_field_as_llm(tmp_path: Path, monkeypatch) -> None:
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    def fake_extract_metadata_with_sources(file_path, **kwargs):
+        return {"date": "2025-01-02", "sample": "E03"}, {"date": "filename", "sample": "filename"}
+
+    def fake_suggest_fields_with_ollama(**kwargs):
+        return {"markers": "GFP"}
+
+    monkeypatch.setattr(service, "extract_metadata_with_sources", fake_extract_metadata_with_sources)
+    monkeypatch.setattr(service, "suggest_fields_with_ollama", fake_suggest_fields_with_ollama)
+
+    result = service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+        use_llm=True,
+    )
+
+    assert result.fields["markers"] == "GFP"
+    assert result.sources["markers"] == "llm"
+    # Untouched-by-llm fields keep their original source.
+    assert result.sources["date"] == "filename"
 
 
 @pytest.mark.integration

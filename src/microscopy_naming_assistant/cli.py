@@ -57,6 +57,7 @@ def cmd_suggest(args: argparse.Namespace) -> int:
             "suggested": result.target_name,
             "fields": result.fields,
             "issues": [asdict(issue) for issue in result.issues],
+            "sources": result.sources,
         }
         print(json.dumps(payload))
         return 2 if strict_blocked else 0
