@@ -8,7 +8,14 @@ src_path = Path(__file__).parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
+import os
 import tempfile
+
+# ── Force upload limit to 10 GB (overrides the 200 MB default) ──
+# Environment variables are the lightest way to set Streamlit config;
+# they are read once during import with zero per-rerun overhead.
+os.environ.setdefault("STREAMLIT_SERVER_MAX_UPLOAD_SIZE", "10240")   # 10 GB
+os.environ.setdefault("STREAMLIT_SERVER_MAX_MESSAGE_SIZE", "10240")  # 10 GB
 
 import streamlit as st
 
