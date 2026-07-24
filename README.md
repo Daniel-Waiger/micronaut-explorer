@@ -180,3 +180,8 @@ Run the test suite:
 
 python -m pytest -q
 
+## License
+
+This project is licensed under the Apache License, Version 2.0. See the
+[LICENSE](LICENSE) file for the full text.
+

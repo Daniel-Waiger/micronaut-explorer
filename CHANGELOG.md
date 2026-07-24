@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pytest-timeout` is also in place as a safety net.
 
 ### Added
+- Apache License 2.0 (`LICENSE`, `NOTICE`) and license metadata in pyproject.
 - `--json` output for `mna suggest` and `mna batch`, for machine-readable/scripted use.
 - `--recursive` flag for `mna batch`, and a matching "Search subfolders" checkbox in the
   Streamlit UI (batch is non-recursive by default — see Changed).
