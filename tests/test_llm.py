@@ -48,9 +48,7 @@ def test_suggest_fields_filters_allowed_keys(monkeypatch) -> None:
     response = Mock()
     response.raise_for_status.return_value = None
     response.json.return_value = {
-        "message": {
-            "content": '{"sample":"E03","notes":"GOOD","ignored":"x"}'
-        }
+        "message": {"content": '{"sample":"E03","notes":"GOOD","ignored":"x"}'}
     }
     monkeypatch.setattr(llm.requests, "post", lambda *args, **kwargs: response)
 

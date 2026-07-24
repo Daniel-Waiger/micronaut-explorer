@@ -1,28 +1,32 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 # Add src to sys.path so we can run directly
 import sys
+from pathlib import Path
+
 src_path = Path(__file__).parent / "src"
 if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
+import copy
+import csv
+import io
+import json
 import os
 import tempfile
 
 # ── Force upload limit to 10 GB (overrides the 200 MB default) ──
 # Environment variables are the lightest way to set Streamlit config;
 # they are read once during import with zero per-rerun overhead.
-os.environ.setdefault("STREAMLIT_SERVER_MAX_UPLOAD_SIZE", "10240")   # 10 GB
+os.environ.setdefault("STREAMLIT_SERVER_MAX_UPLOAD_SIZE", "10240")  # 10 GB
 os.environ.setdefault("STREAMLIT_SERVER_MAX_MESSAGE_SIZE", "10240")  # 10 GB
 
 import streamlit as st
 
 from microscopy_naming_assistant.config import default_config, load_config, save_config
 from microscopy_naming_assistant.llm import list_local_ollama_models
+from microscopy_naming_assistant.profiles import ProfileRules, save_profile
 from microscopy_naming_assistant.service import apply_batch, plan_batch, suggest_for_file
-
 
 st.set_page_config(page_title="Microscopy Naming Assistant", page_icon="🔬", layout="wide")
 st.title("Microscopy Naming Assistant")
@@ -38,6 +42,13 @@ if not config_path.exists():
 
 config = load_config(config_path)
 
+# Snapshot the on-disk llm settings so we can tell, after the sidebar widgets
+# below have had their say, whether anything actually changed. The sidebar
+# only ever mutates config.llm[...] (see the assignments before "Folder
+# Mode"), so comparing this dict before/after is sufficient to decide
+# whether a rewrite of config_path is needed.
+loaded_llm_snapshot = copy.deepcopy(config.llm)
+
 llm_endpoint = st.sidebar.text_input(
     "Ollama endpoint",
     value=str(config.llm.get("endpoint", "http://localhost:11434/api/chat")),
@@ -52,16 +63,20 @@ llm_timeout = int(
     )
 )
 
-use_llm = st.sidebar.checkbox("Use Ollama suggestions", value=bool(config.llm.get("enabled", False)))
+use_llm = st.sidebar.checkbox(
+    "Use Ollama suggestions", value=bool(config.llm.get("enabled", False))
+)
 
 default_preferred = ["llama3.1:8b", "qwen2.5-coder:7b", "phi3:mini"]
 preferred = [str(x) for x in config.llm.get("preferred_models", default_preferred)]
+
 
 # Cache Ollama model discovery so a connection-timeout penalty (when Ollama is
 # not running) is paid at most once per minute instead of on every rerun.
 @st.cache_data(ttl=60, show_spinner=False)
 def _cached_ollama_models(endpoint: str) -> list[str]:
     return list_local_ollama_models(endpoint=endpoint, timeout_seconds=2)
+
 
 installed = _cached_ollama_models(endpoint=llm_endpoint)
 
@@ -80,9 +95,13 @@ llm_model = st.sidebar.selectbox(
 )
 
 if use_llm and not installed:
-    st.sidebar.warning("No local Ollama models detected. The app will safely continue without LLM enrichment.")
+    st.sidebar.warning(
+        "No local Ollama models detected. The app will safely continue without LLM enrichment."
+    )
 
-profile_input = st.sidebar.text_input("Profile path (optional)", value="profiles/facsi_default.json").strip()
+profile_input = st.sidebar.text_input(
+    "Profile path (optional)", value="profiles/facsi_default.json"
+).strip()
 profile_path = Path(profile_input).expanduser() if profile_input else None
 
 if profile_path is not None and not profile_path.exists():
@@ -98,10 +117,22 @@ config.llm["model"] = llm_model
 config.llm["endpoint"] = llm_endpoint
 config.llm["timeout_seconds"] = llm_timeout
 config.llm["preferred_models"] = preferred
-save_config(config_path, config)
+
+# Only rewrite naming_scheme.json when the widgets actually changed a value.
+# Without this check, every rerun (i.e. every widget interaction anywhere on
+# the page) would rewrite the file, even for unrelated actions like clicking
+# "Preview Renames".
+if config.llm != loaded_llm_snapshot:
+    save_config(config_path, config)
 
 st.subheader("Folder Mode (Preview + Apply)")
 folder_input = st.text_input("Input folder path", value="")
+recursive = st.checkbox(
+    "Search subfolders",
+    value=False,
+    help="Recurse into nested folders. Off = only the top folder.",
+)
+st.caption("Large or unreadable files fall back to filename/date heuristics after a timeout.")
 
 if st.button("Preview Renames"):
     if not folder_input:
@@ -111,16 +142,18 @@ if st.button("Preview Renames"):
         if not input_dir.exists():
             st.error(f"Folder does not exist: {input_dir}")
         else:
-            batch = plan_batch(
-                input_dir=input_dir,
-                pattern=pattern,
-                config_path=config_path,
-                use_llm=use_llm,
-                profile_path=profile_path,
-                strict=strict,
-                llm_model_override=llm_model,
-                conflict_strategy=conflict_strategy,
-            )
+            with st.spinner("Reading metadata and planning renames…"):
+                batch = plan_batch(
+                    input_dir=input_dir,
+                    pattern=pattern,
+                    config_path=config_path,
+                    recursive=recursive,
+                    use_llm=use_llm,
+                    profile_path=profile_path,
+                    strict=strict,
+                    llm_model_override=llm_model,
+                    conflict_strategy=conflict_strategy,
+                )
 
             st.session_state["suggestions"] = batch.suggestions
             st.session_state["input_dir"] = input_dir
@@ -128,43 +161,92 @@ if st.button("Preview Renames"):
 if "suggestions" in st.session_state:
     input_dir = st.session_state["input_dir"]
     suggestions = st.session_state["suggestions"]
-    
+
+    defaulted_count = sum(
+        1 for s in suggestions if any(v == "default" for k, v in s.sources.items() if k != "ext")
+    )
+    if defaulted_count:
+        st.info(
+            f"ℹ️ {defaulted_count} of {len(suggestions)} file(s) have one or more "
+            "fields that could not be extracted and fell back to defaults — "
+            "review those before applying."
+        )
+
     with_issues = [s for s in suggestions if s.issues]
-    
+
     if with_issues:
-        st.warning(f"⚠️ {len(with_issues)} files have validation issues. Please fix the missing or invalid fields below:")
-        
+        st.warning(
+            f"⚠️ {len(with_issues)} files have validation issues. "
+            "Please fix the missing or invalid fields below:"
+        )
+
         data = []
         for s in with_issues:
             row = {"_source": str(s.source.name)}
             row.update(s.fields)
             data.append(row)
-            
-        edited_df = st.data_editor(data, num_rows="fixed", use_container_width=True)
-        
+
+        edited_df = st.data_editor(
+            data, num_rows="fixed", use_container_width=True, key="issue_editor"
+        )
+
         if st.button("Re-validate & Update Fields"):
-            from microscopy_naming_assistant.naming import build_filename, normalize_fields
-            from microscopy_naming_assistant.validation import validate_fields
+            from microscopy_naming_assistant.naming import finalize_fields, render_name
             from microscopy_naming_assistant.profiles import load_profile
-            
+            from microscopy_naming_assistant.validation import validate_fields
+
             profile = load_profile(profile_path) if profile_path else None
-            
-            for row, s in zip(edited_df, with_issues):
+
+            by_source = {s.source.name: s for s in with_issues}
+            for row in edited_df:
+                s = by_source.get(row["_source"])
+                if s is None:
+                    continue
                 new_fields = {k: v for k, v in row.items() if k != "_source"}
-                s.fields = normalize_fields(new_fields, config)
-                s.target_name = build_filename(s.source, s.fields, config)
-                if profile:
-                    s.issues = validate_fields(s.fields, profile)
-                else:
-                    s.issues = []
+                s.fields = finalize_fields(s.source, new_fields, config)
+                s.target_name = render_name(s.fields, config)
+                s.issues = validate_fields(s.fields, profile) if profile else []
             st.rerun()
 
     from microscopy_naming_assistant.service import recalculate_batch
+
     batch = recalculate_batch(input_dir, suggestions, strict, conflict_strategy)
 
     st.write("### Planned Renames")
     table_rows = [{"source": src.name, "suggested": dst.name} for src, dst in batch.planned]
     st.dataframe(table_rows, use_container_width=True)
+
+    issues_by_source = {
+        s.source.name: "; ".join(f"{i.severity}:{i.field}" for i in s.issues)
+        for s in batch.suggestions
+    }
+    report_rows = [
+        {
+            "source": src.name,
+            "target": dst.name,
+            "issues": issues_by_source.get(src.name, ""),
+        }
+        for src, dst in batch.planned
+    ]
+    csv_buffer = io.StringIO()
+    csv_writer = csv.DictWriter(csv_buffer, fieldnames=["source", "target", "issues"])
+    csv_writer.writeheader()
+    csv_writer.writerows(report_rows)
+
+    st.download_button(
+        "Download report (CSV)",
+        data=csv_buffer.getvalue(),
+        file_name="rename_report.csv",
+        mime="text/csv",
+        key="download_report_csv",
+    )
+    st.download_button(
+        "Download report (JSON)",
+        data=json.dumps(report_rows, indent=2),
+        file_name="rename_report.json",
+        mime="application/json",
+        key="download_report_json",
+    )
 
     if batch.skipped:
         st.warning("Skipped items")
@@ -181,7 +263,9 @@ if "suggestions" in st.session_state:
             st.info(f"Manifest saved for rollback: `{manifest.name}`")
 
 st.subheader("Drag-and-Drop Mode (Suggestion Preview)")
-st.caption("Upload files to preview names. For safety, this mode does not modify original source files.")
+st.caption(
+    "Upload files to preview names. For safety, this mode does not modify original source files."
+)
 uploaded = st.file_uploader(
     "Drop microscopy files here",
     accept_multiple_files=True,
@@ -192,25 +276,26 @@ if uploaded:
     preview_rows = []
     with tempfile.TemporaryDirectory(prefix="mna_upload_") as tmp:
         tmp_dir = Path(tmp)
-        for file_obj in uploaded:
-            tmp_path = tmp_dir / file_obj.name
-            tmp_path.write_bytes(file_obj.getbuffer())
-            result = suggest_for_file(
-                file_path=tmp_path,
-                config_path=config_path,
-                use_llm=use_llm,
-                profile_path=profile_path,
-                llm_model_override=llm_model,
-            )
-            preview_rows.append(
-                {
-                    "source": file_obj.name,
-                    "suggested": result.target_name,
-                    "issues": "; ".join(
-                        [f"{i.severity}:{i.field}" for i in result.issues]
-                    ),
-                }
-            )
+        with st.spinner("Reading metadata…"):
+            for file_obj in uploaded:
+                tmp_path = tmp_dir / file_obj.name
+                tmp_path.write_bytes(file_obj.getbuffer())
+                result = suggest_for_file(
+                    file_path=tmp_path,
+                    config_path=config_path,
+                    use_llm=use_llm,
+                    profile_path=profile_path,
+                    llm_model_override=llm_model,
+                )
+                defaulted = [k for k, v in result.sources.items() if v == "default"]
+                preview_rows.append(
+                    {
+                        "source": file_obj.name,
+                        "suggested": result.target_name,
+                        "issues": "; ".join([f"{i.severity}:{i.field}" for i in result.issues]),
+                        "review (defaulted)": ", ".join(defaulted),
+                    }
+                )
     st.dataframe(preview_rows, use_container_width=True)
 
 st.divider()
@@ -223,13 +308,14 @@ if st.button("Run Rollback"):
     if not rollback_dir or not manifest_file:
         st.error("Provide a target directory and upload a manifest.")
     else:
-        from microscopy_naming_assistant.manifest import rollback_manifest
         import tempfile
-        
+
+        from microscopy_naming_assistant.manifest import rollback_manifest
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
             tmp.write(manifest_file.getvalue())
             tmp_path = Path(tmp.name)
-            
+
         r_dir = Path(rollback_dir).expanduser()
         if not r_dir.exists():
             st.error(f"Directory not found: {r_dir}")
@@ -242,3 +328,46 @@ if st.button("Run Rollback"):
                 for e in errors:
                     st.write(f"- {e}")
         tmp_path.unlink(missing_ok=True)
+
+st.divider()
+with st.expander("Create a validation profile", expanded=False):
+    st.caption("New here? Build a validation profile JSON without hand-editing the file.")
+    with st.form("profile_wizard"):
+        wizard_name = st.text_input("Profile name", value="my_lab")
+        wizard_experiment_types = st.text_input(
+            "Allowed experiment types (comma-separated)",
+            value="CT, G1G2, G1G2G3",
+        )
+        wizard_markers = st.text_input(
+            "Allowed markers (comma-separated)",
+            value="ARL, GFP, DAPI, SOX",
+        )
+        wizard_sample_pattern = st.text_input("Sample pattern (regex)", value=r"^E\d{2}$")
+        wizard_magnification_pattern = st.text_input(
+            "Magnification pattern (regex)", value=r"^X\d{2,3}$"
+        )
+        wizard_notes_pattern = st.text_input("Notes pattern (regex)", value=r"^[A-Za-z0-9_-]+$")
+        wizard_unknown_marker_policy = st.selectbox(
+            "Unknown marker policy", ["warn", "allow", "block"]
+        )
+        wizard_save_path = st.text_input("Save path", value="profiles/my_lab.json")
+
+        if st.form_submit_button("Create profile"):
+            try:
+                experiment_types = [
+                    item.strip() for item in wizard_experiment_types.split(",") if item.strip()
+                ]
+                markers = [item.strip() for item in wizard_markers.split(",") if item.strip()]
+                profile = ProfileRules(
+                    name=wizard_name,
+                    allowed_experiment_types=experiment_types,
+                    allowed_markers=markers,
+                    sample_pattern=wizard_sample_pattern,
+                    magnification_pattern=wizard_magnification_pattern,
+                    notes_pattern=wizard_notes_pattern,
+                    unknown_marker_policy=wizard_unknown_marker_policy,
+                )
+                save_profile(Path(wizard_save_path), profile)
+                st.success(f"Saved profile to {wizard_save_path}")
+            except Exception as exc:
+                st.error(f"Could not save profile: {exc}")

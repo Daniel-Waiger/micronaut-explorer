@@ -27,7 +27,7 @@ YYYY-MM-DD_EXPTYPE_SAMPLE_MAGNIFICATION_MARKERS_NOTES.tif
 - src/microscopy_naming_assistant/validation.py: validation engine
 - src/microscopy_naming_assistant/service.py: shared suggestion and batch logic
 - app_streamlit.py: desktop-style local UI
-- profiles/facsi_default.json: starter lab profile
+- profiles/facsi_default.json: example (restrictive) lab profile
 
 ## Setup
 
@@ -82,35 +82,35 @@ UI includes:
 
 mna init-config --output naming_scheme.json
 
-1. Create default profile:
+2. Create default profile:
 
 mna init-profile --output profile.json
 
-2. Suggest a filename for one file:
+3. Suggest a filename for one file:
 
 mna suggest --input path/to/file.tif --config naming_scheme.json
 
-2. Suggest with profile validation (strict):
+4. Suggest with profile validation (strict):
 
 mna suggest --input path/to/file.tif --config naming_scheme.json --profile profiles/facsi_default.json --strict
 
-3. Batch preview (dry-run):
+5. Batch preview (dry-run):
 
 mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json
 
-3. Batch preview with validation profile:
+6. Batch preview with validation profile:
 
 mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json --profile profiles/facsi_default.json --strict
 
-4. Apply batch rename:
+7. Apply batch rename:
 
 mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json --apply
 
-5. Use Ollama-assisted suggestions:
+8. Use Ollama-assisted suggestions:
 
 mna suggest --input path/to/file.tif --config naming_scheme.json --llm
 
-6. Choose a specific local model without editing JSON:
+9. Choose a specific local model without editing JSON:
 
 mna suggest --input path/to/file.tif --config naming_scheme.json --llm --llm-model llama3.1:8b
 
@@ -126,6 +126,16 @@ The generated naming_scheme.json is user-tailorable. Important fields:
 - llm.preferred_models: priority order used when llm.model is auto
 - llm.endpoint: default http://localhost:11434/api/chat
 
+Field separators are defined entirely by the `template` field (there is no
+separate separator setting); multiple markers are always joined with `-`.
+
+Out of the box, `defaults` uses neutral placeholders (`UNKNOWN`, `UNSPECIFIED`)
+rather than lab-specific values — tailor them to your own naming scheme. Any
+field that falls back to a default is tagged with `provenance: default` (see
+`mna suggest --json` and the Streamlit review column), so an `UNKNOWN`/
+`UNSPECIFIED` token in a suggested name is easy to spot and fix before
+renaming.
+
 ## Profile format
 
 Profile JSON controls validation policy for each user or lab:
@@ -137,7 +147,14 @@ Profile JSON controls validation policy for each user or lab:
 - notes_pattern
 - unknown_marker_policy (allow, warn, block)
 
-Example profile is included at profiles/facsi_default.json.
+`mna init-profile` writes a neutral, permissive starter profile: `allowed_experiment_types`
+and `allowed_markers` are empty, and an empty allow-list means "no restriction" rather than
+"reject everything" (the `sample`/`magnification`/`notes` patterns default to generic
+alphanumeric shapes). Tighten these to your own lab's codes, markers, and patterns as needed.
+
+profiles/facsi_default.json is a separate, explicitly-named EXAMPLE of a restrictive lab
+profile (fixed experiment codes like `CT`/`G1G2`, a fixed marker list, `E##`/`X##` patterns) —
+a demonstration to adapt, not the default any lab is expected to use as-is.
 
 Example LLM section:
 
@@ -162,4 +179,9 @@ Example LLM section:
 Run the test suite:
 
 python -m pytest -q
+
+## License
+
+This project is licensed under the Apache License, Version 2.0. See the
+[LICENSE](LICENSE) file for the full text.
 

@@ -12,19 +12,18 @@ class NamingConfig:
     defaults: dict[str, str] = field(
         default_factory=lambda: {
             "date": "1970-01-01",
-            "exptype": "CT",
-            "sample": "E01",
-            "magnification": "X90",
-            "markers": "ARL",
+            "exptype": "UNKNOWN",
+            "sample": "UNKNOWN",
+            "magnification": "UNKNOWN",
+            "markers": "UNKNOWN",
             "notes": "UNSPECIFIED",
         }
     )
     uppercase_fields: list[str] = field(
-        default_factory=lambda: ["exptype", "sample", "magnification", "markers", "notes"]
+        default_factory=lambda: ["exptype", "sample", "magnification", "markers"]
     )
-    field_separator: str = "_"
-    marker_separator: str = "-"
     safe_char_pattern: str = r"[^A-Za-z0-9_-]+"
+    extraction_timeout_seconds: int = 20
     llm: dict[str, Any] = field(
         default_factory=lambda: {
             "enabled": False,
@@ -45,9 +44,8 @@ def save_config(path: Path, config: NamingConfig) -> None:
         "template": config.template,
         "defaults": config.defaults,
         "uppercase_fields": config.uppercase_fields,
-        "field_separator": config.field_separator,
-        "marker_separator": config.marker_separator,
         "safe_char_pattern": config.safe_char_pattern,
+        "extraction_timeout_seconds": config.extraction_timeout_seconds,
         "llm": config.llm,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -61,8 +59,9 @@ def load_config(path: Path) -> NamingConfig:
         template=payload.get("template", base.template),
         defaults={**base.defaults, **payload.get("defaults", {})},
         uppercase_fields=payload.get("uppercase_fields", base.uppercase_fields),
-        field_separator=payload.get("field_separator", base.field_separator),
-        marker_separator=payload.get("marker_separator", base.marker_separator),
         safe_char_pattern=payload.get("safe_char_pattern", base.safe_char_pattern),
+        extraction_timeout_seconds=payload.get(
+            "extraction_timeout_seconds", base.extraction_timeout_seconds
+        ),
         llm={**base.llm, **payload.get("llm", {})},
     )

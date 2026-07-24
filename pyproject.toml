@@ -8,6 +8,13 @@ version = "0.1.0"
 description = "Metadata-aware microscopy file naming assistant with optional local LLM suggestions"
 readme = "README.md"
 requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [{name = "Daniel Waiger"}]
+classifiers = [
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent"
+]
 dependencies = [
   "bioio>=1.1.0",
   "bioio-bioformats>=1.0.0",
@@ -20,7 +27,11 @@ mna = "microscopy_naming_assistant.cli:main"
 
 [project.optional-dependencies]
 test = [
-  "pytest>=9.1.0"
+  "pytest>=9.1.0",
+  "pytest-timeout>=2.3.0",
+  "ruff>=0.6.0",
+  "black>=24.0.0",
+  "mypy>=1.10.0"
 ]
 
 [tool.setuptools]
@@ -28,3 +39,32 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+microscopy_naming_assistant = ["py.typed"]
+
+[tool.pytest.ini_options]
+timeout = 60
+markers = [
+  "integration: needs Java/real readers"
+]
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100
+exclude = ["build", "dist", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# app_streamlit.py deliberately imports after a sys.path fixup and after
+# setting STREAMLIT_SERVER_MAX_UPLOAD_SIZE/MAX_MESSAGE_SIZE env vars (both
+# must run before their dependent imports), so E402 is expected here.
+"app_streamlit.py" = ["E402"]
+
+[tool.mypy]
+ignore_missing_imports = true
+python_version = "3.10"

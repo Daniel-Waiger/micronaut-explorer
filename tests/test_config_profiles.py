@@ -23,6 +23,9 @@ def test_config_round_trip(tmp_path: Path) -> None:
 def test_profile_round_trip(tmp_path: Path) -> None:
     profile = default_profile()
     profile.unknown_marker_policy = "block"
+    # Use an arbitrary, non-FACSI-specific list: the round trip should preserve
+    # whatever was saved, not any particular lab's values.
+    profile.allowed_experiment_types = ["FOO", "BAR"]
 
     path = tmp_path / "profile.json"
     save_profile(path, profile)
@@ -30,4 +33,4 @@ def test_profile_round_trip(tmp_path: Path) -> None:
 
     assert loaded.name == profile.name
     assert loaded.unknown_marker_policy == "block"
-    assert "CT" in loaded.allowed_experiment_types
+    assert loaded.allowed_experiment_types == ["FOO", "BAR"]

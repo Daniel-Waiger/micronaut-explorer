@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import load_config
 from .llm import suggest_fields_with_ollama
-from .metadata import extract_metadata
-from .naming import build_filename, normalize_fields
+from .metadata import extract_metadata_with_sources
+from .naming import finalize_fields, render_name
 from .profiles import load_profile
 from .validation import ValidationIssue, validate_fields
 
@@ -17,6 +17,7 @@ class SuggestionResult:
     target_name: str
     fields: dict[str, str]
     issues: list[ValidationIssue]
+    sources: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -34,7 +35,9 @@ def suggest_for_file(
     llm_model_override: str | None = None,
 ) -> SuggestionResult:
     config = load_config(config_path)
-    extracted = extract_metadata(file_path)
+    extracted, ex_sources = extract_metadata_with_sources(
+        file_path, timeout_seconds=int(config.extraction_timeout_seconds)
+    )
 
     if use_llm and bool(config.llm.get("enabled", False)):
         llm_model = llm_model_override or str(config.llm.get("model", "auto"))
@@ -47,18 +50,30 @@ def suggest_for_file(
             preferred_models=[str(x) for x in config.llm.get("preferred_models", [])],
         )
         extracted = {**extracted, **llm_fields}
+        for key in llm_fields:
+            ex_sources[key] = "llm"
 
-    merged = {**config.defaults, **extracted}
-    merged["ext"] = file_path.suffix.lower() or ".tif"
-    normalized = normalize_fields(merged, config)
+    fields = finalize_fields(file_path, extracted, config)
+
+    # A key present in the final fields but not in `extracted`/`llm` was
+    # supplied by config.defaults inside `finalize_fields`.
+    sources: dict[str, str] = {
+        key: ex_sources.get(key, "default") for key in fields if key != "ext"
+    }
 
     issues: list[ValidationIssue] = []
     if profile_path is not None:
         profile = load_profile(profile_path)
-        issues = validate_fields(normalized, profile)
+        issues = validate_fields(fields, profile)
 
-    target_name = build_filename(file_path, extracted, config)
-    return SuggestionResult(source=file_path, target_name=target_name, fields=normalized, issues=issues)
+    target_name = render_name(fields, config)
+    return SuggestionResult(
+        source=file_path,
+        target_name=target_name,
+        fields=fields,
+        issues=issues,
+        sources=sources,
+    )
 
 
 def recalculate_batch(
@@ -78,7 +93,7 @@ def recalculate_batch(
             continue
 
         target = result.source.with_name(result.target_name)
-        
+
         if target in collisions:
             if conflict_strategy == "skip":
                 skipped.append(f"{result.source.name}: duplicate target {target.name}")
@@ -104,13 +119,15 @@ def plan_batch(
     input_dir: Path,
     pattern: str,
     config_path: Path,
+    recursive: bool = False,
     use_llm: bool = False,
     profile_path: Path | None = None,
     strict: bool = False,
     llm_model_override: str | None = None,
     conflict_strategy: str = "suffix",
 ) -> BatchResult:
-    files = [p for p in input_dir.rglob(pattern) if p.is_file()]
+    matches = input_dir.rglob(pattern) if recursive else input_dir.glob(pattern)
+    files = [p for p in matches if p.is_file()]
     suggestions: list[SuggestionResult] = []
 
     for file_path in files:
@@ -133,6 +150,7 @@ def plan_batch(
 
 def apply_batch(input_dir: Path, planned: list[tuple[Path, Path]]) -> tuple[int, Path | None]:
     from .manifest import save_manifest
+
     renamed = 0
     actually_renamed = []
     for src, dst in planned:
@@ -141,6 +159,6 @@ def apply_batch(input_dir: Path, planned: list[tuple[Path, Path]]) -> tuple[int,
         src.rename(dst)
         actually_renamed.append((src, dst))
         renamed += 1
-        
+
     manifest_path = save_manifest(input_dir, actually_renamed)
     return renamed, manifest_path

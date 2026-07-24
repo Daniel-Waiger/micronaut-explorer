@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
 import logging
-from pathlib import Path
+import multiprocessing
+import queue
 import re
+from datetime import datetime
+from pathlib import Path
+
+from .markers import alias_map
 
 logger = logging.getLogger(__name__)
 
@@ -34,18 +38,6 @@ FORMAT_FIELD_HINTS: dict[str, dict[str, list[str]]] = {
     },
 }
 
-KNOWN_MARKERS = [
-    "ARL",
-    "GFP",
-    "DAPI",
-    "SOX",
-    "SOX2",
-    "RFP",
-    "CFP",
-    "YFP",
-    "HOECHST",
-]
-
 
 def _guess_sample_from_name(stem: str) -> str | None:
     parts = stem.replace("-", "_").split("_")
@@ -61,17 +53,17 @@ def _extract_date_from_name(stem: str) -> str | None:
     match = re.search(r"((?:19|20)\d{2})[-_](0[1-9]|1[0-2])[-_](0[1-9]|[12]\d|3[01])", stem)
     if match:
         return f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
-    
+
     # Look for YYYYMMDD
     match = re.search(r"(?<!\d)((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)", stem)
     if match:
         return f"{match.group(1)}-{match.group(2)}-{match.group(3)}"
-        
+
     # Look for YYMMDD (assuming 20YY)
     match = re.search(r"(?<!\d)(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)", stem)
     if match:
         return f"20{match.group(1)}-{match.group(2)}-{match.group(3)}"
-        
+
     return None
 
 
@@ -95,7 +87,9 @@ def _extract_text_chunks(metadata_obj: object) -> str:
 
 
 def _extract_near_key(text: str, key: str) -> str | None:
-    pattern = re.compile(rf"{re.escape(key)}[^A-Za-z0-9]{{0,8}}([A-Za-z0-9_. -]{{2,40}})", re.IGNORECASE)
+    pattern = re.compile(
+        rf"{re.escape(key)}[^A-Za-z0-9]{{0,8}}([A-Za-z0-9_. -]{{2,40}})", re.IGNORECASE
+    )
     match = pattern.search(text)
     if not match:
         return None
@@ -105,21 +99,44 @@ def _extract_near_key(text: str, key: str) -> str | None:
 
 
 def _extract_markers(text: str, hints: list[str]) -> str | None:
-    found: list[str] = []
-    upper_text = text.upper()
+    """Find canonical marker/fluorophore names in `text`.
 
-    for marker in KNOWN_MARKERS:
-        if marker in upper_text and marker not in found:
-            found.append(marker)
+    Every known alias (see `markers.alias_map`) is searched for as a whole
+    word, case-insensitively, directly in `text` -- so "CFP" no longer
+    false-positives inside a larger token like "SCFPX", and spelled-out
+    aliases (e.g. "Alexa Fluor 488") normalize to their canonical form
+    (e.g. "ALEXA488"). Matches are ordered by first occurrence in `text` and
+    deduped (first occurrence wins), then joined with "-".
+
+    `hints` (format-specific metadata keys such as "Channel"/"Fluor") are
+    kept as a secondary signal via `_extract_near_key`, in case a marker only
+    surfaces near one of those keys and isn't otherwise picked up verbatim by
+    the whole-text scan above; any it finds are appended after, only if not
+    already found.
+    """
+    amap = alias_map()
+
+    matches: list[tuple[int, str]] = []
+    for alias, canonical in amap.items():
+        match = re.search(r"\b" + re.escape(alias) + r"\b", text, re.IGNORECASE)
+        if match:
+            matches.append((match.start(), canonical))
+    matches.sort(key=lambda item: item[0])
+
+    found: list[str] = []
+    for _, canonical in matches:
+        if canonical not in found:
+            found.append(canonical)
 
     for key in hints:
         near = _extract_near_key(text, key)
         if not near:
             continue
-        for token in re.split(r"[-_,;/| ]+", near.upper()):
-            token = token.strip()
-            if token in KNOWN_MARKERS and token not in found:
-                found.append(token)
+        for alias, canonical in amap.items():
+            if canonical in found:
+                continue
+            if re.search(r"\b" + re.escape(alias) + r"\b", near, re.IGNORECASE):
+                found.append(canonical)
 
     if not found:
         return None
@@ -136,7 +153,9 @@ def _extract_magnification(text: str, hints: list[str]) -> str | None:
             value = int(float(match.group(1)))
             return f"X{value}"
 
-    fallback = re.search(r"(?:MAGNIFICATION|OBJECTIVE|ZOOM)[^0-9]{0,10}(\d{1,3}(?:\.\d+)?)", text, re.IGNORECASE)
+    fallback = re.search(
+        r"(?:MAGNIFICATION|OBJECTIVE|ZOOM)[^0-9]{0,10}(\d{1,3}(?:\.\d+)?)", text, re.IGNORECASE
+    )
     if fallback:
         value = int(float(fallback.group(1)))
         return f"X{value}"
@@ -174,26 +193,15 @@ def _extract_sample(text: str, hints: list[str]) -> str | None:
     return None
 
 
-def extract_metadata(file_path: Path) -> dict[str, str]:
-    """Extract naming-relevant metadata using bioio when available.
+def _extract_bioio_fields(file_path: Path) -> dict[str, str]:
+    """Extract markers/magnification/exptype/sample using bioio, if available.
 
-    Falls back to file timestamps and filename heuristics if scientific readers
-    are unavailable or cannot read the file.
+    Returns only the bioio-derived fields; date/sample-from-filename heuristics
+    live in `extract_metadata`. Must stay module-level and picklable (no
+    closures, no reliance on outer state) so it can later be run in a separate
+    process to bound its runtime (see P0-3).
     """
     result: dict[str, str] = {}
-
-    # Always derive date from file mtime as a reliable baseline.
-    mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
-    result["date"] = mtime.strftime("%Y-%m-%d")
-    
-    date_guess = _extract_date_from_name(file_path.stem)
-    if date_guess:
-        result["date"] = date_guess
-
-    sample_guess = _guess_sample_from_name(file_path.stem)
-    if sample_guess:
-        result["sample"] = sample_guess
-
     file_format = _detect_format(file_path)
 
     try:
@@ -235,3 +243,108 @@ def extract_metadata(file_path: Path) -> dict[str, str]:
         logger.warning("Failed to extract metadata using bioio for %s: %s", file_path.name, e)
 
     return result
+
+
+def _bioio_worker(file_path_str: str, q: multiprocessing.Queue) -> None:
+    """Top-level, picklable child-process entry point for `_extract_bioio_fields`.
+
+    Must stay module-level (spawn imports it by reference) and must never let
+    an exception escape uncaught — an uncaught exception would kill the child
+    without putting anything on the queue, leaving the parent to wait out the
+    full timeout for no reason.
+    """
+    try:
+        q.put(_extract_bioio_fields(Path(file_path_str)))
+    except Exception:
+        q.put({})
+
+
+def extract_metadata_with_sources(
+    file_path: Path, timeout_seconds: int = 20
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Extract naming-relevant metadata, tagging where each field came from.
+
+    Returns `(fields, sources)`: `fields` is identical to what
+    `extract_metadata` returns. `sources` maps each key present in `fields` to
+    `"filename"` for the parent-computed heuristics (date from mtime or
+    filename, sample guessed from filename) or `"metadata"` for anything
+    supplied by the bioio worker (`_extract_bioio_fields`) -- bioio values are
+    applied last and override the heuristics, so they're tagged `"metadata"`
+    even when they replace a `"filename"`-sourced value (e.g. `sample`).
+
+    Falls back to file timestamps and filename heuristics if scientific readers
+    are unavailable or cannot read the file. The bioio read itself runs in a
+    bounded child process: some files (e.g. ones the Bio-Formats/Java backend
+    cannot parse) make bioio hang indefinitely, so `_extract_bioio_fields` is
+    run in a `multiprocessing` child that is terminated after `timeout_seconds`.
+    The filename/mtime heuristics below always run in the parent, so a timeout
+    still yields a usable name instead of freezing the caller.
+    """
+    result: dict[str, str] = {}
+    sources: dict[str, str] = {}
+
+    # Always derive date from file mtime as a reliable baseline.
+    mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
+    result["date"] = mtime.strftime("%Y-%m-%d")
+    sources["date"] = "filename"
+
+    date_guess = _extract_date_from_name(file_path.stem)
+    if date_guess:
+        result["date"] = date_guess
+        sources["date"] = "filename"
+
+    sample_guess = _guess_sample_from_name(file_path.stem)
+    if sample_guess:
+        result["sample"] = sample_guess
+        sources["sample"] = "filename"
+
+    ctx = multiprocessing.get_context("spawn")
+    q = ctx.Queue()
+    p = ctx.Process(target=_bioio_worker, args=(str(file_path), q))
+    p.start()
+    p.join(timeout_seconds)
+
+    if p.is_alive():
+        p.terminate()
+        p.join(5)
+        if p.is_alive():
+            # Child didn't die from terminate() (e.g. stuck in bioio/JVM
+            # startup on Windows spawn) -- escalate to a hard kill so this
+            # branch can never hang past a bounded worst case.
+            p.kill()
+            p.join(5)
+        logger.warning(
+            "bioio extraction for %s exceeded %ss timeout; using heuristics only",
+            file_path.name,
+            timeout_seconds,
+        )
+        return result, sources
+
+    try:
+        bioio_fields = q.get(timeout=1)
+    except queue.Empty:
+        bioio_fields = {}
+
+    result.update(bioio_fields)
+    for key in bioio_fields:
+        sources[key] = "metadata"
+
+    return result, sources
+
+
+def extract_metadata(file_path: Path, timeout_seconds: int = 20) -> dict[str, str]:
+    """Extract naming-relevant metadata using bioio when available.
+
+    Falls back to file timestamps and filename heuristics if scientific readers
+    are unavailable or cannot read the file. The bioio read itself runs in a
+    bounded child process: some files (e.g. ones the Bio-Formats/Java backend
+    cannot parse) make bioio hang indefinitely, so `_extract_bioio_fields` is
+    run in a `multiprocessing` child that is terminated after `timeout_seconds`.
+    The filename/mtime heuristics below always run in the parent, so a timeout
+    still yields a usable name instead of freezing the caller.
+
+    See `extract_metadata_with_sources` for a variant that also reports where
+    each field came from.
+    """
+    fields, _sources = extract_metadata_with_sources(file_path, timeout_seconds=timeout_seconds)
+    return fields

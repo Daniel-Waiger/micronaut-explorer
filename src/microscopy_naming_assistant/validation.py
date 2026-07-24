@@ -22,7 +22,11 @@ def validate_fields(fields: dict[str, str], profile: ProfileRules) -> list[Valid
     issues: list[ValidationIssue] = []
 
     exptype = str(fields.get("exptype", "")).upper()
-    if exptype and exptype not in {x.upper() for x in profile.allowed_experiment_types}:
+    if (
+        exptype
+        and profile.allowed_experiment_types
+        and exptype not in {x.upper() for x in profile.allowed_experiment_types}
+    ):
         issues.append(
             ValidationIssue(
                 field="exptype",
@@ -36,7 +40,9 @@ def validate_fields(fields: dict[str, str], profile: ProfileRules) -> list[Valid
         issues.append(
             ValidationIssue(
                 field="sample",
-                message=f"Value '{sample}' does not match sample_pattern '{profile.sample_pattern}'.",
+                message=(
+                    f"Value '{sample}' does not match sample_pattern '{profile.sample_pattern}'."
+                ),
                 severity="error",
             )
         )
@@ -64,21 +70,22 @@ def validate_fields(fields: dict[str, str], profile: ProfileRules) -> list[Valid
             )
         )
 
-    allowed_markers = {m.upper() for m in profile.allowed_markers}
-    markers = _split_markers(str(fields.get("markers", "")))
-    unknown_markers = [m for m in markers if m not in allowed_markers]
-    if unknown_markers:
-        severity = "warning" if profile.unknown_marker_policy == "warn" else "error"
-        if profile.unknown_marker_policy != "allow":
-            issues.append(
-                ValidationIssue(
-                    field="markers",
-                    message=(
-                        "Unknown markers not in allowed_markers: "
-                        + ", ".join(sorted(unknown_markers))
-                    ),
-                    severity=severity,
+    if profile.allowed_markers:
+        allowed_markers = {m.upper() for m in profile.allowed_markers}
+        markers = _split_markers(str(fields.get("markers", "")))
+        unknown_markers = [m for m in markers if m not in allowed_markers]
+        if unknown_markers:
+            severity = "warning" if profile.unknown_marker_policy == "warn" else "error"
+            if profile.unknown_marker_policy != "allow":
+                issues.append(
+                    ValidationIssue(
+                        field="markers",
+                        message=(
+                            "Unknown markers not in allowed_markers: "
+                            + ", ".join(sorted(unknown_markers))
+                        ),
+                        severity=severity,
+                    )
                 )
-            )
 
     return issues

@@ -4,6 +4,6 @@
   "allowed_markers": ["ARL", "GFP", "DAPI", "SOX"],
   "sample_pattern": "^E\\d{2}$",
   "magnification_pattern": "^X\\d{2,3}$",
-  "notes_pattern": "^[A-Z0-9_-]+$",
+  "notes_pattern": "^[A-Za-z0-9_-]+$",
   "unknown_marker_policy": "warn"
 }

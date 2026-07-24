@@ -2,21 +2,18 @@
   "template": "{date}_{exptype}_{sample}_{magnification}_{markers}_{notes}{ext}",
   "defaults": {
     "date": "1970-01-01",
-    "exptype": "CT",
-    "sample": "E01",
-    "magnification": "X90",
-    "markers": "ARL",
+    "exptype": "UNKNOWN",
+    "sample": "UNKNOWN",
+    "magnification": "UNKNOWN",
+    "markers": "UNKNOWN",
     "notes": "UNSPECIFIED"
   },
   "uppercase_fields": [
     "exptype",
     "sample",
     "magnification",
-    "markers",
-    "notes"
+    "markers"
   ],
-  "field_separator": "_",
-  "marker_separator": "-",
   "safe_char_pattern": "[^A-Za-z0-9_-]+",
   "llm": {
     "enabled": false,
