@@ -43,7 +43,7 @@ def test_build_filename_uses_defaults_and_extension() -> None:
     }
 
     result = build_filename(source, extracted, config)
-    assert result.startswith("2026-07-22_CT_E03_")
+    assert result.startswith("2026-07-22_UNKNOWN_E03_")
     assert result.endswith(".tif")
 
 

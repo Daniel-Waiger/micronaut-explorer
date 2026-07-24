@@ -718,7 +718,12 @@ def test_suggest_for_file_tags_llm_overridden_field_as_llm(tmp_path: Path, monke
 @pytest.mark.integration
 def test_suggest_for_file_with_profile_generates_issues(tmp_path: Path) -> None:
     config = default_config()
-    config.defaults["magnification"] = "90x"
+    # The default profile's magnification_pattern is now a permissive
+    # alphanumeric pattern (P3-4b), so use a value that still violates it.
+    # A hyphen survives config.safe_char_pattern's sanitization (unlike e.g.
+    # "!", which sanitize_token would strip before validation ever sees it)
+    # but is not in the alphanumeric-only magnification_pattern.
+    config.defaults["magnification"] = "90-X"
     config_path = tmp_path / "naming_scheme.json"
     save_config(config_path, config)
 

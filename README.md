@@ -27,7 +27,7 @@ YYYY-MM-DD_EXPTYPE_SAMPLE_MAGNIFICATION_MARKERS_NOTES.tif
 - src/microscopy_naming_assistant/validation.py: validation engine
 - src/microscopy_naming_assistant/service.py: shared suggestion and batch logic
 - app_streamlit.py: desktop-style local UI
-- profiles/facsi_default.json: starter lab profile
+- profiles/facsi_default.json: example (restrictive) lab profile
 
 ## Setup
 
@@ -129,6 +129,13 @@ The generated naming_scheme.json is user-tailorable. Important fields:
 Field separators are defined entirely by the `template` field (there is no
 separate separator setting); multiple markers are always joined with `-`.
 
+Out of the box, `defaults` uses neutral placeholders (`UNKNOWN`, `UNSPECIFIED`)
+rather than lab-specific values — tailor them to your own naming scheme. Any
+field that falls back to a default is tagged with `provenance: default` (see
+`mna suggest --json` and the Streamlit review column), so an `UNKNOWN`/
+`UNSPECIFIED` token in a suggested name is easy to spot and fix before
+renaming.
+
 ## Profile format
 
 Profile JSON controls validation policy for each user or lab:
@@ -140,7 +147,14 @@ Profile JSON controls validation policy for each user or lab:
 - notes_pattern
 - unknown_marker_policy (allow, warn, block)
 
-Example profile is included at profiles/facsi_default.json.
+`mna init-profile` writes a neutral, permissive starter profile: `allowed_experiment_types`
+and `allowed_markers` are empty, and an empty allow-list means "no restriction" rather than
+"reject everything" (the `sample`/`magnification`/`notes` patterns default to generic
+alphanumeric shapes). Tighten these to your own lab's codes, markers, and patterns as needed.
+
+profiles/facsi_default.json is a separate, explicitly-named EXAMPLE of a restrictive lab
+profile (fixed experiment codes like `CT`/`G1G2`, a fixed marker list, `E##`/`X##` patterns) —
+a demonstration to adapt, not the default any lab is expected to use as-is.
 
 Example LLM section:
 

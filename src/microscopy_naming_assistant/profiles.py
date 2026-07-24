@@ -17,12 +17,15 @@ class ProfileRules:
 
 
 def default_profile() -> ProfileRules:
+    # Neutral/permissive starter profile: empty allow-lists mean "no restriction"
+    # (see validation.py), not "reject everything". profiles/facsi_default.json is
+    # a separate, explicitly-named example of a restrictive lab profile.
     return ProfileRules(
         name="default",
-        allowed_experiment_types=["CT", "G1G2", "G1G2G3"],
-        allowed_markers=["ARL", "GFP", "DAPI", "SOX"],
-        sample_pattern=r"^E\d{2}$",
-        magnification_pattern=r"^X\d{2,3}$",
+        allowed_experiment_types=[],
+        allowed_markers=[],
+        sample_pattern=r"^[A-Za-z0-9_-]+$",
+        magnification_pattern=r"^[A-Za-z0-9]+$",
         notes_pattern=r"^[A-Za-z0-9_-]+$",
         unknown_marker_policy="warn",
     )

@@ -12,10 +12,10 @@ class NamingConfig:
     defaults: dict[str, str] = field(
         default_factory=lambda: {
             "date": "1970-01-01",
-            "exptype": "CT",
-            "sample": "E01",
-            "magnification": "X90",
-            "markers": "ARL",
+            "exptype": "UNKNOWN",
+            "sample": "UNKNOWN",
+            "magnification": "UNKNOWN",
+            "markers": "UNKNOWN",
             "notes": "UNSPECIFIED",
         }
     )

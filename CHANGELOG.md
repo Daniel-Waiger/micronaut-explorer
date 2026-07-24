@@ -49,3 +49,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Alexa Fluor 488` -> `ALEXA488`).
 - `.ome.tif` / `.ome.tiff` compound extensions are now preserved when building output filenames
   instead of being collapsed to `.tif`.
+- Default `naming_scheme.json` values for `exptype`/`sample`/`magnification`/`markers` are now
+  the neutral placeholder `UNKNOWN` instead of example FACSI-specific values (`CT`/`E01`/`X90`/
+  `ARL`). These are just starter examples for a config any lab can tailor; unextracted fields
+  already carry `provenance: default` (see Added, above), so they now read as obvious
+  placeholders flagged for review rather than plausible-but-wrong lab values.
+- `mna init-profile` / `default_profile()` now emit a neutral, permissive starter profile
+  instead of FACSI-specific example values: `allowed_experiment_types` and `allowed_markers`
+  are empty, and validation now treats an empty allow-list as "no restriction" instead of
+  "reject everything" (the exptype/marker allow-list checks are skipped entirely when the
+  corresponding list is empty). The `sample`/`magnification`/`notes` patterns are now generic
+  alphanumeric shapes instead of the FACSI-specific `E##`/`X##` shapes. `profiles/facsi_default.json`
+  is unchanged and remains as a separate, explicitly-named example of a restrictive lab profile
+  for labs that want to start from a locked-down template.
