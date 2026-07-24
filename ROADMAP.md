@@ -33,3 +33,30 @@ low-confidence guesses are surfaced for review instead of silently landing in na
 Robust data-editor round-trip; exportable preview report (CSV/JSON); first-run
 config/profile wizard; opt-in/flagged lab defaults; LICENSE, CHANGELOG, lint/format/
 type gates, and versioning discipline.
+
+## Future directions (not scheduled)
+
+Larger bets captured for later — not committed work.
+
+### Friendlier naming (near-term candidate)
+Format masks instead of regex (`E##`, `X#+`), an example under every field, and a
+"plan the name before you acquire" mode that previews the exact filename and exports
+a naming guide or a reusable profile.
+
+### Web app re-platform (under discussion)
+Deliver naming as a static website: naming rules/masks, the planner, and OME-TIFF
+metadata read client-side in the browser (no upload, no install); vendor formats
+(CZI/LIF/ND2) read locally via bioio through a run-without-install command
+(`uvx mna …`), with the UI explaining why a local step is needed. Open decisions:
+web language (TypeScript-native vs Pyodide), and whether to allow any upload fallback.
+
+### Microscopy experimental-design assistant (vision)
+Grow beyond naming into a broader experimental-design suite that advises on the
+"why", not just the "what":
+- Recommend the required experimental groups and controls for a given design, with
+  the rationale for each.
+- Help plan a fluorophore/color panel to minimize spectral spillover.
+- Modality-specific guidance (e.g. STED, confocal, widefield): probe/dye selection,
+  acquisition settings, and common pitfalls.
+- Broadly: encode microscopy-core expertise so users design sound experiments before
+  they acquire data.
