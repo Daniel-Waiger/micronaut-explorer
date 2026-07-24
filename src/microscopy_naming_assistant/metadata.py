@@ -200,6 +200,16 @@ def _extract_bioio_fields(file_path: Path) -> dict[str, str]:
     live in `extract_metadata`. Must stay module-level and picklable (no
     closures, no reliance on outer state) so it can later be run in a separate
     process to bound its runtime (see P0-3).
+
+    No reader is selected here explicitly: bioio picks a plugin per file
+    extension from whatever is installed, preferring the most specific
+    native reader (bioio-ome-tiff/-tifffile/-czi/-lif/-nd2) over the generic
+    bioio-bioformats plugin, which only steps in for formats none of the
+    native readers claim. Native reads are plain Python/C and return
+    quickly; bioio-bioformats spins up a JVM (via jpype/scyjava/jgo), which
+    is slower and occasionally hangs -- the process timeout around this call
+    (see `extract_metadata_with_sources`) mainly exists to guard that rarer
+    Java fallback path now.
     """
     result: dict[str, str] = {}
     file_format = _detect_format(file_path)

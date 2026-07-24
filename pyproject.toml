@@ -17,6 +17,11 @@ classifiers = [
 ]
 dependencies = [
   "bioio>=1.1.0",
+  # native readers preferred; bioio-bioformats is the Java fallback
+  "bioio-ome-tiff>=1.0.0",
+  "bioio-tifffile>=1.0.0",
+  "bioio-lif>=1.0.0",
+  "bioio-nd2>=1.0.0",
   "bioio-bioformats>=1.0.0",
   "requests>=2.32.0",
   "streamlit>=1.37.0"
@@ -26,6 +31,13 @@ dependencies = [
 mna = "microscopy_naming_assistant.cli:main"
 
 [project.optional-dependencies]
+# bioio-czi (native CZI reader) requires building aicspylibczi/pylibczirw from
+# source on platforms without prebuilt wheels (needs CMake + a C++ toolchain);
+# install manually where a build toolchain is available. Without it, .czi
+# files still work via the bioio-bioformats (Java) fallback.
+czi = [
+  "bioio-czi>=1.0.0"
+]
 test = [
   "pytest>=9.1.0",
   "pytest-timeout>=2.3.0",
