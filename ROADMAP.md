@@ -43,6 +43,24 @@ Format masks instead of regex (`E##`, `X#+`), an example under every field, and 
 "plan the name before you acquire" mode that previews the exact filename and exports
 a naming guide or a reusable profile.
 
+### Multi-image containers: LIF / ND2 / CZI (near-term correctness item)
+LIF (series), ND2 (multipoint), and CZI (scenes) pack multiple images with differing
+per-image metadata into one file. The extractor currently reads only the default scene
+once, so a multi-series file is silently named off whichever scene bioio returns first —
+confidently-wrong, not just incomplete. Fix, tied to P2-2 structured extraction (both
+touch how `_extract_bioio_fields` reads these formats):
+- Detect scene/series count (bioio exposes per-scene access); only special-case when > 1.
+- Rename the CONTAINER file (do not split — this is a namer, not a converter). Put only
+  fields shared across all internal images in the name; omit per-image-varying fields
+  (per-series markers, stage positions) rather than guessing.
+- Emit a sidecar (CSV/JSON) mapping each internal image (series index + internal name) to
+  its canonical name, so per-image detail is preserved with zero bytes rewritten.
+- Semantics differ: LIF series are often different setups (may want per-series identity);
+  CZI scenes / ND2 points are usually one experiment at different positions (share identity,
+  differ by a position index). Treat the varying axis as a suffix/sidecar, never a guess.
+- Optional, clearly-destructive future converter: opt-in "export each series to its own
+  canonically-named file" — separate from the default rename.
+
 ### Free-text experiment description → structured metadata (near-term candidate)
 For image data with no embedded metadata, add an "experiment description" field where
 the user describes what they did in plain language. The chosen LLM formulates that free
