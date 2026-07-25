@@ -28,8 +28,8 @@ from microscopy_naming_assistant.llm import list_local_ollama_models
 from microscopy_naming_assistant.profiles import ProfileRules, save_profile
 from microscopy_naming_assistant.service import apply_batch, plan_batch, suggest_for_file
 
-st.set_page_config(page_title="Microscopy Naming Assistant", page_icon="🔬", layout="wide")
-st.title("Microscopy Naming Assistant")
+st.set_page_config(page_title="μicronaut", page_icon="🔬", layout="wide")
+st.title("μicronaut")
 st.caption("Preview and apply naming-convention renames with optional profile validation.")
 
 st.sidebar.header("Settings")

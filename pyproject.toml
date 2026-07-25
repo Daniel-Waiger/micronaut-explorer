@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "microscopy-naming-assistant"
 version = "0.1.0"
-description = "Metadata-aware microscopy file naming assistant with optional local LLM suggestions"
+description = "Micronaut - metadata-aware microscopy file naming assistant with optional local LLM suggestions"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}

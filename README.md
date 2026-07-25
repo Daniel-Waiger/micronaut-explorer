@@ -1,6 +1,7 @@
-﻿# Microscopy Naming Assistant
+﻿# μicronaut
 
-Metadata-aware microscopy file naming assistant with optional local LLM suggestions.
+μicronaut — a metadata-aware microscopy file naming assistant with optional local LLM suggestions.
+(The µ is the micron symbol; the project name is pronounced "Micronaut.")
 
 ## What this does
 

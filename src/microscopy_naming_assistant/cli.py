@@ -208,7 +208,7 @@ def cmd_rollback(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mna",
-        description="Microscopy Naming Assistant",
+        description="Micronaut - microscopy file naming assistant",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 

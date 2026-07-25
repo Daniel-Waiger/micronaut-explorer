@@ -1,4 +1,4 @@
-"""Microscopy Naming Assistant package."""
+"""Micronaut - microscopy file naming assistant package."""
 
 __all__ = [
     "__version__",
