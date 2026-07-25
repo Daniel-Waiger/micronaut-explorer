@@ -18,6 +18,8 @@ Default naming template:
 
 YYYY-MM-DD_EXPTYPE_SAMPLE_MAGNIFICATION_MARKERS_NOTES.tif
 
+See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for the full user manual (every field and setting explained, with screenshots).
+
 ## Project layout
 
 - src/microscopy_naming_assistant/cli.py: command-line interface
