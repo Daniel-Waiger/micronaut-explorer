@@ -4,7 +4,8 @@ Metadata-aware microscopy file naming assistant with optional local LLM suggesti
 
 ## What this does
 
-- Extracts metadata from microscopy files using bioio (with Bio-Formats plugin support).
+- Extracts metadata from microscopy files using bioio, via native Python readers first
+  (OME-TIFF, CZI, LIF, ND2) with Bio-Formats (Java) as a fallback for other formats.
 - Adds format-aware extraction heuristics for OME-TIFF, CZI, LIF, and ND2.
 - Builds standardized names from a configurable template.
 - Supports per-user or per-lab naming schemes via JSON config.
@@ -44,7 +45,13 @@ pip install -e .
 
 pip install -e .[test]
 
-Note: Bio-Formats readers may require Java runtime depending on file formats and plugin internals.
+Note: OME-TIFF, CZI, LIF, and ND2 are read by native Python plugins (bioio-ome-tiff,
+bioio-tifffile, bioio-czi, bioio-lif, bioio-nd2) and do not need Java. A Java runtime is
+only required as a fallback for other/less-common formats, handled by bioio-bioformats.
+bioio-czi in particular needs a C++ build toolchain (CMake) to install from source on
+platforms without a prebuilt wheel; if it fails to install, `.czi` files still work via
+the Bio-Formats fallback (install it separately with `pip install bioio-czi` where a
+toolchain is available -- see the `czi` extra in pyproject.toml).
 
 ## Optional local LLM (free tier)
 

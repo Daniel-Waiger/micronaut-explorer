@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pytest-timeout` is also in place as a safety net.
 
 ### Added
+- Native bioio reader plugins (`bioio-ome-tiff`, `bioio-tifffile`, `bioio-lif`, `bioio-nd2`)
+  so OME-TIFF, TIFF, LIF, and ND2 files are read with plain Python/C readers instead of
+  spinning up a JVM through Bio-Formats; bioio auto-prefers these native, more specific
+  readers over `bioio-bioformats`, which remains installed as the fallback for formats none
+  of them claim. `bioio-czi` (native CZI) is available as an optional `czi` extra
+  (`pip install .[czi]`) rather than a hard dependency: it requires a C++ build toolchain
+  (CMake) to build from source on platforms without a prebuilt wheel (confirmed failing on
+  this machine's Python 3.14/Windows combination); `.czi` files still work via the
+  Bio-Formats fallback without it.
 - Apache License 2.0 (`LICENSE`, `NOTICE`) and license metadata in pyproject.
 - `--json` output for `mna suggest` and `mna batch`, for machine-readable/scripted use.
 - `--recursive` flag for `mna batch`, and a matching "Search subfolders" checkbox in the

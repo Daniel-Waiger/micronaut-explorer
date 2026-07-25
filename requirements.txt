@@ -1,4 +1,13 @@
 bioio>=1.1.0
+# native readers preferred; bioio-bioformats is the Java fallback
+bioio-ome-tiff>=1.0.0
+bioio-tifffile>=1.0.0
+bioio-lif>=1.0.0
+bioio-nd2>=1.0.0
 bioio-bioformats>=1.0.0
+# bioio-czi (native CZI reader) needs a C++ build toolchain (CMake) to build
+# aicspylibczi/pylibczirw from source where no prebuilt wheel exists; install
+# separately when available. .czi still works via the bioio-bioformats
+# (Java) fallback without it: pip install bioio-czi
 requests>=2.32.0
 streamlit>=1.37.0
