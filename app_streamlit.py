@@ -165,48 +165,113 @@ if "suggestions" in st.session_state:
     defaulted_count = sum(
         1 for s in suggestions if any(v == "default" for k, v in s.sources.items() if k != "ext")
     )
-    if defaulted_count:
-        st.info(
-            f"ℹ️ {defaulted_count} of {len(suggestions)} file(s) have one or more "
-            "fields that could not be extracted and fell back to defaults — "
-            "review those before applying."
+
+    st.write("### Tag Files")
+    st.caption(
+        "Every previewed file is listed below with its naming fields, pre-filled from "
+        "extracted metadata (or filename/date heuristics) where possible. The "
+        '"needs review" column lists fields that could not be extracted and fell back '
+        "to a default (e.g. UNKNOWN) — check those. Edit any cell to control the final "
+        "filename directly, without needing the LLM. "
+        f"({defaulted_count} of {len(suggestions)} file(s) currently need review.)"
+    )
+
+    # Naming-field columns, in first-seen order, shared by every suggestion
+    # (config.defaults guarantees the same key set for all of them); "ext" is
+    # rendered onto the name automatically and isn't user-editable.
+    field_names = list(dict.fromkeys(k for s in suggestions for k in s.fields if k != "ext"))
+
+    tag_rows = []
+    for s in suggestions:
+        row = {"file": s.source.name}
+        for name in field_names:
+            row[name] = s.fields.get(name, "")
+        row["needs review"] = ", ".join(
+            k for k, v in s.sources.items() if v == "default" and k != "ext"
         )
+        row["issues"] = "; ".join(f"{i.severity}:{i.field}" for i in s.issues)
+        tag_rows.append(row)
 
-    with_issues = [s for s in suggestions if s.issues]
+    edited_rows = st.data_editor(
+        tag_rows,
+        key="tag_table",
+        use_container_width=True,
+        num_rows="fixed",
+        disabled=["file", "needs review", "issues"],
+    )
 
-    if with_issues:
-        st.warning(
-            f"⚠️ {len(with_issues)} files have validation issues. "
-            "Please fix the missing or invalid fields below:"
-        )
+    tag_button_col, llm_button_col = st.columns(2)
+    apply_tags_clicked = tag_button_col.button("Apply tags & preview names")
+    suggest_llm_clicked = llm_button_col.button("Suggest missing fields with LLM")
 
-        data = []
-        for s in with_issues:
-            row = {"_source": str(s.source.name)}
-            row.update(s.fields)
-            data.append(row)
+    if apply_tags_clicked:
+        from microscopy_naming_assistant.naming import finalize_fields, render_name
+        from microscopy_naming_assistant.profiles import load_profile
+        from microscopy_naming_assistant.validation import validate_fields
 
-        edited_df = st.data_editor(
-            data, num_rows="fixed", use_container_width=True, key="issue_editor"
-        )
+        profile = load_profile(profile_path) if profile_path else None
+        by_name = {s.source.name: s for s in suggestions}
 
-        if st.button("Re-validate & Update Fields"):
-            from microscopy_naming_assistant.naming import finalize_fields, render_name
-            from microscopy_naming_assistant.profiles import load_profile
-            from microscopy_naming_assistant.validation import validate_fields
+        for row in edited_rows:
+            s = by_name.get(row["file"])
+            if s is None:
+                continue
+            edited_fields = {
+                k: v for k, v in row.items() if k not in ("file", "needs review", "issues")
+            }
+            s.fields = finalize_fields(s.source, edited_fields, config)
+            s.target_name = render_name(s.fields, config)
+            s.issues = validate_fields(s.fields, profile) if profile else []
+        st.rerun()
 
-            profile = load_profile(profile_path) if profile_path else None
+    if suggest_llm_clicked:
+        from microscopy_naming_assistant.llm import suggest_fields_with_ollama
+        from microscopy_naming_assistant.naming import finalize_fields, render_name
+        from microscopy_naming_assistant.profiles import load_profile
+        from microscopy_naming_assistant.validation import validate_fields
 
-            by_source = {s.source.name: s for s in with_issues}
-            for row in edited_df:
-                s = by_source.get(row["_source"])
-                if s is None:
+        profile = load_profile(profile_path) if profile_path else None
+        filled_count = 0
+
+        with st.spinner("Asking the local LLM…"):
+            for s in suggestions:
+                missing_fields = [k for k, v in s.sources.items() if v == "default" and k != "ext"]
+                if not missing_fields:
                     continue
-                new_fields = {k: v for k, v in row.items() if k != "_source"}
-                s.fields = finalize_fields(s.source, new_fields, config)
+
+                current_fields = {k: v for k, v in s.fields.items() if k != "ext"}
+                llm_fields = suggest_fields_with_ollama(
+                    current_fields=current_fields,
+                    original_name=s.source.name,
+                    endpoint=str(config.llm.get("endpoint", llm_endpoint)),
+                    model=llm_model,
+                    timeout_seconds=int(config.llm.get("timeout_seconds", llm_timeout)),
+                    preferred_models=[str(x) for x in config.llm.get("preferred_models", [])],
+                )
+
+                merged = dict(current_fields)
+                for name in missing_fields:
+                    value = llm_fields.get(name, "")
+                    if value:
+                        merged[name] = value
+                        s.sources[name] = "llm"
+                        filled_count += 1
+
+                s.fields = finalize_fields(s.source, merged, config)
                 s.target_name = render_name(s.fields, config)
                 s.issues = validate_fields(s.fields, profile) if profile else []
+
+        if filled_count > 0:
+            st.success(
+                f"Filled {filled_count} field(s) from LLM suggestions — "
+                "review them in the table."
+            )
             st.rerun()
+        else:
+            st.info(
+                "No LLM suggestions available. Is Ollama running and a model installed? "
+                "You can still tag fields manually."
+            )
 
     from microscopy_naming_assistant.service import recalculate_batch
 
