@@ -43,6 +43,13 @@ Format masks instead of regex (`E##`, `X#+`), an example under every field, and 
 "plan the name before you acquire" mode that previews the exact filename and exports
 a naming guide or a reusable profile.
 
+### Free-text experiment description → structured metadata (near-term candidate)
+For image data with no embedded metadata, add an "experiment description" field where
+the user describes what they did in plain language. The chosen LLM formulates that free
+text into structured naming fields and injects them into a new editable metadata table
+for the user to review, correct, and extend — turning "I know what I did" into a
+conforming filename with no file metadata required.
+
 ### Web app re-platform (under discussion)
 Deliver naming as a static website: naming rules/masks, the planner, and OME-TIFF
 metadata read client-side in the browser (no upload, no install); vendor formats
