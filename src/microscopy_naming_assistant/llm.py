@@ -1,3 +1,16 @@
+"""Local-LLM enhancement layer for microscopy filename suggestions.
+
+Naming in this project is deterministic-first: the base name is always built
+from extracted metadata and filename keywords, before any LLM is consulted.
+This module's job is strictly to *enhance* that deterministic base -- filling
+in genuinely missing fields, and formatting/tidying values -- grounded only in
+the extracted metadata, the original filename, and (when supplied) the user's
+own description. It must never *originate* biological identity (experiment
+type, marker/fluorophore, sample, magnification, date) that isn't already
+evidenced in those inputs. When in doubt, the model is instructed to omit a
+key rather than guess.
+"""
+
 from __future__ import annotations
 
 import json
@@ -89,8 +102,15 @@ def suggest_fields_with_ollama(
     model: str,
     timeout_seconds: int,
     preferred_models: list[str] | None = None,
+    user_description: str | None = None,
 ) -> dict[str, str]:
     """Ask a local/free LLM (via Ollama) to refine naming fields.
+
+    This is an *enhancer*, not an originator: the model may only fill in or
+    tidy fields that are directly supported by the extracted metadata, the
+    original filename, or an optional user-supplied description. It must
+    never fabricate biological identity (marker, experiment type, sample,
+    magnification, date) that isn't evidenced in those inputs.
 
     Returns a partial dictionary of suggested fields. Invalid JSON responses are
     ignored safely.
@@ -104,15 +124,33 @@ def suggest_fields_with_ollama(
     if resolved_model is None:
         return {}
 
-    prompt = (
-        "You are helping standardize microscopy filenames. "
-        "Return only JSON with any of these keys: "
-        "date, exptype, sample, magnification, markers, notes. "
-        "Use uppercase for exptype/sample/magnification/markers/notes. "
-        "Do not invent values if uncertain.\n\n"
-        f"Original filename: {original_name}\n"
-        f"Current extracted fields: {json.dumps(current_fields)}"
-    )
+    prompt_lines = [
+        "Role: You refine and format microscopy filename fields. You do NOT invent facts.",
+        "Allowed keys only: date, exptype, sample, magnification, markers, notes.",
+        "Hard rules:",
+        "1. Only propose a value directly supported by the provided extracted "
+        "metadata, the original filename, or the user's description.",
+        "2. NEVER fabricate markers, experiment type, sample, magnification, or "
+        "date from weak or absent cues. If a field is not evidenced, OMIT its "
+        "key entirely. Omission is always better than a guess.",
+        "3. Do NOT change or overwrite any value already present in the current "
+        "fields -- only fill genuinely missing ones.",
+        "4. Do not infer biological identity (which fluorophore/marker, which "
+        "experiment type) unless it is explicitly present in the inputs.",
+        "5. Format only: uppercase exptype/sample/magnification/markers/notes; "
+        "keep date as YYYY-MM-DD.",
+        "6. Return a compact JSON object containing ONLY the keys you can "
+        "justify from the inputs. If nothing can be justified, return {}.",
+        "",
+        f"Original filename: {original_name}",
+        f"Current extracted fields: {json.dumps(current_fields)}",
+    ]
+    if user_description:
+        prompt_lines.append(
+            "User-provided description (authoritative context -- use this to "
+            f"enhance the name): {user_description}"
+        )
+    prompt = "\n".join(prompt_lines)
 
     payload: dict[str, Any] = {
         "model": resolved_model,

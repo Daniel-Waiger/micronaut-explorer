@@ -60,3 +60,62 @@ def test_suggest_fields_filters_allowed_keys(monkeypatch) -> None:
         timeout_seconds=3,
     )
     assert result == {"sample": "E03", "notes": "GOOD"}
+
+
+def _captured_prompt_text(captured_payload: dict) -> str:
+    return " ".join(str(m.get("content", "")) for m in captured_payload["messages"])
+
+
+def test_suggest_fields_includes_user_description_in_prompt(monkeypatch) -> None:
+    captured: dict = {}
+
+    def _capture_post(url, json=None, timeout=None):
+        captured["payload"] = json
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"message": {"content": "{}"}}
+        return response
+
+    monkeypatch.setattr(llm.requests, "post", _capture_post)
+
+    result = llm.suggest_fields_with_ollama(
+        current_fields={"sample": "E01"},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+        user_description="stained for GFP and DAPI",
+    )
+
+    assert result == {}
+    prompt_text = _captured_prompt_text(captured["payload"])
+    assert "stained for GFP and DAPI" in prompt_text
+
+
+def test_suggest_fields_prompt_contains_guardrail_language(monkeypatch) -> None:
+    captured: dict = {}
+
+    def _capture_post(url, json=None, timeout=None):
+        captured["payload"] = json
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"message": {"content": "{}"}}
+        return response
+
+    monkeypatch.setattr(llm.requests, "post", _capture_post)
+
+    llm.suggest_fields_with_ollama(
+        current_fields={"sample": "E01"},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+    )
+
+    prompt_text = _captured_prompt_text(captured["payload"])
+    # Robust substring checks for the guardrail philosophy, not brittle exact wording.
+    assert "OMIT" in prompt_text
+    assert "do not" in prompt_text.lower()
+    assert "do not invent facts" in prompt_text.lower()
+    for key in ("date", "exptype", "sample", "magnification", "markers", "notes"):
+        assert key in prompt_text

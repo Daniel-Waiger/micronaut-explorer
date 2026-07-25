@@ -72,3 +72,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   alphanumeric shapes instead of the FACSI-specific `E##`/`X##` shapes. `profiles/facsi_default.json`
   is unchanged and remains as a separate, explicitly-named example of a restrictive lab profile
   for labs that want to start from a locked-down template.
+- Hardened the LLM prompt in `suggest_fields_with_ollama`: it now spells out an explicit,
+  numbered set of guardrails (allowed keys only; never fabricate markers/experiment
+  type/sample/magnification/date from weak or absent cues -- omit the key instead of guessing;
+  never overwrite a value already present in the current fields; format only, no invented
+  biological identity). Naming stays deterministic-first (metadata + keywords build the base
+  name); the LLM only *enhances* it, grounded in the extracted metadata, the filename, and an
+  optional new `user_description` argument (authoritative context supplied by the user) -- it
+  must never originate unsupported biological identity.
