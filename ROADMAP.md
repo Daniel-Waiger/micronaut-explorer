@@ -61,6 +61,36 @@ touch how `_extract_bioio_fields` reads these formats):
 - Optional, clearly-destructive future converter: opt-in "export each series to its own
   canonically-named file" — separate from the default rename.
 
+### Safe renaming (hardening cluster)
+A rename is a destructive graph operation; the tool must not break links or destroy identity:
+- Rename companion/sidecar files together (and never break a multi-file OME-TIFF set, whose
+  planes reference each other by filename); warn when companions are detected.
+- Always preserve the original filename (sidecar and/or embedded) so identity is recoverable
+  even if the rollback manifest is lost or the files are moved.
+- Mark LLM-suggested fields as provisional through to the final name (not just in-app), so a
+  guess never reads as ground truth once applied.
+- Warn before renaming files that are cloud-synced (e.g. Google Drive), locked/open, or
+  externally referenced; make batch apply transactional (all-or-nothing) or clearly resumable,
+  since a half-completed batch looks done.
+- Treat raw acquisition data as potentially immutable (data-integrity / ALCOA posture): offer a
+  "plan/sidecar only, don't mutate raw" mode; distinguish raw from working copies.
+- Filesystem edges: Windows MAX_PATH, case-insensitive collisions, reserved names.
+- Validation is a format check, not a truth check — never present "valid" as "correct"; make it
+  explicit that an empty allow-list validates nothing for that field.
+- Collisions hide real distinctions: prefer a unique/time component over a bare `_NN` suffix so
+  two different acquisitions never become indistinguishable.
+- Date provenance: `date` may come from file mtime (often the copy date, not acquisition) —
+  surface which, don't silently trust mtime.
+
+### LLM as enhancer, not originator (guardrails)
+Naming is deterministic-first: parse metadata + keywords to build a solid base name; the LLM only
+refines/formats it, grounded in the extracted metadata and the user's own input, and must never
+invent biological identity (markers, experiment type, sample) from weak cues. First-line coded
+guardrails live in `llm.py`'s prompt (do not fabricate; omit over guess; don't overwrite known
+values; treat a user-provided description as authoritative context). Deeper enforcement — validate
+LLM output against the available evidence, and keep suggestions reproducible (pin model/seed) — is
+a follow-on.
+
 ### Free-text experiment description → structured metadata (near-term candidate)
 For image data with no embedded metadata, add an "experiment description" field where
 the user describes what they did in plain language. The chosen LLM formulates that free
