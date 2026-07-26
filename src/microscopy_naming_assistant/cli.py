@@ -48,6 +48,7 @@ def cmd_suggest(args: argparse.Namespace) -> int:
         use_llm=args.llm,
         profile_path=profile_path,
         llm_model_override=args.llm_model,
+        user_description=args.describe,
     )
 
     strict_blocked = args.strict and any(i.severity == "error" for i in result.issues)
@@ -59,13 +60,24 @@ def cmd_suggest(args: argparse.Namespace) -> int:
             "fields": result.fields,
             "issues": [asdict(issue) for issue in result.issues],
             "sources": result.sources,
+            "reader": result.reader,
+            "extraction_error": result.extraction_error,
         }
+        if args.show_metadata:
+            payload["metadata"] = result.metadata_text
         print(json.dumps(payload))
         return 2 if strict_blocked else 0
 
     print(f"Source: {source.name}")
     print(f"Suggested: {result.target_name}")
     print(f"Fields: {result.fields}")
+
+    if args.show_metadata:
+        print(f"Reader: {result.reader or 'none'}")
+        if result.extraction_error:
+            print(f"Extraction problem: {result.extraction_error}")
+        print("Metadata read from file:")
+        print(result.metadata_text or "(none)")
 
     if result.issues:
         print("Validation:")
@@ -127,6 +139,7 @@ def cmd_batch(args: argparse.Namespace) -> int:
         strict=args.strict,
         llm_model_override=args.llm_model,
         conflict_strategy=args.conflict_strategy,
+        user_description=args.describe,
     )
 
     if not batch.suggestions:
@@ -236,6 +249,16 @@ def build_parser() -> argparse.ArgumentParser:
     p_suggest.add_argument(
         "--json", action="store_true", help="Print machine-readable JSON instead of text"
     )
+    p_suggest.add_argument(
+        "--show-metadata",
+        action="store_true",
+        help="Print the raw metadata read from the file (what Fiji's Show Info displays)",
+    )
+    p_suggest.add_argument(
+        "--describe",
+        default=None,
+        help="Plain-language description of the experiment, passed to the LLM as context",
+    )
     p_suggest.set_defaults(func=cmd_suggest)
 
     p_batch = sub.add_parser("batch", help="Batch rename files")
@@ -248,6 +271,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--llm-model",
         default=None,
         help="Optional Ollama model override (use 'auto' to auto-select local model)",
+    )
+    p_batch.add_argument(
+        "--describe",
+        default=None,
+        help="Plain-language description of the experiment, passed to the LLM as context",
     )
     p_batch.add_argument("--strict", action="store_true", help="Skip files with validation errors")
     p_batch.add_argument(

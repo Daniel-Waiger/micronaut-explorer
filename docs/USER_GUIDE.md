@@ -115,10 +115,17 @@ After you click **Preview Renames**, every previewed file appears as one row in 
 - The **issues** column shows validation problems (from your profile, if one is set), each as `severity:field`.
 - You can **edit any editable cell directly** to control exactly what the final filename will be. No LLM is required — manual tagging alone fully drives the result. (The `file`, `needs review`, and `issues` columns are read-only.)
 
-Two buttons sit below the table:
+Below the table is an **Experiment description** box and two buttons:
 
+- **Experiment description (optional)** — describe what you did in plain language, e.g. *"CT electroporation, sox/arl/gfp/dapi, embryo 3, 93x glycerol objective"*. It is used only by the LLM, as authoritative context alongside the file's own metadata. This is the way to name images whose files carry no usable metadata: you know what you did, and this turns that into a conforming filename.
 - **Apply tags & preview names** — takes your edited cells, re-runs sanitization and validation, and updates the planned target names. Use this after editing to see the result.
-- **Suggest missing fields with LLM** — only fills fields that are *currently missing* (still on a default), and never overwrites values you or the metadata already provided. If no local model is available, it reports that gracefully and leaves your manual work untouched; you can still tag by hand.
+- **Suggest missing fields with LLM** — only fills fields that are *currently missing* (still on a default), and never overwrites values you or the metadata already provided. The model is given the file's metadata and filename together with your description, and is told to prefer the metadata when they disagree. If no local model is available, it reports that gracefully and leaves your manual work untouched; you can still tag by hand.
+
+### Checking what was actually in the file
+
+Expand **Metadata read from files** to see exactly what the reader found inside any previewed file — the same record Fiji shows under Image > Show Info — along with which reader handled it. When a field falls back to `UNKNOWN`, this tells you whether the file genuinely never carried that field or the extractor merely missed it. Files that yielded no readable metadata at all are called out at the top of the panel.
+
+This matters more than it sounds for ImageJ/Fiji exports. When Fiji writes a TIFF it usually moves the original vendor metadata into an ImageJ `Info` block rather than standard TIFF fields, so a file that looks stripped often still carries its full acquisition record. Micronaut reads that block, plus OME metadata, channel names, and per-scene metadata for multi-series containers (LIF series, CZI scenes, ND2 points).
 
 ## 6. Planned Renames and Apply
 
@@ -164,6 +171,31 @@ A **validation profile** is a small JSON file of naming rules for a lab or user.
 | `magnification_pattern` | A regex the `magnification` field must fully match | `^X\d{2,3}$` (X40, X100, …) |
 | `notes_pattern` | A regex the `notes` field must fully match | `^[A-Za-z0-9_-]+$` |
 | `unknown_marker_policy` | What to do with markers not in `allowed_markers` | `warn` / `allow` / `block` |
+| `filename_extraction_mask` | Optional. Reads fields *out of* existing filenames (see below) | `{date}_{exptype}_{sample}` |
+
+### Reading fields out of existing filenames
+
+Some images carry no usable embedded metadata — ImageJ `.tif` exports, for
+instance, are typically stripped. If those files already follow a naming
+convention of your own, `filename_extraction_mask` lets μicronaut read the
+fields straight out of the filename.
+
+Describe the layout with placeholders, e.g. `{date}_{exptype}_{sample}_{magnification}`.
+The available placeholders are `date`, `exptype`, `sample`, `magnification`,
+`markers`, and `notes`.
+
+Two rules matter:
+
+- **Each placeholder matches one segment.** It stops at the neighbouring
+  separator rather than swallowing the rest of the name.
+- **The whole filename must match.** If a file doesn't fit the convention, the
+  mask is ignored for that file and μicronaut falls back to its normal
+  metadata-and-keyword extraction — it never applies a partial match, which
+  would produce confidently-wrong fields.
+
+A mask outranks values read from the file's own metadata, because it is an
+explicit statement about how *your* files are named. If you leave it blank,
+μicronaut uses embedded metadata plus keyword heuristics as usual.
 
 ### Empty allow-lists mean "no restriction"
 
@@ -181,7 +213,7 @@ This applies only when `allowed_markers` is non-empty and a file has a marker th
 
 ### The "Create a validation profile" wizard
 
-Rather than hand-editing JSON, expand **Create a validation profile** at the bottom of the app to build one through a form. Fill in the profile name, comma-separated allowed experiment types and markers, the three regex patterns, and the unknown-marker policy, then set a **Save path** (e.g. `profiles/my_lab.json`) and click **Create profile**. Point the sidebar Profile path at the file you saved to start using it.
+Rather than hand-editing JSON, expand **Create a validation profile** at the bottom of the app to build one through a form. Fill in the profile name, comma-separated allowed experiment types and markers, the three regex patterns, the unknown-marker policy, and optionally a filename extraction mask, then set a **Save path** (e.g. `profiles/my_lab.json`) and click **Create profile**. Point the sidebar Profile path at the file you saved to start using it.
 
 ### A stricter example to model on
 

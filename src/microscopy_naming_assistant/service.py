@@ -5,7 +5,7 @@ from pathlib import Path
 
 from .config import load_config
 from .llm import suggest_fields_with_ollama
-from .metadata import extract_metadata_with_sources
+from .metadata import extract_metadata_detailed
 from .naming import finalize_fields, render_name
 from .profiles import load_profile
 from .validation import ValidationIssue, validate_fields
@@ -18,6 +18,9 @@ class SuggestionResult:
     fields: dict[str, str]
     issues: list[ValidationIssue]
     sources: dict[str, str] = field(default_factory=dict)
+    metadata_text: str = ""
+    reader: str = ""
+    extraction_error: str = ""
 
 
 @dataclass
@@ -33,10 +36,16 @@ def suggest_for_file(
     use_llm: bool = False,
     profile_path: Path | None = None,
     llm_model_override: str | None = None,
+    user_description: str | None = None,
 ) -> SuggestionResult:
     config = load_config(config_path)
-    extracted, ex_sources = extract_metadata_with_sources(
-        file_path, timeout_seconds=int(config.extraction_timeout_seconds)
+
+    profile = load_profile(profile_path) if profile_path is not None else None
+
+    extracted, ex_sources, detail = extract_metadata_detailed(
+        file_path,
+        timeout_seconds=int(config.extraction_timeout_seconds),
+        extraction_mask=profile.filename_extraction_mask if profile else None,
     )
 
     if use_llm and bool(config.llm.get("enabled", False)):
@@ -48,10 +57,15 @@ def suggest_for_file(
             model=llm_model,
             timeout_seconds=int(config.llm.get("timeout_seconds", 30)),
             preferred_models=[str(x) for x in config.llm.get("preferred_models", [])],
+            user_description=user_description,
+            metadata_text=detail.metadata_text,
         )
-        extracted = {**extracted, **llm_fields}
-        for key in llm_fields:
-            ex_sources[key] = "llm"
+        # Fill only genuinely missing fields. The LLM is an enhancer: a value we
+        # actually extracted from the file outranks anything the model proposes.
+        for key, value in llm_fields.items():
+            if key not in extracted:
+                extracted[key] = value
+                ex_sources[key] = "llm"
 
     fields = finalize_fields(file_path, extracted, config)
 
@@ -62,8 +76,7 @@ def suggest_for_file(
     }
 
     issues: list[ValidationIssue] = []
-    if profile_path is not None:
-        profile = load_profile(profile_path)
+    if profile is not None:
         issues = validate_fields(fields, profile)
 
     target_name = render_name(fields, config)
@@ -73,6 +86,9 @@ def suggest_for_file(
         fields=fields,
         issues=issues,
         sources=sources,
+        metadata_text=detail.metadata_text,
+        reader=detail.reader,
+        extraction_error=detail.error,
     )
 
 
@@ -125,6 +141,7 @@ def plan_batch(
     strict: bool = False,
     llm_model_override: str | None = None,
     conflict_strategy: str = "suffix",
+    user_description: str | None = None,
 ) -> BatchResult:
     matches = input_dir.rglob(pattern) if recursive else input_dir.glob(pattern)
     files = [p for p in matches if p.is_file()]
@@ -137,6 +154,7 @@ def plan_batch(
             use_llm=use_llm,
             profile_path=profile_path,
             llm_model_override=llm_model_override,
+            user_description=user_description,
         )
         suggestions.append(result)
 

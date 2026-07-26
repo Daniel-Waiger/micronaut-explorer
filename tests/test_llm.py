@@ -92,6 +92,59 @@ def test_suggest_fields_includes_user_description_in_prompt(monkeypatch) -> None
     assert "stained for GFP and DAPI" in prompt_text
 
 
+def test_suggest_fields_includes_file_metadata_in_prompt(monkeypatch) -> None:
+    captured: dict = {}
+
+    def _capture_post(url, json=None, timeout=None):
+        captured["payload"] = json
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"message": {"content": "{}"}}
+        return response
+
+    monkeypatch.setattr(llm.requests, "post", _capture_post)
+
+    llm.suggest_fields_with_ollama(
+        current_fields={"sample": "E01"},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+        metadata_text="ObjectiveName = HC PL APO 93x\nChannelName #0 = GFP green",
+    )
+
+    prompt_text = _captured_prompt_text(captured["payload"])
+    assert "HC PL APO 93x" in prompt_text
+    assert "GFP green" in prompt_text
+
+
+def test_suggest_fields_truncates_huge_metadata_blob(monkeypatch) -> None:
+    # A vendor XML dump must not blow a small local model's context window.
+    captured: dict = {}
+
+    def _capture_post(url, json=None, timeout=None):
+        captured["payload"] = json
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"message": {"content": "{}"}}
+        return response
+
+    monkeypatch.setattr(llm.requests, "post", _capture_post)
+
+    llm.suggest_fields_with_ollama(
+        current_fields={},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+        metadata_text="X" * (llm.MAX_PROMPT_METADATA_CHARS * 3),
+    )
+
+    prompt_text = _captured_prompt_text(captured["payload"])
+    assert "[truncated]" in prompt_text
+    assert len(prompt_text) < llm.MAX_PROMPT_METADATA_CHARS * 2
+
+
 def test_suggest_fields_prompt_contains_guardrail_language(monkeypatch) -> None:
     captured: dict = {}
 

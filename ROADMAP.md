@@ -98,6 +98,9 @@ text into structured naming fields and injects them into a new editable metadata
 for the user to review, correct, and extend — turning "I know what I did" into a
 conforming filename with no file metadata required.
 
+### Open-weights model support (near-term candidate)
+Add support for local and open-weights models such as Qwen 3.5 and Gemma 30, allowing users to run the metadata enhancer and experiment describer without relying on closed-source APIs or sending data externally.
+
 ### Web app re-platform (under discussion)
 Deliver naming as a static website: naming rules/masks, the planner, and OME-TIFF
 metadata read client-side in the browser (no upload, no install); vendor formats

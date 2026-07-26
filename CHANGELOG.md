@@ -15,8 +15,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI no longer hangs: reader/Bio-Formats-dependent tests are split behind an `integration` pytest
   marker, so the default test run (`pytest -m "not integration"`) is fast and green; a global
   `pytest-timeout` is also in place as a safety net.
+- Synthesized channel names (`Channel:0:0`, `C0`, …) that bioio emits when a format carries no
+  real channel names were being written into filenames as if they were fluorophores — and, worse,
+  they unconditionally overwrote markers that had been correctly parsed from the filename or
+  metadata. They are now recognized as placeholders and discarded.
+- Metadata extraction could never have returned a large payload from its subprocess: the parent
+  called `Process.join(timeout)` *before* reading the queue, but a `Queue.put` larger than the
+  OS pipe buffer (~64KB) blocks the child until the parent drains it. Any metadata-rich file
+  would therefore have been declared timed-out and killed, losing the payload. The parent now
+  reads before joining.
+- `_extract_near_key` could not read the `KeyName = value` shape that vendor metadata
+  overwhelmingly uses (`ObjectiveName`, `ExperimentName`, `ChannelName #0`): anchoring on a hint
+  like `Objective` matched, then captured the remainder of the *key name* rather than the value,
+  so fields plainly present in the metadata were silently missed.
+- Extraction blobs are now trimmed per section rather than truncating the joined string, so one
+  verbose section (a large OME-XML dump) can no longer crowd every later section out entirely.
+- The LLM could overwrite a field that had genuinely been extracted from the file; it now fills
+  only missing fields, matching the documented enhancer-not-originator contract that the prompt
+  already claimed.
+- Drag-and-drop upload in the Streamlit UI wrote and read each file one at a time, so a batch
+  containing companion files (e.g. a multi-file OME-TIFF set, whose planes reference each other
+  by filename) raised `FileNotFoundError`. The whole batch is now written to the temporary
+  directory before any of it is read.
 
 ### Added
+- Full metadata extraction, replacing a read that only ever saw a thin slice of each file.
+  Previously the extractor scanned `str(BioImage.metadata)` alone; for an ImageJ/Fiji-exported
+  TIFF that is just the structural header (`ImageJ=1.54f images=210 channels=3 ...`), so the
+  vendor acquisition record Fiji shows under Image > Show Info was invisible and such files
+  named out as `UNKNOWN`. Extraction now harvests every reachable surface into one labelled
+  blob: `metadata`, the structured `ome_metadata` model, `channel_names`,
+  `physical_pixel_sizes`, `dims`, per-scene metadata for multi-series containers (LIF series /
+  CZI scenes / ND2 points), and raw TIFF tags — including the ImageJ `Info` block
+  (`IJMetadata`), which is where an ImageJ export stashes the original vendor metadata.
+- Acquisition date is now read from metadata (`AcquisitionDate`, `CreationDate`, `DateTime`, …)
+  instead of always deriving `date` from the file mtime, which is usually the date the file was
+  *copied* rather than acquired.
+- The LLM is now grounded in the file's own metadata: `suggest_fields_with_ollama` takes a
+  `metadata_text` argument and includes it in the prompt alongside the filename, so it can
+  recover fields stated in vendor prose that no regex was written for. The prompt instructs it
+  to prefer the metadata over the filename when the two disagree. Blob is truncated to keep a
+  small local model's context window usable.
+- Free-text "Experiment description" input in the Streamlit UI and `--describe` on `mna suggest`
+  / `mna batch`, wired into the LLM's existing `user_description` context (previously accepted
+  by `llm.py` but never supplied by any caller).
+- "Metadata read from files" viewer in the Streamlit UI and `--show-metadata` on `mna suggest`,
+  showing exactly what the reader found — so a missing field can be diagnosed as genuinely
+  absent from the file rather than missed by the extractor. `mna suggest --json` now also
+  reports `reader` and `extraction_error`.
 - Native bioio reader plugins (`bioio-ome-tiff`, `bioio-tifffile`, `bioio-lif`, `bioio-nd2`)
   so OME-TIFF, TIFF, LIF, and ND2 files are read with plain Python/C readers instead of
   spinning up a JVM through Bio-Formats; bioio auto-prefers these native, more specific
@@ -41,6 +87,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   saved without hand-editing JSON.
 - Spinner feedback in the Streamlit UI while metadata is read and batches are planned, so long
   operations no longer look frozen.
+- Fallback extraction for images whose embedded metadata was stripped (e.g. ImageJ `.tif`
+  exports), so they no longer fall straight through to placeholder defaults:
+  - An optional `filename_extraction_mask` on a profile reads fields out of filenames that
+    already follow a convention (`{date}_{exptype}_{sample}_{magnification}`; placeholders:
+    `date`, `exptype`, `sample`, `magnification`, `markers`, `notes`). Each placeholder matches a
+    single segment and the whole filename must match, so a non-conforming file is skipped rather
+    than half-parsed. A mask outranks values read from the file's own metadata. Exposed in the
+    Streamlit profile wizard and documented in the README/user guide.
+  - Deterministic keyword scanning of the filename stem now recovers magnification written as
+    `x 93` and samples written as `embryo 3`/`sample 3`, and looks for markers in the stem.
+  - Anything still missing after those two passes falls through to the existing (optional) Ollama
+    step, keeping the deterministic-first, LLM-as-enhancer ordering.
+- `scripts/hardware_check.py`: reports system RAM/VRAM and suggests a local open-weights model
+  size, groundwork for the planned open-weights model support.
 
 ### Changed
 - Unified field assembly: validation and filename rendering now both derive from a single

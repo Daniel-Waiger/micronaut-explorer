@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 import microscopy_naming_assistant.cli as cli
+import microscopy_naming_assistant.metadata as metadata
 import microscopy_naming_assistant.service as service
 from microscopy_naming_assistant.cli import build_parser
 from microscopy_naming_assistant.config import default_config, save_config
@@ -23,7 +24,12 @@ def test_plan_batch_strict_skips_validation_errors(tmp_path: Path, monkeypatch) 
     f2.write_bytes(b"b")
 
     def fake_suggest(
-        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
     ):
         return service.SuggestionResult(
             source=file_path,
@@ -54,7 +60,12 @@ def test_plan_batch_detects_collisions(tmp_path: Path, monkeypatch) -> None:
     f2.write_bytes(b"b")
 
     def fake_suggest(
-        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
     ):
         return service.SuggestionResult(
             source=file_path,
@@ -89,7 +100,12 @@ def test_plan_batch_default_is_not_recursive(tmp_path: Path, monkeypatch) -> Non
     nested.write_bytes(b"b")
 
     def fake_suggest(
-        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
     ):
         return service.SuggestionResult(
             source=file_path,
@@ -121,7 +137,12 @@ def test_plan_batch_recursive_true_includes_nested_files(tmp_path: Path, monkeyp
     nested.write_bytes(b"b")
 
     def fake_suggest(
-        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
     ):
         return service.SuggestionResult(
             source=file_path,
@@ -199,7 +220,12 @@ def test_cmd_suggest_json_prints_single_json_object(tmp_path: Path, monkeypatch,
     source.write_bytes(b"x")
 
     def fake_suggest_for_file(
-        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
     ):
         return service.SuggestionResult(
             source=file_path,
@@ -245,7 +271,12 @@ def test_cmd_suggest_json_includes_sources_map(tmp_path: Path, monkeypatch, caps
     }
 
     def fake_suggest_for_file(
-        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
     ):
         return service.SuggestionResult(
             source=file_path,
@@ -280,7 +311,12 @@ def test_cmd_suggest_json_strict_mode_blocks_without_human_line(
     source.write_bytes(b"x")
 
     def fake_suggest_for_file(
-        file_path, config_path, use_llm=False, profile_path=None, llm_model_override=None
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
     ):
         return service.SuggestionResult(
             source=file_path,
@@ -350,6 +386,7 @@ def test_cmd_batch_json_dry_run_prints_single_json_object(
         strict=False,
         llm_model_override=None,
         conflict_strategy="suffix",
+        user_description=None,
     ):
         return fake_batch
 
@@ -417,6 +454,7 @@ def test_cmd_batch_json_apply_reports_renamed_and_manifest(
         strict=False,
         llm_model_override=None,
         conflict_strategy="suffix",
+        user_description=None,
     ):
         return fake_batch
 
@@ -487,6 +525,7 @@ def test_cmd_batch_report_csv_writes_source_target_issues(
         strict=False,
         llm_model_override=None,
         conflict_strategy="suffix",
+        user_description=None,
     ):
         return fake_batch
 
@@ -547,6 +586,7 @@ def test_cmd_batch_report_json_parses_to_expected_list(tmp_path: Path, monkeypat
         strict=False,
         llm_model_override=None,
         conflict_strategy="suffix",
+        user_description=None,
     ):
         return fake_batch
 
@@ -589,13 +629,11 @@ def test_suggest_for_file_forwards_configured_timeout(tmp_path: Path, monkeypatc
 
     captured_kwargs: dict = {}
 
-    def fake_extract_metadata_with_sources(file_path, **kwargs):
+    def fake_extract_metadata_detailed(file_path, **kwargs):
         captured_kwargs.update(kwargs)
-        return {}, {}
+        return {}, {}, metadata.ExtractionDetail()
 
-    monkeypatch.setattr(
-        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
-    )
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
 
     service.suggest_for_file(
         file_path=source,
@@ -613,12 +651,14 @@ def test_suggest_for_file_unifies_fields_and_name(tmp_path: Path, monkeypatch) -
     source = tmp_path / "test_E1.tif"
     source.write_bytes(b"x")
 
-    def fake_extract_metadata_with_sources(file_path, **kwargs):
-        return {"markers": "GFP", "sample": "E05"}, {"markers": "metadata", "sample": "metadata"}
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        return (
+            {"markers": "GFP", "sample": "E05"},
+            {"markers": "metadata", "sample": "metadata"},
+            metadata.ExtractionDetail(),
+        )
 
-    monkeypatch.setattr(
-        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
-    )
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
 
     result = service.suggest_for_file(
         file_path=source,
@@ -639,12 +679,14 @@ def test_suggest_for_file_tags_defaulted_field_as_default(tmp_path: Path, monkey
     source = tmp_path / "test_E1.tif"
     source.write_bytes(b"x")
 
-    def fake_extract_metadata_with_sources(file_path, **kwargs):
-        return {"date": "2025-01-02", "sample": "E03"}, {"date": "filename", "sample": "filename"}
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        return (
+            {"date": "2025-01-02", "sample": "E03"},
+            {"date": "filename", "sample": "filename"},
+            metadata.ExtractionDetail(),
+        )
 
-    monkeypatch.setattr(
-        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
-    )
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
 
     result = service.suggest_for_file(
         file_path=source,
@@ -666,12 +708,14 @@ def test_suggest_for_file_tags_filename_derived_date_as_filename(
     source = tmp_path / "test_E1.tif"
     source.write_bytes(b"x")
 
-    def fake_extract_metadata_with_sources(file_path, **kwargs):
-        return {"date": "2025-01-02", "sample": "E03"}, {"date": "filename", "sample": "filename"}
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        return (
+            {"date": "2025-01-02", "sample": "E03"},
+            {"date": "filename", "sample": "filename"},
+            metadata.ExtractionDetail(),
+        )
 
-    monkeypatch.setattr(
-        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
-    )
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
 
     result = service.suggest_for_file(
         file_path=source,
@@ -683,7 +727,9 @@ def test_suggest_for_file_tags_filename_derived_date_as_filename(
     assert "ext" not in result.sources
 
 
-def test_suggest_for_file_tags_llm_overridden_field_as_llm(tmp_path: Path, monkeypatch) -> None:
+def test_llm_cannot_overwrite_a_field_read_from_the_file(tmp_path: Path, monkeypatch) -> None:
+    # The LLM is an enhancer: a value actually extracted from the file always
+    # wins over one the model proposes, no matter how confident the model is.
     config = default_config()
     config.llm["enabled"] = True
     config_path = tmp_path / "naming_scheme.json"
@@ -692,15 +738,76 @@ def test_suggest_for_file_tags_llm_overridden_field_as_llm(tmp_path: Path, monke
     source = tmp_path / "test_E1.tif"
     source.write_bytes(b"x")
 
-    def fake_extract_metadata_with_sources(file_path, **kwargs):
-        return {"date": "2025-01-02", "sample": "E03"}, {"date": "filename", "sample": "filename"}
+    def fake_extract(file_path, **kwargs):
+        return (
+            {"markers": "GFP", "sample": "E03"},
+            {"markers": "metadata", "sample": "metadata"},
+            metadata.ExtractionDetail(metadata_text="ChannelName = GFP"),
+        )
+
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract)
+    monkeypatch.setattr(
+        service, "suggest_fields_with_ollama", lambda **kwargs: {"markers": "MCHERRY"}
+    )
+
+    result = service.suggest_for_file(file_path=source, config_path=config_path, use_llm=True)
+
+    assert result.fields["markers"] == "GFP"
+    assert result.sources["markers"] == "metadata"
+
+
+def test_suggest_for_file_passes_metadata_text_to_llm(tmp_path: Path, monkeypatch) -> None:
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+    captured: dict = {}
+
+    def fake_extract(file_path, **kwargs):
+        return {}, {}, metadata.ExtractionDetail(metadata_text="ObjectiveName = 93x")
+
+    def fake_llm(**kwargs):
+        captured.update(kwargs)
+        return {}
+
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract)
+    monkeypatch.setattr(service, "suggest_fields_with_ollama", fake_llm)
+
+    result = service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+        use_llm=True,
+        user_description="93x glycerol objective",
+    )
+
+    assert captured["metadata_text"] == "ObjectiveName = 93x"
+    assert captured["user_description"] == "93x glycerol objective"
+    assert result.metadata_text == "ObjectiveName = 93x"
+
+
+def test_suggest_for_file_tags_llm_filled_field_as_llm(tmp_path: Path, monkeypatch) -> None:
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        return (
+            {"date": "2025-01-02", "sample": "E03"},
+            {"date": "filename", "sample": "filename"},
+            metadata.ExtractionDetail(),
+        )
 
     def fake_suggest_fields_with_ollama(**kwargs):
         return {"markers": "GFP"}
 
-    monkeypatch.setattr(
-        service, "extract_metadata_with_sources", fake_extract_metadata_with_sources
-    )
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
     monkeypatch.setattr(service, "suggest_fields_with_ollama", fake_suggest_fields_with_ollama)
 
     result = service.suggest_for_file(

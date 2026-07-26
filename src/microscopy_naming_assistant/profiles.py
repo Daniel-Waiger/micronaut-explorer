@@ -14,6 +14,7 @@ class ProfileRules:
     magnification_pattern: str
     notes_pattern: str
     unknown_marker_policy: str = "warn"
+    filename_extraction_mask: str | None = None
 
 
 def default_profile() -> ProfileRules:
@@ -28,6 +29,7 @@ def default_profile() -> ProfileRules:
         magnification_pattern=r"^[A-Za-z0-9]+$",
         notes_pattern=r"^[A-Za-z0-9_-]+$",
         unknown_marker_policy="warn",
+        filename_extraction_mask=None,
     )
 
 
@@ -40,6 +42,7 @@ def save_profile(path: Path, profile: ProfileRules) -> None:
         "magnification_pattern": profile.magnification_pattern,
         "notes_pattern": profile.notes_pattern,
         "unknown_marker_policy": profile.unknown_marker_policy,
+        "filename_extraction_mask": profile.filename_extraction_mask,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -57,4 +60,7 @@ def load_profile(path: Path) -> ProfileRules:
         magnification_pattern=payload.get("magnification_pattern", base.magnification_pattern),
         notes_pattern=payload.get("notes_pattern", base.notes_pattern),
         unknown_marker_policy=payload.get("unknown_marker_policy", base.unknown_marker_policy),
+        filename_extraction_mask=payload.get(
+            "filename_extraction_mask", base.filename_extraction_mask
+        ),
     )

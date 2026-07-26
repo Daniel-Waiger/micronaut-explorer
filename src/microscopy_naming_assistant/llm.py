@@ -27,6 +27,11 @@ DEFAULT_PREFERRED_MODELS = [
     "phi3:mini",
 ]
 
+# How much of the metadata blob to put in the prompt. Vendor metadata can run to
+# megabytes of XML, which would blow a small local model's context window and
+# bury the few lines that matter.
+MAX_PROMPT_METADATA_CHARS = 8_000
+
 
 def _to_tags_endpoint(chat_endpoint: str) -> str:
     endpoint = chat_endpoint.rstrip("/")
@@ -103,6 +108,7 @@ def suggest_fields_with_ollama(
     timeout_seconds: int,
     preferred_models: list[str] | None = None,
     user_description: str | None = None,
+    metadata_text: str | None = None,
 ) -> dict[str, str]:
     """Ask a local/free LLM (via Ollama) to refine naming fields.
 
@@ -111,6 +117,13 @@ def suggest_fields_with_ollama(
     original filename, or an optional user-supplied description. It must
     never fabricate biological identity (marker, experiment type, sample,
     magnification, date) that isn't evidenced in those inputs.
+
+    `metadata_text` is the raw metadata blob read from the file. Passing it
+    matters: the deterministic scanners only recognize patterns we thought to
+    write regexes for, whereas vendor metadata states things in prose and in
+    per-vendor key names. Giving the model the actual record -- alongside the
+    filename -- is what lets it recover fields the regexes miss, while keeping
+    it grounded in evidence rather than guessing from the filename alone.
 
     Returns a partial dictionary of suggested fields. Invalid JSON responses are
     ignored safely.
@@ -141,10 +154,22 @@ def suggest_fields_with_ollama(
         "keep date as YYYY-MM-DD.",
         "6. Return a compact JSON object containing ONLY the keys you can "
         "justify from the inputs. If nothing can be justified, return {}.",
+        "7. The file metadata below is the authoritative record of how the image "
+        "was acquired. Prefer it over the filename when the two disagree, and "
+        "quote values from it rather than reformulating them.",
         "",
         f"Original filename: {original_name}",
         f"Current extracted fields: {json.dumps(current_fields)}",
     ]
+    if metadata_text:
+        excerpt = metadata_text[:MAX_PROMPT_METADATA_CHARS]
+        if len(metadata_text) > MAX_PROMPT_METADATA_CHARS:
+            excerpt += "\n... [truncated]"
+        prompt_lines += [
+            "",
+            "File metadata read from the image (may be empty if the file carried none):",
+            excerpt,
+        ]
     if user_description:
         prompt_lines.append(
             "User-provided description (authoritative context -- use this to "

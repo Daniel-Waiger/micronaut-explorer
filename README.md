@@ -74,6 +74,33 @@ Notes:
 - No API key is required for local Ollama usage.
 - You can set `llm.model` to `auto` (default) to pick an installed local model automatically.
 
+The LLM sees both the original filename **and** the metadata read from the file,
+and is instructed to prefer the metadata when the two disagree. Naming stays
+deterministic-first: the base name is built by parsing metadata and filename
+keywords, and the model may only fill fields that are still missing — it never
+overwrites a value actually extracted from the file.
+
+You can also describe the experiment in plain language with `--describe` (or the
+"Experiment description" box in the UI). That text is treated as authoritative
+context, which is the way to name images whose files carry no usable metadata.
+
+## Seeing what was actually in your file
+
+When a field comes out as `UNKNOWN`, it helps to know whether the file never
+carried it or the extractor simply missed it:
+
+    mna suggest --input img.tif --show-metadata
+
+This prints everything the reader found — the same record Fiji shows under
+Image > Show Info — plus which reader was used. The Streamlit UI has the
+equivalent under "Metadata read from files".
+
+Worth knowing: an ImageJ/Fiji-exported TIFF usually keeps the original vendor
+metadata in the ImageJ `Info` block rather than in standard TIFF fields, so a
+file that looks "stripped" often still has its acquisition record. Micronaut
+reads that block, along with OME metadata, channel names, and per-scene metadata
+for multi-series containers (LIF/CZI/ND2).
+
 ## Streamlit UI
 
 Run local UI:
@@ -85,6 +112,8 @@ UI includes:
 - Folder mode: preview and apply renames in-place
 - Drag-and-drop mode: upload files to preview suggestions safely
 - Optional strict profile validation
+- "Metadata read from files": inspect the raw metadata behind each suggestion
+- "Experiment description": plain-language context handed to the LLM
 
 ## Quick start
 
@@ -156,6 +185,17 @@ Profile JSON controls validation policy for each user or lab:
 - magnification_pattern
 - notes_pattern
 - unknown_marker_policy (allow, warn, block)
+- filename_extraction_mask (optional)
+
+`filename_extraction_mask` describes a filename convention your existing files
+already follow, for images whose embedded metadata was stripped (e.g. ImageJ
+`.tif` exports). Write it with placeholders — `{date}_{exptype}_{sample}_{magnification}`
+— using any of `date`, `exptype`, `sample`, `magnification`, `markers`, `notes`.
+Each placeholder matches one segment (it will not swallow the separator), and the
+*whole* filename must match: a file that doesn't follow the convention is skipped
+rather than half-parsed into wrong fields. A mask takes precedence over values
+read from the file's own metadata, since it's an explicit statement about your
+naming. Leave it unset to rely on metadata plus keyword heuristics alone.
 
 `mna init-profile` writes a neutral, permissive starter profile: `allowed_experiment_types`
 and `allowed_markers` are empty, and an empty allow-list means "no restriction" rather than

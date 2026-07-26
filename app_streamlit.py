@@ -32,6 +32,31 @@ st.set_page_config(page_title="μicronaut", page_icon="🔬", layout="wide")
 st.title("μicronaut")
 st.caption("Preview and apply naming-convention renames with optional profile validation.")
 
+
+def _browse_for_folder(initial_dir: str = "") -> str | None:
+    """Open a native OS folder-picker dialog on the machine running this server.
+
+    Streamlit has no built-in folder picker (browser sandboxing means JS can't
+    return real filesystem paths), so this shells out to tkinter's dialog.
+    This only makes sense when the Streamlit server and the browser are the
+    same machine -- the normal case for `streamlit run app_streamlit.py` run
+    locally. Over a remote/hosted deployment it would open the dialog on the
+    server, not the visitor's machine, so it's not offered as a general
+    substitute for typing a path.
+    """
+    import tkinter as tk
+    from tkinter import filedialog
+
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    try:
+        selected = filedialog.askdirectory(initialdir=initial_dir or None, mustexist=True)
+    finally:
+        root.destroy()
+    return selected or None
+
+
 st.sidebar.header("Settings")
 config_path = Path(st.sidebar.text_input("Config path", value="naming_scheme.json")).expanduser()
 
@@ -126,7 +151,25 @@ if config.llm != loaded_llm_snapshot:
     save_config(config_path, config)
 
 st.subheader("Folder Mode (Preview + Apply)")
-folder_input = st.text_input("Input folder path", value="")
+
+st.session_state.setdefault("folder_input_path", "")
+if st.button("Browse…", use_container_width=True):
+    try:
+        chosen = _browse_for_folder(st.session_state["folder_input_path"])
+    except Exception as exc:
+        st.error(f"Could not open folder picker: {exc}")
+    else:
+        if chosen:
+            st.session_state["folder_input_path"] = chosen
+            st.rerun()
+
+folder_input = st.text_input(
+    "Input folder path",
+    key="folder_input_path",
+    help="Type a path, or click Browse… (opens a native folder picker; only "
+    "works when running this app on your own machine).",
+)
+
 recursive = st.checkbox(
     "Search subfolders",
     value=False,
@@ -200,6 +243,17 @@ if "suggestions" in st.session_state:
         disabled=["file", "needs review", "issues"],
     )
 
+    experiment_description = st.text_area(
+        "Experiment description (optional)",
+        key="experiment_description",
+        placeholder=(
+            "Describe what you did, in plain language — e.g. "
+            '"CT electroporation, sox/arl/gfp/dapi, embryo 3, 93x glycerol objective". '
+            "Used only by the LLM, as authoritative context alongside the file's own metadata."
+        ),
+        height=80,
+    )
+
     tag_button_col, llm_button_col = st.columns(2)
     apply_tags_clicked = tag_button_col.button("Apply tags & preview names")
     suggest_llm_clicked = llm_button_col.button("Suggest missing fields with LLM")
@@ -247,6 +301,8 @@ if "suggestions" in st.session_state:
                     model=llm_model,
                     timeout_seconds=int(config.llm.get("timeout_seconds", llm_timeout)),
                     preferred_models=[str(x) for x in config.llm.get("preferred_models", [])],
+                    user_description=experiment_description or None,
+                    metadata_text=s.metadata_text,
                 )
 
                 merged = dict(current_fields)
@@ -272,6 +328,29 @@ if "suggestions" in st.session_state:
                 "No LLM suggestions available. Is Ollama running and a model installed? "
                 "You can still tag fields manually."
             )
+
+    with st.expander("Metadata read from files", expanded=False):
+        st.caption(
+            "Exactly what the reader found inside each file — the same record Fiji shows "
+            "under Image > Show Info. Use it to check whether a field was genuinely absent "
+            "from the file or merely missed by the extractor."
+        )
+        no_metadata = [s.source.name for s in suggestions if not s.metadata_text]
+        if no_metadata:
+            st.warning(
+                f"{len(no_metadata)} file(s) yielded no readable metadata: "
+                + ", ".join(no_metadata[:5])
+                + ("…" if len(no_metadata) > 5 else "")
+            )
+        chosen = st.selectbox(
+            "File", [s.source.name for s in suggestions], key="metadata_viewer_file"
+        )
+        selected = next((s for s in suggestions if s.source.name == chosen), None)
+        if selected is not None:
+            st.caption(f"Reader: {selected.reader or 'none'}")
+            if selected.extraction_error:
+                st.error(f"Extraction problem: {selected.extraction_error}")
+            st.code(selected.metadata_text or "(no metadata found in this file)")
 
     from microscopy_naming_assistant.service import recalculate_batch
 
@@ -342,9 +421,15 @@ if uploaded:
     with tempfile.TemporaryDirectory(prefix="mna_upload_") as tmp:
         tmp_dir = Path(tmp)
         with st.spinner("Reading metadata…"):
+            # Persist the whole batch before reading any of it: companion files
+            # (e.g. a multi-file OME-TIFF set) reference each other by name, so
+            # reading file 1 fails unless file 2 is already on disk.
             for file_obj in uploaded:
                 tmp_path = tmp_dir / file_obj.name
                 tmp_path.write_bytes(file_obj.getbuffer())
+
+            for file_obj in uploaded:
+                tmp_path = tmp_dir / file_obj.name
                 result = suggest_for_file(
                     file_path=tmp_path,
                     config_path=config_path,
@@ -415,6 +500,17 @@ with st.expander("Create a validation profile", expanded=False):
         wizard_unknown_marker_policy = st.selectbox(
             "Unknown marker policy", ["warn", "allow", "block"]
         )
+        wizard_extraction_mask = st.text_input(
+            "Filename extraction mask (optional)",
+            value="",
+            help=(
+                "If your existing filenames already encode fields, describe the layout — "
+                "e.g. {date}_{exptype}_{sample}_{magnification}. Used for images whose "
+                "embedded metadata was stripped. Placeholders: date, exptype, sample, "
+                "magnification, markers, notes. The whole filename must match, or the "
+                "mask is ignored for that file."
+            ),
+        )
         wizard_save_path = st.text_input("Save path", value="profiles/my_lab.json")
 
         if st.form_submit_button("Create profile"):
@@ -431,6 +527,7 @@ with st.expander("Create a validation profile", expanded=False):
                     magnification_pattern=wizard_magnification_pattern,
                     notes_pattern=wizard_notes_pattern,
                     unknown_marker_policy=wizard_unknown_marker_policy,
+                    filename_extraction_mask=wizard_extraction_mask.strip() or None,
                 )
                 save_profile(Path(wizard_save_path), profile)
                 st.success(f"Saved profile to {wizard_save_path}")

@@ -125,8 +125,11 @@ def shot_section(pg, top_loc, bottom_loc, filename: str, pad: int = 12) -> bool:
             return False
         col = _main_column(pg)
         x = max((col["x"] if col else min(tb["x"], bb["x"])) - pad, 0)
-        width = (col["width"] if col else
-                 max(tb["x"] + tb["width"], bb["x"] + bb["width"]) - min(tb["x"], bb["x"])) + 2 * pad
+        if col:
+            span = col["width"]
+        else:
+            span = max(tb["x"] + tb["width"], bb["x"] + bb["width"]) - min(tb["x"], bb["x"])
+        width = span + 2 * pad
         y = max(tb["y"] - pad, 0)
         bottom = min(bb["y"] + bb["height"] + pad, VIEWPORT_H)
         pg.screenshot(path=str(out), clip={"x": x, "y": y, "width": width, "height": bottom - y})
@@ -168,12 +171,14 @@ def main() -> int:
         shot_section(page, folder_head, preview_btn, "section-folder-mode.png")
 
         # Drag-and-drop uploader
-        dd = page.locator('div[data-testid="stFileUploader"]').filter(
-            has_text="Drag-and-drop"
-        ).first
+        dd = (
+            page.locator('div[data-testid="stFileUploader"]').filter(has_text="Drag-and-drop").first
+        )
         if dd.count() == 0:
             dd = page.locator('div[data-testid="stFileUploader"]').first
-        _shot_clip_from_locator(page, dd, OUT_DIR / "section-drag-drop.png", pad=10, full_width=True)
+        _shot_clip_from_locator(
+            page, dd, OUT_DIR / "section-drag-drop.png", pad=10, full_width=True
+        )
 
         # Rollback Manager: heading down through Run Rollback button
         rb_head = page.get_by_text("Rollback Manager", exact=True).first
@@ -192,16 +197,22 @@ def main() -> int:
 
         # ---- Preview-dependent: tag table + planned renames ----
         try:
-            cfg = page.locator('div[data-testid="stTextInput"]').filter(
-                has_text="Config path"
-            ).locator("input").first
+            cfg = (
+                page.locator('div[data-testid="stTextInput"]')
+                .filter(has_text="Config path")
+                .locator("input")
+                .first
+            )
             cfg.fill(DEMO_CONFIG)
             cfg.press("Enter")
             page.wait_for_timeout(1500)
 
-            folder = page.locator('div[data-testid="stTextInput"]').filter(
-                has_text="Input folder path"
-            ).locator("input").first
+            folder = (
+                page.locator('div[data-testid="stTextInput"]')
+                .filter(has_text="Input folder path")
+                .locator("input")
+                .first
+            )
             folder.fill(DEMO_IMAGES)
             folder.press("Enter")
             page.wait_for_timeout(1000)
@@ -212,16 +223,18 @@ def main() -> int:
             page.wait_for_timeout(1500)
 
             tag_head = page.get_by_text("Tag Files", exact=True).first
-            table = page.locator('div[data-testid="stDataFrameResizable"], '
-                                 'div[data-testid="stDataEditor"]').first
+            table = page.locator(
+                'div[data-testid="stDataFrameResizable"], ' 'div[data-testid="stDataEditor"]'
+            ).first
             if table.count() == 0:
                 table = page.locator('div[data-testid="stDataEditor"]').first
             shot_section(page, tag_head, table, "section-tag-table.png")
 
             planned_head = page.get_by_text("Planned Renames", exact=True).first
             planned_head.scroll_into_view_if_needed(timeout=8000)
-            planned_df = page.locator('div[data-testid="stDataFrame"], '
-                                      'div[data-testid="stDataFrameResizable"]').last
+            planned_df = page.locator(
+                'div[data-testid="stDataFrame"], ' 'div[data-testid="stDataFrameResizable"]'
+            ).last
             shot_section(page, planned_head, planned_df, "section-planned-renames.png")
         except Exception as exc:  # noqa: BLE001
             print(f"  ! preview / tag-table / planned-renames (best-effort) failed: {exc}")

@@ -26,6 +26,7 @@ def test_profile_round_trip(tmp_path: Path) -> None:
     # Use an arbitrary, non-FACSI-specific list: the round trip should preserve
     # whatever was saved, not any particular lab's values.
     profile.allowed_experiment_types = ["FOO", "BAR"]
+    profile.filename_extraction_mask = "{date}_{exptype}_{sample}"
 
     path = tmp_path / "profile.json"
     save_profile(path, profile)
@@ -34,3 +35,12 @@ def test_profile_round_trip(tmp_path: Path) -> None:
     assert loaded.name == profile.name
     assert loaded.unknown_marker_policy == "block"
     assert loaded.allowed_experiment_types == ["FOO", "BAR"]
+    assert loaded.filename_extraction_mask == "{date}_{exptype}_{sample}"
+
+
+def test_profile_without_extraction_mask_loads(tmp_path: Path) -> None:
+    # Profiles written before the mask existed must still load.
+    path = tmp_path / "legacy.json"
+    path.write_text('{"name": "legacy"}', encoding="utf-8")
+
+    assert load_profile(path).filename_extraction_mask is None
