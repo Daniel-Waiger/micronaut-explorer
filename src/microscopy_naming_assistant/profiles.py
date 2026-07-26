@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -15,6 +15,10 @@ class ProfileRules:
     notes_pattern: str
     unknown_marker_policy: str = "warn"
     filename_extraction_mask: str | None = None
+    # Maps a naming field name (one of field_map.MAPPABLE_FIELDS) to an exact
+    # metadata key name; consumed by field_map.resolve_fields as `overrides`.
+    # profiles.py stays dependency-free, so field_map is not imported here.
+    field_key_map: dict[str, str] = field(default_factory=dict)
 
 
 def default_profile() -> ProfileRules:
@@ -30,6 +34,7 @@ def default_profile() -> ProfileRules:
         notes_pattern=r"^[A-Za-z0-9_-]+$",
         unknown_marker_policy="warn",
         filename_extraction_mask=None,
+        field_key_map={},
     )
 
 
@@ -43,6 +48,7 @@ def save_profile(path: Path, profile: ProfileRules) -> None:
         "notes_pattern": profile.notes_pattern,
         "unknown_marker_policy": profile.unknown_marker_policy,
         "filename_extraction_mask": profile.filename_extraction_mask,
+        "field_key_map": profile.field_key_map,
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -63,4 +69,5 @@ def load_profile(path: Path) -> ProfileRules:
         filename_extraction_mask=payload.get(
             "filename_extraction_mask", base.filename_extraction_mask
         ),
+        field_key_map=payload.get("field_key_map", base.field_key_map),
     )

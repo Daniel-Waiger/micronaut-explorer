@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .config import load_config
+from .config import NamingConfig, load_config
 from .llm import suggest_fields_with_ollama
 from .metadata import extract_metadata_detailed
 from .naming import finalize_fields, render_name
@@ -21,10 +21,25 @@ class SuggestionResult:
     metadata_text: str = ""
     reader: str = ""
     extraction_error: str = ""
+    # Key-provenance surfaced from ExtractionDetail: `key_paths` is the raw
+    # addressable metadata keys harvested for the (first) image, and
+    # `field_key_provenance` maps each naming field the key map resolved to
+    # the exact metadata key that supplied it (see field_map.resolve_fields).
+    key_paths: dict[str, str] = field(default_factory=dict)
+    field_key_provenance: dict[str, str] = field(default_factory=dict)
+    # Per-image (per-series) resolved-field records straight from
+    # ExtractionDetail.images (see metadata._per_image_records): one flat
+    # str->str dict per image, `{"index": ..., "name": ..., **resolved_fields}`.
+    # Feeds build_series_rows' sidecar view; never used for renaming here.
+    images: list[dict[str, str]] = field(default_factory=list)
 
 
 @dataclass
 class BatchResult:
+    # INVARIANT: `planned` must stay strictly 1:1 with real filesystem entries.
+    # apply_batch does an unguarded `src.rename(dst)` in a loop, so two results
+    # sharing one source path raise FileNotFoundError on the second iteration
+    # AND skip save_manifest, leaving the first rename unrollbackable.
     planned: list[tuple[Path, Path]]
     suggestions: list[SuggestionResult]
     skipped: list[str]
@@ -46,6 +61,7 @@ def suggest_for_file(
         file_path,
         timeout_seconds=int(config.extraction_timeout_seconds),
         extraction_mask=profile.filename_extraction_mask if profile else None,
+        field_key_map=profile.field_key_map if profile else None,
     )
 
     if use_llm and bool(config.llm.get("enabled", False)):
@@ -89,6 +105,9 @@ def suggest_for_file(
         metadata_text=detail.metadata_text,
         reader=detail.reader,
         extraction_error=detail.error,
+        key_paths=detail.key_paths,
+        field_key_provenance=detail.field_key_provenance,
+        images=detail.images,
     )
 
 
@@ -129,6 +148,53 @@ def recalculate_batch(
         planned.append((result.source, target))
 
     return BatchResult(planned=planned, suggestions=suggestions, skipped=skipped)
+
+
+def build_series_rows(
+    suggestions: list[SuggestionResult], config: NamingConfig
+) -> list[dict[str, str]]:
+    """Per-series sidecar rows for multi-image containers (LIF/ND2/CZI/OME-TIFF).
+
+    SAFETY CONSTRAINT: these rows are SIDECAR-ONLY. They must never be
+    appended to `BatchResult.planned` and must never drive a per-series
+    rename or pixel export -- `apply_batch` does an unguarded `src.rename(dst)`
+    in a loop, so N rows sharing one source path would raise
+    `FileNotFoundError` on the second iteration AND skip `save_manifest`,
+    leaving the first rename unrollbackable. This function therefore neither
+    takes nor mutates a `BatchResult`: it is a pure `suggestions -> rows`
+    transform, callable only for display/export, never wired into
+    `recalculate_batch`, `plan_batch`, or `apply_batch`.
+
+    A single-image file has nothing extra to say -- the ordinary rename
+    already covers it -- so containers with one image contribute no rows.
+    For a multi-image container, each per-image record's fields (excluding
+    the `index`/`name` bookkeeping keys) are overlaid onto the container's
+    already-finalized `result.fields` and re-run through the normal
+    `finalize_fields` + `render_name` pipeline, so a series-specific value
+    (e.g. a 40x closeup inside a container whose shared name says nothing
+    about magnification) is reflected in `suggested_name` without altering
+    the container's own rename.
+    """
+    rows: list[dict[str, str]] = []
+    for result in suggestions:
+        if len(result.images) <= 1:
+            continue
+
+        for record in result.images:
+            overlay = {k: v for k, v in record.items() if k not in ("index", "name")}
+            merged_fields = {**result.fields, **overlay}
+            finalized = finalize_fields(result.source, merged_fields, config)
+            suggested_name = render_name(finalized, config)
+            rows.append(
+                {
+                    "source": result.source.name,
+                    "series_index": record["index"],
+                    "internal_name": record["name"],
+                    "suggested_name": suggested_name,
+                }
+            )
+
+    return rows
 
 
 def plan_batch(

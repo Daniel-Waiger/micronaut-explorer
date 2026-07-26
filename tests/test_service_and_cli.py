@@ -10,6 +10,7 @@ import microscopy_naming_assistant.metadata as metadata
 import microscopy_naming_assistant.service as service
 from microscopy_naming_assistant.cli import build_parser
 from microscopy_naming_assistant.config import default_config, save_config
+from microscopy_naming_assistant.naming import finalize_fields, render_name
 from microscopy_naming_assistant.profiles import default_profile, save_profile
 from microscopy_naming_assistant.validation import ValidationIssue
 
@@ -618,6 +619,234 @@ def test_cmd_batch_report_json_parses_to_expected_list(tmp_path: Path, monkeypat
     assert "Report written to" not in captured.out
 
 
+def _fake_plan_batch_returning(fake_batch: service.BatchResult):
+    def fake_plan_batch(
+        input_dir,
+        pattern,
+        config_path,
+        recursive=False,
+        use_llm=False,
+        profile_path=None,
+        strict=False,
+        llm_model_override=None,
+        conflict_strategy="suffix",
+        user_description=None,
+    ):
+        return fake_batch
+
+    return fake_plan_batch
+
+
+def test_cmd_batch_sidecar_csv_writes_series_rows(tmp_path: Path, monkeypatch, capsys) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "container.lif"
+    target = tmp_path / "Container.lif"
+    sidecar_path = tmp_path / "series.csv"
+
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name=target.name,
+        fields={},
+        issues=[],
+        images=[
+            {"index": "0", "name": "Series001"},
+            {"index": "1", "name": "Series002"},
+            {"index": "2", "name": "Series003"},
+            {"index": "3", "name": "Series004"},
+        ],
+    )
+    fake_batch = service.BatchResult(
+        planned=[(source, target)],
+        suggestions=[suggestion],
+        skipped=[],
+    )
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(fake_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--sidecar",
+            str(sidecar_path),
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+    assert exit_code == 0
+
+    assert sidecar_path.exists()
+    lines = sidecar_path.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "source,series_index,internal_name,suggested_name"
+    assert len(lines) == 5  # header + 4 per-series rows
+
+    captured = capsys.readouterr()
+    assert f"Sidecar written to: {sidecar_path}" in captured.out
+
+
+def test_cmd_batch_sidecar_json_parses_to_expected_list(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "container.lif"
+    target = tmp_path / "Container.lif"
+    sidecar_path = tmp_path / "series.json"
+
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name=target.name,
+        fields={},
+        issues=[],
+        images=[
+            {"index": "0", "name": "Series001"},
+            {"index": "1", "name": "Series002"},
+            {"index": "2", "name": "Series003"},
+            {"index": "3", "name": "Series004"},
+        ],
+    )
+    fake_batch = service.BatchResult(
+        planned=[(source, target)],
+        suggestions=[suggestion],
+        skipped=[],
+    )
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(fake_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--sidecar",
+            str(sidecar_path),
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+    assert exit_code == 0
+
+    payload = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    assert isinstance(payload, list)
+    assert len(payload) == 4
+    for row in payload:
+        assert set(row.keys()) == {"source", "series_index", "internal_name", "suggested_name"}
+
+
+def test_cmd_batch_sidecar_no_multi_image_records_writes_nothing(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "a.tif"
+    target = tmp_path / "A.tif"
+    sidecar_path = tmp_path / "series.csv"
+
+    # A single-image file (or one with no per-image records at all) has
+    # nothing extra to say -- build_series_rows must contribute no rows.
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name=target.name,
+        fields={},
+        issues=[],
+        images=[],
+    )
+    fake_batch = service.BatchResult(
+        planned=[(source, target)],
+        suggestions=[suggestion],
+        skipped=[],
+    )
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(fake_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--sidecar",
+            str(sidecar_path),
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+    assert exit_code == 0
+    assert not sidecar_path.exists()
+
+    captured = capsys.readouterr()
+    assert "No multi-image containers found" in captured.out
+
+
+def test_cmd_batch_sidecar_does_not_affect_apply_or_manifest(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    # Target differs by more than case: apply_batch's `src == dst` skip-guard
+    # compares WindowsPath equality, which normalizes case, so a case-only
+    # rename (e.g. container.lif -> Container.lif) would be treated as a
+    # no-op on Windows and never hit `src.rename(dst)`.
+    source = tmp_path / "container.lif"
+    target = tmp_path / "container_renamed.lif"
+    source.write_bytes(b"fake-lif-bytes")
+    sidecar_path = tmp_path / "series.csv"
+
+    # 4 per-image records would produce 4 sidecar rows -- proving the real
+    # `apply_batch` only ever sees the 1-entry `planned` list (never the
+    # sidecar rows) is the point of this test.
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name=target.name,
+        fields={},
+        issues=[],
+        images=[
+            {"index": "0", "name": "Series001"},
+            {"index": "1", "name": "Series002"},
+            {"index": "2", "name": "Series003"},
+            {"index": "3", "name": "Series004"},
+        ],
+    )
+    fake_batch = service.BatchResult(
+        planned=[(source, target)],
+        suggestions=[suggestion],
+        skipped=[],
+    )
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(fake_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--sidecar",
+            str(sidecar_path),
+            "--apply",
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+    assert exit_code == 0
+
+    assert not source.exists()
+    assert target.exists()
+
+    manifests = list((tmp_path / ".manifests").glob("rename_manifest_*.json"))
+    assert len(manifests) == 1
+
+    captured = capsys.readouterr()
+    assert "Renamed 1 files." in captured.out
+    assert "Manifest saved to:" in captured.out
+
+
 def test_suggest_for_file_forwards_configured_timeout(tmp_path: Path, monkeypatch) -> None:
     config = default_config()
     config.extraction_timeout_seconds = 7
@@ -850,3 +1079,178 @@ def test_suggest_for_file_with_profile_generates_issues(tmp_path: Path) -> None:
 
     assert result.target_name.endswith(".tif")
     assert any(issue.field == "magnification" for issue in result.issues)
+
+
+def test_suggest_for_file_passes_profile_field_key_map_to_extraction(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Touchpoint (e): profile.field_key_map must reach extract_metadata_detailed."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    profile = default_profile()
+    profile.field_key_map = {"markers": "ChannelName", "sample": "Sample"}
+    profile_path = tmp_path / "profile.json"
+    save_profile(profile_path, profile)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    captured_kwargs: dict = {}
+
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        captured_kwargs.update(kwargs)
+        return {}, {}, metadata.ExtractionDetail()
+
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
+
+    service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+        profile_path=profile_path,
+    )
+
+    assert captured_kwargs.get("field_key_map") == {"markers": "ChannelName", "sample": "Sample"}
+
+
+def test_suggest_for_file_field_key_map_is_none_without_profile(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """No profile means no field key map: extraction must receive None, not {}."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    captured_kwargs: dict = {}
+
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        captured_kwargs.update(kwargs)
+        return {}, {}, metadata.ExtractionDetail()
+
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
+
+    service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+    )
+
+    assert captured_kwargs.get("field_key_map") is None
+
+
+def test_suggest_for_file_copies_key_provenance_from_extraction_detail(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """SuggestionResult.key_paths/field_key_provenance mirror ExtractionDetail."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    detail = metadata.ExtractionDetail(
+        key_paths={"ChannelName": "GFP"},
+        field_key_provenance={"markers": "ChannelName"},
+    )
+
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        return {}, {}, detail
+
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
+
+    result = service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+    )
+
+    assert result.key_paths == {"ChannelName": "GFP"}
+    assert result.field_key_provenance == {"markers": "ChannelName"}
+
+
+def _make_multi_series_suggestion(tmp_path: Path, config) -> service.SuggestionResult:
+    source = tmp_path / "container.lif"
+    source.write_bytes(b"x")
+    # magnification is deliberately absent from the container-level fields --
+    # this stands in for a real container where series disagree (a 20x
+    # overview and a 40x closeup) so `_shared_fields` had to omit it.
+    fields = finalize_fields(
+        source,
+        {"date": "2025-06-01", "exptype": "CT", "sample": "E01", "markers": "GFP"},
+        config,
+    )
+    return service.SuggestionResult(
+        source=source,
+        target_name=render_name(fields, config),
+        fields=fields,
+        issues=[],
+        images=[
+            {"index": "0", "name": "Series001_overview", "magnification": "X20"},
+            {"index": "1", "name": "Series002_overview", "magnification": "X20"},
+            {"index": "2", "name": "Series003_closeup", "magnification": "X40"},
+            {"index": "3", "name": "Series004_closeup", "magnification": "X40"},
+        ],
+    )
+
+
+def test_build_series_rows_yields_one_row_per_image_with_series_specific_names(
+    tmp_path: Path,
+) -> None:
+    config = default_config()
+    suggestion = _make_multi_series_suggestion(tmp_path, config)
+
+    rows = service.build_series_rows([suggestion], config)
+
+    assert len(rows) == 4
+    assert all(row["source"] == suggestion.source.name for row in rows)
+    for row in rows:
+        assert list(row.keys()) == ["source", "series_index", "internal_name", "suggested_name"]
+
+    by_index = {row["series_index"]: row for row in rows}
+    assert by_index["0"]["internal_name"] == "Series001_overview"
+    assert by_index["2"]["internal_name"] == "Series003_closeup"
+
+    x20_name = by_index["0"]["suggested_name"]
+    x40_name = by_index["2"]["suggested_name"]
+    assert "X20" in x20_name
+    assert "X40" in x40_name
+    assert x20_name != x40_name
+
+
+def test_build_series_rows_skips_single_image_containers(tmp_path: Path) -> None:
+    config = default_config()
+    source = tmp_path / "single.tif"
+    source.write_bytes(b"x")
+    fields = finalize_fields(source, {"sample": "E01"}, config)
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name=render_name(fields, config),
+        fields=fields,
+        issues=[],
+        images=[{"index": "0", "name": "OnlySeries", "magnification": "X20"}],
+    )
+
+    rows = service.build_series_rows([suggestion], config)
+
+    assert rows == []
+
+
+def test_build_series_rows_never_leaks_into_batch_planned(tmp_path: Path) -> None:
+    """THE SAFETY GATE: sidecar rows must never become extra rename entries.
+
+    apply_batch does an unguarded `src.rename(dst)` in a loop, so if the 4
+    per-series rows this suggestion produces ever leaked into
+    `BatchResult.planned`, the same source path would appear 4 times and the
+    second `rename` call would raise `FileNotFoundError`, aborting the batch
+    before `save_manifest` runs and leaving the first rename unrollbackable.
+    """
+    config = default_config()
+    suggestion = _make_multi_series_suggestion(tmp_path, config)
+
+    rows = service.build_series_rows([suggestion], config)
+    assert len(rows) == 4  # sanity: the sidecar view really has 4 entries
+
+    batch = service.recalculate_batch(input_dir=tmp_path, suggestions=[suggestion])
+
+    assert len(batch.planned) == 1
+    assert [src for src, _ in batch.planned] == [suggestion.source]

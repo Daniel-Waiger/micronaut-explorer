@@ -4,7 +4,7 @@ import logging
 import multiprocessing
 import queue
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -132,6 +132,8 @@ def _detect_format(file_path: Path) -> str:
         return "LIF"
     if ext == ".nd2":
         return "ND2"
+    if ext in (".tif", ".tiff"):
+        return "TIFF"
     return "GENERIC"
 
 
@@ -212,9 +214,26 @@ def _render_metadata_text(images: list[ImageMetadata]) -> str:
     return _join_within_budget(sections, MAX_METADATA_TEXT_CHARS)
 
 
-def _shared_fields(
+def _resolve_per_image(
     images: list[ImageMetadata], file_format: str, overrides: dict[str, str] | None
-) -> tuple[dict[str, str], dict[str, str]]:
+) -> list[tuple[dict[str, str], dict[str, str]]]:
+    """Resolve naming fields for every image once.
+
+    Both `_shared_fields` (the container-level view) and `_per_image_records`
+    (the per-series sidecar view) need the same per-image `resolve_fields`
+    result; factored out so a caller holding both concerns -- `_read_with_bioio`
+    -- can compute it once and hand it to each, instead of resolving every
+    image's fields twice over.
+    """
+    return [resolve_fields(image, file_format, overrides) for image in images]
+
+
+def _shared_fields(
+    images: list[ImageMetadata],
+    file_format: str,
+    overrides: dict[str, str] | None,
+    resolved: list[tuple[dict[str, str], dict[str, str]]] | None = None,
+) -> tuple[dict[str, str], dict[str, str], set[str]]:
     """Fields that hold for EVERY image in a container.
 
     A container is one file, so its name may only claim what is true of all of
@@ -226,26 +245,78 @@ def _shared_fields(
     Markers are compared as a SET: detector enumeration order varies between
     series that imaged the same dyes, and "these three dyes are present" is
     true of the container even when the ordering differs.
+
+    Returns `(shared, provenance, contested)`. `contested` names every field
+    the key map resolved for at least one image but which didn't hold across
+    all of them. Callers must treat a contested field as a hard "no" for any
+    further guessing (e.g. a regex fallback over the whole container's text):
+    the map already proved real, disagreeing per-series data exists for it, so
+    picking any single value would silently reintroduce the exact bug this
+    function exists to prevent -- one series's fact stated as the file's.
+
+    `resolved` lets a caller that already ran `_resolve_per_image` (see above)
+    pass the result in instead of resolving every image's fields again; when
+    omitted this resolves them itself so the function stays usable standalone.
     """
     if not images:
-        return {}, {}
+        return {}, {}, set()
 
-    resolved = [resolve_fields(image, file_format, overrides) for image in images]
+    if resolved is None:
+        resolved = _resolve_per_image(images, file_format, overrides)
     first_fields, first_provenance = resolved[0]
+
+    all_field_names: set[str] = set()
+    for image_fields, _ in resolved:
+        all_field_names.update(image_fields)
 
     shared: dict[str, str] = {}
     provenance: dict[str, str] = {}
     for field_name, value in first_fields.items():
         others = [fields.get(field_name) for fields, _ in resolved[1:]]
         if field_name == "markers":
-            agree = all(o is not None and set(o.split("-")) == set(value.split("-")) for o in others)
+            agree = all(
+                o is not None and set(o.split("-")) == set(value.split("-")) for o in others
+            )
         else:
             agree = all(o == value for o in others)
         if agree:
             shared[field_name] = value
             provenance[field_name] = first_provenance[field_name]
 
-    return shared, provenance
+    contested = all_field_names - set(shared)
+    return shared, provenance, contested
+
+
+def _per_image_records(
+    images: list[ImageMetadata],
+    file_format: str,
+    overrides: dict[str, str] | None,
+    resolved: list[tuple[dict[str, str], dict[str, str]]] | None = None,
+) -> list[dict[str, str]]:
+    """Per-image (per-series) resolved fields, for the sidecar.
+
+    `_shared_fields` states only what holds across the whole container; a 20x
+    overview and a 40x closeup in one LIF both have a real, individual
+    magnification even though the container-level name cannot claim either.
+    This is where that per-series detail goes.
+
+    Each record is a FLAT `str -> str` dict -- `{"index": ..., "name": ...,
+    **resolved_fields}` -- never nested, because it must survive a pickle
+    across the multiprocessing spawn Queue (see `_read_with_bioio`).
+
+    `resolved` mirrors `_shared_fields`: pass in an already-computed
+    `_resolve_per_image` result to avoid resolving every image's fields twice;
+    when omitted this resolves them itself.
+    """
+    if resolved is None:
+        resolved = _resolve_per_image(images, file_format, overrides)
+
+    records: list[dict[str, str]] = []
+    for image, (fields, _provenance) in zip(images, resolved):
+        record: dict[str, str] = {"index": str(image.index), "name": image.name}
+        record.update(fields)
+        records.append(record)
+    return records
 
 
 def _collect_metadata_text(image: object, file_path: Path) -> str:
@@ -453,78 +524,123 @@ def _extract_bioio_fields(file_path: Path) -> dict[str, str]:
     return fields if isinstance(fields, dict) else {}
 
 
-def _read_with_bioio(file_path: Path) -> dict[str, object]:
-    """Read a file with bioio and return parsed fields plus the raw metadata.
+def _read_with_bioio(
+    file_path: Path, field_key_map: dict[str, str] | None = None
+) -> dict[str, object]:
+    """Read a file's addressable metadata and return parsed fields plus the raw text.
 
-    Returns `{"fields": dict, "metadata_text": str, "reader": str, "error": str}`.
-    `metadata_text` is the full harvested blob (see `_collect_metadata_text`) so
-    callers can show it to the user and ground an LLM prompt in it, rather than
-    it being scanned once and thrown away.
+    Returns `{"fields": dict, "metadata_text": str, "reader": str, "error": str,
+    "key_paths": dict, "field_key_provenance": dict, "images": list[dict]}`.
+    `metadata_text` is the full harvested blob so callers can show it to the
+    user and ground an LLM prompt in it, rather than it being scanned once and
+    thrown away. `images` is the per-series sidecar detail: one flat str->str
+    record per image (see `_per_image_records`), for containers whose series
+    disagree on a field the container-level `fields` had to omit.
 
     Must stay module-level and picklable (no closures, no reliance on outer
     state) so it can run in a separate process to bound its runtime (see P0-3).
 
-    No reader is selected here explicitly: bioio picks a plugin per file
-    extension from whatever is installed, preferring the most specific
-    native reader (bioio-ome-tiff/-tifffile/-czi/-lif/-nd2) over the generic
-    bioio-bioformats plugin, which only steps in for formats none of the
-    native readers claim. Native reads are plain Python/C and return
-    quickly; bioio-bioformats spins up a JVM (via jpype/scyjava/jgo), which
-    is slower and occasionally hangs -- the process timeout around this call
-    (see `extract_metadata_with_sources`) mainly exists to guard that rarer
-    Java fallback path now.
+    PRIMARY source is `metadata_keys.harvest` + `field_map.resolve_fields`: an
+    exact key -> naming-field mapping (see `_shared_fields`). The legacy regex
+    scanners (`_extract_markers` etc.) and bioio's `channel_names` are FALLBACK
+    only, used per-field when the key map left that field unset -- see the
+    module docstring in `metadata_keys.py` for why a keyword scan over a
+    stringified blob is a guess and the addressable form is not.
+
+    `harvest` runs FIRST and never raises (LIF reads via `readlif`, which needs
+    no bioio at all), so a slow or failing `BioImage` construction below can
+    never discard the harvested keys/metadata_text -- constructing a `BioImage`
+    for a large LIF costs seconds where `harvest` costs a fraction of a second.
     """
-    result: dict[str, str] = {}
     file_format = _detect_format(file_path)
-    metadata_text = ""
+
+    images = harvest(file_path, file_format)
+    metadata_text = _render_metadata_text(images)
+
+    if file_format in ("TIFF", "OME-TIFF"):
+        # ImageJ/Fiji stashes the vendor record in the IJMetadata `Info` tag,
+        # which `metadata_keys._harvest_tiff` already parses into keys -- but
+        # keep the raw shim text too so users can see the untouched tag block.
+        tiff_shim = _collect_metadata_text(None, file_path)
+        if tiff_shim:
+            metadata_text = f"{metadata_text}\n\n{tiff_shim}" if metadata_text else tiff_shim
+
+    resolved = _resolve_per_image(images, file_format, field_key_map)
+    fields, provenance, contested = _shared_fields(
+        images, file_format, field_key_map, resolved=resolved
+    )
+    image_records = _per_image_records(images, file_format, field_key_map, resolved=resolved)
+
+    # FALLBACK: any field the key map left unset for this container is filled,
+    # if possible, by scanning the rendered metadata text the old way -- but
+    # ONLY when the map found nothing anywhere for that field. A `contested`
+    # field is one the map DID resolve for at least one image, just not the
+    # same value for all of them (e.g. a 20x overview and a 40x closeup in one
+    # LIF); guessing a value from the concatenated multi-image text there would
+    # pick whichever series's data appears first and state it as a file-wide
+    # fact -- the same bug `_shared_fields` exists to prevent, reintroduced via
+    # the regex path instead of the key map. Never overwrites a value the key
+    # map already produced.
+    text = _extract_text_chunks(metadata_text)
+    hints = FORMAT_FIELD_HINTS.get(file_format, FORMAT_FIELD_HINTS.get("OME-TIFF", {}))
+
+    if "markers" not in fields and "markers" not in contested:
+        markers = _extract_markers(text, hints.get("markers", []))
+        if markers:
+            fields["markers"] = markers
+
+    if "magnification" not in fields and "magnification" not in contested:
+        magnification = _extract_magnification(text, hints.get("magnification", []))
+        if magnification:
+            fields["magnification"] = magnification
+
+    if "exptype" not in fields and "exptype" not in contested:
+        exptype = _extract_exptype(text, hints.get("exptype", []))
+        if exptype:
+            fields["exptype"] = exptype
+
+    if "sample" not in fields and "sample" not in contested:
+        sample = _extract_sample(text, hints.get("sample", []))
+        if sample:
+            fields["sample"] = sample
+
+    if "date" not in fields and "date" not in contested:
+        acquired = _extract_acquisition_date(text)
+        if acquired:
+            fields["date"] = acquired
+
+    # BioImage is only needed now for its reader name and, as a last-resort
+    # marker fallback, its `channel_names`. Isolated in its own try/except so
+    # a slow/failing construction records `error` but never discards anything
+    # harvested above.
     reader_name = ""
     error = ""
-
     try:
         from bioio import BioImage  # type: ignore
 
         image = BioImage(str(file_path))
         reader_name = type(getattr(image, "reader", image)).__module__.split(".")[0]
 
-        metadata_text = _collect_metadata_text(image, file_path)
-
-        if metadata_text:
-            text = _extract_text_chunks(metadata_text)
-
-            hints = FORMAT_FIELD_HINTS.get(file_format, FORMAT_FIELD_HINTS.get("OME-TIFF", {}))
-
-            markers = _extract_markers(text, hints.get("markers", []))
-            if markers:
-                result["markers"] = markers
-
-            magnification = _extract_magnification(text, hints.get("magnification", []))
-            if magnification:
-                result["magnification"] = magnification
-
-            exptype = _extract_exptype(text, hints.get("exptype", []))
-            if exptype:
-                result["exptype"] = exptype
-
-            sample = _extract_sample(text, hints.get("sample", []))
-            if sample:
-                result["sample"] = sample
-
-            acquired = _extract_acquisition_date(text)
-            if acquired:
-                result["date"] = acquired
-
-        # Real channel names are the single most reliable marker source, but
-        # only when the format actually carried them -- see
-        # `_is_placeholder_channel`. Never let synthesized names overwrite a
-        # marker the metadata scan already identified.
-        channel_names = getattr(image, "channel_names", None) or []
-        named_channels = [
-            str(c).strip().upper()
-            for c in channel_names
-            if str(c).strip() and not _is_placeholder_channel(str(c))
-        ]
-        if named_channels:
-            result["markers"] = "-".join(dict.fromkeys(named_channels))
+        # Real channel names are a reliable marker source only when the format
+        # actually carried dye names -- bioio synthesizes placeholder names
+        # ("Channel:0:0") or, worse, LUT display colours ("Green"/"Blue"/"Red")
+        # when it has neither. `_is_placeholder_channel` catches the former but
+        # not the latter, so this must stay a fallback used ONLY when nothing
+        # above (key map or regex scan) already identified the markers -- else
+        # a correct 'DAPI-CY3-ALEXA488' gets silently overwritten by LUT colours.
+        # Also skipped when markers is `contested` (per-series dyes genuinely
+        # disagree): a single BioImage-wide channel_names list can't state a
+        # fact about the whole container any more validly than the regex scan
+        # can.
+        if "markers" not in fields and "markers" not in contested:
+            channel_names = getattr(image, "channel_names", None) or []
+            named_channels = [
+                str(c).strip().upper()
+                for c in channel_names
+                if str(c).strip() and not _is_placeholder_channel(str(c))
+            ]
+            if named_channels:
+                fields["markers"] = "-".join(dict.fromkeys(named_channels))
     except ImportError:
         error = "bioio is not installed"
     except Exception as e:
@@ -532,14 +648,21 @@ def _read_with_bioio(file_path: Path) -> dict[str, object]:
         logger.warning("Failed to extract metadata using bioio for %s: %s", file_path.name, e)
 
     return {
-        "fields": result,
+        "fields": fields,
         "metadata_text": metadata_text,
         "reader": reader_name,
         "error": error,
+        "key_paths": dict(images[0].keys) if images else {},
+        "field_key_provenance": provenance,
+        "images": image_records,
     }
 
 
-def _bioio_worker(file_path_str: str, q: multiprocessing.Queue) -> None:
+def _bioio_worker(
+    file_path_str: str,
+    q: multiprocessing.Queue,
+    field_key_map: dict[str, str] | None = None,
+) -> None:
     """Top-level, picklable child-process entry point for `_extract_bioio_fields`.
 
     Must stay module-level (spawn imports it by reference) and must never let
@@ -548,9 +671,19 @@ def _bioio_worker(file_path_str: str, q: multiprocessing.Queue) -> None:
     full timeout for no reason.
     """
     try:
-        q.put(_read_with_bioio(Path(file_path_str)))
+        q.put(_read_with_bioio(Path(file_path_str), field_key_map))
     except Exception as exc:
-        q.put({"fields": {}, "metadata_text": "", "reader": "", "error": f"{type(exc).__name__}"})
+        q.put(
+            {
+                "fields": {},
+                "metadata_text": "",
+                "reader": "",
+                "error": f"{type(exc).__name__}",
+                "key_paths": {},
+                "field_key_provenance": {},
+                "images": [],
+            }
+        )
 
 
 @dataclass
@@ -559,16 +692,27 @@ class ExtractionDetail:
 
     `metadata_text` is the full harvested metadata blob, kept so the UI can show
     users what was actually in their file and so the LLM can be grounded in it.
+
+    `images` is the per-series sidecar detail: one flat str->str record per
+    image (see `_per_image_records`), carrying the fields the key map resolved
+    for that image alone -- including any the container-level `fields` had to
+    omit because series disagreed.
     """
 
     metadata_text: str = ""
     reader: str = ""
     error: str = ""
     timed_out: bool = False
+    key_paths: dict[str, str] = field(default_factory=dict)
+    field_key_provenance: dict[str, str] = field(default_factory=dict)
+    images: list[dict[str, str]] = field(default_factory=list)
 
 
 def extract_metadata_detailed(
-    file_path: Path, timeout_seconds: int = 20, extraction_mask: str | None = None
+    file_path: Path,
+    timeout_seconds: int = 20,
+    extraction_mask: str | None = None,
+    field_key_map: dict[str, str] | None = None,
 ) -> tuple[dict[str, str], dict[str, str], ExtractionDetail]:
     """Extract naming-relevant metadata, tagging where each field came from.
 
@@ -581,6 +725,9 @@ def extract_metadata_detailed(
     replace a `"filename"`-sourced value (e.g. `sample`). The one exception is
     `extraction_mask`, a user-configured placeholder mask (see
     `_extract_from_mask`), which is applied last and wins outright.
+
+    `field_key_map` overrides the curated per-format key -> field mapping (see
+    `field_map.resolve_fields`); forwarded through to the worker unchanged.
 
     Falls back to file timestamps and filename heuristics if scientific readers
     are unavailable or cannot read the file. The bioio read itself runs in a
@@ -644,7 +791,7 @@ def extract_metadata_detailed(
 
     ctx = multiprocessing.get_context("spawn")
     q = ctx.Queue()
-    p = ctx.Process(target=_bioio_worker, args=(str(file_path), q))
+    p = ctx.Process(target=_bioio_worker, args=(str(file_path), q, field_key_map))
     p.start()
 
     # Read BEFORE joining. A Queue.put is handed to a feeder thread that writes
@@ -682,6 +829,16 @@ def extract_metadata_detailed(
     detail.metadata_text = str(payload.get("metadata_text") or "")
     detail.reader = str(payload.get("reader") or "")
     detail.error = str(payload.get("error") or "")
+
+    key_paths = payload.get("key_paths") or {}
+    if isinstance(key_paths, dict):
+        detail.key_paths = key_paths
+    field_key_provenance = payload.get("field_key_provenance") or {}
+    if isinstance(field_key_provenance, dict):
+        detail.field_key_provenance = field_key_provenance
+    images = payload.get("images") or []
+    if isinstance(images, list):
+        detail.images = images
 
     bioio_fields = payload.get("fields") or {}
     if isinstance(bioio_fields, dict):

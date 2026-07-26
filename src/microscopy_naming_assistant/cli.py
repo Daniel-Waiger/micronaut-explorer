@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import argparse
 import csv
+import io
 import json
 from dataclasses import asdict
 from pathlib import Path
 
-from .config import default_config, save_config
+from .config import default_config, load_config, save_config
 from .profiles import default_profile, save_profile
-from .service import BatchResult, apply_batch, plan_batch, suggest_for_file
+from .service import BatchResult, apply_batch, build_series_rows, plan_batch, suggest_for_file
 
 
 def cmd_init_config(args: argparse.Namespace) -> int:
@@ -109,15 +110,51 @@ def _batch_report_rows(batch: BatchResult) -> list[dict[str, str]]:
     ]
 
 
-def _write_batch_report(report_path: Path, batch: BatchResult) -> None:
-    rows = _batch_report_rows(batch)
-    if report_path.suffix.lower() == ".json":
-        report_path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+REPORT_COLUMNS = ["source", "target", "issues"]
+SIDECAR_COLUMNS = ["source", "series_index", "internal_name", "suggested_name"]
+
+
+def rows_to_csv(rows: list[dict[str, str]], fieldnames: list[str] | None = None) -> str:
+    """Render `rows` as CSV text.
+
+    Columns come from `fieldnames` when given, else from the first row's keys
+    (dicts preserve insertion order, so a caller controls column order just by
+    the order it builds each row in).
+
+    Pass `fieldnames` whenever the row list may be empty. A batch can legitimately
+    plan nothing while still having suggestions -- `--strict` where every file has
+    an error, or `--conflict-strategy skip` with all targets colliding -- and
+    without it that report would be a bare newline with no header, silently
+    breaking any script that reads the column names.
+    """
+    buffer = io.StringIO()
+    columns = fieldnames if fieldnames is not None else (list(rows[0].keys()) if rows else [])
+    writer = csv.DictWriter(buffer, fieldnames=columns)
+    writer.writeheader()
+    writer.writerows(rows)
+    return buffer.getvalue()
+
+
+def _write_rows(
+    path: Path, rows: list[dict[str, str]], fieldnames: list[str] | None = None
+) -> None:
+    """Write `rows` as JSON (path ends in .json) or CSV.
+
+    Shared by --report (source/target/issues) and --sidecar
+    (source/series_index/internal_name/suggested_name), so there is exactly
+    one report writer in the CLI.
+    """
+    if path.suffix.lower() == ".json":
+        path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
     else:
-        with report_path.open("w", newline="", encoding="utf-8") as handle:
-            writer = csv.DictWriter(handle, fieldnames=["source", "target", "issues"])
-            writer.writeheader()
-            writer.writerows(rows)
+        # newline="" so the CSV module's own \r\n terminators reach disk
+        # unchanged -- text-mode translation would otherwise double them.
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            handle.write(rows_to_csv(rows, fieldnames))
+
+
+def _write_batch_report(report_path: Path, batch: BatchResult) -> None:
+    _write_rows(report_path, _batch_report_rows(batch), REPORT_COLUMNS)
 
 
 def cmd_batch(args: argparse.Namespace) -> int:
@@ -149,6 +186,16 @@ def cmd_batch(args: argparse.Namespace) -> int:
     if args.report:
         _write_batch_report(Path(args.report), batch)
 
+    # SAFETY: sidecar rows are a pure side report -- never fed into
+    # batch.planned/apply_batch/the manifest, computed here only to be
+    # written out or reflected in the printed payload below.
+    sidecar_rows: list[dict[str, str]] = []
+    if args.sidecar:
+        config = load_config(config_path)
+        sidecar_rows = build_series_rows(batch.suggestions, config)
+        if sidecar_rows:
+            _write_rows(Path(args.sidecar), sidecar_rows, SIDECAR_COLUMNS)
+
     if args.json:
         renamed = None
         manifest = None
@@ -167,6 +214,8 @@ def cmd_batch(args: argparse.Namespace) -> int:
             "renamed": renamed,
             "manifest": str(manifest) if manifest else None,
         }
+        if args.sidecar:
+            payload["sidecar"] = str(args.sidecar) if sidecar_rows else None
         print(json.dumps(payload))
         return 0
 
@@ -188,6 +237,12 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
     if args.report:
         print(f"Report written to: {args.report}")
+
+    if args.sidecar:
+        if sidecar_rows:
+            print(f"Sidecar written to: {args.sidecar}")
+        else:
+            print("No multi-image containers found; sidecar not written.")
 
     if args.apply:
         renamed, manifest = apply_batch(input_dir, batch.planned)
@@ -298,6 +353,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Write a source/target/issues report for the planned batch "
         "(CSV, or JSON if the path ends in .json)",
+    )
+    p_batch.add_argument(
+        "--sidecar",
+        default=None,
+        help="Write a per-series CSV/JSON for multi-image containers such as "
+        "LIF/ND2/CZI (JSON if the path ends in .json)",
     )
     p_batch.set_defaults(func=cmd_batch)
 

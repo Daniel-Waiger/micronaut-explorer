@@ -9,8 +9,6 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 import copy
-import csv
-import io
 import json
 import os
 import subprocess
@@ -357,7 +355,114 @@ if "suggestions" in st.session_state:
                 st.error(f"Extraction problem: {selected.extraction_error}")
             st.code(selected.metadata_text or "(no metadata found in this file)")
 
-    from microscopy_naming_assistant.service import recalculate_batch
+            st.write("#### Harvested metadata keys")
+            if not selected.key_paths:
+                st.caption("No addressable metadata keys were harvested for this file.")
+            else:
+                key_filter = st.text_input(
+                    "Filter keys/values",
+                    key="metadata_key_filter",
+                    placeholder="Type to filter by key or value (case-insensitive)…",
+                )
+                needle = key_filter.strip().lower()
+                key_rows = [
+                    {"key": k, "value": v}
+                    for k, v in sorted(selected.key_paths.items())
+                    if not needle or needle in k.lower() or needle in v.lower()
+                ]
+                st.caption(f"{len(key_rows)} of {len(selected.key_paths)} key(s) shown.")
+                st.dataframe(key_rows, use_container_width=True)
+
+            st.write("#### Field provenance")
+            st.caption(
+                "Which metadata key produced each naming field's value -- a value that "
+                "only says 'metadata' is what let a 40x objective be reported as X1."
+            )
+            if not selected.field_key_provenance:
+                st.caption("No naming field was resolved from an exact metadata key for this file.")
+            else:
+                for prov_field, prov_key in sorted(selected.field_key_provenance.items()):
+                    # Show what the KEY says, not the current field value: the
+                    # field may since have been LLM-filled or hand-edited, and
+                    # attributing an edited value to a metadata key would be
+                    # precisely the false provenance this panel exists to expose.
+                    key_value = selected.key_paths.get(prov_key, "")
+                    current = selected.fields.get(prov_field, "")
+                    line = f"{prov_field} = {current}  (from key: {prov_key} = {key_value})"
+                    if selected.sources.get(prov_field) != "metadata":
+                        line += (
+                            f"  — now overridden ({selected.sources.get(prov_field, 'unknown')})"
+                        )
+                    st.write(line)
+
+            st.write("#### Field → metadata key mapping")
+            st.caption(
+                "Override which exact metadata key feeds each naming field. Takes effect "
+                "on the next extraction (Preview Renames)."
+            )
+            from microscopy_naming_assistant.field_map import MAPPABLE_FIELDS
+            from microscopy_naming_assistant.profiles import load_profile
+
+            current_field_key_map: dict[str, str] = {}
+            if profile_path is not None:
+                try:
+                    current_field_key_map = dict(load_profile(profile_path).field_key_map)
+                except Exception:
+                    current_field_key_map = {}
+
+            key_options = ["(automatic)"] + sorted(selected.key_paths)
+            chosen_field_key_map: dict[str, str] = {}
+            for mappable_field in MAPPABLE_FIELDS:
+                preselected = current_field_key_map.get(mappable_field, "(automatic)")
+                default_index = key_options.index(preselected) if preselected in key_options else 0
+                chosen_field_key_map[mappable_field] = st.selectbox(
+                    mappable_field,
+                    options=key_options,
+                    index=default_index,
+                    key=f"fieldmap_{mappable_field}",
+                )
+
+            if st.session_state.pop("field_map_saved", None):
+                st.success(f"Saved field mapping to {profile_path}")
+
+            if st.button("Save mapping to profile"):
+                if profile_path is None:
+                    st.info(
+                        "No profile is configured. Select or create a profile path in the "
+                        "sidebar (or below, under 'Create a validation profile') before "
+                        "saving a field mapping."
+                    )
+                else:
+                    try:
+                        mapping_profile = load_profile(profile_path)
+                        # MERGE, never replace. The dropdowns only offer keys present
+                        # in the file being viewed, so a field mapped to a key this
+                        # file lacks shows as "(automatic)" — not because the user
+                        # cleared it, but because it was unrepresentable here.
+                        # Replacing wholesale would silently delete that mapping the
+                        # moment the user saved while viewing a different file.
+                        merged = dict(mapping_profile.field_key_map or {})
+                        for field_name, key in chosen_field_key_map.items():
+                            if key != "(automatic)":
+                                merged[field_name] = key
+                            elif merged.get(field_name) in key_options:
+                                # Was offered here and the user chose automatic:
+                                # a genuine clear.
+                                merged.pop(field_name, None)
+                        mapping_profile.field_key_map = merged
+                        save_profile(profile_path, mapping_profile)
+                        st.session_state["field_map_saved"] = True
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Could not save mapping: {exc}")
+
+    from microscopy_naming_assistant.cli import (
+        REPORT_COLUMNS,
+        SIDECAR_COLUMNS,
+        _batch_report_rows,
+        rows_to_csv,
+    )
+    from microscopy_naming_assistant.service import build_series_rows, recalculate_batch
 
     batch = recalculate_batch(input_dir, suggestions, strict, conflict_strategy)
 
@@ -365,26 +470,13 @@ if "suggestions" in st.session_state:
     table_rows = [{"source": src.name, "suggested": dst.name} for src, dst in batch.planned]
     st.dataframe(table_rows, use_container_width=True)
 
-    issues_by_source = {
-        s.source.name: "; ".join(f"{i.severity}:{i.field}" for i in s.issues)
-        for s in batch.suggestions
-    }
-    report_rows = [
-        {
-            "source": src.name,
-            "target": dst.name,
-            "issues": issues_by_source.get(src.name, ""),
-        }
-        for src, dst in batch.planned
-    ]
-    csv_buffer = io.StringIO()
-    csv_writer = csv.DictWriter(csv_buffer, fieldnames=["source", "target", "issues"])
-    csv_writer.writeheader()
-    csv_writer.writerows(report_rows)
+    # Reuse the CLI's own row-builder + CSV writer so this download, the JSON
+    # download below, and `mna batch --report` can never drift out of sync.
+    report_rows = _batch_report_rows(batch)
 
     st.download_button(
         "Download report (CSV)",
-        data=csv_buffer.getvalue(),
+        data=rows_to_csv(report_rows, REPORT_COLUMNS),
         file_name="rename_report.csv",
         mime="text/csv",
         key="download_report_csv",
@@ -396,6 +488,31 @@ if "suggestions" in st.session_state:
         mime="application/json",
         key="download_report_json",
     )
+
+    # Per-series sidecar: download-only detail for multi-image containers
+    # (LIF/ND2/CZI/OME-TIFF). These rows are never merged into batch.planned
+    # and never drive a rename -- see build_series_rows' safety constraint.
+    series_rows = build_series_rows(batch.suggestions, config)
+    if series_rows:
+        st.download_button(
+            "Download per-series sidecar (CSV)",
+            data=rows_to_csv(series_rows, SIDECAR_COLUMNS),
+            file_name="rename_report_sidecar.csv",
+            mime="text/csv",
+            key="download_sidecar_csv",
+        )
+        st.download_button(
+            "Download per-series sidecar (JSON)",
+            data=json.dumps(series_rows, indent=2),
+            file_name="rename_report_sidecar.json",
+            mime="application/json",
+            key="download_sidecar_json",
+        )
+    else:
+        st.caption(
+            "No multi-image containers (LIF/ND2/CZI/OME-TIFF) found in this batch — "
+            "nothing to include in a per-series sidecar."
+        )
 
     if batch.skipped:
         st.warning("Skipped items")
