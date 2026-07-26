@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from .field_map import resolve_fields
 from .markers import alias_map
+from .metadata_keys import ImageMetadata, harvest
 
 logger = logging.getLogger(__name__)
 
@@ -192,67 +194,67 @@ def _imagej_info_text(file_path: Path) -> str:
     return "\n".join(chunks)
 
 
-def _collect_metadata_text(image: object, file_path: Path) -> str:
-    """Gather every metadata surface we can reach into one searchable blob.
+def _render_metadata_text(images: list[ImageMetadata]) -> str:
+    """Render harvested keys as readable `Key = Value` sections.
 
-    `image.metadata` alone is often a thin structural header (see
-    `_imagej_info_text`), so we also pull the structured OME model, per-scene
-    metadata for multi-series containers, and raw TIFF tags. Sections are
-    labelled so both the regex scanners and the LLM can tell them apart.
+    Built from the addressable records rather than by stringifying reader
+    objects. That matters twice over: stringifying an `ElementTree.Element`
+    yields `<Element 'LMSDataContainerHeader' at 0x...>` -- a memory address,
+    not a document -- and dumping the raw XML instead would spend the whole
+    budget on `BeamRoute`/`Aotf` boilerplate. Keys are the signal; this is what
+    the user reads and what grounds the LLM.
     """
     sections: list[str] = []
-
-    def add(label: str, value: object) -> None:
-        if value is None:
-            return
-        text = str(value).strip()
-        if text and text.lower() != "none":
-            sections.append(f"=== {label} ===\n{text}")
-
-    add("metadata", getattr(image, "metadata", None))
-
-    try:
-        add("ome-metadata", getattr(image, "ome_metadata", None))
-    except Exception as exc:
-        logger.debug("ome_metadata unavailable for %s: %s", file_path.name, exc)
-
-    for attribute in ("channel_names", "physical_pixel_sizes", "dims"):
-        try:
-            add(attribute, getattr(image, attribute, None))
-        except Exception as exc:
-            logger.debug("%s unavailable for %s: %s", attribute, file_path.name, exc)
-
-    # Multi-series containers (LIF series, CZI scenes, ND2 points) keep
-    # per-image metadata behind the scene selector; the default scene alone can
-    # miss most of the record.
-    try:
-        scenes = list(getattr(image, "scenes", []) or [])
-        if len(scenes) > 1:
-            add("scenes", ", ".join(str(s) for s in scenes))
-            current = getattr(image, "current_scene", None)
-            for scene in scenes[:8]:
-                try:
-                    image.set_scene(scene)  # type: ignore[attr-defined]
-                    add(f"scene[{scene}] metadata", getattr(image, "metadata", None))
-                    add(f"scene[{scene}] channel_names", getattr(image, "channel_names", None))
-                except Exception as exc:
-                    logger.debug("scene %s unreadable in %s: %s", scene, file_path.name, exc)
-            if current is not None:
-                try:
-                    image.set_scene(current)  # type: ignore[attr-defined]
-                except Exception:
-                    pass
-    except Exception as exc:
-        logger.debug("scene enumeration failed for %s: %s", file_path.name, exc)
-
-    tiff_text = _imagej_info_text(file_path)
-    if tiff_text:
-        # Prepended, not appended: for a stripped ImageJ export this is the only
-        # section carrying real acquisition detail, and a blob truncated from
-        # the front would drop it in favour of boilerplate like dims.
-        sections.insert(0, f"=== tiff-tags ===\n{tiff_text}")
-
+    for image in images:
+        lines = [f"{key} = {value}" for key, value in sorted(image.keys.items())]
+        label = f"image[{image.index}] {image.name}" if len(images) > 1 else "metadata"
+        sections.append(f"=== {label} ===\n" + "\n".join(lines))
     return _join_within_budget(sections, MAX_METADATA_TEXT_CHARS)
+
+
+def _shared_fields(
+    images: list[ImageMetadata], file_format: str, overrides: dict[str, str] | None
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Fields that hold for EVERY image in a container.
+
+    A container is one file, so its name may only claim what is true of all of
+    it. Where series disagree -- a LIF holding both a 20x overview and a 40x
+    closeup -- the field is omitted rather than taking series 0's value and
+    stating it as fact. The per-series detail is not lost; it goes to the
+    sidecar.
+
+    Markers are compared as a SET: detector enumeration order varies between
+    series that imaged the same dyes, and "these three dyes are present" is
+    true of the container even when the ordering differs.
+    """
+    if not images:
+        return {}, {}
+
+    resolved = [resolve_fields(image, file_format, overrides) for image in images]
+    first_fields, first_provenance = resolved[0]
+
+    shared: dict[str, str] = {}
+    provenance: dict[str, str] = {}
+    for field_name, value in first_fields.items():
+        others = [fields.get(field_name) for fields, _ in resolved[1:]]
+        if field_name == "markers":
+            agree = all(o is not None and set(o.split("-")) == set(value.split("-")) for o in others)
+        else:
+            agree = all(o == value for o in others)
+        if agree:
+            shared[field_name] = value
+            provenance[field_name] = first_provenance[field_name]
+
+    return shared, provenance
+
+
+def _collect_metadata_text(image: object, file_path: Path) -> str:
+    """Deprecated shim retained for the `_imagej_info_text` path.
+
+    Superseded by `metadata_keys.harvest` + `_render_metadata_text`.
+    """
+    tiff_text = _imagej_info_text(file_path)
+    return f"=== tiff-tags ===\n{tiff_text}" if tiff_text else ""
 
 
 def _join_within_budget(sections: list[str], budget: int) -> str:
