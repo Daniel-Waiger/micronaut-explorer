@@ -13,6 +13,7 @@ import csv
 import io
 import json
 import os
+import subprocess
 import tempfile
 
 # ── Force upload limit to 10 GB (overrides the 200 MB default) ──
@@ -37,24 +38,28 @@ def _browse_for_folder(initial_dir: str = "") -> str | None:
     """Open a native OS folder-picker dialog on the machine running this server.
 
     Streamlit has no built-in folder picker (browser sandboxing means JS can't
-    return real filesystem paths), so this shells out to tkinter's dialog.
-    This only makes sense when the Streamlit server and the browser are the
-    same machine -- the normal case for `streamlit run app_streamlit.py` run
-    locally. Over a remote/hosted deployment it would open the dialog on the
-    server, not the visitor's machine, so it's not offered as a general
-    substitute for typing a path.
-    """
-    import tkinter as tk
-    from tkinter import filedialog
+    hand back real filesystem paths), so this drives tkinter's dialog. It runs
+    in a *subprocess*, not inline: tkinter's event loop must own its process's
+    main thread, and Streamlit executes this script on a ScriptRunner worker
+    thread, so an inline call fails with "main thread is not in main loop".
 
-    root = tk.Tk()
-    root.withdraw()
-    root.attributes("-topmost", True)
-    try:
-        selected = filedialog.askdirectory(initialdir=initial_dir or None, mustexist=True)
-    finally:
-        root.destroy()
-    return selected or None
+    This only makes sense when the Streamlit server and the browser are the
+    same machine -- the normal case for a local `streamlit run`. On a remote
+    deployment the dialog would open on the server rather than the visitor's
+    machine, which is why typing a path stays supported alongside it.
+    """
+    picker = src_path / "microscopy_naming_assistant" / "folder_picker.py"
+    completed = subprocess.run(
+        [sys.executable, str(picker), initial_dir],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        # Keep a console window from flashing up on Windows; absent elsewhere.
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or "folder picker failed")
+    return completed.stdout.strip() or None
 
 
 st.sidebar.header("Settings")
