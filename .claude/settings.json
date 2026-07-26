@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(timeout 240 .venv/Scripts/python.exe -X utf8 -)"
+    ]
+  }
+}
