@@ -1,0 +1,278 @@
+<title>Model Activity Monitor — CMA run</title>
+<style>
+  :root{
+    --bg:#0B0E14; --panel:#141925; --panel-2:#1B2233; --line:#232C40;
+    --ink:#E6EBF5; --muted:#8B97AD; --accent:#5B8CFF;
+    --run:#FFB020; --done:#35D07F; --verifying:#22D3EE; --resolved:#A78BFA; --fail:#FF5470; --pend:#5A6680;
+    --crit-bg:rgba(255,84,112,.09); --crit-line:rgba(255,84,112,.38);
+    --mono:ui-monospace,"Cascadia Code",Consolas,"SF Mono",monospace;
+    --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:light){
+    :root{
+      --bg:#F6F7FA; --panel:#FFFFFF; --panel-2:#FFFFFF; --line:#DFE3EC;
+      --ink:#161C28; --muted:#5D6879; --accent:#2C5FE0;
+      --run:#B26A00; --done:#12794A; --verifying:#0E7490; --resolved:#6D45C7; --fail:#C4243C; --pend:#8892A4;
+      --crit-bg:rgba(196,36,60,.06); --crit-line:rgba(196,36,60,.32);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B0E14; --panel:#141925; --panel-2:#1B2233; --line:#232C40;
+    --ink:#E6EBF5; --muted:#8B97AD; --accent:#5B8CFF;
+    --run:#FFB020; --done:#35D07F; --verifying:#22D3EE; --resolved:#A78BFA; --fail:#FF5470; --pend:#5A6680;
+    --crit-bg:rgba(255,84,112,.09); --crit-line:rgba(255,84,112,.38);
+  }
+  :root[data-theme="light"]{
+    --bg:#F6F7FA; --panel:#FFFFFF; --panel-2:#FFFFFF; --line:#DFE3EC;
+    --ink:#161C28; --muted:#5D6879; --accent:#2C5FE0;
+    --run:#B26A00; --done:#12794A; --verifying:#0E7490; --resolved:#6D45C7; --fail:#C4243C; --pend:#8892A4;
+    --crit-bg:rgba(196,36,60,.06); --crit-line:rgba(196,36,60,.32);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);padding:26px 20px 70px;}
+  .wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:20px;}
+  h1{font-size:15px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0;}
+  .eyebrow{font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:0;}
+  code{font-family:var(--mono);}
+
+  /* hero */
+  .hero{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:22px 24px;
+        display:flex;flex-direction:column;gap:14px;}
+  .model-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--pend);flex:none;}
+  .dot.running{background:var(--run);box-shadow:0 0 0 0 rgba(255,176,32,.55);animation:pulse 1.6s infinite;}
+  .dot.done{background:var(--done);} .dot.idle{background:var(--accent);} .dot.paused{background:var(--run);}
+  @media (prefers-reduced-motion:reduce){.dot.running{animation:none;}}
+  @keyframes pulse{70%{box-shadow:0 0 0 12px rgba(255,176,32,0);}100%{box-shadow:0 0 0 0 rgba(255,176,32,0);}}
+  .model{font-size:30px;font-weight:700;letter-spacing:-.015em;}
+  .state{margin-left:auto;font-size:12px;color:var(--muted);font-family:var(--mono);text-align:right;}
+  .now{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line);}
+  .now .tid{font-family:var(--mono);font-weight:700;color:var(--accent);}
+  .now .none{color:var(--muted);}
+  .meta{display:flex;gap:10px;flex-wrap:wrap;}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px 13px;flex:1 1 150px;}
+  .stat .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .stat .v{font-size:17px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:3px;}
+  .stat .v.ok{color:var(--done);} .stat .v.bad{color:var(--fail);} .stat .v.sm{font-size:13px;font-family:var(--mono);}
+
+  /* defects */
+  .crit{background:var(--crit-bg);border:1px solid var(--crit-line);border-radius:13px;padding:18px 20px;
+        display:flex;flex-direction:column;gap:13px;}
+  .crit h2{margin:0;font-size:13.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--fail);}
+  .defect{display:flex;flex-direction:column;gap:5px;padding:12px 14px;background:var(--panel);
+          border:1px solid var(--line);border-left:3px solid var(--fail);border-radius:8px;}
+  .defect .top{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;}
+  .defect .tid{font-family:var(--mono);font-weight:700;color:var(--fail);}
+  .defect .ttl{font-weight:600;}
+  .defect .loc{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto;}
+  .defect p{margin:0;font-size:13.5px;color:var(--muted);}
+  .defect .repro{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--panel-2);
+                 border:1px solid var(--line);border-radius:6px;padding:7px 9px;overflow-x:auto;white-space:pre;}
+
+  /* board */
+  .phase{font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:14px 0 3px;}
+  .task{display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);
+        border-radius:9px;padding:10px 13px;flex-wrap:wrap;margin-bottom:7px;}
+  .task.failed{border-color:var(--crit-line);}
+  .task.verifying{border-color:rgba(34,211,238,.4);}
+  .task.running{border-color:var(--run);}
+  .task.resolved{border-color:rgba(167,139,250,.45);}
+  .task.done{opacity:.82;}
+  .pill{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;
+        border-radius:999px;flex:none;min-width:70px;text-align:center;}
+  .pill.done{background:rgba(53,208,127,.14);color:var(--done);}
+  .pill.resolved{background:rgba(167,139,250,.16);color:var(--resolved);}
+  .pill.verifying{background:rgba(34,211,238,.16);color:var(--verifying);}
+  .pill.failed{background:rgba(255,84,112,.16);color:var(--fail);}
+  .pill.running{background:rgba(255,176,32,.16);color:var(--run);}
+  .pill.pending{background:rgba(90,102,128,.18);color:var(--pend);}
+  .task .tid{font-family:var(--mono);font-weight:700;color:var(--accent);min-width:44px;}
+  .task .ttl{flex:1 1 260px;}
+  .task .by{font-size:12px;color:var(--muted);font-family:var(--mono);}
+
+  /* log */
+  .log{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .log h2{margin:0 0 11px;font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);}
+  .log ul{margin:0;padding:0;max-height:300px;overflow-y:auto;}
+  .log li{font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--line);list-style:none;}
+  .log li:last-child{border-bottom:none;}
+  .log .t{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-right:9px;}
+
+  .foot{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;
+        border-top:1px solid var(--line);padding-top:14px;}
+  .live{width:8px;height:8px;border-radius:50%;background:var(--done);flex:none;}
+  .live.snap{background:var(--accent);} .live.stale{background:var(--fail);}
+</style>
+
+<div class="wrap">
+  <h1>Model Activity Monitor</h1>
+
+  <section class="hero">
+    <p class="eyebrow" id="runName">CMA run</p>
+    <div class="model-row">
+      <span id="dot" class="dot idle"></span>
+      <span id="model" class="model">—</span>
+      <span id="state" class="state"></span>
+    </div>
+    <div class="now" id="now"><span class="none">Idle</span></div>
+    <div class="meta" id="stats"></div>
+  </section>
+
+  <section class="crit" id="crit" hidden>
+    <h2 id="critTitle">Live data-safety defects — proven, unfixed</h2>
+    <div id="defects"></div>
+  </section>
+
+  <div class="board" id="board"></div>
+
+  <section class="log">
+    <h2>Run log</h2>
+    <ul id="logBody"></ul>
+  </section>
+
+  <p class="foot"><span id="liveDot" class="live"></span><span id="liveText">loading…</span></p>
+</div>
+
+<script>
+// Embedded snapshot — used when no ./status.json is being served (e.g. published artifact).
+const EMBEDDED = {
+  run: "Run — safe renaming · describer · open-weights",
+  orchestrator: "Claude Fable 5",
+  active_model: "Paused",
+  active_status: "paused",
+  phase: "Stalled mid-round",
+  state_note: "5-HOUR WINDOW ENDED MID-ROUND",
+  current_task: null,
+  stats: [
+    { k: "Orchestrator", v: "Fable 5" },
+    { k: "Test suite", v: "239 passed", tone: "ok" },
+    { k: "Live defects", v: "2 committed", tone: "bad" },
+    { k: "Branch", v: "feat/safe-renaming…", tone: "sm" }
+  ],
+  defects: [
+    {
+      id: "A11",
+      title: "Ledger exclusion is case-sensitive on a case-insensitive filesystem",
+      location: "service.py:323",
+      body: "A ledger whose directory entry reads .ORIGINAL_NAMES.JSON bypasses `p.name != LEDGER_FILENAME`, gets renamed away, and update_ledger then writes a fresh empty ledger — permanently orphaning every prior batch's original-filename mapping. Same flaw on the .manifests check. The module already has _casefold_key for exactly this.",
+      repro: "was the case-variant ledger PLANNED for rename? True\nHISTORY LOST: True"
+    },
+    {
+      id: "B3",
+      title: "Marker scan drops a real second fluorophore",
+      location: "metadata.py:419",
+      body: "re.search yields one candidate per alias. When that candidate is nested inside a longer alias's span the overlap rule discards it, leaving none for the alias's own later occurrence — so a genuine dye vanishes from the filename, depending on channel order. Fix is re.finditer.",
+      repro: "'ch1 ATTO 647-N ch2 ATTO 647' → ATTO647N        (channel 2 lost)\n'ch1 ATTO 647 ch2 ATTO 647-N' → ATTO647-ATTO647N (correct)"
+    }
+  ],
+  tasks: [
+    { id:"FM", phase:"Stalled mid-task", title:"field_map round — uncommitted: field_map.py, pyproject.toml, 3 new test files", status:"running", by:"interrupted" },
+    { id:"A11", phase:"Stalled mid-task", title:"Casefold ledger + .manifests exclusions", status:"pending", by:"queued" },
+    { id:"B3", phase:"Stalled mid-task", title:"re.finditer for alias candidates", status:"pending", by:"queued" },
+    { id:"A1", phase:"Verified pass", title:"Transactional apply — manifest as intent journal, rollback on failure", status:"done", by:"live→dead proven" },
+    { id:"A3", phase:"Verified pass", title:"Locked / cloud-synced warnings — never blocks", status:"done", by:"0.08 ms/file" },
+    { id:"A4", phase:"Verified pass", title:"Reserved names, case collisions, MAX_PATH, distinguishing suffix", status:"done", by:"pass" },
+    { id:"A7", phase:"Verified pass", title:"Rollback masking — key on target.exists()", status:"done", by:"mutation-proven" },
+    { id:"A9", phase:"Verified pass", title:"Case-only rename reverts cleanly (samefile guard)", status:"done", by:"pass" },
+    { id:"A10", phase:"Verified pass", title:"Lock probe gated on ERROR_SHARING_VIOLATION only", status:"done", by:"pass" },
+    { id:"D1", phase:"Verified pass", title:"Open-weights ranking, VRAM-aware, override wins", status:"done", by:"40 attacks, 0 raised" },
+    { id:"A5", phase:"Verified pass", title:"Date provenance — mtime vs real acquisition date", status:"done", by:"committed" },
+    { id:"C1", phase:"Verified pass", title:"Free-text describer → provisional fields", status:"done", by:"committed" },
+    { id:"C2", phase:"Verified pass", title:"Describer + provisional flags in UI/CLI", status:"done", by:"committed" },
+    { id:"B1", phase:"Failed then fixed", title:"Marker dictionary 27 → 76 — wrong-dye bug fixed by B2", status:"resolved", by:"B2" },
+    { id:"A2", phase:"Failed then fixed", title:"Original-name ledger + opt-in TIFF embed — fixed by A8", status:"resolved", by:"A8" },
+    { id:"A8", phase:"Failed — fix still pending", title:"Ledger exclusion — case-variant bypass still live", status:"failed", by:"→ A11" },
+    { id:"B2", phase:"Failed — fix still pending", title:"Marker tie-break — introduced silent marker loss", status:"failed", by:"→ B3" },
+    { id:"CZI", phase:"Deferred", title:"CZI + ND2 key maps and vendor fixture tests", status:"pending", by:"awaiting samples" }
+  ],
+  log: [
+    { time:"commit", msg:"8709940 — magnification parser + AppTest smoke suite" },
+    { time:"commit", msg:"31a1069 — lessons distilled from the A5/C1/C2 resume run" },
+    { time:"commit", msg:"30dc8a7 — date provenance, describer, provisional surfacing" },
+    { time:"commit", msg:"9c9fa13 — transactional rollback, sidecar/embed, safety warnings, markers, VRAM ranking" },
+    { time:"note", msg:"Adversarial verification caught 9 real defects a green suite had missed — 4 introduced by fix tasks." },
+    { time:"note", msg:"PR held: opening one now would ship both live defects above." }
+  ]
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+function render(d){
+  $("runName").textContent = d.run || "CMA run";
+  $("model").textContent = d.active_model || "—";
+  const st = d.active_status || "idle";
+  $("dot").className = "dot " + (["running","done","idle","paused"].includes(st) ? st : "idle");
+  $("state").textContent = d.state_note || st.toUpperCase();
+
+  const ct = d.current_task;
+  $("now").innerHTML = (ct && ct.id)
+    ? '<span class="tid">' + esc(ct.id) + '</span><span>' + esc(ct.title || "") + '</span>'
+    : '<span class="none">' + esc(d.phase || "Idle") + '</span>';
+
+  const tasks = d.tasks || [];
+  const doneN = tasks.filter(t => ["done","resolved"].includes(t.status)).length;
+  const stats = d.stats && d.stats.length ? d.stats : [
+    { k:"Orchestrator", v:d.orchestrator || "—" },
+    { k:"Progress", v:doneN + " / " + tasks.length },
+    { k:"Phase", v:d.phase || "—", tone:"sm" }
+  ];
+  $("stats").innerHTML = stats.map(s =>
+    '<div class="stat"><div class="k">' + esc(s.k) + '</div><div class="v ' + esc(s.tone || "") + '">' + esc(s.v) + '</div></div>'
+  ).join("");
+
+  const defects = d.defects || [];
+  $("crit").hidden = defects.length === 0;
+  if (defects.length){
+    if (d.crit_title) $("critTitle").textContent = d.crit_title;
+    $("defects").innerHTML = defects.map(f =>
+      '<div class="defect"><div class="top"><span class="tid">' + esc(f.id) + '</span>' +
+      '<span class="ttl">' + esc(f.title) + '</span>' +
+      (f.location ? '<span class="loc">' + esc(f.location) + '</span>' : '') + '</div>' +
+      (f.body ? '<p>' + esc(f.body) + '</p>' : '') +
+      (f.repro ? '<div class="repro">' + esc(f.repro) + '</div>' : '') + '</div>'
+    ).join("");
+  }
+
+  const order = [], byPhase = {};
+  for (const t of tasks){
+    const p = t.phase || "Tasks";
+    if (!byPhase[p]){ byPhase[p] = []; order.push(p); }
+    byPhase[p].push(t);
+  }
+  $("board").innerHTML = order.map(p =>
+    '<div class="phase">' + esc(p) + '</div>' + byPhase[p].map(t =>
+      '<div class="task ' + esc(t.status) + '"><span class="pill ' + esc(t.status) + '">' + esc(t.status) + '</span>' +
+      '<span class="tid">' + esc(t.id) + '</span><span class="ttl">' + esc(t.title) + '</span>' +
+      '<span class="by">' + esc(t.by || "") + '</span></div>'
+    ).join("")
+  ).join("");
+
+  $("logBody").innerHTML = (d.log || []).slice().reverse().map(l =>
+    '<li><span class="t">' + esc(l.time || "") + '</span>' + esc(l.msg) + '</li>'
+  ).join("");
+}
+
+let lastRaw = "", lastChange = Date.now(), liveMode = false;
+async function poll(){
+  try {
+    const r = await fetch("./status.json?t=" + Date.now(), { cache:"no-store" });
+    if (!r.ok) throw new Error("no status");
+    const raw = await r.text();
+    if (raw !== lastRaw){ lastRaw = raw; lastChange = Date.now(); }
+    render(JSON.parse(raw));
+    liveMode = true;
+    const stale = Date.now() - lastChange > 25000;
+    $("liveDot").className = "live" + (stale ? " stale" : "");
+    $("liveText").textContent = "live · updated " + Math.round((Date.now() - lastChange)/1000) + "s ago";
+  } catch {
+    if (!liveMode){
+      render(EMBEDDED);
+      $("liveDot").className = "live snap";
+      $("liveText").textContent = "published snapshot · reload to pull the latest redeploy";
+    }
+  }
+}
+poll();
+setInterval(poll, 1500);
+</script>
