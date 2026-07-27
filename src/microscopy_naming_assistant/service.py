@@ -28,6 +28,12 @@ class SuggestionResult:
     # `field_key_provenance` maps each naming field the key map resolved to
     # the exact metadata key that supplied it (see field_map.resolve_fields).
     key_paths: dict[str, str] = field(default_factory=dict)
+    # Raw addressable metadata keys for EVERY image (one dict per series),
+    # unlike `key_paths` above (first image only) -- lets downstream code
+    # (B-2's ranker) tell whether a key VARIES across series. The two must
+    # stay consistent: `image_key_paths[0] == key_paths` whenever any image
+    # was harvested.
+    image_key_paths: list[dict[str, str]] = field(default_factory=list)
     field_key_provenance: dict[str, str] = field(default_factory=dict)
     # Per-image (per-series) resolved-field records straight from
     # ExtractionDetail.images (see metadata._per_image_records): one flat
@@ -129,6 +135,7 @@ def suggest_for_file(
         reader=detail.reader,
         extraction_error=detail.error,
         key_paths=detail.key_paths,
+        image_key_paths=detail.image_key_paths,
         field_key_provenance=detail.field_key_provenance,
         images=detail.images,
     )

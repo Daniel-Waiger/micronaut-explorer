@@ -458,3 +458,96 @@ def test_suggest_fields_prompt_flags_description_as_weakest_evidence(monkeypatch
     prompt_text = _captured_prompt_text(captured["payload"]).lower()
     assert "weakest evidence" in prompt_text
     assert "stained for gfp and dapi" in prompt_text
+
+
+def test_suggest_fields_prompt_never_states_old_never_override_policy(monkeypatch) -> None:
+    # T3 (A-1 policy reversal): the old "a description may never override a
+    # populated field" wording must be gone from the prompt entirely -- with
+    # or without a description supplied -- so the prompt no longer
+    # contradicts the new reviewable-override policy.
+    captured: dict = {}
+
+    def _capture_post(url, json=None, timeout=None):
+        captured["payload"] = json
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"message": {"content": "{}"}}
+        return response
+
+    monkeypatch.setattr(llm.requests, "post", _capture_post)
+
+    for description in (None, "stained for GFP and DAPI"):
+        llm.suggest_fields_with_ollama(
+            current_fields={"sample": "E01"},
+            original_name="a.tif",
+            endpoint="http://localhost:11434/api/chat",
+            model="llama3.1:8b",
+            timeout_seconds=3,
+            user_description=description,
+        )
+        prompt_text = _captured_prompt_text(captured["payload"])
+        assert "Never let the description override" not in prompt_text
+        assert "only ever fill a field" not in prompt_text
+
+
+def test_suggest_fields_prompt_with_description_permits_reviewable_override(monkeypatch) -> None:
+    # (ii) With a user_description supplied, the prompt must state the new
+    # permission (description may replace an already-populated field, but
+    # only when it plainly states it) AND still carry the no-fabrication
+    # guardrail -- the reversal is scoped to the user's own typed words, not
+    # a relaxation of "never fabricate".
+    captured: dict = {}
+
+    def _capture_post(url, json=None, timeout=None):
+        captured["payload"] = json
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"message": {"content": "{}"}}
+        return response
+
+    monkeypatch.setattr(llm.requests, "post", _capture_post)
+
+    llm.suggest_fields_with_ollama(
+        current_fields={"sample": "E01"},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+        user_description="stained for GFP and DAPI",
+    )
+
+    prompt_text = _captured_prompt_text(captured["payload"])
+    assert "It is the ONE input allowed to replace a value" in prompt_text
+    assert "NEVER fabricate" in prompt_text
+
+
+def test_suggest_fields_prompt_without_description_still_forbids_field_changes(
+    monkeypatch,
+) -> None:
+    # (iii) With no user_description at all, the prompt must still forbid
+    # changing any populated field -- the fill-only default is unchanged.
+    captured: dict = {}
+
+    def _capture_post(url, json=None, timeout=None):
+        captured["payload"] = json
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"message": {"content": "{}"}}
+        return response
+
+    monkeypatch.setattr(llm.requests, "post", _capture_post)
+
+    llm.suggest_fields_with_ollama(
+        current_fields={"sample": "E01"},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+    )
+
+    prompt_text = _captured_prompt_text(captured["payload"])
+    assert "Do NOT change or overwrite any value already present" in prompt_text
+    assert "NEVER fabricate" in prompt_text
+    # No user_description was passed, so the description block (and its
+    # override permission) must not appear in the prompt at all.
+    assert "User-provided description" not in prompt_text

@@ -2,11 +2,18 @@
 """Tiny mutator for the dashboard status.json.
 
 Examples:
-  python update.py --model "Claude Sonnet" --status running --current P0-1 "Add timeout" --task P0-1=running:Claude Sonnet --log "Dispatched P0-1"
-  python update.py --status done --current-clear --task P0-1=done --log "P0-1 complete: 3 files, tests green"
+  python update.py --model "Claude Sonnet" --status running \
+      --current P0-1 "Add timeout" --task P0-1=running:Claude Sonnet \
+      --log "Dispatched P0-1"
+  python update.py --status done --current-clear --task P0-1=done \
+      --log "P0-1 complete: 3 files, tests green"
 """
+
 from __future__ import annotations
-import argparse, json, sys
+
+import argparse
+import json
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -46,20 +53,40 @@ def main() -> int:
     ap.add_argument("--run")
     ap.add_argument("--model")
     ap.add_argument("--orch")
-    ap.add_argument("--status")            # running | verifying | done | resolved | failed | pending | paused | idle
+    ap.add_argument(
+        "--status"
+    )  # running | verifying | done | resolved | failed | pending | paused | idle
     ap.add_argument("--phase")
     ap.add_argument("--state-note")
     ap.add_argument("--current", nargs=2, metavar=("ID", "TITLE"))
     ap.add_argument("--current-clear", action="store_true")
-    ap.add_argument("--task", action="append", default=[],
-                    help="ID=STATUS or ID=STATUS:BY (updates an existing task only)")
-    ap.add_argument("--task-add", action="append", default=[],
-                    help="ID=PHASE=TITLE=STATUS[:BY] (appends a new task; no-op if ID exists)")
-    ap.add_argument("--defect-add", action="append", default=[],
-                    help="ID=LOCATION=TITLE (repro/body added separately isn't supported via CLI; edit status.json directly for those)")
-    ap.add_argument("--defect-clear", metavar="ID", help="remove a defect by id once its fix is verified")
-    ap.add_argument("--stat", action="append", default=[],
-                    help="KEY=VALUE[:tone] upserts a hero stat, e.g. 'Test suite=239 passed:ok'")
+    ap.add_argument(
+        "--task",
+        action="append",
+        default=[],
+        help="ID=STATUS or ID=STATUS:BY (updates an existing task only)",
+    )
+    ap.add_argument(
+        "--task-add",
+        action="append",
+        default=[],
+        help="ID=PHASE=TITLE=STATUS[:BY] (appends a new task; no-op if ID exists)",
+    )
+    ap.add_argument(
+        "--defect-add",
+        action="append",
+        default=[],
+        help="ID=LOCATION=TITLE (repro/body: edit status.json directly, not supported here)",
+    )
+    ap.add_argument(
+        "--defect-clear", metavar="ID", help="remove a defect by id once its fix is verified"
+    )
+    ap.add_argument(
+        "--stat",
+        action="append",
+        default=[],
+        help="KEY=VALUE[:tone] upserts a hero stat, e.g. 'Test suite=239 passed:ok'",
+    )
     ap.add_argument("--log", action="append", default=[])
     a = ap.parse_args()
 
@@ -67,12 +94,18 @@ def main() -> int:
     for key in EMPTY_STATE:
         d.setdefault(key, EMPTY_STATE[key])
 
-    if a.run:        d["run"] = a.run
-    if a.model:      d["active_model"] = a.model
-    if a.orch:       d["orchestrator"] = a.orch
-    if a.status:     d["active_status"] = a.status
-    if a.phase:      d["phase"] = a.phase
-    if a.state_note: d["state_note"] = a.state_note
+    if a.run:
+        d["run"] = a.run
+    if a.model:
+        d["active_model"] = a.model
+    if a.orch:
+        d["orchestrator"] = a.orch
+    if a.status:
+        d["active_status"] = a.status
+    if a.phase:
+        d["phase"] = a.phase
+    if a.state_note:
+        d["state_note"] = a.state_note
     if a.current_clear:
         d["current_task"] = None
     if a.current:
@@ -84,8 +117,10 @@ def main() -> int:
         st, _, by = rest.partition(":")
         t = tmap.get(tid)
         if t:
-            if st: t["status"] = st
-            if by: t["by"] = by
+            if st:
+                t["status"] = st
+            if by:
+                t["by"] = by
 
     for spec in a.task_add:
         tid, _, rest = spec.partition("=")
@@ -94,10 +129,15 @@ def main() -> int:
         phase, _, rest2 = rest.partition("=")
         title, _, statusby = rest2.partition("=")
         st, _, by = statusby.partition(":")
-        d["tasks"].append({
-            "id": tid, "phase": phase, "title": title,
-            "status": st or "pending", "by": by,
-        })
+        d["tasks"].append(
+            {
+                "id": tid,
+                "phase": phase,
+                "title": title,
+                "status": st or "pending",
+                "by": by,
+            }
+        )
 
     dmap = {f["id"]: f for f in d["defects"]}
     for spec in a.defect_add:
@@ -116,10 +156,12 @@ def main() -> int:
         s = smap.get(k)
         if s:
             s["v"] = v
-            if tone: s["tone"] = tone
+            if tone:
+                s["tone"] = tone
         else:
             entry = {"k": k, "v": v}
-            if tone: entry["tone"] = tone
+            if tone:
+                entry["tone"] = tone
             d["stats"].append(entry)
             smap[k] = entry
 

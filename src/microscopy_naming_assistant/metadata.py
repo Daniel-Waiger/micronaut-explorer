@@ -121,6 +121,15 @@ def _extract_date_from_name(stem: str) -> str | None:
     return None
 
 
+def _is_str_dict(obj: object) -> bool:
+    """True iff `obj` is a plain `dict[str, str]` -- used to defensively
+    validate `image_key_paths` after it crosses the multiprocessing spawn
+    Queue, where a malformed payload must degrade rather than raise."""
+    if not isinstance(obj, dict):
+        return False
+    return all(isinstance(k, str) and isinstance(v, str) for k, v in obj.items())
+
+
 def _detect_format(file_path: Path) -> str:
     name = file_path.name.lower()
     if name.endswith(".ome.tif") or name.endswith(".ome.tiff"):
@@ -569,12 +578,14 @@ def _read_with_bioio(
     """Read a file's addressable metadata and return parsed fields plus the raw text.
 
     Returns `{"fields": dict, "metadata_text": str, "reader": str, "error": str,
-    "key_paths": dict, "field_key_provenance": dict, "images": list[dict]}`.
-    `metadata_text` is the full harvested blob so callers can show it to the
-    user and ground an LLM prompt in it, rather than it being scanned once and
-    thrown away. `images` is the per-series sidecar detail: one flat str->str
-    record per image (see `_per_image_records`), for containers whose series
-    disagree on a field the container-level `fields` had to omit.
+    "key_paths": dict, "image_key_paths": list[dict], "field_key_provenance": dict,
+    "images": list[dict]}`. `metadata_text` is the full harvested blob so callers
+    can show it to the user and ground an LLM prompt in it, rather than it being
+    scanned once and thrown away. `images` is the per-series sidecar detail: one
+    flat str->str record per image (see `_per_image_records`), for containers
+    whose series disagree on a field the container-level `fields` had to omit.
+    `key_paths` is the raw metadata keys for the first image only; `image_key_paths`
+    is the same raw key dict for every image, one per series.
 
     Must stay module-level and picklable (no closures, no reliance on outer
     state) so it can run in a separate process to bound its runtime (see P0-3).
@@ -692,6 +703,11 @@ def _read_with_bioio(
         "reader": reader_name,
         "error": error,
         "key_paths": dict(images[0].keys) if images else {},
+        # Per-image raw key dicts, one per series -- unlike `key_paths` above
+        # (first image only), this lets downstream code (B-2's ranker) tell
+        # whether a key VARIES across series. Kept as a separate field so
+        # `key_paths` stays byte-identical for every existing consumer.
+        "image_key_paths": [dict(img.keys) for img in images],
         "field_key_provenance": provenance,
         "images": image_records,
     }
@@ -719,6 +735,7 @@ def _bioio_worker(
                 "reader": "",
                 "error": f"{type(exc).__name__}",
                 "key_paths": {},
+                "image_key_paths": [],
                 "field_key_provenance": {},
                 "images": [],
             }
@@ -736,6 +753,14 @@ class ExtractionDetail:
     image (see `_per_image_records`), carrying the fields the key map resolved
     for that image alone -- including any the container-level `fields` had to
     omit because series disagreed.
+
+    `key_paths` is the raw addressable metadata keys harvested for the FIRST
+    image only. `image_key_paths` is the same raw key dict for EVERY image
+    (one dict per series), which is what lets downstream code (B-2's ranker)
+    tell whether a key VARIES across series -- `key_paths` alone cannot. The
+    two must stay consistent: `image_key_paths[0] == key_paths` whenever any
+    image was harvested. Kept as separate fields so `key_paths` stays
+    byte-identical for every existing consumer.
     """
 
     metadata_text: str = ""
@@ -743,6 +768,7 @@ class ExtractionDetail:
     error: str = ""
     timed_out: bool = False
     key_paths: dict[str, str] = field(default_factory=dict)
+    image_key_paths: list[dict[str, str]] = field(default_factory=list)
     field_key_provenance: dict[str, str] = field(default_factory=dict)
     images: list[dict[str, str]] = field(default_factory=list)
 
@@ -883,6 +909,13 @@ def extract_metadata_detailed(
     key_paths = payload.get("key_paths") or {}
     if isinstance(key_paths, dict):
         detail.key_paths = key_paths
+    # Defensive: this crosses the multiprocessing spawn Queue, so a malformed
+    # or unexpected payload (e.g. from a mismatched worker version) must
+    # degrade to the empty-list default rather than raise. Only accept a list
+    # whose entries are all plain str->str dicts.
+    image_key_paths = payload.get("image_key_paths") or []
+    if isinstance(image_key_paths, list) and all(_is_str_dict(entry) for entry in image_key_paths):
+        detail.image_key_paths = image_key_paths
     field_key_provenance = payload.get("field_key_provenance") or {}
     if isinstance(field_key_provenance, dict):
         detail.field_key_provenance = field_key_provenance

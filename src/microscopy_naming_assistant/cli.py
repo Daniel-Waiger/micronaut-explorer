@@ -4,10 +4,11 @@ import argparse
 import csv
 import io
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from .config import default_config, load_config, save_config
+from .config import NamingConfig, default_config, load_config, save_config
 from .profiles import default_profile, save_profile
 from .service import BatchResult, apply_batch, build_series_rows, plan_batch, suggest_for_file
 
@@ -45,6 +46,29 @@ def _provenance_payload(sources: dict[str, str]) -> dict[str, object]:
     }
 
 
+def _warn_if_describe_inert(args: argparse.Namespace, config: NamingConfig) -> None:
+    """A-4: `--describe` is silently discarded today whenever the LLM isn't
+    active -- there is no argparse dependency linking `--describe` to
+    `--llm`/`config.llm['enabled']`, so a user who types a description with
+    `--llm` omitted (or with the config's LLM disabled) gets no error, no
+    warning, exit code 0, and the description simply never reaches the
+    model. Both `cmd_suggest` and `cmd_batch` forward `args.describe`
+    straight into `suggest_for_file`/`plan_batch` with the exact same hole,
+    so this is one shared guard rather than two copies that could drift.
+
+    Never a hard error and never changes the exit code -- `--describe` stays
+    inert exactly as before, it just stops being silent about it."""
+    if not args.describe:
+        return
+    if not args.llm or not bool(config.llm.get("enabled", False)):
+        print(
+            "WARNING: --describe was ignored because the LLM is off "
+            "(pass --llm, and ensure llm.enabled is true in the config). "
+            "The description had no effect on the suggested name.",
+            file=sys.stderr,
+        )
+
+
 def cmd_init_config(args: argparse.Namespace) -> int:
     config = default_config()
     output = Path(args.output)
@@ -75,6 +99,9 @@ def cmd_suggest(args: argparse.Namespace) -> int:
     if not source.exists():
         print(f"Input file not found: {source}")
         return 1
+
+    config = load_config(config_path)
+    _warn_if_describe_inert(args, config)
 
     result = suggest_for_file(
         file_path=source,
@@ -211,6 +238,9 @@ def cmd_batch(args: argparse.Namespace) -> int:
         print(f"Input directory not found: {input_dir}")
         return 1
 
+    config = load_config(config_path)
+    _warn_if_describe_inert(args, config)
+
     batch = plan_batch(
         input_dir=input_dir,
         pattern=args.pattern,
@@ -236,7 +266,6 @@ def cmd_batch(args: argparse.Namespace) -> int:
     # written out or reflected in the printed payload below.
     sidecar_rows: list[dict[str, str]] = []
     if args.sidecar:
-        config = load_config(config_path)
         sidecar_rows = build_series_rows(batch.suggestions, config)
         if sidecar_rows:
             _write_rows(Path(args.sidecar), sidecar_rows, SIDECAR_COLUMNS)

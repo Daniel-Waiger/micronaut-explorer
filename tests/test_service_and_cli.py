@@ -1957,3 +1957,259 @@ def test_build_series_rows_never_leaks_into_batch_planned(tmp_path: Path) -> Non
 
     assert len(batch.planned) == 1
     assert [src for src, _ in batch.planned] == [suggestion.source]
+
+
+# A-4: `--describe` is silently discarded today in BOTH `cmd_suggest` and
+# `cmd_batch` whenever the LLM isn't active -- there is no argparse
+# dependency linking `--describe` to `--llm`/`config.llm['enabled']`, so a
+# typed description simply has no effect, with exit code 0 and no message.
+# These tests cover both commands x both ways the guard can fire (missing
+# `--llm`, and `--llm` present but `config.llm.enabled` false), plus the
+# no-`--describe` and genuinely-active-LLM cases that must stay silent.
+
+
+def _fake_suggest_for_file_minimal(
+    file_path,
+    config_path,
+    use_llm=False,
+    profile_path=None,
+    llm_model_override=None,
+    user_description=None,
+):
+    return service.SuggestionResult(
+        source=file_path,
+        target_name="TEST.tif",
+        fields={},
+        issues=[],
+    )
+
+
+def test_cmd_suggest_warns_when_describe_used_without_llm_flag(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())  # llm.enabled defaults to False
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    monkeypatch.setattr(cli, "suggest_for_file", _fake_suggest_for_file_minimal)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "suggest",
+            "--input",
+            str(source),
+            "--config",
+            str(config_path),
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" in captured.err
+    assert "--describe" in captured.err
+
+
+def test_cmd_suggest_warns_when_llm_flag_set_but_config_disabled(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    # Same hole, other half of the condition: --llm was passed but the
+    # config's llm.enabled is false -- service.suggest_for_file's own guard
+    # (`use_llm and bool(config.llm.get("enabled", False))`) would refuse to
+    # call the model here too, so the CLI must still warn, not stay silent.
+    config = default_config()
+    config.llm["enabled"] = False
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    monkeypatch.setattr(cli, "suggest_for_file", _fake_suggest_for_file_minimal)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "suggest",
+            "--input",
+            str(source),
+            "--config",
+            str(config_path),
+            "--llm",
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" in captured.err
+    assert "--describe" in captured.err
+
+
+def test_cmd_suggest_no_warning_without_describe(tmp_path: Path, monkeypatch, capsys) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    monkeypatch.setattr(cli, "suggest_for_file", _fake_suggest_for_file_minimal)
+
+    parser = build_parser()
+    args = parser.parse_args(["suggest", "--input", str(source), "--config", str(config_path)])
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.err == ""
+
+
+def test_cmd_suggest_no_warning_when_describe_reaches_an_active_llm(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    # Falsify the mechanism, not just the surface (lesson 20): the guard
+    # must stay silent in the one case where --describe genuinely DOES
+    # reach the model, or it would just be permanently noisy.
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    monkeypatch.setattr(cli, "suggest_for_file", _fake_suggest_for_file_minimal)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "suggest",
+            "--input",
+            str(source),
+            "--config",
+            str(config_path),
+            "--llm",
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" not in captured.err
+
+
+def test_cmd_batch_warns_when_describe_used_without_llm_flag(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())  # llm.enabled defaults to False
+
+    empty_batch = service.BatchResult(planned=[], suggestions=[], skipped=[])
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(empty_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" in captured.err
+    assert "--describe" in captured.err
+
+
+def test_cmd_batch_warns_when_llm_flag_set_but_config_disabled(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config = default_config()
+    config.llm["enabled"] = False
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    empty_batch = service.BatchResult(planned=[], suggestions=[], skipped=[])
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(empty_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--llm",
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" in captured.err
+    assert "--describe" in captured.err
+
+
+def test_cmd_batch_no_warning_without_describe(tmp_path: Path, monkeypatch, capsys) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    empty_batch = service.BatchResult(planned=[], suggestions=[], skipped=[])
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(empty_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(["batch", "--input-dir", str(tmp_path), "--config", str(config_path)])
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.err == ""
+
+
+def test_cmd_batch_no_warning_when_describe_reaches_an_active_llm(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    empty_batch = service.BatchResult(planned=[], suggestions=[], skipped=[])
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(empty_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--llm",
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" not in captured.err

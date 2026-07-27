@@ -3,23 +3,36 @@
 Naming in this project is deterministic-first: the base name is always built
 from extracted metadata and filename keywords, before any LLM is consulted.
 This module's job is strictly to *enhance* that deterministic base -- filling
-in genuinely missing fields, and formatting/tidying values -- grounded only in
-the extracted metadata, the original filename, and (when supplied) the user's
-own description. It must never *originate* biological identity (experiment
-type, marker/fluorophore, sample, magnification, date) that isn't already
-evidenced in those inputs. When in doubt, the model is instructed to omit a
-key rather than guess.
+in genuinely missing fields, formatting/tidying values, and (only when the
+user typed a description) proposing a reviewable replacement for a field the
+description plainly states -- grounded only in the extracted metadata, the
+original filename, and (when supplied) the user's own description. It must
+never *originate* biological identity (experiment type, marker/fluorophore,
+sample, magnification, date) that isn't already evidenced in those inputs.
+When in doubt, the model is instructed to omit a key rather than guess.
 
-The free-text describer path (a user-written experiment description passed
-as ``user_description``) is the weakest-evidence input this module accepts:
-it is the user's recollection, not an instrument record. The same
-omit-over-guess and never-overwrite guardrails apply to it unchanged -- a
-description may only ever fill a field neither metadata nor the filename
-already supplied, never invent beyond what the description states. Callers
-(``service.suggest_for_file``) are responsible for tagging any field filled
-while a description was supplied with the distinct ``"llm_description"``
-provenance -- never plain ``"llm"`` -- so downstream UI can flag it
-provisional / needs-review rather than presenting it as ground truth.
+Description-override policy, stated once here and kept consistent everywhere
+below: the free-text describer path (a user-written experiment description
+passed as ``user_description``) is the weakest-evidence input this module
+accepts -- it is the user's recollection, not an instrument record. WITHOUT
+a description, every populated field stays untouchable: the model may only
+fill genuinely missing ones, exactly as when no description is given at all.
+WITH a description, the model MAY additionally propose a replacement value
+for an already-populated field, but only for a field the description states
+plainly -- never by inference, never beyond what it states. This module
+never applies anything itself; it always returns one flat ``{field: value}``
+dict regardless of whether an entry is a fill or a proposed override, and it
+is the CALLER's job to tell the two apart (by diffing against the current
+fields) and decide what to do with each: the non-interactive CLI path
+(``service.suggest_for_file``) keeps only fills, since it has no review step
+and applying an override there would be exactly the silent overwrite this
+policy exists to prevent; the Streamlit UI path classifies the response into
+fills (applied immediately) and overrides (held for an explicit user
+accept/reject, never auto-applied). Callers are responsible for tagging any
+field filled or proposed while a description was supplied with the distinct
+``"llm_description"`` provenance -- never plain ``"llm"`` -- so downstream
+code can flag it provisional / needs-review rather than presenting it as
+ground truth.
 """
 
 from __future__ import annotations
@@ -266,9 +279,12 @@ def suggest_fields_with_ollama(
 
     This is an *enhancer*, not an originator: the model may only fill in or
     tidy fields that are directly supported by the extracted metadata, the
-    original filename, or an optional user-supplied description. It must
-    never fabricate biological identity (marker, experiment type, sample,
-    magnification, date) that isn't evidenced in those inputs.
+    original filename, or an optional user-supplied description -- and, only
+    when a description is supplied and states a field plainly, propose a
+    replacement for a field that is already populated (see hard rule 8 in
+    the prompt below). It must never fabricate biological identity (marker,
+    experiment type, sample, magnification, date) that isn't evidenced in
+    those inputs.
 
     `metadata_text` is the raw metadata blob read from the file. Passing it
     matters: the deterministic scanners only recognize patterns we thought to
@@ -279,15 +295,20 @@ def suggest_fields_with_ollama(
 
     Returns a partial dictionary of suggested fields -- deliberately a flat
     ``{field: value}`` mapping regardless of which input(s) justified each
-    value, since the guardrails below (never overwrite, omit over guess) hold
-    identically whether the evidence was metadata, filename, or description.
-    The caller decides provenance tagging: `suggest_for_file` tags every
-    field filled here with `"llm_description"` when a `user_description` was
-    supplied (weaker, prose-derived evidence -- flagged provisional for
-    review) and plain `"llm"` otherwise (metadata/filename-grounded
-    refinement). Invalid JSON responses, an unreachable endpoint, or any
-    other failure are ignored safely and never raise -- this function always
-    degrades to `{}` rather than breaking the naming path.
+    value, and regardless of whether an entry is a fill for a missing field
+    or (only possible when `user_description` was supplied and plainly
+    states it) a proposed replacement for an already-populated one; the
+    omit-over-guess guardrail holds identically for all of them. This
+    function never applies anything -- the caller decides both provenance
+    tagging and, when a value competes with a populated field, whether to
+    use it at all: `suggest_for_file` tags every field filled here with
+    `"llm_description"` when a `user_description` was supplied (weaker,
+    prose-derived evidence -- flagged provisional for review) and plain
+    `"llm"` otherwise (metadata/filename-grounded refinement), and keeps
+    only fills -- never overrides -- since its non-interactive CLI caller
+    has no review step. Invalid JSON responses, an unreachable endpoint, or
+    any other failure are ignored safely and never raise -- this function
+    always degrades to `{}` rather than breaking the naming path.
     """
     resolved_model = resolve_ollama_model(
         endpoint=endpoint,
@@ -308,7 +329,9 @@ def suggest_fields_with_ollama(
         "date from weak or absent cues. If a field is not evidenced, OMIT its "
         "key entirely. Omission is always better than a guess.",
         "3. Do NOT change or overwrite any value already present in the current "
-        "fields -- only fill genuinely missing ones.",
+        "fields -- only fill genuinely missing ones. The ONE exception is a "
+        "user-provided description that plainly states a replacement value "
+        "for that exact field -- see rule 8.",
         "4. Do not infer biological identity (which fluorophore/marker, which "
         "experiment type) unless it is explicitly present in the inputs.",
         "5. Format only: uppercase exptype/sample/magnification/markers/notes; "
@@ -322,9 +345,13 @@ def suggest_fields_with_ollama(
         "evidence here -- it is the user's own recollection, not an "
         "instrument record. Only propose a field from it when the "
         "description states that field plainly; still OMIT anything vague, "
-        "ambiguous, or not explicitly said. Never let the description "
-        "override or reformulate a value already present in the current "
-        "fields or in the file metadata -- describe only what fills a gap.",
+        "ambiguous, or not explicitly said. It is the ONE input allowed to "
+        "replace a value already present in the current fields or the file "
+        "metadata: when it plainly and explicitly states a different value "
+        "for that field, propose the replacement instead of omitting it. "
+        "Every other rule above stays fill-only -- never use the "
+        "description to merely reformulate or infer a value that's already "
+        "been established some other way.",
         "",
         f"Original filename: {original_name}",
         f"Current extracted fields: {json.dumps(current_fields)}",
@@ -340,8 +367,8 @@ def suggest_fields_with_ollama(
         ]
     if user_description:
         prompt_lines.append(
-            "User-provided description (authoritative context -- use this to "
-            f"enhance the name): {user_description}"
+            "User-provided description (weaker evidence than metadata -- see "
+            f"rule 8 for when it may replace an already-filled field): {user_description}"
         )
     prompt = "\n".join(prompt_lines)
 
