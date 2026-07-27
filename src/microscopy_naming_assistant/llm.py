@@ -9,6 +9,17 @@ own description. It must never *originate* biological identity (experiment
 type, marker/fluorophore, sample, magnification, date) that isn't already
 evidenced in those inputs. When in doubt, the model is instructed to omit a
 key rather than guess.
+
+The free-text describer path (a user-written experiment description passed
+as ``user_description``) is the weakest-evidence input this module accepts:
+it is the user's recollection, not an instrument record. The same
+omit-over-guess and never-overwrite guardrails apply to it unchanged -- a
+description may only ever fill a field neither metadata nor the filename
+already supplied, never invent beyond what the description states. Callers
+(``service.suggest_for_file``) are responsible for tagging any field filled
+while a description was supplied with the distinct ``"llm_description"``
+provenance -- never plain ``"llm"`` -- so downstream UI can flag it
+provisional / needs-review rather than presenting it as ground truth.
 """
 
 from __future__ import annotations
@@ -266,8 +277,17 @@ def suggest_fields_with_ollama(
     filename -- is what lets it recover fields the regexes miss, while keeping
     it grounded in evidence rather than guessing from the filename alone.
 
-    Returns a partial dictionary of suggested fields. Invalid JSON responses are
-    ignored safely.
+    Returns a partial dictionary of suggested fields -- deliberately a flat
+    ``{field: value}`` mapping regardless of which input(s) justified each
+    value, since the guardrails below (never overwrite, omit over guess) hold
+    identically whether the evidence was metadata, filename, or description.
+    The caller decides provenance tagging: `suggest_for_file` tags every
+    field filled here with `"llm_description"` when a `user_description` was
+    supplied (weaker, prose-derived evidence -- flagged provisional for
+    review) and plain `"llm"` otherwise (metadata/filename-grounded
+    refinement). Invalid JSON responses, an unreachable endpoint, or any
+    other failure are ignored safely and never raise -- this function always
+    degrades to `{}` rather than breaking the naming path.
     """
     resolved_model = resolve_ollama_model(
         endpoint=endpoint,
@@ -298,6 +318,13 @@ def suggest_fields_with_ollama(
         "7. The file metadata below is the authoritative record of how the image "
         "was acquired. Prefer it over the filename when the two disagree, and "
         "quote values from it rather than reformulating them.",
+        "8. A user-provided description (if present below) is the weakest "
+        "evidence here -- it is the user's own recollection, not an "
+        "instrument record. Only propose a field from it when the "
+        "description states that field plainly; still OMIT anything vague, "
+        "ambiguous, or not explicitly said. Never let the description "
+        "override or reformulate a value already present in the current "
+        "fields or in the file metadata -- describe only what fills a gap.",
         "",
         f"Original filename: {original_name}",
         f"Current extracted fields: {json.dumps(current_fields)}",

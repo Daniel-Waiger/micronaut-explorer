@@ -211,6 +211,48 @@ def test_suggest_fields_returns_empty_on_garbage_json_response_shape(monkeypatch
     assert result == {}
 
 
+def test_suggest_fields_with_description_degrades_gracefully_on_malformed_response(
+    monkeypatch,
+) -> None:
+    # C1 degraded-mode proof: a malformed/non-JSON model response must not
+    # raise into the naming path even when a user_description is supplied --
+    # the describer path shares the exact same never-raise contract as the
+    # plain metadata-enhancer path.
+    response = Mock()
+    response.raise_for_status.return_value = None
+    response.json.return_value = {"message": {"content": "not json at all {{{"}}
+    monkeypatch.setattr(llm.requests, "post", lambda *args, **kwargs: response)
+
+    result = llm.suggest_fields_with_ollama(
+        current_fields={"sample": "E01"},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+        user_description="stained for GFP and DAPI",
+    )
+    assert result == {}
+
+
+def test_suggest_fields_with_description_degrades_gracefully_when_ollama_unreachable(
+    monkeypatch,
+) -> None:
+    def _refused(*args, **kwargs):
+        raise llm.requests.exceptions.ConnectionError("connection refused")
+
+    monkeypatch.setattr(llm.requests, "post", _refused)
+
+    result = llm.suggest_fields_with_ollama(
+        current_fields={},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+        user_description="stained for GFP and DAPI",
+    )
+    assert result == {}
+
+
 def test_suggest_fields_returns_empty_when_content_parses_to_non_dict(monkeypatch) -> None:
     # Content is valid JSON but not an object (e.g. a bare list) -- must not
     # raise AttributeError from .items() on a non-dict.
@@ -387,3 +429,32 @@ def test_suggest_fields_prompt_contains_guardrail_language(monkeypatch) -> None:
     assert "do not invent facts" in prompt_text.lower()
     for key in ("date", "exptype", "sample", "magnification", "markers", "notes"):
         assert key in prompt_text
+
+
+def test_suggest_fields_prompt_flags_description_as_weakest_evidence(monkeypatch) -> None:
+    # C1 (1): the free-text description is structured as strictly weaker
+    # evidence than metadata/filename -- the prompt must say so explicitly,
+    # not just rely on the generic never-fabricate rules.
+    captured: dict = {}
+
+    def _capture_post(url, json=None, timeout=None):
+        captured["payload"] = json
+        response = Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"message": {"content": "{}"}}
+        return response
+
+    monkeypatch.setattr(llm.requests, "post", _capture_post)
+
+    llm.suggest_fields_with_ollama(
+        current_fields={"sample": "E01"},
+        original_name="a.tif",
+        endpoint="http://localhost:11434/api/chat",
+        model="llama3.1:8b",
+        timeout_seconds=3,
+        user_description="stained for GFP and DAPI",
+    )
+
+    prompt_text = _captured_prompt_text(captured["payload"]).lower()
+    assert "weakest evidence" in prompt_text
+    assert "stained for gfp and dapi" in prompt_text

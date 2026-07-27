@@ -79,11 +79,25 @@ def suggest_for_file(
             metadata_text=detail.metadata_text,
         )
         # Fill only genuinely missing fields. The LLM is an enhancer: a value we
-        # actually extracted from the file outranks anything the model proposes.
+        # actually extracted from the file (or already derived from the
+        # filename/mtime) outranks anything the model proposes -- `extracted`
+        # at this point holds exactly those genuine gaps, so this can never
+        # clobber a metadata- or filename-sourced value.
+        #
+        # A field the model justified with help from the user's free-text
+        # `user_description` carries materially weaker evidence than one
+        # grounded only in the file's own metadata/filename: prose is the
+        # user's recollection, not an instrument record. Tag such fields with
+        # the distinct `"llm_description"` provenance rather than folding them
+        # into plain `"llm"` -- collapsing the two would erase exactly the
+        # "refined an extracted value" vs. "invented from prose" distinction
+        # C2 needs to flag description-derived fields as provisional / needs
+        # review all the way to the final name.
+        llm_source_tag = "llm_description" if user_description else "llm"
         for key, value in llm_fields.items():
             if key not in extracted:
                 extracted[key] = value
-                ex_sources[key] = "llm"
+                ex_sources[key] = llm_source_tag
 
     fields = finalize_fields(file_path, extracted, config)
 

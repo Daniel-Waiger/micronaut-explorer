@@ -751,13 +751,20 @@ def extract_metadata_detailed(
 
     Returns `(fields, sources)`: `fields` is identical to what
     `extract_metadata` returns. `sources` maps each key present in `fields` to
-    `"filename"` for the parent-computed heuristics (date from mtime or
-    filename, sample guessed from filename) or `"metadata"` for anything
-    supplied by the bioio worker (`_extract_bioio_fields`) -- bioio values
-    override the heuristics, so they're tagged `"metadata"` even when they
-    replace a `"filename"`-sourced value (e.g. `sample`). The one exception is
-    `extraction_mask`, a user-configured placeholder mask (see
-    `_extract_from_mask`), which is applied last and wins outright.
+    `"filename"` for parent-computed heuristics parsed out of the filename
+    itself (date/sample/markers/... guessed from the stem), `"mtime"` for the
+    weakest heuristic -- the file's modification timestamp, used only as a
+    `date` fallback when nothing else supplied one -- or `"metadata"` for
+    anything supplied by the bioio worker (`_extract_bioio_fields`). `"mtime"`
+    is deliberately distinct from `"filename"`: mtime is frequently the date a
+    file was *copied*, not acquired, so callers that would otherwise treat it
+    as a confident guess need to be able to tell the two apart (see E7 --
+    provenance must not blur a weaker origin into a stronger-sounding one).
+    bioio values override the heuristics, so they're tagged `"metadata"` even
+    when they replace a `"filename"`- or `"mtime"`-sourced value (e.g.
+    `sample`, `date`). The one exception is `extraction_mask`, a
+    user-configured placeholder mask (see `_extract_from_mask`), which is
+    applied last and wins outright.
 
     `field_key_map` overrides the curated per-format key -> field mapping (see
     `field_map.resolve_fields`); forwarded through to the worker unchanged.
@@ -774,10 +781,14 @@ def extract_metadata_detailed(
     sources: dict[str, str] = {}
     detail = ExtractionDetail()
 
-    # Always derive date from file mtime as a reliable baseline.
+    # Derive date from file mtime as a last-resort baseline. This is the
+    # weakest possible origin -- mtime is frequently the date the file was
+    # *copied*, not acquired -- so it gets its own "mtime" tag rather than
+    # being folded into "filename", which callers reasonably treat as a
+    # stronger, content-derived guess.
     mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
     result["date"] = mtime.strftime("%Y-%m-%d")
-    sources["date"] = "filename"
+    sources["date"] = "mtime"
 
     date_guess = _extract_date_from_name(file_path.stem)
     if date_guess:

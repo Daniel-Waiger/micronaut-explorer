@@ -22,6 +22,7 @@ os.environ.setdefault("STREAMLIT_SERVER_MAX_MESSAGE_SIZE", "10240")  # 10 GB
 
 import streamlit as st
 
+from microscopy_naming_assistant.cli import _date_is_weak, _provisional_fields
 from microscopy_naming_assistant.config import default_config, load_config, save_config
 from microscopy_naming_assistant.llm import DEFAULT_PREFERRED_MODELS, list_local_ollama_models
 from microscopy_naming_assistant.profiles import ProfileRules, save_profile
@@ -211,30 +212,65 @@ if "suggestions" in st.session_state:
         1 for s in suggestions if any(v == "default" for k, v in s.sources.items() if k != "ext")
     )
 
-    st.write("### Tag Files")
-    st.caption(
-        "Every previewed file is listed below with its naming fields, pre-filled from "
-        "extracted metadata (or filename/date heuristics) where possible. The "
-        '"needs review" column lists fields that could not be extracted and fell back '
-        "to a default (e.g. UNKNOWN) — check those. Edit any cell to control the final "
-        "filename directly, without needing the LLM. "
-        f"({defaulted_count} of {len(suggestions)} file(s) currently need review.)"
-    )
-
     # Naming-field columns, in first-seen order, shared by every suggestion
     # (config.defaults guarantees the same key set for all of them); "ext" is
     # rendered onto the name automatically and isn't user-editable.
     field_names = list(dict.fromkeys(k for s in suggestions for k in s.fields if k != "ext"))
+
+    # Read-only status/label columns rendered in the SAME table as the real
+    # naming fields above. A status column that happens to share a name with
+    # a real field (e.g. a naming config that defines a field literally
+    # called "date") would SILENTLY SHADOW it: `row[name] = ...` for the
+    # status flag would overwrite the field's own value in the editor, and
+    # excluding that name from `edited_fields` on save would drop the field
+    # itself, substituting the config default. So every status column name
+    # is disambiguated against `field_names` (and against the other status
+    # columns) here, once, rather than hard-coded as a literal string.
+    _taken_status_columns: set[str] = set()
+
+    def _status_column(base: str) -> str:
+        name = base
+        while name in field_names or name in _taken_status_columns:
+            name = f"{name} (status)"
+        _taken_status_columns.add(name)
+        return name
+
+    col_needs_review = _status_column("needs review")
+    col_provisional = _status_column("provisional")
+    col_date_weak = _status_column("date provenance")
+    col_issues = _status_column("issues")
+    status_columns = (col_needs_review, col_provisional, col_date_weak, col_issues)
+
+    st.write("### Tag Files")
+    st.caption(
+        "Every previewed file is listed below with its naming fields, pre-filled from "
+        "extracted metadata (or filename/date heuristics) where possible. The "
+        f'"{col_needs_review}" column lists fields that could not be extracted and fell '
+        f'back to a default (e.g. UNKNOWN) — check those. "{col_provisional}" lists '
+        "fields filled from your free-text description below (weaker evidence than the "
+        f'file\'s own metadata -- always review before applying). "{col_date_weak}" flags '
+        "a date that came only from the file's modification time, not confirmed "
+        "acquisition metadata. Edit any cell to control the final filename directly, "
+        "without needing the LLM. "
+        f"({defaulted_count} of {len(suggestions)} file(s) currently need review.)"
+    )
 
     tag_rows = []
     for s in suggestions:
         row = {"file": s.source.name}
         for name in field_names:
             row[name] = s.fields.get(name, "")
-        row["needs review"] = ", ".join(
+        row[col_needs_review] = ", ".join(
             k for k, v in s.sources.items() if v == "default" and k != "ext"
         )
-        row["issues"] = "; ".join(f"{i.severity}:{i.field}" for i in s.issues)
+        # C2: surface C1's "llm_description" provenance (fields filled from
+        # the free-text description) and A5's "mtime" date provenance as
+        # visibly provisional/weak -- never silently as ground truth. These
+        # go in their own disambiguated status columns, never into a real
+        # naming-field column (see the shadowing note above).
+        row[col_provisional] = ", ".join(_provisional_fields(s.sources))
+        row[col_date_weak] = "weak (mtime)" if _date_is_weak(s.sources) else ""
+        row[col_issues] = "; ".join(f"{i.severity}:{i.field}" for i in s.issues)
         tag_rows.append(row)
 
     edited_rows = st.data_editor(
@@ -242,7 +278,7 @@ if "suggestions" in st.session_state:
         key="tag_table",
         use_container_width=True,
         num_rows="fixed",
-        disabled=["file", "needs review", "issues"],
+        disabled=["file", *status_columns],
     )
 
     experiment_description = st.text_area(
@@ -267,18 +303,39 @@ if "suggestions" in st.session_state:
 
         profile = load_profile(profile_path) if profile_path else None
         by_name = {s.source.name: s for s in suggestions}
+        # Read-only status columns rendered in the table alongside the actual
+        # naming fields -- must never be treated as fields themselves. Uses
+        # the same disambiguated names as the table above (never a hard-coded
+        # "date"/"provisional" literal) so a real "date" naming field is
+        # never dropped from `edited_fields` on save.
+        non_field_columns = ("file", *status_columns)
 
         for row in edited_rows:
             s = by_name.get(row["file"])
             if s is None:
                 continue
-            edited_fields = {
-                k: v for k, v in row.items() if k not in ("file", "needs review", "issues")
-            }
+            edited_fields = {k: v for k, v in row.items() if k not in non_field_columns}
+            # A hand-edit IS the review a provisional/weak-date flag exists to
+            # prompt -- once the user has looked at a field and (re)typed it,
+            # its old provenance tag ("llm_description"/"mtime") would keep
+            # flagging it forever with no way to clear it from the UI. Retag
+            # anything the user actually changed so the flag reflects that a
+            # human, not a guess, now owns this value.
+            for field_name, new_value in edited_fields.items():
+                if s.fields.get(field_name) != new_value:
+                    s.sources[field_name] = "user_edited"
             s.fields = finalize_fields(s.source, edited_fields, config)
             s.target_name = render_name(s.fields, config)
             s.issues = validate_fields(s.fields, profile) if profile else []
         st.rerun()
+
+    # E6(b): st.success() called immediately before st.rerun() is never
+    # rendered (the rerun discards the current script run before the browser
+    # paints it) -- render any pending message from the PREVIOUS run first,
+    # via a session_state flag, then let this run set a new one if needed.
+    llm_fill_message = st.session_state.pop("llm_fill_message", None)
+    if llm_fill_message:
+        st.success(llm_fill_message)
 
     if suggest_llm_clicked:
         from microscopy_naming_assistant.llm import suggest_fields_with_ollama
@@ -288,6 +345,13 @@ if "suggestions" in st.session_state:
 
         profile = load_profile(profile_path) if profile_path else None
         filled_count = 0
+        # C1: a field filled while the user's free-text description was
+        # supplied carries materially weaker evidence than one grounded only
+        # in the file's own metadata/filename -- tag it with the distinct
+        # "llm_description" provenance (never plain "llm"), mirroring
+        # service.suggest_for_file's own tagging, so it reads as provisional
+        # / needs review all the way to the final name (E7).
+        llm_source_tag = "llm_description" if experiment_description else "llm"
 
         with st.spinner("Asking the local LLM…"):
             for s in suggestions:
@@ -312,7 +376,7 @@ if "suggestions" in st.session_state:
                     value = llm_fields.get(name, "")
                     if value:
                         merged[name] = value
-                        s.sources[name] = "llm"
+                        s.sources[name] = llm_source_tag
                         filled_count += 1
 
                 s.fields = finalize_fields(s.source, merged, config)
@@ -320,9 +384,15 @@ if "suggestions" in st.session_state:
                 s.issues = validate_fields(s.fields, profile) if profile else []
 
         if filled_count > 0:
-            st.success(
+            review_note = (
+                " These are PROVISIONAL (filled from your description) -- review before "
+                "applying."
+                if llm_source_tag == "llm_description"
+                else ""
+            )
+            st.session_state["llm_fill_message"] = (
                 f"Filled {filled_count} field(s) from LLM suggestions — "
-                "review them in the table."
+                f"review them in the table.{review_note}"
             )
             st.rerun()
         else:
@@ -352,6 +422,22 @@ if "suggestions" in st.session_state:
             st.caption(f"Reader: {selected.reader or 'none'}")
             if selected.extraction_error:
                 st.error(f"Extraction problem: {selected.extraction_error}")
+
+            # C2: surface C1/A5's provenance distinctions here too, right
+            # next to the raw metadata -- a described field or an
+            # mtime-derived date must read as provisional/weak, not as fact.
+            selected_provisional = _provisional_fields(selected.sources)
+            if selected_provisional:
+                st.warning(
+                    "PROVISIONAL (filled from your description, needs review): "
+                    + ", ".join(selected_provisional)
+                )
+            if _date_is_weak(selected.sources):
+                st.warning(
+                    "Date is WEAK: derived only from the file's modification time, which "
+                    "is often the copy date rather than the true acquisition date."
+                )
+
             st.code(selected.metadata_text or "(no metadata found in this file)")
 
             st.write("#### Harvested metadata keys")
@@ -466,7 +552,30 @@ if "suggestions" in st.session_state:
     batch = recalculate_batch(input_dir, suggestions, strict, conflict_strategy)
 
     st.write("### Planned Renames")
-    table_rows = [{"source": src.name, "suggested": dst.name} for src, dst in batch.planned]
+    st.caption(
+        f'"{col_provisional}" and "{col_date_weak}" carry the same review flags shown in '
+        "Tag Files above, through to the final planned name -- a provisional or "
+        "weak-date row should be checked before Apply."
+    )
+    # Look up each planned pair's SuggestionResult so the provisional/weak-date
+    # flags read all the way to the final planned name, not just the earlier
+    # per-field table (see C2 scope: "must read as provisional all the way to
+    # the final name, not silently as ground truth"). This table has no real
+    # naming-field columns (just source/suggested), so no shadowing risk, but
+    # it reuses the same disambiguated column names for consistency.
+    suggestion_by_source = {s.source: s for s in batch.suggestions}
+    table_rows = []
+    for src, dst in batch.planned:
+        suggestion = suggestion_by_source.get(src)
+        row_sources = suggestion.sources if suggestion is not None else {}
+        table_rows.append(
+            {
+                "source": src.name,
+                "suggested": dst.name,
+                col_provisional: ", ".join(_provisional_fields(row_sources)),
+                col_date_weak: "weak (mtime)" if _date_is_weak(row_sources) else "",
+            }
+        )
     st.dataframe(table_rows, use_container_width=True)
 
     # Reuse the CLI's own row-builder + CSV writer so this download, the JSON
@@ -518,7 +627,34 @@ if "suggestions" in st.session_state:
         for item in batch.skipped:
             st.write(f"- {item}")
 
-    if batch.suggestions and not any(s.issues for s in batch.suggestions):
+    # A provisional (description-derived) field is an unreviewed GUESS and
+    # must still be flagged here, right before Apply -- otherwise "All clear"
+    # would present it as ground truth at the one moment that matters most
+    # (see C2 scope). A weak (mtime-only) date is different in kind: it is a
+    # real, honestly-labelled value (just a low-confidence one), not a guess
+    # -- metadata.py seeds every file's date from mtime as a baseline, so
+    # treating it as equally blocking would make "All clear" unreachable for
+    # nearly every ordinary file. Weak dates get a heads-up, not a block.
+    files_with_provisional = [
+        s.source.name for s in batch.suggestions if _provisional_fields(s.sources)
+    ]
+    files_with_weak_date = [s.source.name for s in batch.suggestions if _date_is_weak(s.sources)]
+
+    if files_with_provisional:
+        st.warning(
+            "Provisional fields still need review before applying: "
+            + ", ".join(files_with_provisional)
+        )
+    if files_with_weak_date:
+        st.info(
+            "Date derived only from file modification time (often the copy date, not "
+            "acquisition) for: " + ", ".join(files_with_weak_date)
+        )
+    if (
+        not files_with_provisional
+        and batch.suggestions
+        and not any(s.issues for s in batch.suggestions)
+    ):
         st.success("All clear! Ready to apply.")
 
     if st.button("Apply Renames", type="primary"):
@@ -565,6 +701,14 @@ if uploaded:
                         "suggested": result.target_name,
                         "issues": "; ".join([f"{i.severity}:{i.field}" for i in result.issues]),
                         "review (defaulted)": ", ".join(defaulted),
+                        # A5/C2: no LLM description input in this upload-only
+                        # preview mode, but a weak (mtime-only) date can still
+                        # occur and must not be presented as fact. Named
+                        # "date provenance" (not "date") since this preview
+                        # row has no naming-field columns of its own to
+                        # collide with, but the label stays consistent with
+                        # the Tag Files table above.
+                        "date provenance": "weak (mtime)" if _date_is_weak(result.sources) else "",
                     }
                 )
     st.dataframe(preview_rows, use_container_width=True)
