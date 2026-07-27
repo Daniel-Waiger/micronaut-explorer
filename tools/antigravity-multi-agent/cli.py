@@ -20,9 +20,17 @@ def cmd_plan(args):
 
 def cmd_execute(args):
     import json
+    import subprocess
     from google import genai
     from ama_execute import execute_task, verify_task
     
+    def update_dash(args_list):
+        try:
+            update_script = os.path.join(args.repo_path, 'tools', 'cma-dashboard', 'update.py')
+            subprocess.run([sys.executable, update_script] + args_list, check=False)
+        except Exception as e:
+            print(f"Dashboard update failed: {e}")
+            
     with open(args.plan, 'r') as f:
         plan = json.load(f)
     
@@ -30,28 +38,86 @@ def cmd_execute(args):
     tasks_by_id = {t['id']: t for t in plan['tasks']}
     batches = plan.get('batches', [[t['id'] for t in plan['tasks']]])
     
+    done_tasks = set()
+    try:
+        status_path = os.path.join(args.repo_path, 'tools', 'cma-dashboard', 'status.json')
+        if os.path.exists(status_path):
+            with open(status_path, 'r', encoding='utf-8') as sf:
+                st = json.load(sf)
+                for t in st.get('tasks', []):
+                    if t.get('status') == 'done':
+                        done_tasks.add(t['id'])
+    except Exception as e:
+        print(f"Could not load status.json: {e}")
+        
     results = []
     
-    for batch in batches:
+    update_dash([
+        "--run", "AMA Execution Run",
+        "--orch", "Antigravity Multi-Agent",
+        "--model", "Gemini 3.6 Flash / 3.1 Pro",
+        "--status", "running",
+        "--log", "AMA Run Started"
+    ])
+    
+    for i, batch in enumerate(batches):
+        phase = f"Batch {i+1}"
         for task_id in batch:
             task = tasks_by_id.get(task_id)
             if not task: continue
             
+            if task_id in done_tasks:
+                print(f"Skipping task {task_id} as it is already 'done' in status.json.")
+                continue
+                
+            update_dash([
+                "--status", "running",
+                "--phase", phase,
+                "--current", task_id, task['title'],
+                "--task-add", f"{task_id}={phase}={task['title']}=running:Gemini Flash",
+                "--log", f"Dispatched {task_id}"
+            ])
+            
             exec_outcome = execute_task(client, task, args.repo_path)
+            
+            update_dash(["--task", f"{task_id}=verifying:Gemini Pro", "--log", f"Verifying {task_id}"])
             verify_outcome = verify_task(client, task, args.repo_path, exec_outcome)
             
             if not verify_outcome.pass_:
+                update_dash([
+                    "--task", f"{task_id}=running:Gemini Flash",
+                    "--log", f"{task_id} verifier FAIL, retrying..."
+                ])
                 print(f"Task {task_id} failed verification. Retrying...")
                 feedback = "\\n".join(verify_outcome.problems)
                 exec_outcome = execute_task(client, task, args.repo_path, feedback)
+                update_dash(["--task", f"{task_id}=verifying:Gemini Pro", "--log", f"Re-verifying {task_id}"])
                 verify_outcome = verify_task(client, task, args.repo_path, exec_outcome)
                 
             if verify_outcome.pass_:
+                update_dash([
+                    "--task", f"{task_id}=done:Gemini Pro (Verified)",
+                    "--log", f"{task_id} verified PASS"
+                ])
                 print(f"Task {task_id} VERIFIED successfully.")
+                
+                print(f"Committing and pushing {task_id} to GitHub...")
+                commit_msg = f"CMA [ama-run] {task_id}: {task['title']}"
+                subprocess.run("git add .", shell=True, cwd=args.repo_path, check=False)
+                subprocess.run(['git', 'commit', '-m', commit_msg], cwd=args.repo_path, check=False)
+                subprocess.run(['git', 'push'], cwd=args.repo_path, check=False)
+                
                 results.append({"id": task_id, "status": "VERIFIED"})
             else:
+                update_dash([
+                    "--task", f"{task_id}=failed:Gemini Pro",
+                    "--status", "failed",
+                    "--log", f"{task_id} FAILED after retry. Halting."
+                ])
                 print(f"Task {task_id} FAILED verification after retry. Stopping.")
                 sys.exit(1)
+                
+    update_dash(["--status", "done", "--current-clear", "--log", "All tasks completed successfully."])
 
 def cmd_learn(args):
     from google import genai

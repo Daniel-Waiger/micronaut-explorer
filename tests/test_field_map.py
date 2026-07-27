@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from microscopy_naming_assistant.field_map import _transform_magnification
+from microscopy_naming_assistant.field_map import (
+    _transform_magnification,
+    normalize_key_stem,
+    resolve_fields,
+    FALLBACK_KEYS,
+)
+from microscopy_naming_assistant.metadata_keys import ImageMetadata
 
 
 def test_unit_anchored_magnification_from_full_objective_strings() -> None:
@@ -34,3 +40,44 @@ def test_objective_string_never_yields_the_numerical_aperture_or_model_number() 
     assert result == "X63"
     assert result != "X1"
     assert result != "X2"
+
+
+def test_normalize_key_stem() -> None:
+    assert normalize_key_stem("ObjectiveName") == "objective"
+    assert normalize_key_stem("Objective") == "objective"
+    assert normalize_key_stem("objective_name") == "objective"
+    assert normalize_key_stem("ATLConfocalSettingDefinition #0|ObjectiveName") == "objective"
+
+
+def test_resolve_magnification_atomic_vs_descriptive() -> None:
+    # Only ObjectiveName
+    image1 = ImageMetadata(0, 's', {'ObjectiveName': 'HC PL APO CS2 20x/0.75 DRY'})
+    fields1, prov1 = resolve_fields(image1, 'LIF')
+    assert fields1.get("magnification") == "X20"
+    
+    # Both Magnification and ObjectiveName (atomic wins)
+    image2 = ImageMetadata(0, 's', {'Magnification': '40', 'ObjectiveName': '...20x...'})
+    fields2, prov2 = resolve_fields(image2, 'LIF')
+    assert fields2.get("magnification") == "X40"
+    assert prov2.get("magnification") == "Magnification"
+
+
+def test_vendor_spelled_objective_name_family_match() -> None:
+    image = ImageMetadata(0, 's', {'objective_name': 'HC PL APO 63x'})
+    fields, prov = resolve_fields(image, 'LIF')
+    assert fields.get("magnification") == "X63"
+    assert prov.get("magnification") == "objective_name"
+
+
+def test_dyes_and_channel_name_resolves_from_dyes() -> None:
+    image = ImageMetadata(0, 's', {'Dyes': 'DAPI', 'ChannelName': 'Green'})
+    fields, prov = resolve_fields(image, 'LIF')
+    assert fields.get("markers") == "DAPI"
+    assert prov.get("markers") == "Dyes"
+
+
+def test_fallback_keys_are_atomic_first() -> None:
+    # Verify that in FALLBACK_KEYS['magnification'], Magnification comes before ObjectiveName
+    for keys_list in FALLBACK_KEYS["magnification"].values():
+        if "Magnification" in keys_list and "ObjectiveName" in keys_list:
+            assert keys_list.index("Magnification") < keys_list.index("ObjectiveName")

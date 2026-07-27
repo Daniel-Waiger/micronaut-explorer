@@ -16,6 +16,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+import re
+from dataclasses import dataclass
+
 from .markers import alias_map
 from .metadata_keys import ImageMetadata
 
@@ -181,14 +184,64 @@ def default_map_for(file_format: str) -> dict[str, FieldSource]:
     return dict(DEFAULT_FIELD_MAPS.get(file_format, {}))
 
 
+def normalize_key_stem(key: str) -> str:
+    """Normalize a metadata key into its base semantic stem."""
+    if "|" in key:
+        key = key.split("|")[-1]
+    key = re.sub(r"\s*#\d+$", "", key)
+    key = re.sub(r'([a-z])([A-Z])', r'\1 \2', key)
+    key = key.replace("_", " ")
+    words = key.split()
+    if words and words[-1].lower() in {"name", "value", "setting", "settings", "number", "id"}:
+        words.pop()
+    return "".join(words).lower()
+
+
+def _is_atomic_value(value: str) -> bool:
+    """Return True if value has no whitespace and is either fully numeric or <= 12 chars."""
+    if not value or value.isspace() or re.search(r"\s", value):
+        return False
+    if value.replace(".", "", 1).replace("-", "", 1).isdigit():
+        return True
+    return len(value) <= 12
+
+
 def _candidate_sources(
-    field_name: str, source: FieldSource | None, file_format: str
+    field_name: str, source: FieldSource | None, file_format: str, image: ImageMetadata
 ) -> list[FieldSource]:
     candidates: list[FieldSource] = [source] if source else []
     per_field = FALLBACK_KEYS.get(field_name, {})
+    tier0_keys = {source.key} if source else set()
+    
     for key in per_field.get(file_format, []) + per_field.get("*", []):
-        transform = source.transform if source else field_name
-        candidates.append(FieldSource(key, transform if transform in TRANSFORMS else "verbatim"))
+        if key not in tier0_keys:
+            transform = source.transform if source else field_name
+            candidates.append(FieldSource(key, transform if transform in TRANSFORMS else "verbatim"))
+            tier0_keys.add(key)
+
+    families = {
+        "magnification": {"magnification", "nominalmagnification", "objective"},
+        "markers": {"dye", "fluor", "channel", "lut"},
+        "date": {"acquisitiondate", "creationdate", "datetime", "imagedate", "date"}
+    }
+    family = families.get(field_name, set())
+
+    if family:
+        tier1_candidates = []
+        for key in image.keys:
+            if key not in tier0_keys and normalize_key_stem(key) in family:
+                tier1_candidates.append(key)
+        
+        def sort_key(k: str) -> int:
+            val = image.get(k)
+            return 0 if val and _is_atomic_value(val) else 1
+            
+        tier1_candidates.sort(key=sort_key)
+        
+        for key in tier1_candidates:
+            transform = source.transform if source else field_name
+            candidates.append(FieldSource(key, transform if transform in TRANSFORMS else "verbatim"))
+
     return candidates
 
 
@@ -216,7 +269,7 @@ def resolve_fields(
     provenance: dict[str, str] = {}
 
     for field_name in MAPPABLE_FIELDS:
-        for candidate in _candidate_sources(field_name, mapping.get(field_name), file_format):
+        for candidate in _candidate_sources(field_name, mapping.get(field_name), file_format, image):
             raw = image.get(candidate.key)
             if raw is None:
                 continue

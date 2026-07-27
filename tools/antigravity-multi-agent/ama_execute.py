@@ -184,6 +184,19 @@ if __name__ == "__main__":
     tasks_by_id = {t['id']: t for t in plan['tasks']}
     batches = plan.get('batches', [[t['id'] for t in plan['tasks']]])
     
+    # Load status.json to skip done tasks
+    done_tasks = set()
+    try:
+        status_path = os.path.join(args.repo_path, 'tools', 'cma-dashboard', 'status.json')
+        if os.path.exists(status_path):
+            with open(status_path, 'r', encoding='utf-8') as sf:
+                st = json.load(sf)
+                for t in st.get('tasks', []):
+                    if t.get('status') == 'done':
+                        done_tasks.add(t['id'])
+    except Exception as e:
+        print(f"Could not load status.json: {e}")
+
     results = []
     
     # Initialize dashboard
@@ -200,6 +213,9 @@ if __name__ == "__main__":
         for task_id in batch:
             task = tasks_by_id.get(task_id)
             if not task: continue
+            if task_id in done_tasks:
+                print(f"Skipping task {task_id} as it is already 'done' in status.json.")
+                continue
             
             update_dash([
                 "--status", "running",
@@ -236,6 +252,14 @@ if __name__ == "__main__":
                     "--log", f"{task_id} verified PASS"
                 ])
                 print(f"Task {task_id} VERIFIED successfully.")
+                
+                # Push to GitHub
+                print(f"Committing and pushing {task_id} to GitHub...")
+                commit_msg = f"CMA [ama-run] {task_id}: {task['title']}"
+                subprocess.run("git add .", shell=True, cwd=args.repo_path, check=False)
+                subprocess.run(['git', 'commit', '-m', commit_msg], cwd=args.repo_path, check=False)
+                subprocess.run(['git', 'push'], cwd=args.repo_path, check=False)
+                
                 results.append({"id": task_id, "status": "VERIFIED"})
             else:
                 update_dash([
