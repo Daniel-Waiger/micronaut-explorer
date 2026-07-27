@@ -23,7 +23,7 @@ os.environ.setdefault("STREAMLIT_SERVER_MAX_MESSAGE_SIZE", "10240")  # 10 GB
 import streamlit as st
 
 from microscopy_naming_assistant.config import default_config, load_config, save_config
-from microscopy_naming_assistant.llm import list_local_ollama_models
+from microscopy_naming_assistant.llm import DEFAULT_PREFERRED_MODELS, list_local_ollama_models
 from microscopy_naming_assistant.profiles import ProfileRules, save_profile
 from microscopy_naming_assistant.service import apply_batch, plan_batch, suggest_for_file
 
@@ -95,8 +95,7 @@ use_llm = st.sidebar.checkbox(
     "Use Ollama suggestions", value=bool(config.llm.get("enabled", False))
 )
 
-default_preferred = ["llama3.1:8b", "qwen2.5-coder:7b", "phi3:mini"]
-preferred = [str(x) for x in config.llm.get("preferred_models", default_preferred)]
+preferred = [str(x) for x in config.llm.get("preferred_models", DEFAULT_PREFERRED_MODELS)]
 
 
 # Cache Ollama model discovery so a connection-timeout penalty (when Ollama is

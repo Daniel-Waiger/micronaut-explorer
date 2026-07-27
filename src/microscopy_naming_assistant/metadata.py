@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .field_map import resolve_fields
-from .markers import alias_map
+from .markers import AMBIGUOUS_IN_FREE_TEXT, alias_map
 from .metadata_keys import ImageMetadata, harvest
 
 logger = logging.getLogger(__name__)
@@ -375,30 +375,65 @@ def _extract_near_key(text: str, key: str) -> str | None:
 def _extract_markers(text: str, hints: list[str]) -> str | None:
     """Find canonical marker/fluorophore names in `text`.
 
-    Every known alias (see `markers.alias_map`) is searched for as a whole
-    word, case-insensitively, directly in `text` -- so "CFP" no longer
+    Every known alias (see `markers.alias_map`) except those in
+    `markers.AMBIGUOUS_IN_FREE_TEXT` is searched for as a whole word,
+    case-insensitively, directly in `text` -- so "CFP" no longer
     false-positives inside a larger token like "SCFPX", and spelled-out
     aliases (e.g. "Alexa Fluor 488") normalize to their canonical form
-    (e.g. "ALEXA488"). Matches are ordered by first occurrence in `text` and
-    deduped (first occurrence wins), then joined with "-".
+    (e.g. "ALEXA488"). `AMBIGUOUS_IN_FREE_TEXT` aliases (e.g. "snap", "halo",
+    "venus", "citrine") are real marker spellings but are ALSO common English
+    words or standard instrument/camera-software terms, so they are skipped
+    here entirely -- they still resolve through an exact metadata-value
+    lookup (`field_map.py::_canonical_marker`), which never sees surrounding
+    prose to collide with.
+
+    Longest-match-wins is a STRUCTURAL guarantee, not an accident of
+    `MARKER_ALIASES`'s dict insertion order: candidate matches are sorted by
+    `(start, -length)` and then a match is only kept if its span does not
+    overlap any already-accepted match's span. So when two aliases both
+    match at (or overlapping) the same position -- e.g. "atto 647" and
+    "atto 647-n" both matching at the start of "ATTO 647-N" -- the longer,
+    more specific alias always wins and the shorter one is discarded
+    outright, never appended as a second, spurious marker. This holds
+    regardless of which alias happens to appear first in the dict (see
+    test_markers.py for the adversarial-order proof).
+
+    Once a span is accepted, matches are ordered by first occurrence in
+    `text` and deduped by canonical (first occurrence wins), then joined
+    with "-".
 
     `hints` (format-specific metadata keys such as "Channel"/"Fluor") are
     kept as a secondary signal via `_extract_near_key`, in case a marker only
     surfaces near one of those keys and isn't otherwise picked up verbatim by
     the whole-text scan above; any it finds are appended after, only if not
-    already found.
+    already found. The same ambiguous-alias exclusion and longest-match/
+    span-overlap rules apply there too.
     """
     amap = alias_map()
 
-    matches: list[tuple[int, str]] = []
-    for alias, canonical in amap.items():
-        match = re.search(r"\b" + re.escape(alias) + r"\b", text, re.IGNORECASE)
-        if match:
-            matches.append((match.start(), canonical))
-    matches.sort(key=lambda item: item[0])
+    def _non_overlapping_matches(haystack: str, exclude: set[str]) -> list[tuple[int, int, str]]:
+        candidates: list[tuple[int, int, str]] = []
+        for alias, canonical in amap.items():
+            if alias in AMBIGUOUS_IN_FREE_TEXT or canonical in exclude:
+                continue
+            match = re.search(r"\b" + re.escape(alias) + r"\b", haystack, re.IGNORECASE)
+            if match:
+                candidates.append((match.start(), match.end(), canonical))
+        # Longer alias wins any tie/overlap at the same start index -- sort by
+        # (start, -length) so it is considered, and therefore accepted, first.
+        candidates.sort(key=lambda item: (item[0], -(item[1] - item[0])))
+
+        accepted: list[tuple[int, int, str]] = []
+        accepted_spans: list[tuple[int, int]] = []
+        for start, end, canonical in candidates:
+            if any(start < a_end and end > a_start for a_start, a_end in accepted_spans):
+                continue  # overlaps an already-accepted (longer or earlier) match
+            accepted_spans.append((start, end))
+            accepted.append((start, end, canonical))
+        return accepted
 
     found: list[str] = []
-    for _, canonical in matches:
+    for _, _, canonical in _non_overlapping_matches(text, exclude=set()):
         if canonical not in found:
             found.append(canonical)
 
@@ -406,10 +441,8 @@ def _extract_markers(text: str, hints: list[str]) -> str | None:
         near = _extract_near_key(text, key)
         if not near:
             continue
-        for alias, canonical in amap.items():
-            if canonical in found:
-                continue
-            if re.search(r"\b" + re.escape(alias) + r"\b", near, re.IGNORECASE):
+        for _, _, canonical in _non_overlapping_matches(near, exclude=set(found)):
+            if canonical not in found:
                 found.append(canonical)
 
     if not found:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -86,7 +87,108 @@ def test_plan_batch_detects_collisions(tmp_path: Path, monkeypatch) -> None:
     assert len(result.skipped) == 0
     targets = [p[1].name for p in result.planned]
     assert "DUPLICATE.tif" in targets
+    # The default "suffix" strategy no longer uses a bare `_NN` counter (A4):
+    # two DIFFERENT sources colliding on the same target must get a
+    # distinguishable (content-derived) suffix instead of ambiguous `_01`.
+    other = [t for t in targets if t != "DUPLICATE.tif"]
+    assert len(other) == 1
+    assert re.fullmatch(r"DUPLICATE_[0-9a-f]{8}\.tif", other[0])
+    assert other[0] != "DUPLICATE_01.tif"
+
+
+def test_plan_batch_suffix_numeric_keeps_legacy_bare_counter(tmp_path: Path, monkeypatch) -> None:
+    """The legacy `_NN` behaviour stays reachable via conflict_strategy='suffix_numeric'."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    f1 = tmp_path / "a.tif"
+    f2 = tmp_path / "b.tif"
+    f1.write_bytes(b"a")
+    f2.write_bytes(b"b")
+
+    def fake_suggest(
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
+    ):
+        return service.SuggestionResult(
+            source=file_path,
+            target_name="DUPLICATE.tif",
+            fields={},
+            issues=[],
+        )
+
+    monkeypatch.setattr(service, "suggest_for_file", fake_suggest)
+
+    result = service.plan_batch(
+        input_dir=tmp_path,
+        pattern="*.tif",
+        config_path=config_path,
+        conflict_strategy="suffix_numeric",
+    )
+    targets = [p[1].name for p in result.planned]
+    assert "DUPLICATE.tif" in targets
     assert "DUPLICATE_01.tif" in targets
+
+
+def test_recalculate_batch_treats_case_only_targets_as_colliding(tmp_path: Path) -> None:
+    """On Windows, 'A.tif' and 'a.tif' are the SAME file -- two suggestions
+    that render to targets differing only by case must not both plan as
+    non-colliding, or the second apply_batch rename would silently overwrite
+    the first (A4 point 2)."""
+    src_a = tmp_path / "one.tif"
+    src_b = tmp_path / "two.tif"
+    src_a.write_bytes(b"a")
+    src_b.write_bytes(b"b")
+
+    suggestion_a = service.SuggestionResult(source=src_a, target_name="A.tif", fields={}, issues=[])
+    suggestion_b = service.SuggestionResult(source=src_b, target_name="a.tif", fields={}, issues=[])
+
+    result = service.recalculate_batch(input_dir=tmp_path, suggestions=[suggestion_a, suggestion_b])
+
+    assert len(result.planned) == 2
+    target_names = [dst.name for _, dst in result.planned]
+    # The two planned targets must not be a case-only pair -- casefolding
+    # them must yield two DISTINCT keys, or apply_batch's rename loop would
+    # have the second rename silently collide with/overwrite the first on a
+    # real Windows filesystem.
+    casefolded = {name.casefold() for name in target_names}
+    assert len(casefolded) == 2
+
+
+def test_recalculate_batch_warns_on_max_path_exceeded(tmp_path: Path) -> None:
+    """A full target path over 260 chars must surface a ValidationIssue, not
+    be silently truncated (A4 point 3)."""
+    long_name = "A" * 300 + ".tif"
+    src = tmp_path / "short.tif"
+    src.write_bytes(b"x")
+
+    suggestion = service.SuggestionResult(source=src, target_name=long_name, fields={}, issues=[])
+
+    result = service.recalculate_batch(input_dir=tmp_path, suggestions=[suggestion])
+
+    assert len(result.planned) == 1
+    _, dst = result.planned[0]
+    # Never truncated: the full (unsafe) name must survive intact.
+    assert dst.name == long_name
+    assert any(
+        issue.severity == "warning" and "MAX_PATH" in issue.message for issue in suggestion.issues
+    )
+
+
+def test_recalculate_batch_does_not_warn_on_short_path(tmp_path: Path) -> None:
+    src = tmp_path / "short.tif"
+    src.write_bytes(b"x")
+    suggestion = service.SuggestionResult(
+        source=src, target_name="short_result.tif", fields={}, issues=[]
+    )
+
+    service.recalculate_batch(input_dir=tmp_path, suggestions=[suggestion])
+
+    assert not any("MAX_PATH" in issue.message for issue in suggestion.issues)
 
 
 def test_plan_batch_default_is_not_recursive(tmp_path: Path, monkeypatch) -> None:
@@ -164,6 +266,120 @@ def test_plan_batch_recursive_true_includes_nested_files(tmp_path: Path, monkeyp
     assert sources == {top, nested}
 
 
+def _fake_suggest_renamed_prefix(
+    file_path,
+    config_path,
+    use_llm=False,
+    profile_path=None,
+    llm_model_override=None,
+    user_description=None,
+):
+    return service.SuggestionResult(
+        source=file_path,
+        target_name=f"RENAMED_{file_path.name}",
+        fields={},
+        issues=[],
+    )
+
+
+def test_plan_batch_excludes_own_ledger_and_history_survives_broad_pattern(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A8: reproduces the proven self-consumption defect. A broad pattern
+    (`*`) run in a folder that already has a real ledger must NEVER plan a
+    rename of `.original_names.json` itself -- doing so lets `apply_batch`
+    physically rename the ledger file, so `update_ledger` finds it missing,
+    silently degrades to `{}`, and overwrites it with a brand-new
+    history-free ledger, permanently orphaning every prior batch's
+    true-original mapping. A real data file and a plain user `.json` file
+    must still be planned -- the exclusion must not over-filter."""
+    from microscopy_naming_assistant import original_name
+
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    input_dir = tmp_path / "data"
+    input_dir.mkdir()
+
+    # Pre-existing ledger holding REAL history from a prior batch: this file
+    # was already renamed once, from "important_file_A.tif" to "A_renamed.tif".
+    important = input_dir / "A_renamed.tif"
+    important.write_bytes(b"a")
+    original_name.update_ledger(input_dir, [(input_dir / "important_file_A.tif", important)])
+    assert original_name.load_ledger(input_dir) == {"A_renamed.tif": "important_file_A.tif"}
+
+    # A legitimate user file that merely happens to have a `.json` extension
+    # -- must NOT be swept up by the ledger exclusion.
+    user_json = input_dir / "user_data.json"
+    user_json.write_bytes(b"{}")
+
+    monkeypatch.setattr(service, "suggest_for_file", _fake_suggest_renamed_prefix)
+
+    batch = service.plan_batch(input_dir=input_dir, pattern="*", config_path=config_path)
+
+    planned_source_names = {src.name for src, _ in batch.planned}
+    # The ledger itself must never be a rename candidate...
+    assert original_name.LEDGER_FILENAME not in planned_source_names
+    # ...while the real data file it describes, and an ordinary user .json
+    # file, are still planned like any other match.
+    assert "A_renamed.tif" in planned_source_names
+    assert "user_data.json" in planned_source_names
+
+    # Exactly the real, non-excluded files got planned -- no more, no fewer.
+    real_files = [
+        p for p in input_dir.iterdir() if p.is_file() and p.name != original_name.LEDGER_FILENAME
+    ]
+    assert len(batch.planned) == len(real_files)
+
+    service.apply_batch(input_dir, batch.planned)
+
+    # The ledger file was never renamed off its well-known path.
+    assert original_name.ledger_path(input_dir).exists()
+
+    ledger_after = original_name.load_ledger(input_dir)
+    # The stale intermediate key is gone (the file really was renamed away)...
+    assert "A_renamed.tif" not in ledger_after
+    # ...but the TRUE ORIGINAL mapping survived the batch, correctly chained
+    # forward to whatever "A_renamed.tif" became.
+    assert ledger_after.get("RENAMED_A_renamed.tif") == "important_file_A.tif"
+
+
+def test_plan_batch_excludes_manifests_dir_under_recursive(tmp_path: Path, monkeypatch) -> None:
+    """A8: `.manifests/` holds A1's rollback journals. Under `recursive=True`
+    a broad pattern must not sweep them into the plan the way it must not
+    sweep up the ledger."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    input_dir = tmp_path / "data"
+    input_dir.mkdir()
+
+    real = input_dir / "sample.tif"
+    real.write_bytes(b"x")
+
+    manifests_dir = input_dir / ".manifests"
+    manifests_dir.mkdir()
+    journal = manifests_dir / "rename_manifest_20260101_000000.json"
+    journal.write_text("[]", encoding="utf-8")
+
+    monkeypatch.setattr(service, "suggest_for_file", _fake_suggest_renamed_prefix)
+
+    batch = service.plan_batch(
+        input_dir=input_dir, pattern="*", config_path=config_path, recursive=True
+    )
+
+    planned_sources = {src for src, _ in batch.planned}
+    assert journal not in planned_sources
+    assert real in planned_sources
+    assert len(batch.planned) == 1
+
+    service.apply_batch(input_dir, batch.planned)
+
+    # The journal was never touched.
+    assert journal.exists()
+    assert journal.read_text(encoding="utf-8") == "[]"
+
+
 def test_apply_batch_renames_files(tmp_path: Path) -> None:
     src = tmp_path / "old.tif"
     dst = tmp_path / "new.tif"
@@ -175,6 +391,105 @@ def test_apply_batch_renames_files(tmp_path: Path) -> None:
     assert not src.exists()
     assert manifest_path is not None
     assert manifest_path.exists()
+
+
+def test_apply_batch_empty_plan_returns_zero_and_none(tmp_path: Path) -> None:
+    renamed, manifest_path = service.apply_batch(tmp_path, [])
+    assert (renamed, manifest_path) == (0, None)
+
+
+def test_apply_batch_all_noop_plan_returns_zero_and_none(tmp_path: Path) -> None:
+    same = tmp_path / "same.tif"
+    same.write_bytes(b"x")
+
+    renamed, manifest_path = service.apply_batch(tmp_path, [(same, same)])
+    assert (renamed, manifest_path) == (0, None)
+    assert same.exists()
+
+
+def test_apply_batch_rolls_back_on_mid_batch_failure(tmp_path: Path, monkeypatch) -> None:
+    """A.1's core guarantee: a failure partway through a batch must leave the
+    filesystem exactly as it started (all-or-nothing), the ORIGINAL exception
+    must propagate to the caller unchanged, and the manifest written BEFORE
+    any rename (the intent journal) must still be on disk describing the
+    full attempted batch."""
+    files = []
+    for i in range(4):
+        p = tmp_path / f"f{i}.tif"
+        p.write_bytes(b"x")
+        files.append(p)
+    targets = [tmp_path / f"g{i}.tif" for i in range(4)]
+    planned = list(zip(files, targets))
+
+    original_rename = Path.rename
+    call_count = {"n": 0}
+
+    def flaky_rename(self, target):
+        call_count["n"] += 1
+        if call_count["n"] == 3:
+            raise OSError("simulated failure at file 3")
+        return original_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", flaky_rename)
+
+    with pytest.raises(OSError, match="simulated failure at file 3"):
+        service.apply_batch(tmp_path, planned)
+
+    # Every already-renamed file (the first two) is back at its original name.
+    for src in files:
+        assert src.exists()
+    for dst in targets:
+        assert not dst.exists()
+
+    # The intent journal was written before any rename and still describes
+    # the full attempted batch, even though the batch itself failed.
+    manifest_files = list((tmp_path / ".manifests").glob("rename_manifest_*.json"))
+    assert len(manifest_files) == 1
+    manifest_data = json.loads(manifest_files[0].read_text(encoding="utf-8"))
+    assert len(manifest_data) == 4
+
+
+def test_apply_batch_surfaces_unrestorable_files_when_rollback_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """If the undo itself fails, that failure must never be swallowed: the
+    raised error must name the file that could not be restored, and it must
+    be chained from the original failure rather than replacing it."""
+    f0 = tmp_path / "f0.tif"
+    f1 = tmp_path / "f1.tif"
+    f0.write_bytes(b"x")
+    f1.write_bytes(b"x")
+    g0 = tmp_path / "g0.tif"
+    g1 = tmp_path / "g1.tif"
+    planned = [(f0, g0), (f1, g1)]
+
+    original_rename = Path.rename
+    call_count = {"n": 0}
+
+    def flaky_rename(self, target):
+        call_count["n"] += 1
+        if call_count["n"] == 2:
+            raise OSError("simulated failure at file 2")
+        if call_count["n"] > 2:
+            # Every rename attempted while unwinding (rollback) also fails.
+            raise OSError("simulated rollback failure")
+        return original_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", flaky_rename)
+
+    with pytest.raises(RuntimeError, match="could not fully restore") as excinfo:
+        service.apply_batch(tmp_path, planned)
+
+    assert isinstance(excinfo.value.__cause__, OSError)
+    assert "simulated failure at file 2" in str(excinfo.value.__cause__)
+    assert "g0.tif" in str(excinfo.value)
+
+    # f0->g0's rollback failed, so g0 is left in its renamed state (surfaced,
+    # not silently lost); f1 was never touched.
+    assert g0.exists()
+    assert not f0.exists()
+    assert f1.exists()
+    assert not g1.exists()
 
 
 def test_cli_parser_accepts_llm_model_option() -> None:

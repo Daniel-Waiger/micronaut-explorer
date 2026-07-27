@@ -15,15 +15,29 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+import subprocess
 from typing import Any
 
 import requests
 
 logger = logging.getLogger(__name__)
 
+# Open-weights general-reasoning models (NOT coding models) for local
+# naming-metadata enrichment, ordered best-first for a 64 GB RAM / 16 GB VRAM
+# machine (a 14B model fits fully on GPU at that tier). Sizes here mirror the
+# tiers in scripts/hardware_check.py::recommend_model so the two stay
+# consistent. Entries are "family:tag" -- resolve_ollama_model tolerates any
+# installed tag that starts with a listed tag (e.g. "qwen3.5:14b" matches an
+# install named "qwen3.5:14b-instruct-q4_K_M"), so these are deliberately the
+# short canonical size tags rather than exact quantization/build strings.
 DEFAULT_PREFERRED_MODELS = [
+    "qwen3.5:14b",
+    "gemma2:9b",
     "llama3.1:8b",
-    "qwen2.5-coder:7b",
+    "qwen3.5:7b",
+    "gemma2:2b",
+    "qwen3.5:3b",
     "phi3:mini",
 ]
 
@@ -59,7 +73,15 @@ def list_local_ollama_models(endpoint: str, timeout_seconds: int = 5) -> list[st
         logger.warning("Unexpected error listing Ollama models: %s", e)
         return []
 
+    if not isinstance(data, dict):
+        logger.warning("Unexpected /api/tags response shape from Ollama: %r", type(data))
+        return []
+
     models = data.get("models", [])
+    if not isinstance(models, list):
+        logger.warning("Unexpected 'models' field shape from Ollama: %r", type(models))
+        return []
+
     names: list[str] = []
     for item in models:
         if not isinstance(item, dict):
@@ -72,6 +94,119 @@ def list_local_ollama_models(endpoint: str, timeout_seconds: int = 5) -> list[st
     return list(dict.fromkeys(names))
 
 
+def _detect_vram_gb() -> float | None:
+    """Best-effort local GPU VRAM probe. Never raises; ``None`` means undetectable.
+
+    Mirrors the ``nvidia-smi`` query in ``scripts/hardware_check.py``, kept as a
+    self-contained copy here since ``scripts/`` is a developer utility folder,
+    not part of the installed package, and this module must add no new
+    dependency. VRAM awareness is a nice-to-have for ranking, never a
+    requirement -- any failure (no GPU, missing binary, timeout, unparsable
+    output) degrades to "unknown" rather than raising.
+    """
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=True,
+        )
+    except Exception:
+        return None
+
+    try:
+        first_line = result.stdout.strip().splitlines()[0].strip()
+        return float(first_line) / 1024
+    except (IndexError, ValueError):
+        return None
+
+
+_SIZE_TOKEN_RE = re.compile(r"^(\d+(?:\.\d+)?)b$", re.IGNORECASE)
+
+
+def _approx_min_vram_gb(size_tag: str) -> float:
+    """Rough VRAM (GB) needed to fully offload a model of this size tag.
+
+    Mirrors the tiers in ``scripts/hardware_check.py::recommend_model``. A
+    non-numeric tag (e.g. "mini") is assumed to fit anywhere.
+    """
+    match = _SIZE_TOKEN_RE.match(size_tag)
+    if not match:
+        return 0.0
+    size_b = float(match.group(1))
+    if size_b >= 9:
+        return 15.5
+    if size_b >= 7:
+        return 7.5
+    if size_b >= 3:
+        return 3.5
+    return 0.0
+
+
+def _parse_model_ref(name: str) -> tuple[str, str]:
+    family, _, tag = name.partition(":")
+    return family.strip().lower(), tag.strip().lower()
+
+
+def _tag_matches(preference_tag: str, installed_tag: str) -> bool:
+    """True if ``installed_tag`` is ``preference_tag``, optionally with a
+    trailing ``-suffix`` (build/quantization info). Boundary-checked so a
+    preference of "14b" matches an install tagged "14b-instruct-q4_K_M" but
+    not one tagged "140b-instruct"."""
+    if not preference_tag:
+        return True
+    if installed_tag == preference_tag:
+        return True
+    if not installed_tag.startswith(preference_tag):
+        return False
+    boundary_char = installed_tag[len(preference_tag)]
+    return not boundary_char.isalnum()
+
+
+def _model_matches_preference(preference: str, installed_name: str) -> bool:
+    pref_family, pref_tag = _parse_model_ref(preference)
+    inst_family, inst_tag = _parse_model_ref(installed_name)
+    if pref_family != inst_family:
+        return False
+    return _tag_matches(pref_tag, inst_tag)
+
+
+def _rank_installed_models(
+    installed: list[str],
+    preferred_models: list[str],
+    vram_gb: float | None,
+) -> str | None:
+    """Pick the best installed model per ``preferred_models`` order.
+
+    When ``vram_gb`` is known, a first pass restricts consideration to
+    preference entries whose approximate size fits the available VRAM, so a
+    16 GB machine is not steered toward a model too large to fully offload.
+    If nothing matches under that restriction (or VRAM is unknown), a second
+    pass ranks the full, unrestricted preference list.
+    """
+
+    def _fits_vram(preference: str) -> bool:
+        if vram_gb is None:
+            return True
+        _, tag = _parse_model_ref(preference)
+        return _approx_min_vram_gb(tag) <= vram_gb
+
+    for preference in preferred_models:
+        if not _fits_vram(preference):
+            continue
+        for candidate in installed:
+            if _model_matches_preference(preference, candidate):
+                return candidate
+
+    for preference in preferred_models:
+        for candidate in installed:
+            if _model_matches_preference(preference, candidate):
+                return candidate
+
+    return None
+
+
 def resolve_ollama_model(
     endpoint: str,
     requested_model: str,
@@ -80,8 +215,14 @@ def resolve_ollama_model(
 ) -> str | None:
     """Resolve a concrete model name.
 
-    If requested_model is "auto", pick the first preferred model available
-    locally, otherwise fallback to the first installed model.
+    If ``requested_model`` is an explicit value (anything but "auto"), it is
+    authoritative and returned unchanged -- a user override always beats
+    auto-detection. Otherwise, rank what is ACTUALLY installed (via
+    ``list_local_ollama_models``) against ``preferred_models`` (default
+    ``DEFAULT_PREFERRED_MODELS``), tolerating tag suffixes and, when local
+    VRAM can be determined cheaply, preferring a size that fits it. Falls back
+    to the first installed model if nothing on the preference list matches.
+    Returns ``None`` only when no models are installed at all.
     """
     requested = requested_model.strip()
     if requested and requested.lower() != "auto":
@@ -92,10 +233,10 @@ def resolve_ollama_model(
         return None
 
     preferred = preferred_models or DEFAULT_PREFERRED_MODELS
-    installed_set = set(installed)
-    for candidate in preferred:
-        if candidate in installed_set:
-            return candidate
+    vram_gb = _detect_vram_gb()
+    ranked = _rank_installed_models(installed, preferred, vram_gb)
+    if ranked is not None:
+        return ranked
 
     return installed[0]
 
@@ -198,11 +339,20 @@ def suggest_fields_with_ollama(
         logger.warning("Unexpected error communicating with Ollama: %s", e)
         return {}
 
-    content = data.get("message", {}).get("content", "{}")
+    if not isinstance(data, dict):
+        logger.warning("Unexpected /api/chat response shape from Ollama: %r", type(data))
+        return {}
+
+    message = data.get("message", {})
+    content = message.get("content", "{}") if isinstance(message, dict) else "{}"
     try:
         parsed = json.loads(content)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, TypeError) as e:
         logger.warning("Failed to parse JSON from Ollama: %s", e)
+        return {}
+
+    if not isinstance(parsed, dict):
+        logger.warning("Unexpected parsed content shape from Ollama: %r", type(parsed))
         return {}
 
     allowed = {"date", "exptype", "sample", "magnification", "markers", "notes"}

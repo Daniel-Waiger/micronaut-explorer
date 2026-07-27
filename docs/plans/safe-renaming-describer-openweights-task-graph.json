@@ -1,0 +1,110 @@
+{
+  "run": "safe-renaming-describer-openweights",
+  "generated": "2026-07-26",
+  "planner": "Claude Fable 5 (CMA)",
+  "plan_doc": "docs/plans/safe-renaming-describer-openweights.md",
+  "baseline": {
+    "fast_suite": "95 passed",
+    "integration_suite": "3 passed (ImageJ) + 4 skipped (no fixtures)",
+    "head": "76daad7"
+  },
+  "decisions": {
+    "batch_failure": "all-or-nothing + auto-rollback",
+    "original_name": "sidecar always + embed opt-in, TIFF/OME-TIFF only, default off",
+    "model_selection": "auto-detect installed, rank vs preference list, user override wins",
+    "describer_fields": "flagged provisional, require review before apply",
+    "markers": "extend broadly",
+    "out_of_scope": ["CZI key map", "ND2 key map", "vendor fixture tests", "web re-platform", "experimental-design assistant"]
+  },
+  "invariants": [
+    "All Python via .venv/Scripts/python.exe (Python 3.14)",
+    "Fast gate: pytest -q -m \"not integration\" must stay >= 95 passed",
+    "ruff check + black --check clean, line-length 100",
+    "Executors must NOT run git commit/push - orchestrator owns git",
+    "Dirty working tree from earlier verified tasks is expected, not a defect",
+    "Never load pixel data (.data/.get_image_data/.xarray_data)",
+    "No vendor sample files exist - never write a test requiring a real czi/nd2/lif/ome.tif",
+    "BatchResult.planned stays strictly 1:1 with filesystem entries",
+    "Read docs/cma-lessons.md first; E1-E7 apply",
+    "Format-routing changes must also run pytest -q -m integration (lesson 34)"
+  ],
+  "tasks": [
+    {
+      "id": "A4",
+      "title": "Windows path & collision edges",
+      "files": ["src/microscopy_naming_assistant/naming.py", "src/microscopy_naming_assistant/validation.py", "src/microscopy_naming_assistant/service.py", "tests/"],
+      "depends_on": [],
+      "batch": 1,
+      "concerns": ["reserved device names", "case-insensitive collisions", "MAX_PATH warning", "unique collision suffix"]
+    },
+    {
+      "id": "B1",
+      "title": "Extend marker/fluorophore dictionary broadly",
+      "files": ["src/microscopy_naming_assistant/markers.py", "tests/"],
+      "depends_on": [],
+      "batch": 1,
+      "concerns": ["word-boundary matching", "longest-alias precedence", "substring false-positive gates"]
+    },
+    {
+      "id": "D1",
+      "title": "Open-weights model detection & VRAM-aware ranking",
+      "files": ["src/microscopy_naming_assistant/llm.py", "src/microscopy_naming_assistant/config.py", "tests/"],
+      "depends_on": [],
+      "batch": 1,
+      "concerns": ["modern preference list", "tag-suffix tolerant matching", "VRAM awareness", "override wins", "never raises"]
+    },
+    {
+      "id": "A1",
+      "title": "Transactional apply + guaranteed rollback",
+      "files": ["src/microscopy_naming_assistant/service.py", "src/microscopy_naming_assistant/manifest.py", "tests/"],
+      "depends_on": [],
+      "batch": 2,
+      "concerns": ["manifest as intent journal before rename", "undo completed renames on failure", "re-raise original exception", "surface un-restorable files", "keep tuple return arity"]
+    },
+    {
+      "id": "A2",
+      "title": "Original-name preservation (sidecar + opt-in embed)",
+      "files": ["src/microscopy_naming_assistant/manifest.py", "src/microscopy_naming_assistant/service.py", "tests/"],
+      "depends_on": ["A1"],
+      "batch": 2,
+      "concerns": ["durable ledger", "append/merge never replace", "embed TIFF-only default off", "never rewrite vendor raw", "embed failure must not undo rename"]
+    },
+    {
+      "id": "A3",
+      "title": "Warn on locked / cloud-synced files",
+      "files": ["src/microscopy_naming_assistant/safety.py", "src/microscopy_naming_assistant/service.py", "tests/"],
+      "depends_on": ["A1"],
+      "batch": 2,
+      "concerns": ["locked/read-only probe", "Google Drive/OneDrive/Dropbox path heuristics", "warn never block", "cheap and never raises"]
+    },
+    {
+      "id": "A5",
+      "title": "Date-provenance honesty (mtime vs acquisition)",
+      "files": ["src/microscopy_naming_assistant/metadata.py", "src/microscopy_naming_assistant/service.py", "tests/"],
+      "depends_on": [],
+      "batch": 2,
+      "concerns": ["split mtime from filename provenance", "surface weak origin", "E7 no false provenance", "must run -m integration"]
+    },
+    {
+      "id": "C1",
+      "title": "Describer core: description -> provisional fields",
+      "files": ["src/microscopy_naming_assistant/llm.py", "src/microscopy_naming_assistant/service.py", "tests/"],
+      "depends_on": ["D1"],
+      "batch": 3,
+      "concerns": ["distinct provisional tag", "never overwrite metadata-supplied values", "guardrails stay", "degrades without raising"]
+    },
+    {
+      "id": "C2",
+      "title": "Surface describer + provisional flags in UI/CLI",
+      "files": ["app_streamlit.py", "src/microscopy_naming_assistant/cli.py"],
+      "depends_on": ["C1", "A5"],
+      "batch": 3,
+      "concerns": ["provisional visible through to final name", "mtime date flagged weak", "--json carries provenance", "report CSV byte-identical", "E6 streamlit traps", "apply path untouched"]
+    }
+  ],
+  "batches": [
+    { "n": 1, "tasks": ["A4", "B1", "D1"], "mode": "parallel", "rationale": "file-disjoint" },
+    { "n": 2, "tasks": ["A1", "A2", "A3", "A5"], "mode": "sequential", "rationale": "all touch service.py" },
+    { "n": 3, "tasks": ["C1", "C2"], "mode": "sequential", "rationale": "C2 depends on C1; C1 shares llm.py with D1" }
+  ]
+}
