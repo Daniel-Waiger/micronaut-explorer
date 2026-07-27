@@ -1,4 +1,4 @@
-﻿# μicronaut
+# μicronaut
 
 μicronaut — a metadata-aware microscopy file naming assistant with optional local LLM suggestions.
 (The µ is the micron symbol; the project name is pronounced "Micronaut.")
@@ -235,3 +235,7 @@ python -m pytest -q
 This project is licensed under the Apache License, Version 2.0. See the
 [LICENSE](LICENSE) file for the full text.
 
+<!-- test update text -->
+## Test Update
+
+This section contains the test update text for task verification.

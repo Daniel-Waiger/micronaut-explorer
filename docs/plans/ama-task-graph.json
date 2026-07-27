@@ -1,0 +1,27 @@
+{
+  "objective": "Make a tiny test update to README.md",
+  "assumptions": [
+    "README.md exists in the root of the repository or can be created."
+  ],
+  "tasks": [
+    {
+      "id": "update-readme",
+      "title": "Update README.md with a test string",
+      "scope": "README.md",
+      "depends_on": [],
+      "parallel_safe": true,
+      "verification": "Read the contents of README.md and verify that the test update text is present."
+    }
+  ],
+  "batches": [
+    [
+      "update-readme"
+    ]
+  ],
+  "risks": [
+    {
+      "risk": "README.md might not exist in the repository.",
+      "mitigation": "The executor should create README.md if it is missing."
+    }
+  ]
+}

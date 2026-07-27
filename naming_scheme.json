@@ -15,9 +15,10 @@
     "markers"
   ],
   "safe_char_pattern": "[^A-Za-z0-9_-]+",
+  "extraction_timeout_seconds": 20,
   "llm": {
-    "enabled": false,
-    "model": "auto",
+    "enabled": true,
+    "model": "qwen3.5:14b",
     "preferred_models": [
       "qwen3.5:14b",
       "gemma2:9b",
