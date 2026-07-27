@@ -57,12 +57,34 @@ def _transform_token(value: str) -> str | None:
     return cleaned or None
 
 
+_MAGNIFICATION_UNIT = re.compile(r"(\d+(?:\.\d+)?)\s*[xX]\b")
+_MAGNIFICATION_BARE = re.compile(r"^\d+(?:\.\d+)?$")
+
+
 def _transform_magnification(value: str) -> str | None:
-    """`40` / `40x` / `HC PL APO 40x/0.95` -> `X40`."""
-    match = re.search(r"(\d{1,3}(?:\.\d+)?)\s*[xX]?", value.strip())
-    if not match:
+    """`HC PL APO CS2 63x/1.40 OIL` -> `X63`; bare `40` (LIF) / `63` (OME) -> `X40` / `X63`.
+
+    Objective strings pack several numbers together -- model designations
+    ("CS2"), the magnification, and the numerical aperture ("/1.40") -- and
+    taking "the first digit run anywhere" grabs whichever one happens to come
+    first, which is how a 63x/1.40 objective could be reported as X1 (the NA)
+    or X2 (the "CS2" designation). The magnification is the ONLY number in
+    these strings followed by a literal `x`/`X`, so anchor on that unit
+    first. Only when no unit-anchored match exists do we fall back to
+    treating the whole (stripped) value as a bare number, because some
+    formats store magnification as a number with no unit at all: LIF's
+    atomic `Magnification` key is literally `'40'` and OME's
+    `NominalMagnification` is `'63'`. We never fall back further than that --
+    "first number anywhere" is the bug this function exists to not have.
+    """
+    stripped = value.strip()
+    match = _MAGNIFICATION_UNIT.search(stripped)
+    if match:
+        number = float(match.group(1))
+    elif _MAGNIFICATION_BARE.match(stripped):
+        number = float(stripped)
+    else:
         return None
-    number = float(match.group(1))
     if number <= 0:
         return None
     return f"X{int(number)}"
