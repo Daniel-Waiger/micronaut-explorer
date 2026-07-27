@@ -320,8 +320,12 @@ def plan_batch(
         p
         for p in matches
         if p.is_file()
-        and p.name != LEDGER_FILENAME
-        and ".manifests" not in p.relative_to(input_dir).parts
+        # A11: casefold both -- Windows/NTFS is case-insensitive, so a ledger
+        # or .manifests entry that merely differs in case (e.g. an OS/sync
+        # client that wrote `.ORIGINAL_NAMES.JSON`) must still be excluded,
+        # or the data-loss bug above reproduces via that one path.
+        and p.name.casefold() != LEDGER_FILENAME.casefold()
+        and ".manifests" not in {part.casefold() for part in p.relative_to(input_dir).parts}
     ]
     suggestions: list[SuggestionResult] = []
 

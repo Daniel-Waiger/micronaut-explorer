@@ -416,8 +416,14 @@ def _extract_markers(text: str, hints: list[str]) -> str | None:
         for alias, canonical in amap.items():
             if alias in AMBIGUOUS_IN_FREE_TEXT or canonical in exclude:
                 continue
-            match = re.search(r"\b" + re.escape(alias) + r"\b", haystack, re.IGNORECASE)
-            if match:
+            # B3: every occurrence, not just the first. re.search finds one
+            # candidate per alias, so when that one candidate happens to be
+            # nested inside a longer alias's span the overlap rule below
+            # correctly discards it -- but then nothing is left for this
+            # alias's own separate, later occurrence, silently dropping a
+            # real second marker (order-dependent: 'ch1 ATTO 647-N ch2 ATTO
+            # 647' lost channel 2's dye under re.search).
+            for match in re.finditer(r"\b" + re.escape(alias) + r"\b", haystack, re.IGNORECASE):
                 candidates.append((match.start(), match.end(), canonical))
         # Longer alias wins any tie/overlap at the same start index -- sort by
         # (start, -length) so it is considered, and therefore accepted, first.
