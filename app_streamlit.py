@@ -573,19 +573,77 @@ if "suggestions" in st.session_state:
             if not selected.key_paths:
                 st.caption("No addressable metadata keys were harvested for this file.")
             else:
+                from microscopy_naming_assistant.key_ranking import rank_keys
+
                 key_filter = st.text_input(
                     "Filter keys/values",
                     key="metadata_key_filter",
                     placeholder="Type to filter by key or value (case-insensitive)…",
                 )
                 needle = key_filter.strip().lower()
-                key_rows = [
-                    {"key": k, "value": v}
-                    for k, v in sorted(selected.key_paths.items())
-                    if not needle or needle in k.lower() or needle in v.lower()
+
+                # image_key_paths carries one raw key dict per series so the
+                # ranker can tell which keys vary; a container with only one
+                # harvested image (or an older payload) falls back to the
+                # single key_paths dict rather than ranking against nothing.
+                images_for_ranking = selected.image_key_paths or [selected.key_paths]
+                file_format = selected.source.suffix.lstrip(".").upper()
+                all_scores = rank_keys(images_for_ranking, file_format)
+                scores = [
+                    s
+                    for s in all_scores
+                    if not needle or needle in s.key.lower() or needle in s.value.lower()
                 ]
-                st.caption(f"{len(key_rows)} of {len(selected.key_paths)} key(s) shown.")
-                st.dataframe(key_rows, use_container_width=True)
+                st.caption(f"{len(scores)} of {len(all_scores)} key(s) shown.")
+
+                suggested = [s for s in scores if s.tier == "suggested"]
+                varying = [s for s in scores if s.tier == "varying"]
+                constant = [s for s in scores if s.tier == "constant"]
+
+                def _token_first_line(score) -> str:
+                    # The user picks the TOKEN that lands in the filename
+                    # ('X40'), never the raw prose value it came from
+                    # ('HC PL APO 40x/0.95 DRY') -- so the token leads.
+                    if score.field and score.token:
+                        return (
+                            f"{score.field} → {score.token}  "
+                            f"(from key: {score.key} = {score.value})"
+                        )
+                    return f"{score.key} = {score.value}"
+
+                def _grouped_by_family(rows) -> None:
+                    grouped: dict[str, list] = {}
+                    for s in rows:
+                        grouped.setdefault(s.semantic_family, []).append(s)
+                    for family_name in sorted(grouped):
+                        st.write(f"_{family_name}_")
+                        for s in sorted(grouped[family_name], key=lambda s: s.key):
+                            st.write(f"{s.key} = {s.value}")
+
+                with st.expander(f"Suggested ({len(suggested)})", expanded=True):
+                    if not suggested:
+                        st.caption("No keys scored as suggested for this filter.")
+                    for s in suggested:
+                        st.write(_token_first_line(s))
+
+                with st.expander(f"Other varying ({len(varying)})", expanded=False):
+                    if not varying:
+                        st.caption("None.")
+                    for s in varying:
+                        st.write(_token_first_line(s))
+
+                with st.expander(f"Constant across images ({len(constant)})", expanded=False):
+                    st.caption(
+                        "These keys read the same for every image in this container, so "
+                        "they can't distinguish one series from another -- but they're "
+                        "still valid for naming the container as a whole."
+                    )
+                    if not constant:
+                        st.caption("None.")
+                    _grouped_by_family(constant)
+
+                with st.expander(f"Everything ({len(scores)})", expanded=False):
+                    _grouped_by_family(scores)
 
             st.write("#### Field provenance")
             st.caption(
