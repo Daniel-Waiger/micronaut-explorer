@@ -360,18 +360,28 @@ if "suggestions" in st.session_state:
             from microscopy_naming_assistant.llm import suggest_fields_with_ollama
             from microscopy_naming_assistant.naming import finalize_fields, render_name
             from microscopy_naming_assistant.profiles import load_profile
+            from microscopy_naming_assistant.service import classify_description_proposals
             from microscopy_naming_assistant.validation import validate_fields
 
             profile = load_profile(profile_path) if profile_path else None
             filled_count = 0
-            files_with_gaps = 0
-            # C1: a field filled while the user's free-text description was
+            override_count = 0
+            files_processed = 0
+            # A1/T10: a description may propose changing an ALREADY-populated
+            # field, not just fill a gap -- so unlike before, a file with no
+            # missing fields is still processed whenever a description was
+            # typed (skipped only when there is neither a description nor a
+            # gap, which costs exactly what the no-description path did
+            # before this change).
+            new_pending_overrides: dict[str, dict[str, tuple[str, str]]] = {}
+            # C1: a field FILLED (a genuine gap) while a description was
             # supplied carries materially weaker evidence than one grounded
             # only in the file's own metadata/filename -- tag it with the
             # distinct "llm_description" provenance (never plain "llm"),
             # mirroring service.suggest_for_file's own tagging, so it reads
             # as provisional / needs review all the way to the final name
-            # (E7).
+            # (E7). An OVERRIDE proposal gets this same tag only once
+            # actually accepted below -- never on proposal alone.
             llm_source_tag = "llm_description" if experiment_description else "llm"
 
             with st.spinner("Asking the local LLM…"):
@@ -379,9 +389,15 @@ if "suggestions" in st.session_state:
                     missing_fields = [
                         k for k, v in s.sources.items() if v == "default" and k != "ext"
                     ]
-                    if not missing_fields:
+                    # A1/T10: process this file whenever it has a genuine gap
+                    # OR a description was supplied -- a description may
+                    # propose changing an already-populated field, not only
+                    # fill a gap, so "no gap" alone is no longer a reason to
+                    # skip a file once the user has typed something.
+                    has_work_to_do = bool(missing_fields) or bool(experiment_description)
+                    if not has_work_to_do:
                         continue
-                    files_with_gaps += 1
+                    files_processed += 1
 
                     current_fields = {k: v for k, v in s.fields.items() if k != "ext"}
                     llm_fields = suggest_fields_with_ollama(
@@ -395,34 +411,53 @@ if "suggestions" in st.session_state:
                         metadata_text=s.metadata_text,
                     )
 
+                    fills, overrides = classify_description_proposals(
+                        current_fields,
+                        s.sources,
+                        llm_fields,
+                        description_supplied=bool(experiment_description),
+                    )
+
                     merged = dict(current_fields)
-                    for name in missing_fields:
-                        value = llm_fields.get(name, "")
-                        if value:
-                            merged[name] = value
-                            s.sources[name] = llm_source_tag
-                            filled_count += 1
+                    for name, value in fills.items():
+                        merged[name] = value
+                        s.sources[name] = llm_source_tag
+                        filled_count += 1
+
+                    if overrides:
+                        new_pending_overrides[s.source.name] = overrides
+                        override_count += len(overrides)
 
                     s.fields = finalize_fields(s.source, merged, config)
                     s.target_name = render_name(s.fields, config)
                     s.issues = validate_fields(s.fields, profile) if profile else []
 
-            if filled_count > 0:
+            # Replaces (not merges) any earlier pending set: this click just
+            # recomputed proposals for every currently-processed file, so a
+            # stale leftover from a previous click would be out of date.
+            st.session_state["pending_overrides"] = new_pending_overrides
+
+            if filled_count > 0 or override_count > 0:
+                parts = []
+                if filled_count > 0:
+                    parts.append(f"filled {filled_count} field(s)")
+                if override_count > 0:
+                    parts.append(f"proposed {override_count} change(s) for review below")
                 review_note = (
-                    " These are PROVISIONAL (filled from your description) -- review before "
+                    " Filled fields are PROVISIONAL (from your description) -- review before "
                     "applying."
-                    if llm_source_tag == "llm_description"
+                    if llm_source_tag == "llm_description" and filled_count > 0
                     else ""
                 )
                 st.session_state["llm_fill_message"] = (
-                    f"Filled {filled_count} field(s) from LLM suggestions — "
-                    f"review them in the table.{review_note}"
+                    "LLM " + " and ".join(parts) + f".{review_note}"
                 )
                 st.rerun()
-            elif files_with_gaps == 0:
-                # A non-failure: every file already has all fields filled,
-                # so there was genuinely nothing for the LLM to do -- must
-                # never be phrased as if Ollama failed.
+            elif files_processed == 0:
+                # A non-failure: every file already has all fields filled and
+                # no description was given, so there was genuinely nothing
+                # for the LLM to do -- must never be phrased as if Ollama
+                # failed.
                 st.info("Every file already has all fields filled — nothing for the LLM to fill.")
             else:
                 st.warning(
@@ -430,6 +465,70 @@ if "suggestions" in st.session_state:
                     "suggestions. Try a different model, or add more detail to your "
                     "description."
                 )
+
+    # A1/T10: proposals from the block above are NEVER applied there -- only
+    # here, and only on an explicit Accept, so a description can never
+    # silently overwrite a value real metadata already supplied. Rendered
+    # unconditionally (outside `if suggest_llm_clicked:`) so pending
+    # proposals survive every rerun until the user actually decides.
+    pending_overrides: dict[str, dict[str, tuple[str, str]]] = st.session_state.get(
+        "pending_overrides", {}
+    )
+    if pending_overrides:
+        from microscopy_naming_assistant.naming import finalize_fields, render_name
+        from microscopy_naming_assistant.profiles import load_profile
+        from microscopy_naming_assistant.validation import validate_fields
+
+        profile = load_profile(profile_path) if profile_path else None
+        by_source_name = {s.source.name: s for s in suggestions}
+
+        st.write("#### Proposed changes from your description")
+        st.caption(
+            "Your description disagrees with an already-populated field. Nothing here is "
+            "applied until you Accept it."
+        )
+        accept_all = st.button("Accept all", key="accept_all_overrides")
+        reject_all = st.button("Reject all", key="reject_all_overrides")
+
+        changed = accept_all or reject_all
+        for filename in list(pending_overrides.keys()):
+            s = by_source_name.get(filename)
+            field_changes = pending_overrides.get(filename, {})
+            if s is None:
+                # No longer among the current suggestions (e.g. re-previewed
+                # since this proposal was made) -- nothing sane to apply it to.
+                pending_overrides.pop(filename, None)
+                changed = True
+                continue
+
+            for field_name in list(field_changes.keys()):
+                before, after = field_changes[field_name]
+                col_desc, col_accept, col_reject = st.columns([4, 1, 1])
+                col_desc.write(f"**{filename}** — {field_name}: `{before}` → `{after}`")
+                do_accept = accept_all or col_accept.button(
+                    "Accept", key=f"accept_{filename}_{field_name}"
+                )
+                do_reject = reject_all or col_reject.button(
+                    "Reject", key=f"reject_{filename}_{field_name}"
+                )
+                if do_accept:
+                    s.fields[field_name] = after
+                    s.sources[field_name] = "llm_description"
+                    s.fields = finalize_fields(s.source, s.fields, config)
+                    s.target_name = render_name(s.fields, config)
+                    s.issues = validate_fields(s.fields, profile) if profile else []
+                    del field_changes[field_name]
+                    changed = True
+                elif do_reject:
+                    del field_changes[field_name]
+                    changed = True
+
+            if not field_changes:
+                pending_overrides.pop(filename, None)
+
+        st.session_state["pending_overrides"] = pending_overrides
+        if changed:
+            st.rerun()
 
     with st.expander("Metadata read from files", expanded=False):
         st.caption(
