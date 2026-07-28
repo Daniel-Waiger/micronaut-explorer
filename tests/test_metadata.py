@@ -7,6 +7,7 @@ import pytest
 
 from microscopy_naming_assistant import metadata as metadata_module
 from microscopy_naming_assistant.metadata import (
+    MAX_METADATA_TEXT_CHARS,
     _extract_acquisition_date,
     _extract_from_mask,
     _extract_magnification,
@@ -195,6 +196,21 @@ def test_detailed_extraction_reports_reader_and_raw_metadata(tmp_path: Path) -> 
     assert detail.reader
     assert not detail.timed_out
     assert "HC PL APO 93x" in detail.metadata_text
+
+
+@pytest.mark.integration
+def test_oversized_imagej_info_block_stays_within_metadata_text_budget(tmp_path: Path) -> None:
+    # Regression: a real 210-page ImageJ hyperstack export measured a 1.36M-char
+    # Info tag (the tag repeats per slice) -- the raw shim text was appended
+    # AFTER metadata_text was already bounded to MAX_METADATA_TEXT_CHARS, so the
+    # final blob blew straight past the budget it was documented to respect.
+    path = tmp_path / "huge_info.tif"
+    _write_imagej_tif(path, "ObjectiveName = HC PL APO 93x\n" + "x" * (MAX_METADATA_TEXT_CHARS * 4))
+
+    _fields, _sources, detail = extract_metadata_detailed(path, timeout_seconds=60)
+
+    assert not detail.timed_out
+    assert len(detail.metadata_text) <= MAX_METADATA_TEXT_CHARS + 200
 
 
 class _SyncProcess:

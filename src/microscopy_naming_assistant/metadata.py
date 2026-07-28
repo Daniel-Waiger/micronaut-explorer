@@ -611,9 +611,14 @@ def _read_with_bioio(
         # ImageJ/Fiji stashes the vendor record in the IJMetadata `Info` tag,
         # which `metadata_keys._harvest_tiff` already parses into keys -- but
         # keep the raw shim text too so users can see the untouched tag block.
+        # A hyperstack's `Info` tag repeats per-slice, so the shim alone can run
+        # into the megabytes (measured 1.36M chars on a 210-page real export) --
+        # re-join through the SAME budget rather than appending it raw, or the
+        # blob blows past MAX_METADATA_TEXT_CHARS right after being bounded to it.
         tiff_shim = _collect_metadata_text(None, file_path)
         if tiff_shim:
-            metadata_text = f"{metadata_text}\n\n{tiff_shim}" if metadata_text else tiff_shim
+            sections = [metadata_text, tiff_shim] if metadata_text else [tiff_shim]
+            metadata_text = _join_within_budget(sections, MAX_METADATA_TEXT_CHARS)
 
     resolved = _resolve_per_image(images, file_format, field_key_map)
     fields, provenance, contested = _shared_fields(
