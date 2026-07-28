@@ -16,10 +16,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-import re
-from dataclasses import dataclass
-
-from .markers import alias_map
+from .markers import AMBIGUOUS_IN_FREE_TEXT, alias_map
 from .metadata_keys import ImageMetadata
 
 # Naming fields a mapping may target. `date` is included but left unmapped by
@@ -30,9 +27,17 @@ MAPPABLE_FIELDS = ("date", "exptype", "sample", "magnification", "markers", "not
 
 @dataclass(frozen=True)
 class FieldSource:
-    """A naming field's address in the metadata, plus how to format it."""
+    """A naming field's address in the metadata, plus how to format it.
 
-    key: str
+    `key` is normally a single metadata key. It may also be a tuple of keys
+    when several sibling keys must be combined into one value before
+    transforming -- e.g. per-channel dye names stored as "ChannelName #0",
+    "ChannelName #1", ... rather than one pre-joined "Dyes" key. Offering such
+    siblings one at a time to a first-non-empty-wins resolver locks onto
+    channel 0 and silently drops every channel after it.
+    """
+
+    key: str | tuple[str, ...]
     transform: str = "verbatim"
 
 
@@ -114,6 +119,24 @@ def _canonical_marker(raw: str) -> str | None:
     if compact in aliases:
         return aliases[compact]
 
+    # The value may be a short free-text label rather than a bare dye name --
+    # e.g. a per-channel key holding "GFP green" or "DAPI blue" -- so look for
+    # a known alias as a whole word within it before giving up on it as
+    # unknown. Same principle as metadata._extract_markers (word-boundary,
+    # AMBIGUOUS_IN_FREE_TEXT excluded so words like "snap"/"halo" don't
+    # false-positive here either), applied to one isolated value instead of a
+    # whole document; prefer the longest match so e.g. "Alexa Fluor 488
+    # channel" resolves to ALEXA488 rather than a shorter substring alias.
+    best: tuple[int, str] | None = None
+    for alias, canonical in aliases.items():
+        if alias in AMBIGUOUS_IN_FREE_TEXT:
+            continue
+        if re.search(r"\b" + re.escape(alias) + r"\b", cleaned, re.IGNORECASE):
+            if best is None or len(alias) > best[0]:
+                best = (len(alias), canonical)
+    if best:
+        return best[1]
+
     # Unknown dye: keep it rather than dropping evidence, but make it safe.
     return _UNSAFE.sub("", cleaned).upper() or None
 
@@ -189,7 +212,7 @@ def normalize_key_stem(key: str) -> str:
     if "|" in key:
         key = key.split("|")[-1]
     key = re.sub(r"\s*#\d+$", "", key)
-    key = re.sub(r'([a-z])([A-Z])', r'\1 \2', key)
+    key = re.sub(r"([a-z])([A-Z])", r"\1 \2", key)
     key = key.replace("_", " ")
     words = key.split()
     if words and words[-1].lower() in {"name", "value", "setting", "settings", "number", "id"}:
@@ -212,35 +235,46 @@ def _candidate_sources(
     candidates: list[FieldSource] = [source] if source else []
     per_field = FALLBACK_KEYS.get(field_name, {})
     tier0_keys = {source.key} if source else set()
-    
+
     for key in per_field.get(file_format, []) + per_field.get("*", []):
         if key not in tier0_keys:
             transform = source.transform if source else field_name
-            candidates.append(FieldSource(key, transform if transform in TRANSFORMS else "verbatim"))
+            candidates.append(
+                FieldSource(key, transform if transform in TRANSFORMS else "verbatim")
+            )
             tier0_keys.add(key)
 
     families = {
         "magnification": {"magnification", "nominalmagnification", "objective"},
         "markers": {"dye", "fluor", "channel", "lut"},
-        "date": {"acquisitiondate", "creationdate", "datetime", "imagedate", "date"}
+        "date": {"acquisitiondate", "creationdate", "datetime", "imagedate", "date"},
     }
     family = families.get(field_name, set())
 
     if family:
-        tier1_candidates = []
-        for key in image.keys:
-            if key not in tier0_keys and normalize_key_stem(key) in family:
-                tier1_candidates.append(key)
-        
+        tier1_keys = [
+            key for key in image.keys if key not in tier0_keys and normalize_key_stem(key) in family
+        ]
+
         def sort_key(k: str) -> int:
             val = image.get(k)
             return 0 if val and _is_atomic_value(val) else 1
-            
-        tier1_candidates.sort(key=sort_key)
-        
-        for key in tier1_candidates:
-            transform = source.transform if source else field_name
-            candidates.append(FieldSource(key, transform if transform in TRANSFORMS else "verbatim"))
+
+        tier1_keys.sort(key=sort_key)
+
+        transform = source.transform if source else field_name
+        transform = transform if transform in TRANSFORMS else "verbatim"
+
+        if field_name == "markers" and len(tier1_keys) > 1:
+            # Multiple sibling keys in the same family (e.g. "ChannelName #0",
+            # "#1", "#2") each hold ONE dye name, not a delimited list. Join
+            # them into a single candidate so _transform_markers sees every
+            # channel, instead of stopping at the first non-empty result and
+            # silently dropping the rest.
+            candidates.append(FieldSource(tuple(tier1_keys), "markers"))
+        else:
+            for key in tier1_keys:
+                candidates.append(FieldSource(key, transform))
 
     return candidates
 
@@ -269,15 +303,23 @@ def resolve_fields(
     provenance: dict[str, str] = {}
 
     for field_name in MAPPABLE_FIELDS:
-        for candidate in _candidate_sources(field_name, mapping.get(field_name), file_format, image):
-            raw = image.get(candidate.key)
+        for candidate in _candidate_sources(
+            field_name, mapping.get(field_name), file_format, image
+        ):
+            if isinstance(candidate.key, tuple):
+                parts = [v for k in candidate.key if (v := image.get(k))]
+                raw = ";".join(parts) if parts else None
+                provenance_key = ", ".join(candidate.key)
+            else:
+                raw = image.get(candidate.key)
+                provenance_key = candidate.key
             if raw is None:
                 continue
             transform = TRANSFORMS.get(candidate.transform, _transform_verbatim)
             value = transform(raw)
             if value:
                 fields[field_name] = value
-                provenance[field_name] = candidate.key
+                provenance[field_name] = provenance_key
                 break
 
     return fields, provenance
