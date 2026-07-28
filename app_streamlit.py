@@ -338,68 +338,98 @@ if "suggestions" in st.session_state:
         st.success(llm_fill_message)
 
     if suggest_llm_clicked:
-        from microscopy_naming_assistant.llm import suggest_fields_with_ollama
-        from microscopy_naming_assistant.naming import finalize_fields, render_name
-        from microscopy_naming_assistant.profiles import load_profile
-        from microscopy_naming_assistant.validation import validate_fields
-
-        profile = load_profile(profile_path) if profile_path else None
-        filled_count = 0
-        # C1: a field filled while the user's free-text description was
-        # supplied carries materially weaker evidence than one grounded only
-        # in the file's own metadata/filename -- tag it with the distinct
-        # "llm_description" provenance (never plain "llm"), mirroring
-        # service.suggest_for_file's own tagging, so it reads as provisional
-        # / needs review all the way to the final name (E7).
-        llm_source_tag = "llm_description" if experiment_description else "llm"
-
-        with st.spinner("Asking the local LLM…"):
-            for s in suggestions:
-                missing_fields = [k for k, v in s.sources.items() if v == "default" and k != "ext"]
-                if not missing_fields:
-                    continue
-
-                current_fields = {k: v for k, v in s.fields.items() if k != "ext"}
-                llm_fields = suggest_fields_with_ollama(
-                    current_fields=current_fields,
-                    original_name=s.source.name,
-                    endpoint=str(config.llm.get("endpoint", llm_endpoint)),
-                    model=llm_model,
-                    timeout_seconds=int(config.llm.get("timeout_seconds", llm_timeout)),
-                    preferred_models=[str(x) for x in config.llm.get("preferred_models", [])],
-                    user_description=experiment_description or None,
-                    metadata_text=s.metadata_text,
-                )
-
-                merged = dict(current_fields)
-                for name in missing_fields:
-                    value = llm_fields.get(name, "")
-                    if value:
-                        merged[name] = value
-                        s.sources[name] = llm_source_tag
-                        filled_count += 1
-
-                s.fields = finalize_fields(s.source, merged, config)
-                s.target_name = render_name(s.fields, config)
-                s.issues = validate_fields(s.fields, profile) if profile else []
-
-        if filled_count > 0:
-            review_note = (
-                " These are PROVISIONAL (filled from your description) -- review before "
-                "applying."
-                if llm_source_tag == "llm_description"
-                else ""
+        # A-3: honour the same gate service.suggest_for_file already enforces
+        # (`use_llm and config.llm['enabled']`) -- without it, this handler
+        # could reach a model with the "Use Ollama suggestions" checkbox
+        # OFF, contradicting the documented "with it off, the app never
+        # contacts a model" guarantee. Warn and skip the entire handler
+        # (no network call attempted) rather than silently no-op.
+        if not (use_llm and bool(config.llm.get("enabled", False))):
+            st.warning(
+                "LLM suggestions are off. Enable 'Use Ollama suggestions' in the "
+                "sidebar to use this."
             )
-            st.session_state["llm_fill_message"] = (
-                f"Filled {filled_count} field(s) from LLM suggestions — "
-                f"review them in the table.{review_note}"
-            )
-            st.rerun()
+        # A-2: `installed` (line ~109) is the same free, 60s-cached, never-
+        # raising reachability signal the sidebar warning already uses --
+        # checking it here means a genuinely unreachable Ollama is reported
+        # as such up front, distinct from every other reason nothing got
+        # filled.
+        elif not installed:
+            st.error(f"Could not reach Ollama at {llm_endpoint}, or no model is installed.")
         else:
-            st.info(
-                "No LLM suggestions available. Is Ollama running and a model installed? "
-                "You can still tag fields manually."
-            )
+            from microscopy_naming_assistant.llm import suggest_fields_with_ollama
+            from microscopy_naming_assistant.naming import finalize_fields, render_name
+            from microscopy_naming_assistant.profiles import load_profile
+            from microscopy_naming_assistant.validation import validate_fields
+
+            profile = load_profile(profile_path) if profile_path else None
+            filled_count = 0
+            files_with_gaps = 0
+            # C1: a field filled while the user's free-text description was
+            # supplied carries materially weaker evidence than one grounded
+            # only in the file's own metadata/filename -- tag it with the
+            # distinct "llm_description" provenance (never plain "llm"),
+            # mirroring service.suggest_for_file's own tagging, so it reads
+            # as provisional / needs review all the way to the final name
+            # (E7).
+            llm_source_tag = "llm_description" if experiment_description else "llm"
+
+            with st.spinner("Asking the local LLM…"):
+                for s in suggestions:
+                    missing_fields = [
+                        k for k, v in s.sources.items() if v == "default" and k != "ext"
+                    ]
+                    if not missing_fields:
+                        continue
+                    files_with_gaps += 1
+
+                    current_fields = {k: v for k, v in s.fields.items() if k != "ext"}
+                    llm_fields = suggest_fields_with_ollama(
+                        current_fields=current_fields,
+                        original_name=s.source.name,
+                        endpoint=str(config.llm.get("endpoint", llm_endpoint)),
+                        model=llm_model,
+                        timeout_seconds=int(config.llm.get("timeout_seconds", llm_timeout)),
+                        preferred_models=[str(x) for x in config.llm.get("preferred_models", [])],
+                        user_description=experiment_description or None,
+                        metadata_text=s.metadata_text,
+                    )
+
+                    merged = dict(current_fields)
+                    for name in missing_fields:
+                        value = llm_fields.get(name, "")
+                        if value:
+                            merged[name] = value
+                            s.sources[name] = llm_source_tag
+                            filled_count += 1
+
+                    s.fields = finalize_fields(s.source, merged, config)
+                    s.target_name = render_name(s.fields, config)
+                    s.issues = validate_fields(s.fields, profile) if profile else []
+
+            if filled_count > 0:
+                review_note = (
+                    " These are PROVISIONAL (filled from your description) -- review before "
+                    "applying."
+                    if llm_source_tag == "llm_description"
+                    else ""
+                )
+                st.session_state["llm_fill_message"] = (
+                    f"Filled {filled_count} field(s) from LLM suggestions — "
+                    f"review them in the table.{review_note}"
+                )
+                st.rerun()
+            elif files_with_gaps == 0:
+                # A non-failure: every file already has all fields filled,
+                # so there was genuinely nothing for the LLM to do -- must
+                # never be phrased as if Ollama failed.
+                st.info("Every file already has all fields filled — nothing for the LLM to fill.")
+            else:
+                st.warning(
+                    f"The model ({llm_model}) was reached but returned no usable "
+                    "suggestions. Try a different model, or add more detail to your "
+                    "description."
+                )
 
     with st.expander("Metadata read from files", expanded=False):
         st.caption(
