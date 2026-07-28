@@ -141,6 +141,63 @@ def suggest_for_file(
     )
 
 
+def classify_description_proposals(
+    current_fields: dict[str, str],
+    sources: dict[str, str],
+    llm_fields: dict[str, str],
+    *,
+    description_supplied: bool,
+) -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
+    """Split an LLM's proposed fields into genuine fills vs. reviewable overrides.
+
+    The guardrail that the LLM may only fill a field that is actually
+    missing is correct for the model's OWN inferences, but a user's typed
+    description is different: it is the user speaking, not the model
+    guessing, and ROADMAP.md already treats it as authoritative context. So
+    when (and ONLY when) a description was supplied, a field the model
+    proposes that disagrees with an already-populated value is classified as
+    a reviewable override PROPOSAL -- returned for a caller to show as a
+    before/after diff, never applied here and never applied silently
+    anywhere. Pure and side-effect-free: does not mutate its inputs, call
+    the LLM, or apply anything.
+
+    Returns `(fills, overrides)`:
+    - `fills`: fields whose current source is `"default"` or whose current
+      value is empty/absent -- today's existing "only fill genuine gaps"
+      behaviour, unchanged.
+    - `overrides`: `{field: (before, after)}` for fields already populated
+      from real evidence where the model proposed a DIFFERENT, non-empty
+      value. Always empty when `description_supplied` is False -- without a
+      description, disagreeing with real evidence is exactly the fabrication
+      the LLM-as-enhancer guardrail exists to forbid, not a proposal to
+      surface. A field whose source is `"user_edited"` is never proposed as
+      an override -- the human already decided it. A field can never appear
+      in both dicts.
+    """
+    fills: dict[str, str] = {}
+    overrides: dict[str, tuple[str, str]] = {}
+
+    for field_name, proposed in llm_fields.items():
+        if field_name == "ext":
+            continue
+
+        current_value = current_fields.get(field_name, "")
+        current_source = sources.get(field_name, "default")
+
+        if current_source == "default" or not current_value:
+            fills[field_name] = proposed
+            continue
+
+        if not description_supplied or current_source == "user_edited":
+            continue
+        if not proposed or proposed == current_value:
+            continue
+
+        overrides[field_name] = (current_value, proposed)
+
+    return fills, overrides
+
+
 def _casefold_key(path: Path) -> str:
     """Collision key for `path` that treats case-only differences as the SAME
     target, matching Windows/NTFS semantics regardless of the host OS running
