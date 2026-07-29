@@ -212,21 +212,24 @@ Format per lesson: **practice — evidence — why it matters.**
     missing verifier is a missing FALSIFIER, not a missing formality; a named, reproducible
     loop is a weaker but real verification path, and saying so lets the orchestrator and
     LEARN grade the work instead of treating it as unverified.
-43. **Standing model assignment: Opus or Fable orchestrates/plans (whichever fits availability
-    and need — neither is fixed to the role), Sonnet executes, Opus verifies, Haiku for
-    quick/short-context mechanical ops (git/GitHub housekeeping, simple file moves, rerunning
-    a suite to confirm) — given detailed, explicit instructions since Haiku has less headroom
-    for ambiguity.** Economize tokens both strategically (that assignment itself: expensive
-    reasoning only where a wrong answer is costly) and tactically (prioritize WARM-CONTEXT
-    execution by default — implement a planned task directly in the already-warm orchestrator/
-    executor context rather than dispatching a fresh subagent, unless the task specifically
-    needs genuine isolation, true file-disjoint parallelism, or a fresh unbiased pass on a
-    task class this run already burned on). — User directive, 2026-07-29, generalized same
-    day from an earlier scarce-budget-only carve-out (lesson 42) to a standing default:
-    codified as the `cma-run` skill (installed both globally at `~/.claude/skills/cma-run` and
-    per-project) so the assignment doesn't need restating each run. Never let an expensive
-    model run git/GitHub commands directly, and never let Opus sit idle while Sonnet
-    self-verifies its own work when Opus is available for the check.
+43. **Master decision rule: well-scoped work (an existing task graph with per-task scope +
+    verification text, or an unambiguous ask) runs WARM-CONTEXT direct — implement it in the
+    already-warm session rather than spinning up a separate orchestrator. Unclear-scope work
+    gets the full scheme: Opus or Fable orchestrates/plans (neither fixed to the role), Sonnet
+    executes. EITHER WAY, Opus (or Fable) verifies at the end — no exception, including
+    warm-context runs with no separate orchestrator.** Haiku handles quick/short-context
+    mechanical ops (git/GitHub housekeeping, simple file moves, rerunning a suite to confirm)
+    given detailed, explicit instructions since Haiku has less headroom for ambiguity. Economize
+    tokens both strategically (the assignment itself: expensive reasoning only where a wrong
+    answer is costly) and tactically (warm-context-first, as above). — User directives,
+    2026-07-29: first generalized warm-context-first from a scarce-budget carve-out (lesson 42)
+    to a standing default, then refined same day to the two-path rule above after asking why a
+    warm-context run's dashboard showed "Sonnet" as orchestrator — answer: warm-context
+    execution IS Sonnet (or whichever model is running) orchestrating itself when scope is
+    already clear, and that's fine PROVIDED Opus/Fable still verifies before the work is called
+    done. Codified as the `cma-run` skill (installed both globally at `~/.claude/skills/cma-run`
+    and per-project). Never let an expensive model run git/GitHub commands directly, and never
+    let a warm-context run skip its end-of-run Opus/Fable verification pass.
 
 ## E. This repo's invariants (microscopy-naming-assistant)
 
