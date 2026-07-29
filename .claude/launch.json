@@ -6,6 +6,12 @@
       "runtimeExecutable": ".venv/Scripts/python.exe",
       "runtimeArgs": ["-m", "streamlit", "run", "app_streamlit.py", "--server.headless", "true"],
       "port": 8501
+    },
+    {
+      "name": "cma-dashboard",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8777", "--directory", "tools/cma-dashboard"],
+      "port": 8777
     }
   ]
 }

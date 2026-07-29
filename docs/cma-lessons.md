@@ -212,6 +212,17 @@ Format per lesson: **practice — evidence — why it matters.**
     missing verifier is a missing FALSIFIER, not a missing formality; a named, reproducible
     loop is a weaker but real verification path, and saying so lets the orchestrator and
     LEARN grade the work instead of treating it as unverified.
+43. **Standing model assignment: Fable plans, Sonnet executes, Opus verifies, Haiku for
+    quick/short-context mechanical ops (git/GitHub housekeeping, simple file moves, rerunning
+    a suite to confirm) — given detailed, explicit instructions since Haiku has less headroom
+    for ambiguity.** Economize tokens both strategically (that assignment itself: expensive
+    reasoning only where a wrong answer is costly) and tactically (the scarce-budget
+    cold-context carve-out in lesson 42/[[cma-run]] — implement directly instead of
+    dispatching when budget is tight AND the task is low-risk/pure-function-shaped). — User
+    directive, 2026-07-29: codified as the `cma-run` skill (installed both globally at
+    `~/.claude/skills/cma-run` and per-project) so the assignment doesn't need restating each
+    run. Never let an expensive model run git/GitHub commands directly, and never let Opus
+    sit idle while Sonnet self-verifies its own work when Opus is available for the check.
 
 ## E. This repo's invariants (microscopy-naming-assistant)
 
