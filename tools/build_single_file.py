@@ -77,16 +77,48 @@ def _declared_name(line: str) -> str | None:
     return next(g for g in m.groups() if g)
 
 
+def _strip_line_comment(line: str) -> str:
+    """Return `line` with any trailing `//` line comment removed, respecting
+    string/template-literal quoting so a `//` (or a stray brace) inside a
+    string is never mistaken for a comment. Used only to decide where the
+    scope tracker below looks for `await`/`{`/`}` -- the original line,
+    comment included, still reaches the output unchanged."""
+    quote = None
+    i = 0
+    n = len(line)
+    while i < n:
+        ch = line[i]
+        if quote:
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"', "`"):
+            quote = ch
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and line[i + 1] == "/":
+            return line[:i]
+        i += 1
+    return line
+
+
 def _check_no_top_level_await(path: Path, body_lines: list[str]) -> None:
     """Heuristic scope tracker: forbid `await` that isn't inside a function.
 
     Only tracks whether a line *opens* a function-like body on the same line
     (the codebase's style throughout); good enough to catch the real mistake
-    (a stray top-level await) without needing a full JS parser.
+    (a stray top-level await) without needing a full JS parser. Comments are
+    stripped first so a docstring merely mentioning "await" (or containing a
+    stray brace) can't corrupt the scope depth or trip a false positive.
     """
     depth = 0
     func_open_depths: list[int] = []
-    for line in body_lines:
+    for raw_line in body_lines:
+        line = _strip_line_comment(raw_line)
         if AWAIT_RE.search(line) and not func_open_depths:
             raise BuildError(
                 f"{path}: top-level await is not allowed (the build's IIFE "

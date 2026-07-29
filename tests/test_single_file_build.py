@@ -118,6 +118,50 @@ def test_top_level_await_raises(tmp_path: Path) -> None:
         build(web_dir, tmp_path / "dist")
 
 
+def test_comment_mentioning_await_does_not_false_positive(tmp_path: Path) -> None:
+    # Regression: a `//` comment merely containing the word "await" (e.g. a
+    # doc comment explaining why a function ISN'T top-level await) must not
+    # trip the top-level-await gate. AWAIT_RE must only see the code portion
+    # of the line, never the comment portion.
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": (
+                "// Bootstrap, not top-level await -- the inliner forbids it.\n"
+                "export function init() {\n"
+                "  return 1;\n"
+                "}\n"
+            ),
+        },
+    )
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "function init()" in output
+
+
+def test_comment_containing_a_brace_does_not_corrupt_scope_depth(tmp_path: Path) -> None:
+    # Regression: a comment like `// if (x) { do it }` has an unbalanced-
+    # looking brace pair that must not be counted -- otherwise it could
+    # desync the function-open-depth tracker for the rest of the file.
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": (
+                "export async function load() {\n"
+                "  // comment with a brace: { not real code }\n"
+                "  const value = await Promise.resolve(1);\n"
+                "  return value;\n"
+                "}\n"
+                "export const AFTER = 1;\n"
+            ),
+        },
+    )
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "await Promise.resolve(1);" in output
+    assert "const AFTER = 1;" in output
+
+
 def test_await_inside_async_function_is_allowed(tmp_path: Path) -> None:
     web_dir = tmp_path / "web"
     _write_fixture(
