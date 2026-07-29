@@ -1,0 +1,326 @@
+/* Micronaut Planner shell styles.
+   Palette follows the custom-property + light/dark pattern proven in
+   tools/cma-dashboard/index.html: a default :root palette, an
+   @media (prefers-color-scheme) override, and explicit
+   :root[data-theme="dark"|"light"] overrides so the in-app toggle always
+   wins over the OS preference in both directions. */
+
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c2128;
+  --line: #2a313c;
+  --ink: #e6edf3;
+  --muted: #8b96a5;
+  --accent: #2dd4bf;
+  --accent-ink: #04302b;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --ok: #34d399;
+  --mono: ui-monospace, "Cascadia Code", Consolas, "SF Mono", monospace;
+  --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f9fa;
+    --panel: #ffffff;
+    --panel-2: #ffffff;
+    --line: #dfe4ea;
+    --ink: #1a2027;
+    --muted: #5b6572;
+    --accent: #0f9c8c;
+    --accent-ink: #ffffff;
+    --danger: #dc2626;
+    --warn: #b45309;
+    --ok: #059669;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c2128;
+  --line: #2a313c;
+  --ink: #e6edf3;
+  --muted: #8b96a5;
+  --accent: #2dd4bf;
+  --accent-ink: #04302b;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --ok: #34d399;
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f9fa;
+  --panel: #ffffff;
+  --panel-2: #ffffff;
+  --line: #dfe4ea;
+  --ink: #1a2027;
+  --muted: #5b6572;
+  --accent: #0f9c8c;
+  --accent-ink: #ffffff;
+  --danger: #dc2626;
+  --warn: #b45309;
+  --ok: #059669;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.shell-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.theme-toggle {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+}
+
+.theme-toggle:focus-visible,
+.nav-step:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shell-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 0;
+  min-height: 0;
+}
+
+.shell-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 10px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.nav-step {
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.nav-step:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.nav-step.active {
+  background: var(--panel-2);
+  color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.shell-main {
+  padding: 24px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.shell-status {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.shell-status.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.step-heading {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.naming-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field-input {
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-height: 44px;
+}
+
+.field-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.preview-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+
+.preview-label {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-basis: 100%;
+}
+
+.preview-name {
+  font-family: var(--mono);
+  font-size: 17px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.copy-button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.copy-button:hover {
+  filter: brightness(1.05);
+}
+
+.issues-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.issue {
+  font-size: 13.5px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+}
+
+.issue-warning {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.issue-error {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+@media print {
+  .shell-header,
+  .shell-nav,
+  .shell-status {
+    display: none;
+  }
+
+  .shell-body {
+    display: block;
+  }
+
+  .shell-main {
+    padding: 0;
+    overflow: visible;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
