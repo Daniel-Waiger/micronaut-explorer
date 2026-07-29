@@ -6,10 +6,11 @@ description: microscopy-naming-assistant's CMA multi-agent scheme — extends th
 # /cma-run — microscopy-naming-assistant
 
 **First: read `C:\Users\dwaig\.claude\skills\cma-run\SKILL.md` and follow its
-procedure.** That file owns the role/model assignment (Fable plans, Sonnet
-executes, Opus verifies, Haiku for quick/short-context ops), the token-economy
-rules, and the dashboard/lessons-file requirements. This file only adds what
-is specific to this project. Do not restate the base procedure here.
+procedure.** That file owns the role/model assignment (Opus or Fable
+orchestrates depending on availability/need, Sonnet executes, Opus verifies,
+Haiku for quick/short-context ops), the token-economy rules, and the
+dashboard/lessons-file requirements. This file only adds what is specific to
+this project. Do not restate the base procedure here.
 
 ## This repo's dashboard
 

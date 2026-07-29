@@ -1,0 +1,31 @@
+[
+  { "pattern": "^E\\d{2}$", "input": "E02", "expected": true },
+  { "pattern": "^E\\d{2}$", "input": "E2", "expected": false },
+  { "pattern": "^E\\d{2}$", "input": "xE02", "expected": false },
+  { "pattern": "^E\\d{2}$", "input": "E02x", "expected": false },
+  { "pattern": "^X\\d{2,3}$", "input": "X90", "expected": true },
+  { "pattern": "^X\\d{2,3}$", "input": "X900", "expected": true },
+  { "pattern": "^X\\d{2,3}$", "input": "X9000", "expected": false },
+  { "pattern": "^X\\d{2,3}$", "input": "X9", "expected": false },
+  { "pattern": "^[A-Za-z0-9_-]+$", "input": "OK_01", "expected": true },
+  { "pattern": "^[A-Za-z0-9_-]+$", "input": "Trial-1b", "expected": true },
+  { "pattern": "^[A-Za-z0-9_-]+$", "input": "bad note", "expected": false },
+  { "pattern": "^[A-Za-z0-9_-]+$", "input": "", "expected": false },
+  { "pattern": "^[A-Za-z0-9_-]*$", "input": "", "expected": true },
+  {
+    "pattern": "[A-Za-z0-9_-]+",
+    "input": "bad note",
+    "expected": false,
+    "landmine": true,
+    "note": "Unanchored: a naive JS RegExp.test() or Python re.search() would WRONGLY match the 'bad' substring and return true. The correct full-match answer is false because the whole string ('bad note') contains a space. compileFullMatch/re.fullmatch must both agree on false."
+  },
+  { "pattern": "[A-Za-z0-9_-]+", "input": "OK01", "expected": true },
+  {
+    "pattern": "\\d+",
+    "input": "abc123",
+    "expected": false,
+    "landmine": true,
+    "note": "Unanchored: naive substring search matches '123' and returns true; the correct full-match answer is false."
+  },
+  { "pattern": "\\d+", "input": "123", "expected": true }
+]

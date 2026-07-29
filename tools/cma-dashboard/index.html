@@ -137,62 +137,41 @@
 <script>
 // Embedded snapshot — used when no ./status.json is being served (e.g. published artifact).
 const EMBEDDED = {
-  run: "Run — safe renaming · describer · open-weights",
-  orchestrator: "Claude Fable 5",
-  active_model: "Paused",
-  active_status: "paused",
-  phase: "Stalled mid-round",
-  state_note: "5-HOUR WINDOW ENDED MID-ROUND",
-  current_task: null,
+  run: "planner-web-v1 — web pivot (Batch 1)",
+  orchestrator: "Claude Sonnet 5 (direct continuation)",
+  active_model: "Claude Sonnet 5",
+  active_status: "running",
+  phase: "Batch 2",
+  state_note: "Batch 1 committed (b7bb7ce, baaef04). Batch 2 in progress: C0-4 (validation port) done, C0-2 (store+provenance) underway.",
+  current_task: { id: "C0-2", title: "Store + tiered provenance" },
+  crit_title: "Live defects — none open on this run",
   stats: [
-    { k: "Orchestrator", v: "Fable 5" },
-    { k: "Test suite", v: "239 passed", tone: "ok" },
-    { k: "Live defects", v: "2 committed", tone: "bad" },
-    { k: "Branch", v: "feat/safe-renaming…", tone: "sm" }
+    { k: "Orchestrator", v: "Sonnet 5", tone: "sm" },
+    { k: "JS tests", v: "46 passed", tone: "ok" },
+    { k: "Live defects", v: "0", tone: "ok" },
+    { k: "Branch", v: "feat/safe-renaming…", tone: "sm" },
+    { k: "Run status", v: "Batch 1 committed", tone: "ok" }
   ],
-  defects: [
-    {
-      id: "A11",
-      title: "Ledger exclusion is case-sensitive on a case-insensitive filesystem",
-      location: "service.py:323",
-      body: "A ledger whose directory entry reads .ORIGINAL_NAMES.JSON bypasses `p.name != LEDGER_FILENAME`, gets renamed away, and update_ledger then writes a fresh empty ledger — permanently orphaning every prior batch's original-filename mapping. Same flaw on the .manifests check. The module already has _casefold_key for exactly this.",
-      repro: "was the case-variant ledger PLANNED for rename? True\nHISTORY LOST: True"
-    },
-    {
-      id: "B3",
-      title: "Marker scan drops a real second fluorophore",
-      location: "metadata.py:419",
-      body: "re.search yields one candidate per alias. When that candidate is nested inside a longer alias's span the overlap rule discards it, leaving none for the alias's own later occurrence — so a genuine dye vanishes from the filename, depending on channel order. Fix is re.finditer.",
-      repro: "'ch1 ATTO 647-N ch2 ATTO 647' → ATTO647N        (channel 2 lost)\n'ch1 ATTO 647 ch2 ATTO 647-N' → ATTO647-ATTO647N (correct)"
-    }
-  ],
+  defects: [],
   tasks: [
-    { id:"FM", phase:"Stalled mid-task", title:"field_map round — uncommitted: field_map.py, pyproject.toml, 3 new test files", status:"running", by:"interrupted" },
-    { id:"A11", phase:"Stalled mid-task", title:"Casefold ledger + .manifests exclusions", status:"pending", by:"queued" },
-    { id:"B3", phase:"Stalled mid-task", title:"re.finditer for alias candidates", status:"pending", by:"queued" },
-    { id:"A1", phase:"Verified pass", title:"Transactional apply — manifest as intent journal, rollback on failure", status:"done", by:"live→dead proven" },
-    { id:"A3", phase:"Verified pass", title:"Locked / cloud-synced warnings — never blocks", status:"done", by:"0.08 ms/file" },
-    { id:"A4", phase:"Verified pass", title:"Reserved names, case collisions, MAX_PATH, distinguishing suffix", status:"done", by:"pass" },
-    { id:"A7", phase:"Verified pass", title:"Rollback masking — key on target.exists()", status:"done", by:"mutation-proven" },
-    { id:"A9", phase:"Verified pass", title:"Case-only rename reverts cleanly (samefile guard)", status:"done", by:"pass" },
-    { id:"A10", phase:"Verified pass", title:"Lock probe gated on ERROR_SHARING_VIOLATION only", status:"done", by:"pass" },
-    { id:"D1", phase:"Verified pass", title:"Open-weights ranking, VRAM-aware, override wins", status:"done", by:"40 attacks, 0 raised" },
-    { id:"A5", phase:"Verified pass", title:"Date provenance — mtime vs real acquisition date", status:"done", by:"committed" },
-    { id:"C1", phase:"Verified pass", title:"Free-text describer → provisional fields", status:"done", by:"committed" },
-    { id:"C2", phase:"Verified pass", title:"Describer + provisional flags in UI/CLI", status:"done", by:"committed" },
-    { id:"B1", phase:"Failed then fixed", title:"Marker dictionary 27 → 76 — wrong-dye bug fixed by B2", status:"resolved", by:"B2" },
-    { id:"A2", phase:"Failed then fixed", title:"Original-name ledger + opt-in TIFF embed — fixed by A8", status:"resolved", by:"A8" },
-    { id:"A8", phase:"Failed — fix still pending", title:"Ledger exclusion — case-variant bypass still live", status:"failed", by:"→ A11" },
-    { id:"B2", phase:"Failed — fix still pending", title:"Marker tie-break — introduced silent marker loss", status:"failed", by:"→ B3" },
-    { id:"CZI", phase:"Deferred", title:"CZI + ND2 key maps and vendor fixture tests", status:"pending", by:"awaiting samples" }
+    { id:"C0-1", phase:"Batch 1", title:"Experiment schema + JSON-path utility", status:"done", by:"Sonnet · resumed, wrote schema.test.js, 19 tests pass" },
+    { id:"C0-3", phase:"Batch 1", title:"Port naming.py to engine/naming.js", status:"done", by:"Sonnet · wrote naming.test.js verbatim vs tests/test_naming.py, 17 tests pass" },
+    { id:"C0-5", phase:"Batch 1", title:"Single-file inliner + build gates", status:"done", by:"Sonnet · 15/15 pytest gates pass, ruff+black clean, committed baaef04" },
+    { id:"C0-2", phase:"Batch 2", title:"Store + tiered provenance", status:"running", by:"Sonnet · provenance.js written, store.js in progress" },
+    { id:"C0-4", phase:"Batch 2", title:"Port validation.py + compileFullMatch + shared regex fixture", status:"done", by:"Sonnet · validation.js port + shared regex_conformance.json fixture (landmine cases proven both languages), 12 tests pass" },
+    { id:"C0-6", phase:"Batch 3", title:"App shell, hash router, CSS with print stylesheet", status:"pending", by:"queued" },
+    { id:"C0-7", phase:"Batch 3", title:"Persistence: autosave ring buffer, loud quota failure, import/export", status:"pending", by:"queued" },
+    { id:"C0-8", phase:"Batch 4", title:"P0 vertical slice: name builder runs from file://", status:"pending", by:"queued" }
   ],
   log: [
-    { time:"commit", msg:"8709940 — magnification parser + AppTest smoke suite" },
-    { time:"commit", msg:"31a1069 — lessons distilled from the A5/C1/C2 resume run" },
-    { time:"commit", msg:"30dc8a7 — date provenance, describer, provisional surfacing" },
-    { time:"commit", msg:"9c9fa13 — transactional rollback, sidecar/embed, safety warnings, markers, VRAM ranking" },
-    { time:"note", msg:"Adversarial verification caught 9 real defects a green suite had missed — 4 introduced by fix tasks." },
-    { time:"note", msg:"PR held: opening one now would ship both live defects above." }
+    { time:"note", msg:"Previous run (T1-T11 describer/metadata-picker) fully closed out and LEARN-distilled (commit 3410e33) before this pivot began." },
+    { time:"note", msg:"User approved the planner-web pivot (docs/plans/planner-web.md + task graph); web/ scaffolding started, then the 5-hour window ended mid-Batch-1." },
+    { time:"resume", msg:"Session resumed 2026-07-29. Found web/src/core/{schema,paths,ids}.js and web/src/engine/naming.js already written but only paths.test.js existed (10 tests)." },
+    { time:"resume", msg:"Wrote web/tests/schema.test.js (9 tests) and web/tests/naming.test.js (17 tests, verbatim-intent port of tests/test_naming.py). Full web/tests suite: 36/36 passing." },
+    { time:"resume", msg:"Building C0-5: tools/build_single_file.py (stdlib-only inliner with hard-fail gates), web/index.html (dev shell + build template with BUILD:STYLE/KB/SCRIPT markers), tests/test_single_file_build.py." },
+    { time:"note", msg:"User codified the CMA model assignment as an installed skill: Opus or Fable orchestrates, Sonnet executes, Opus verifies, Haiku for quick/short-context ops. Installed at ~/.claude/skills/cma-run and this repo's .claude/skills/cma-run; docs/cma-lessons.md lesson 43 added." },
+    { time:"23:18:20", msg:"Batch 1 fully committed (b7bb7ce CMA-skill codification, baaef04 C0-1/C0-3/C0-5). 36/36 JS tests, 309 passed/10 deselected Python, ruff+black clean." },
+    { time:"23:29:40", msg:"C0-4 done: validation.js ported, tests/fixtures/regex_conformance.json shared by both languages, landmine (unanchored-pattern) cases proven in both. C0-2 underway: provenance.js (tiered tags, canOverwrite, promoteOnUserEdit) written." }
   ]
 };
 

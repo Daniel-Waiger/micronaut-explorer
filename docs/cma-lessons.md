@@ -212,7 +212,8 @@ Format per lesson: **practice — evidence — why it matters.**
     missing verifier is a missing FALSIFIER, not a missing formality; a named, reproducible
     loop is a weaker but real verification path, and saying so lets the orchestrator and
     LEARN grade the work instead of treating it as unverified.
-43. **Standing model assignment: Fable plans, Sonnet executes, Opus verifies, Haiku for
+43. **Standing model assignment: Opus or Fable orchestrates/plans (whichever fits availability
+    and need — neither is fixed to the role), Sonnet executes, Opus verifies, Haiku for
     quick/short-context mechanical ops (git/GitHub housekeeping, simple file moves, rerunning
     a suite to confirm) — given detailed, explicit instructions since Haiku has less headroom
     for ambiguity.** Economize tokens both strategically (that assignment itself: expensive
