@@ -216,13 +216,16 @@ Format per lesson: **practice — evidence — why it matters.**
     quick/short-context mechanical ops (git/GitHub housekeeping, simple file moves, rerunning
     a suite to confirm) — given detailed, explicit instructions since Haiku has less headroom
     for ambiguity.** Economize tokens both strategically (that assignment itself: expensive
-    reasoning only where a wrong answer is costly) and tactically (the scarce-budget
-    cold-context carve-out in lesson 42/[[cma-run]] — implement directly instead of
-    dispatching when budget is tight AND the task is low-risk/pure-function-shaped). — User
-    directive, 2026-07-29: codified as the `cma-run` skill (installed both globally at
-    `~/.claude/skills/cma-run` and per-project) so the assignment doesn't need restating each
-    run. Never let an expensive model run git/GitHub commands directly, and never let Opus
-    sit idle while Sonnet self-verifies its own work when Opus is available for the check.
+    reasoning only where a wrong answer is costly) and tactically (prioritize WARM-CONTEXT
+    execution by default — implement a planned task directly in the already-warm orchestrator/
+    executor context rather than dispatching a fresh subagent, unless the task specifically
+    needs genuine isolation, true file-disjoint parallelism, or a fresh unbiased pass on a
+    task class this run already burned on). — User directive, 2026-07-29, generalized same
+    day from an earlier scarce-budget-only carve-out (lesson 42) to a standing default:
+    codified as the `cma-run` skill (installed both globally at `~/.claude/skills/cma-run` and
+    per-project) so the assignment doesn't need restating each run. Never let an expensive
+    model run git/GitHub commands directly, and never let Opus sit idle while Sonnet
+    self-verifies its own work when Opus is available for the check.
 
 ## E. This repo's invariants (microscopy-naming-assistant)
 
