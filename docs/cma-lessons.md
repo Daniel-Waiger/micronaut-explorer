@@ -230,6 +230,22 @@ Format per lesson: **practice — evidence — why it matters.**
     done. Codified as the `cma-run` skill (installed both globally at `~/.claude/skills/cma-run`
     and per-project). Never let an expensive model run git/GitHub commands directly, and never
     let a warm-context run skip its end-of-run Opus/Fable verification pass.
+44. **Lesson 43's mandatory end-of-run verification is not a formality even for warm-context
+    work the same session already self-tested green.** — 2026-07-29: the planner-web P0 slice
+    (8 tasks, 82 passing JS tests + 318 Python tests, self-verified live in a browser) still
+    had an Opus adversarial pass find 9 concrete defects, several directly reachable from the
+    already-passing test suite's own blind spots: a prototype-pollution hole in a path utility
+    no test exercised with an adversarial key; a false-provenance permanent-lock bug where
+    clearing a form field tagged the resulting emptiness STRONG, defeating lesson 37's "what
+    user action clears it?" test on a path no test suite happened to exercise; a swallowed
+    QuotaExceededError where the callback contract was honoured by the module but never wired
+    by its caller (lesson 36, producer→consumer, again); and two instances of the SAME bug
+    class recurring one syntax over (a `//`-comment false-positive fix in a build-time scanner
+    left `/* */` block comments and regex literals with the identical vulnerability) — proving
+    that fixing the reported case is not the same as fixing the class of bug. — A green test
+    suite proves the tests that were written are satisfied, not that the RIGHT tests were
+    written; an adversarial pass looking for what ISN'T tested is a different, complementary
+    check that self-testing structurally cannot replace.
 
 ## E. This repo's invariants (microscopy-naming-assistant)
 
