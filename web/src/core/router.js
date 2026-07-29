@@ -47,6 +47,11 @@ export function createRouter(steps) {
     if (id && isReachable(id)) {
       current = id;
       notify();
+    } else if (current) {
+      // A bogus or currently-unreachable hash must not leave the URL
+      // desynced from what's actually displayed -- correct it back to the
+      // last known-good step.
+      navigate(current);
     }
   });
 

@@ -63,3 +63,26 @@ test('listPaths handles a wildcard at the top level of an array of primitives', 
   const obj = { tags: ['x', 'y'] };
   assert.deepEqual(listPaths(obj, 'tags[*]'), ['tags[0]', 'tags[1]']);
 });
+
+test('setPath rejects __proto__ to prevent prototype pollution', () => {
+  const obj = {};
+  assert.throws(() => setPath(obj, '__proto__.polluted', 'yes'), /unsafe path segment/);
+  assert.equal({}.polluted, undefined);
+});
+
+test('setPath rejects constructor.prototype to prevent prototype pollution', () => {
+  const obj = {};
+  assert.throws(() => setPath(obj, 'constructor.prototype.polluted', 'yes'), /unsafe path segment/);
+  assert.equal({}.polluted, undefined);
+});
+
+test('getPath also rejects a dangerous segment rather than silently traversing it', () => {
+  const obj = {};
+  assert.throws(() => getPath(obj, '__proto__.polluted'), /unsafe path segment/);
+});
+
+test('a key merely containing the word prototype (not equal to it) is unaffected', () => {
+  const obj = {};
+  setPath(obj, 'prototypeName', 'ok');
+  assert.equal(getPath(obj, 'prototypeName'), 'ok');
+});

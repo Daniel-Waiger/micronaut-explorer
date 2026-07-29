@@ -13,7 +13,8 @@ optional inlined knowledge-pack blob are substituted into <web-dir>/index.html
 at BUILD:* marker comments.
 
 Hard-fail build gates (each raises BuildError with a specific message):
-  - two modules exporting the same symbol name
+  - two modules declaring the same top-level symbol name, exported or not
+    (both share one scope once concatenated)
   - an import cycle
   - top-level `await` inside any module (the assembled IIFE cannot be async)
   - `type="module"` or a dynamic `import(` surviving into the assembled output
@@ -61,11 +62,11 @@ class BuildError(RuntimeError):
 
 
 class Module:
-    __slots__ = ("path", "exported", "body", "deps")
+    __slots__ = ("path", "declared", "body", "deps")
 
     def __init__(self, path: Path):
         self.path = path
-        self.exported: list[str] = []
+        self.declared: list[str] = []
         self.body: list[str] = []
         self.deps: list[Path] = []
 
@@ -77,17 +78,57 @@ def _declared_name(line: str) -> str | None:
     return next(g for g in m.groups() if g)
 
 
-def _strip_line_comment(line: str) -> str:
-    """Return `line` with any trailing `//` line comment removed, respecting
-    string/template-literal quoting so a `//` (or a stray brace) inside a
-    string is never mistaken for a comment. Used only to decide where the
-    scope tracker below looks for `await`/`{`/`}` -- the original line,
-    comment included, still reaches the output unchanged."""
-    quote = None
+# A `/` opens a regex literal (rather than meaning division) when the
+# previous significant character is one of these, or when it's the first
+# thing on the line -- the same heuristic real lightweight JS tools use to
+# tell `a / b` from `/regex/`.
+_REGEX_PRECEDING_CHARS = set("=([{,;:!&|?~+-*%^<>")
+
+
+def _strip_comments_for_scope_tracking(line: str, in_block_comment: bool) -> tuple[str, bool]:
+    """Return (line with comments/regex-literal bodies blanked out, whether a
+    block comment is still open after this line).
+
+    Used ONLY to decide where the scope trackers below look for
+    `await`/`{`/`}`/declarations -- the original line (comments, regex
+    literals, and all) still reaches the build output unchanged. Handles `//`
+    line comments, `/* ... */` block comments (including ones spanning into
+    or out of this line), string/template literals, and regex literals well
+    enough to avoid the false positives a naive scan would hit: a comment
+    merely mentioning "await", a JSDoc block doing the same, a comment
+    containing a stray brace, or a regex literal containing "//" (e.g.
+    `/\\/\\//g`, which is NOT a line comment). Deliberately a heuristic, not a
+    full JS lexer, matching this module's documented scope.
+    """
+    out: list[str] = []
+    quote: str | None = None  # one of "'", '"', "`", "regex", or None
     i = 0
     n = len(line)
+    prev_significant = ""
     while i < n:
+        if in_block_comment:
+            end = line.find("*/", i)
+            if end == -1:
+                return "".join(out), True
+            i = end + 2
+            in_block_comment = False
+            continue
         ch = line[i]
+        if quote == "regex":
+            if ch == "\\":
+                i += 2
+                continue
+            if ch == "[":
+                # a character class: '/' doesn't end the regex inside [...]
+                j = i + 1
+                while j < n and line[j] != "]":
+                    j += 2 if line[j] == "\\" else 1
+                i = j + 1
+                continue
+            if ch == "/":
+                quote = None
+            i += 1
+            continue
         if quote:
             if ch == "\\":
                 i += 2
@@ -101,9 +142,20 @@ def _strip_line_comment(line: str) -> str:
             i += 1
             continue
         if ch == "/" and i + 1 < n and line[i + 1] == "/":
-            return line[:i]
+            break  # rest of the line is a line comment
+        if ch == "/" and i + 1 < n and line[i + 1] == "*":
+            in_block_comment = True
+            i += 2
+            continue
+        if ch == "/" and (prev_significant == "" or prev_significant in _REGEX_PRECEDING_CHARS):
+            quote = "regex"
+            i += 1
+            continue
+        out.append(ch)
+        if not ch.isspace():
+            prev_significant = ch
         i += 1
-    return line
+    return "".join(out), in_block_comment
 
 
 def _check_no_top_level_await(path: Path, body_lines: list[str]) -> None:
@@ -111,14 +163,16 @@ def _check_no_top_level_await(path: Path, body_lines: list[str]) -> None:
 
     Only tracks whether a line *opens* a function-like body on the same line
     (the codebase's style throughout); good enough to catch the real mistake
-    (a stray top-level await) without needing a full JS parser. Comments are
-    stripped first so a docstring merely mentioning "await" (or containing a
-    stray brace) can't corrupt the scope depth or trip a false positive.
+    (a stray top-level await) without needing a full JS parser. Comments,
+    strings, and regex literals are blanked out first (see
+    _strip_comments_for_scope_tracking) so none of them can corrupt the scope
+    depth or trip a false positive.
     """
     depth = 0
     func_open_depths: list[int] = []
+    in_block_comment = False
     for raw_line in body_lines:
-        line = _strip_line_comment(raw_line)
+        line, in_block_comment = _strip_comments_for_scope_tracking(raw_line, in_block_comment)
         if AWAIT_RE.search(line) and not func_open_depths:
             raise BuildError(
                 f"{path}: top-level await is not allowed (the build's IIFE "
@@ -132,6 +186,27 @@ def _check_no_top_level_await(path: Path, body_lines: list[str]) -> None:
         depth += opens - closes
         while func_open_depths and depth < func_open_depths[-1]:
             func_open_depths.pop()
+
+
+def _collect_top_level_declared_names(body_lines: list[str]) -> list[str]:
+    """All top-level const/let/var/function/class names in `body_lines`
+    (which has already had any leading `export` keyword stripped) -- exported
+    or private, since both share the very same scope once every module is
+    concatenated into one IIFE. A private name colliding with another
+    module's name breaks the assembled script exactly as badly as two
+    exported names colliding does.
+    """
+    names: list[str] = []
+    depth = 0
+    in_block_comment = False
+    for raw_line in body_lines:
+        line, in_block_comment = _strip_comments_for_scope_tracking(raw_line, in_block_comment)
+        if depth == 0:
+            name = _declared_name(line)
+            if name:
+                names.append(name)
+        depth += line.count("{") - line.count("}")
+    return names
 
 
 def parse_module(path: Path) -> Module:
@@ -152,22 +227,17 @@ def parse_module(path: Path) -> Module:
 
         m_export_list = EXPORT_LIST_RE.match(line)
         if m_export_list:
-            names = [n.strip() for n in m_export_list.group(1).split(",") if n.strip()]
-            mod.exported.extend(names)
-            continue  # the names are already declared earlier in this file
+            continue  # a re-export list; the names are declared elsewhere in this file
 
         m_decl = EXPORT_DECL_RE.match(line)
         if m_decl:
-            stripped = EXPORT_DECL_RE.sub(r"\1", line)
-            mod.body.append(stripped)
-            name = _declared_name(stripped)
-            if name:
-                mod.exported.append(name)
+            mod.body.append(EXPORT_DECL_RE.sub(r"\1", line))
             continue
 
         mod.body.append(line)
 
     _check_no_top_level_await(path, mod.body)
+    mod.declared = _collect_top_level_declared_names(mod.body)
     return mod
 
 
@@ -180,18 +250,21 @@ def _check_deps_in_scope(modules: dict[Path, Module]) -> None:
                 )
 
 
-def _check_duplicate_exports(modules: dict[Path, Module]) -> None:
+def _check_duplicate_declarations(modules: dict[Path, Module]) -> None:
     owners: dict[str, list[Path]] = {}
     for path, mod in modules.items():
-        for name in mod.exported:
+        for name in mod.declared:
             owners.setdefault(name, []).append(path)
     duplicates = {name: paths for name, paths in owners.items() if len(paths) > 1}
     if duplicates:
         lines = [
-            f"  '{name}' exported by: {', '.join(str(p) for p in paths)}"
+            f"  '{name}' declared by: {', '.join(str(p) for p in paths)}"
             for name, paths in sorted(duplicates.items())
         ]
-        raise BuildError("duplicate exported symbol name(s) across web/src:\n" + "\n".join(lines))
+        raise BuildError(
+            "duplicate top-level symbol name(s) across web/src (exported or "
+            "private -- both share one scope once concatenated):\n" + "\n".join(lines)
+        )
 
 
 def _topo_sort(modules: dict[Path, Module]) -> list[Path]:
@@ -230,7 +303,7 @@ def flatten_modules(src_dir: Path) -> str:
 
     modules = {f: parse_module(f) for f in js_files}
     _check_deps_in_scope(modules)
-    _check_duplicate_exports(modules)
+    _check_duplicate_declarations(modules)
     order = _topo_sort(modules)
 
     parts = ["(function () {", "'use strict';"]

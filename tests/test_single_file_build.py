@@ -89,8 +89,42 @@ def test_duplicate_exported_symbol_raises(tmp_path: Path) -> None:
             "b.js": "export const FOO = 2;\n",
         },
     )
-    with pytest.raises(BuildError, match="duplicate exported symbol"):
+    with pytest.raises(BuildError, match="duplicate top-level symbol"):
         build(web_dir, tmp_path / "dist")
+
+
+def test_duplicate_private_symbol_raises(tmp_path: Path) -> None:
+    # Regression: the gate originally only inspected EXPORTED names. Two
+    # modules each declaring the same PRIVATE (non-exported) top-level const
+    # collide exactly as badly once concatenated into one IIFE, but used to
+    # sail through this gate and produce an unparseable bundle.
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": "const HELPER = 1;\nexport function useA() { return HELPER; }\n",
+            "b.js": "const HELPER = 2;\nexport function useB() { return HELPER; }\n",
+        },
+    )
+    with pytest.raises(BuildError, match="duplicate top-level symbol"):
+        build(web_dir, tmp_path / "dist")
+
+
+def test_private_name_reused_inside_different_functions_is_fine(tmp_path: Path) -> None:
+    # The SAME local name in two different function bodies (or nested
+    # blocks) must NOT trip the duplicate gate -- only true top-level
+    # (depth-0) declarations collide once concatenated.
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": "export function a() { const local = 1; return local; }\n",
+            "b.js": "export function b() { const local = 2; return local; }\n",
+        },
+    )
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "function a()" in output
+    assert "function b()" in output
 
 
 def test_import_cycle_raises(tmp_path: Path) -> None:
@@ -160,6 +194,65 @@ def test_comment_containing_a_brace_does_not_corrupt_scope_depth(tmp_path: Path)
     output = build(web_dir, tmp_path / "dist").decode("utf-8")
     assert "await Promise.resolve(1);" in output
     assert "const AFTER = 1;" in output
+
+
+def test_block_comment_mentioning_await_does_not_false_positive(tmp_path: Path) -> None:
+    # Regression: the // fix above left /* */ block comments (including
+    # JSDoc) unhandled -- the exact same bug, one comment syntax over.
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": (
+                "/**\n"
+                " * Caller must await the returned promise.\n"
+                " */\n"
+                "export function f() {\n"
+                "  return 1;\n"
+                "}\n"
+            ),
+        },
+    )
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "function f()" in output
+
+
+def test_single_line_block_comment_mentioning_await_does_not_false_positive(
+    tmp_path: Path,
+) -> None:
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": "/* not top-level await */ export const FOO = 1;\n",
+        },
+    )
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "const FOO = 1;" in output
+
+
+def test_regex_literal_containing_double_slash_does_not_truncate_the_line(
+    tmp_path: Path,
+) -> None:
+    # Regression: a regex literal like /\/\//g contains "//" from its own
+    # escaped-slash tokens, which a naive line-comment scan mistakes for a
+    # comment start, silently dropping everything after it on the line --
+    # including a following brace, which would desync the scope tracker.
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": (
+                "export function hasDoubleSlash(s) {\n"
+                "  const re = /\\/\\//g;\n"
+                "  return re.test(s);\n"
+                "}\n"
+            ),
+        },
+    )
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "const re = /\\/\\//g;" in output
+    assert "return re.test(s);" in output
 
 
 def test_await_inside_async_function_is_allowed(tmp_path: Path) -> None:

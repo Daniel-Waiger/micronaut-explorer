@@ -5,6 +5,14 @@
 
 const TOKEN_RE = /[^.[\]]+|\[\d+\]|\[\*\]/g;
 
+// A key token matching one of these would let setPath climb out of the
+// target object onto Object.prototype itself (e.g. setPath({}, '__proto__.x',
+// 1) or setPath({}, 'constructor.prototype.x', 1)) -- since every plain
+// object shares one prototype, that one write corrupts every object in the
+// running app, not just the object passed in. Reject these unconditionally;
+// no legitimate Experiment field is named any of them.
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 function tokenize(path) {
   const tokens = [];
   const matches = path.match(TOKEN_RE) || [];
@@ -14,6 +22,9 @@ function tokenize(path) {
     } else if (raw.startsWith('[') && raw.endsWith(']')) {
       tokens.push({ kind: 'index', value: Number(raw.slice(1, -1)) });
     } else {
+      if (DANGEROUS_KEYS.has(raw)) {
+        throw new Error(`unsafe path segment '${raw}' in '${path}'`);
+      }
       tokens.push({ kind: 'key', value: raw });
     }
   }

@@ -25,6 +25,10 @@ function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
 }
 
+function osPrefersLight() {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches;
+}
+
 export function renderShell(root, store, router) {
   root.textContent = '';
 
@@ -39,14 +43,24 @@ export function renderShell(root, store, router) {
   const themeToggle = document.createElement('button');
   themeToggle.type = 'button';
   themeToggle.className = 'theme-toggle';
-  const initialTheme = loadTheme() || 'dark';
-  applyTheme(initialTheme);
-  themeToggle.textContent = initialTheme === 'dark' ? 'Light mode' : 'Dark mode';
+  // Only stamp data-theme when the user has made an EXPLICIT choice before.
+  // Stamping it unconditionally (even to 'dark', matching the app's own
+  // :root default) would always win over the
+  // @media (prefers-color-scheme: light) rule, so a first-time visitor on a
+  // light-OS machine would always see dark regardless of their system
+  // preference -- the toggle is meant to override the OS default, not
+  // replace it before the user has ever touched it.
+  const storedTheme = loadTheme();
+  if (storedTheme) {
+    applyTheme(storedTheme);
+  }
+  let currentTheme = storedTheme || (osPrefersLight() ? 'light' : 'dark');
+  themeToggle.textContent = currentTheme === 'dark' ? 'Light mode' : 'Dark mode';
   themeToggle.addEventListener('click', () => {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    applyTheme(next);
-    saveTheme(next);
-    themeToggle.textContent = next === 'dark' ? 'Light mode' : 'Dark mode';
+    currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(currentTheme);
+    saveTheme(currentTheme);
+    themeToggle.textContent = currentTheme === 'dark' ? 'Light mode' : 'Dark mode';
   });
   header.appendChild(themeToggle);
 

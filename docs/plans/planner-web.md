@@ -25,7 +25,7 @@ Two problems turn out to be **the same problem**:
 | **LLM** | Optional, off by default. Deterministic tier (keyword spotting from `markers.py` alias matching + factor/replicate patterns) always on. Manual paste-provider ships v1. Ollama is opt-in (tier 2). The LLM **never originates a domain fact** — structured guardrail: the adapter supplies a vocabulary and drops any ID not in it. |
 | **Interview** | Deterministic question bank; LLM upgrades comprehension but is not the floor. Tier 0 already carries the headline demo (paragraph → slots via existing matching). |
 | **Renaming** | **NOT** in the web app. Micronaut Classic keeps the rename-folder job (destructive graph operation, transactional apply, rollback manifests, original-name ledger, lock/cloud-sync probes, case-insensitive collisions, MAX_PATH). The web planner will never rename a file. |
-| **JS tests** | `node --test` (verified on this machine: node v24.11.1 with `node:test` built into the binary). Zero npm install; 3-line package.json only. Cross-language coupling: shared `regex_conformance.json` fixture read by both pytest and JS tests, since `re.fullmatch` in Python and `RegExp.test` in JS have different defaults. |
+| **JS tests** | `node --test web/tests/*.test.js` (verified on node v22.21.0 with `node:test` built into the binary -- the bare `node --test web/tests/` form fails with `MODULE_NOT_FOUND`; use the glob, or `cd web && node --test`). Zero npm install; 3-line package.json only. Cross-language coupling: shared `regex_conformance.json` fixture read by both pytest and JS tests, since `re.fullmatch` in Python and `RegExp.test` in JS have different defaults. |
 
 ## Invariants — structural constraints that guard correctness
 
@@ -38,7 +38,7 @@ Two problems turn out to be **the same problem**:
 - The LLM may only emit IDs present in the vocabulary the app supplied
 - Never write into a STRONG-provenance slot from a weaker source (tiered: STRONG ≥ user/user_edited/imported; WEAK ≥ freetext/kb-default/derived/default; PROVISIONAL ≥ llm/llm_freetext)
 - Python gate: `pytest -q -m 'not integration'` stays green (Classic must not regress)
-- JS gate: `node --test web/tests`, no `node_modules` ever created
+- JS gate: `node --test web/tests/*.test.js`, no `node_modules` ever created
 
 ## The P0 task table
 

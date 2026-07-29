@@ -42,14 +42,29 @@ export function createStore(initialExperiment) {
    * Refuses (returns false, leaves state unchanged) when the slot at `path`
    * already carries a STRONG tag and `tag` is not itself STRONG. Returns
    * true and notifies subscribers on a successful write.
+   *
+   * An empty value (the user clearing a field) is a deliberate exception:
+   * it always succeeds, regardless of the existing tag, and is tagged
+   * 'default' (WEAK) rather than whatever `tag` the caller passed. Without
+   * this, clearing a field that once held a STRONG ('user') value would tag
+   * the resulting emptiness STRONG too -- manufacturing false provenance
+   * (the record would claim the user deliberately set the field to blank)
+   * and permanently locking the slot, since canOverwrite would then refuse
+   * every future WEAK/PROVISIONAL write (a KB default, an LLM suggestion)
+   * forever. There is no user action that could ever clear a lock like
+   * that, which is exactly the deadlock repo lesson 37 warns against.
    */
   function setValueAtPath(path, value, tag) {
-    const existingTag = state.provenance?.slots?.[path]?.tag ?? null;
-    if (!canOverwrite(existingTag, tag)) {
-      return false;
+    const isClearing = value === '' || value === null || value === undefined;
+    const effectiveTag = isClearing ? 'default' : tag;
+    if (!isClearing) {
+      const existingTag = state.provenance?.slots?.[path]?.tag ?? null;
+      if (!canOverwrite(existingTag, effectiveTag)) {
+        return false;
+      }
     }
     setPath(state, path, value);
-    tagSlot(state, path, tag);
+    tagSlot(state, path, effectiveTag);
     scheduleNotify();
     return true;
   }

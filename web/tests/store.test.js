@@ -66,6 +66,43 @@ test('setPath with user_edited SUCCEEDS over an llm slot and clears needsReview'
   assert.ok(!slot.needsReview);
 });
 
+test('clearing a field (empty value) always succeeds even over a STRONG slot', () => {
+  // Regression: writing an empty value used to keep the caller's tag
+  // ('user'), permanently locking the slot against any future WEAK/
+  // PROVISIONAL write (a KB default, an LLM suggestion) since canOverwrite
+  // refuses non-STRONG writes over a STRONG slot forever after.
+  const store = createStore(emptyExperiment());
+  store.setPath('naming.fields.sample', 'E02', 'user');
+
+  const ok = store.setPath('naming.fields.sample', '', 'user');
+
+  assert.equal(ok, true);
+  assert.equal(store.getPath('naming.fields.sample'), '');
+});
+
+test('clearing a field tags the slot default (WEAK), not the caller-supplied tag', () => {
+  const store = createStore(emptyExperiment());
+  store.setPath('naming.fields.sample', 'E02', 'user');
+  store.setPath('naming.fields.sample', '', 'user');
+
+  const slot = store.get().provenance.slots['naming.fields.sample'];
+  assert.equal(slot.tag, 'default');
+});
+
+test('a cleared (WEAK-tagged) slot can be freely refilled by any source afterward', () => {
+  const store = createStore(emptyExperiment());
+  store.setPath('naming.fields.sample', 'E02', 'user');
+  store.setPath('naming.fields.sample', '', 'user'); // user clears the field
+
+  // Without the fix, this would be refused: the empty write above would
+  // have kept a STRONG 'user' tag, and canOverwrite('user', 'kb-default')
+  // is false.
+  const ok = store.setPath('naming.fields.sample', 'E03', 'kb-default');
+
+  assert.equal(ok, true);
+  assert.equal(store.getPath('naming.fields.sample'), 'E03');
+});
+
 test('subscribe returns an unsubscribe function', () => {
   const store = createStore(emptyExperiment());
   let calls = 0;
