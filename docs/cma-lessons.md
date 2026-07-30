@@ -246,6 +246,19 @@ Format per lesson: **practice — evidence — why it matters.**
     suite proves the tests that were written are satisfied, not that the RIGHT tests were
     written; an adversarial pass looking for what ISN'T tested is a different, complementary
     check that self-testing structurally cannot replace.
+45. **A subagent's "completed" status is not evidence of anything on its own — check its
+    actual deliverables before believing it, especially when the report text looks even
+    slightly off.** — 2026-07-30: a dispatched executor's task-notification result was, verbatim,
+    a nested `Agent({...})` tool-call it had apparently tried to make (to delegate its own
+    required file-reading to a fresh sub-agent instead of reading the files itself) rather than
+    a synthesized report; status still read "completed". A filesystem check (`ls` the task's
+    listed deliverable files) found NONE of them existed — the dispatch had produced nothing.
+    Separately the same session, two dispatches failed cleanly and legibly with "monthly spend
+    limit" (not transient); per lesson 42 both were re-implemented directly in warm context
+    with the substitution declared on the dashboard rather than silently treated as done. —
+    Strengthens lesson 20 (verify the mechanism, not the surface) one level up the stack: it
+    now applies to the verification step itself, not just to the task being verified. A
+    malformed/garbled final result is itself a signal to distrust the status field next to it.
 
 ## E. This repo's invariants (microscopy-naming-assistant)
 
