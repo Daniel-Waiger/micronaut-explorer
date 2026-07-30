@@ -259,6 +259,22 @@ Format per lesson: **practice — evidence — why it matters.**
     Strengthens lesson 20 (verify the mechanism, not the surface) one level up the stack: it
     now applies to the verification step itself, not just to the task being verified. A
     malformed/garbled final result is itself a signal to distrust the status field next to it.
+46. **A UI-wiring task's "avoid full re-render to preserve focus" fix and "avoid stale
+    closures" are in tension, and only driving the real interaction catches the collision.**
+    — 2026-07-30 (C1-6): a factor-editing row deliberately did NOT re-render its own inputs on
+    every keystroke (an earlier fix in the same task, to stop each keystroke destroying focus)
+    -- but that meant each field's input handler closed over the `factors` array snapshotted
+    when the row was first drawn, not the store's current state. Editing the NAME then the
+    LEVELS on the SAME row silently clobbered the name back to its pre-edit value, because the
+    levels handler mapped over the stale snapshot. Every unit test passed (there are none for
+    UI wiring -- see lesson 4, this is why it's the risky task) and a single-field smoke click
+    would have missed it too; it only surfaced by editing TWO fields on ONE row in sequence,
+    live, in a real build. Fix: read current store state fresh inside the handler, not the
+    render-time closure. — Generalizes: whenever a "don't rebuild the DOM, preserve focus"
+    optimization is applied to more than one sibling control on the same data row, each
+    control's handler needs to independently re-fetch current state rather than share one
+    snapshot -- the interaction to test is EDITING SIBLING FIELDS IN SEQUENCE, not each field
+    in isolation.
 
 ## E. This repo's invariants (microscopy-naming-assistant)
 
