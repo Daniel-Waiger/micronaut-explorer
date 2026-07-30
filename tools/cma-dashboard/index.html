@@ -148,8 +148,8 @@ const EMBEDDED = {
   "orchestrator": "Claude Sonnet 5 (direct continuation)",
   "active_model": "Claude Sonnet 5 (direct continuation)",
   "active_status": "idle",
-  "phase": "Batch 1+2 done",
-  "state_note": "Monthly spend limit hit on both batch-2 subagent dispatches (C1-3 retry, C1-4). Per lesson 42: not retrying dispatch -- implementing both directly in warm context instead, same verification rigor, substitution declared here.",
+  "phase": "P1 Batch 3 done",
+  "state_note": "P1 (all 6 tasks) committed. Full demo verified live: paragraph -> 3 proposals (X63/DAPI-ALEXA488/n=3) -> accept -> flows into Naming step filename; Design step 2x3 factor expansion -> 6 sample IDs + filenames; reload-persistence confirmed on both steps. One real bug found+fixed during live testing: editing name then levels on the same factor row clobbered the first edit (stale-closure bug in design.js) -- caught only by actually driving the UI, not by unit tests (none exist for UI wiring).",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
@@ -160,7 +160,7 @@ const EMBEDDED = {
     },
     {
       "k": "Tasks",
-      "v": "5 / 6"
+      "v": "6 / 6"
     }
   ],
   "defects": [],
@@ -204,8 +204,8 @@ const EMBEDDED = {
       "id": "C1-6",
       "phase": "Batch 3",
       "title": "P1 vertical slice: paste a paragraph, answer questions, get sample IDs and filenames",
-      "status": "pending",
-      "by": "queued"
+      "status": "resolved",
+      "by": "direct · describe.js+design.js wired, verified live over file:// (proposals, interview, 6-row design expansion, reload-persistence)"
     }
   ],
   "log": [
@@ -256,9 +256,21 @@ const EMBEDDED = {
     {
       "time": "15:45:43",
       "msg": "Batch 2 complete: C1-3 (interview engine + 12-question bank, 15 tests) and C1-4 (free-text ingest, 15 JS + 2 Python conformance tests) both done DIRECTLY after subagent dispatch hit the monthly spend limit twice -- substituted per lesson 42, declared explicitly. 166/166 JS, 330 Python, ruff+black clean, build succeeds at 98KB. Remaining: C1-6 (UI vertical slice) deferred to next session -- deliberately not starting the highest-risk task this late in the budget."
+    },
+    {
+      "time": "15:48:05",
+      "msg": "Session ending: committed, dashboard synced, memory updated. Handover follows."
+    },
+    {
+      "time": "15:51:32",
+      "msg": "User confirmed enough budget remains -- proceeding with C1-6 directly (established pattern this session, subagent dispatch still unreliable on the monthly spend limit)."
+    },
+    {
+      "time": "16:14:46",
+      "msg": "C1-6 done: describe.js (paste-a-paragraph, reviewable Accept/Dismiss proposals, interview panel with why+skip) + design.js (factors/levels/replicates, live condition table) wired into main.js's router alongside naming.js. Live file:// verification caught and fixed a real UI bug (stale closure clobbering a factor's other field on edit). All P1 (C1-1 through C1-6) now committed. 166 JS / 330 Python tests, zero regressions."
     }
   ],
-  "snapshot_at": "2026-07-30 15:45"
+  "snapshot_at": "2026-07-30 16:14"
 };
 /* CMA:EMBEDDED:END */
 

@@ -4,7 +4,7 @@ import { validateFields, validateTargetPath } from '../../engine/validation.js';
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
 // default_config()/default_profile() so behaviour matches Classic today.
-const NAMING_CONFIG = {
+export const NAMING_CONFIG = {
   template: '{date}_{exptype}_{sample}_{magnification}_{markers}_{notes}{ext}',
   defaults: {
     date: '1970-01-01',
