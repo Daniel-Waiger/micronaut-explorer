@@ -14,9 +14,21 @@ this project. Do not restate the base procedure here.
 
 ## This repo's dashboard
 
-`tools/cma-dashboard/` — see its `README.md`. `status.json` is gitignored
-(per-run state); `update.py` mutates it; serve with
-`python -m http.server 8777` from that directory for a live local view.
+`tools/cma-dashboard/` — see its `README.md` for the full CLI. Use it on
+**every** cma-run task here, per the base skill. The fast path:
+
+```bash
+cd tools/cma-dashboard
+python update.py --new-run "<run name>" --orch "<model>" \
+  --from-task-graph ../../docs/plans/<plan>-task-graph.json
+```
+
+then serve it with the `cma-dashboard` entry in `.claude/launch.json`
+(port 8777) and drive it with `--task` / `--stat` / `--current` / `--log` as
+tasks move. `status.json` is gitignored per-run state; `update.py` also
+auto-rewrites the offline snapshot inside `index.html`, so **never hand-edit
+that HTML to change what the board shows**.
+
 A persistent published-artifact mirror also exists for cross-machine viewing
 — see the `app-workflow-preference` memory for its URL, and always update
 that SAME artifact URL on republish rather than minting a new one.
