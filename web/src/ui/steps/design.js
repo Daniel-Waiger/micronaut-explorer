@@ -1,6 +1,13 @@
-import { buildSampleId, conditionIssues, expandConditions } from '../../engine/conditions.js';
-import { finalizeFields, renderName } from '../../engine/naming.js';
-import { NAMING_CONFIG } from './naming.js';
+import {
+  buildGroupLabel,
+  buildSampleId,
+  conditionIssues,
+  expandConditions,
+  formatReplicateToken,
+} from '../../engine/conditions.js';
+import { finalizeFields, normalizeFields, renderName } from '../../engine/naming.js';
+import { validateTargetPath } from '../../engine/validation.js';
+import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
 function parseLevels(text) {
   return String(text)
@@ -9,9 +16,39 @@ function parseLevels(text) {
     .filter((s) => s.length > 0);
 }
 
-function filenameForRow(row, design, store, sampleId) {
+/**
+ * Stage 1: the stem every file in this experiment shares. Rendered once, above
+ * the condition table, so the reader can see what is common before scanning
+ * what differs.
+ */
+function baseNameFor(store) {
   const namingFields = store.getPath('naming.fields') || {};
-  const raw = { ...namingFields, sample: sampleId };
+  const finalized = finalizeFields('experiment.tif', namingFields, NAMING_CONFIG);
+  return renderName(finalized, { ...NAMING_CONFIG, template: BASE_TEMPLATE });
+}
+
+/**
+ * Stage 1 + stage 2: the full filename for one condition row. `groupLabel` is
+ * computed by the caller (once per row) and dropped into the template's
+ * {group} slot -- it arrives already segment-separated, so distinct arms can
+ * never collapse into one indistinguishable token.
+ *
+ * bioRep/techRep are ALSO overridden here from the row itself (formatted via
+ * the same formatReplicateToken every other replicate token goes through),
+ * never from naming.fields -- each row has its OWN replicate numbers; a
+ * single shared naming.fields value would render the same B01 on every row.
+ * naming.fields.sample (the specimen id) and .notes are left as whatever the
+ * Naming step holds, since -- unlike group/biorep/techrep -- neither varies
+ * row to row within one design.
+ */
+function filenameForRow(row, design, store, groupLabel) {
+  const namingFields = store.getPath('naming.fields') || {};
+  const raw = {
+    ...namingFields,
+    group: groupLabel,
+    biorep: formatReplicateToken('B', row.bioRep),
+    techrep: formatReplicateToken('T', row.techRep),
+  };
   const finalized = finalizeFields('experiment.tif', raw, NAMING_CONFIG);
   return renderName(finalized, NAMING_CONFIG);
 }
@@ -29,7 +66,14 @@ export const designStep = {
 
     function currentDesign() {
       return (
-        store.getPath('design') || { factors: [], replicates: null, idScheme: '', conditions: [] }
+        store.getPath('design') || {
+          groups: { levels: [] },
+          factors: [],
+          biologicalReplicates: null,
+          technicalReplicates: null,
+          idScheme: '',
+          conditions: [],
+        }
       );
     }
 
@@ -48,6 +92,40 @@ export const designStep = {
       renderFactors();
       renderConditions();
     }
+
+    // The arm axis is ONE input (a comma-separated levels list, same
+    // convention as a factor's levels), not a repeated row -- there is
+    // nothing structural to add/remove, so unlike factors there is only ever
+    // one write path and no stale-closure risk from a sibling control.
+    function writeGroups(levels) {
+      store.setPath('design.groups', { levels }, 'user');
+      renderConditions();
+    }
+
+    const groupsHeading = document.createElement('div');
+    groupsHeading.className = 'design-subheading';
+    groupsHeading.textContent = 'Groups (arms)';
+    main.appendChild(groupsHeading);
+
+    const groupsRow = document.createElement('label');
+    groupsRow.className = 'field-row';
+    const groupsLabel = document.createElement('span');
+    groupsLabel.className = 'field-label';
+    groupsLabel.textContent = 'Mutually exclusive arms, comma-separated';
+    groupsRow.appendChild(groupsLabel);
+    const groupsInput = document.createElement('input');
+    groupsInput.type = 'text';
+    groupsInput.className = 'field-input';
+    // Deliberately NOT "e.g. CT, NAM25MM, treatment": that phrasing is what
+    // caused 'CT' and 'NAM50MM' to be entered as two SEPARATE factors and
+    // crossed against each other in the first place. Every level here is one
+    // ARM; a sample belongs to exactly one.
+    groupsInput.placeholder = 'e.g. CT, NAM25MM, NAM50MM -- a sample is exactly ONE of these';
+    groupsInput.addEventListener('input', () => {
+      writeGroups(parseLevels(groupsInput.value));
+    });
+    groupsRow.appendChild(groupsInput);
+    main.appendChild(groupsRow);
 
     const factorsHeading = document.createElement('div');
     factorsHeading.className = 'design-subheading';
@@ -68,29 +146,49 @@ export const designStep = {
     });
     main.appendChild(addFactorBtn);
 
-    const replicatesRow = document.createElement('label');
-    replicatesRow.className = 'field-row';
-    const replicatesLabel = document.createElement('span');
-    replicatesLabel.className = 'field-label';
-    replicatesLabel.textContent = 'Biological replicates';
-    replicatesRow.appendChild(replicatesLabel);
-    const replicatesInput = document.createElement('input');
-    replicatesInput.type = 'number';
-    replicatesInput.className = 'field-input';
-    replicatesInput.min = '1';
-    replicatesRow.appendChild(replicatesInput);
-    main.appendChild(replicatesRow);
+    // Two INDEPENDENT axes, each optional -- not every sample has both kinds
+    // of replicate, and some (SEM/TEM/Raman) commonly have neither. Blank on
+    // either input means that axis is omitted, not "default to 1".
+    function makeReplicatesRow(label, storePath) {
+      const row = document.createElement('label');
+      row.className = 'field-row';
+      const labelEl = document.createElement('span');
+      labelEl.className = 'field-label';
+      labelEl.textContent = label;
+      row.appendChild(labelEl);
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'field-input';
+      input.min = '1';
+      input.placeholder = 'blank = not used';
+      input.addEventListener('input', () => {
+        const raw = input.value;
+        store.setPath(storePath, raw === '' ? null : Number(raw), 'user');
+        renderConditions();
+      });
+      row.appendChild(input);
+      main.appendChild(row);
+      return input;
+    }
+
+    const bioRepInput = makeReplicatesRow('Biological replicates', 'design.biologicalReplicates');
+    const techRepInput = makeReplicatesRow('Technical replicates', 'design.technicalReplicates');
 
     const idSchemeRow = document.createElement('label');
     idSchemeRow.className = 'field-row';
     const idSchemeLabel = document.createElement('span');
     idSchemeLabel.className = 'field-label';
-    idSchemeLabel.textContent = 'Sample ID scheme';
+    idSchemeLabel.textContent = 'Group naming override (optional)';
     idSchemeRow.appendChild(idSchemeLabel);
     const idSchemeInput = document.createElement('input');
     idSchemeInput.type = 'text';
     idSchemeInput.className = 'field-input';
-    idSchemeInput.placeholder = 'e.g. {genotype}R{replicate}';
+    // The old placeholder ('{genotype}R{replicate}') actively TAUGHT the
+    // merge: adjacent tokens with no separator between them. Leave this blank
+    // and the arm plus each factor gets its own segment automatically --
+    // replicates are NOT part of this label; they render through their own
+    // {biorep}/{techrep} slots regardless of this override.
+    idSchemeInput.placeholder = 'Blank = one segment per arm/factor (e.g. CT-NAM50MM). Tokens: {group} {biorep} {techrep} + factor names';
     idSchemeRow.appendChild(idSchemeInput);
     main.appendChild(idSchemeRow);
 
@@ -102,6 +200,20 @@ export const designStep = {
     conditionsHeading.className = 'design-subheading';
     conditionsHeading.textContent = 'Condition rows';
     main.appendChild(conditionsHeading);
+
+    // Stage 1, shown once: the stem every file below shares. Without this the
+    // reader has to diff two long filenames character by character to work out
+    // which part identifies the experiment and which part identifies the group.
+    const baseNameBox = document.createElement('div');
+    baseNameBox.className = 'base-name-box';
+    const baseNameLabel = document.createElement('span');
+    baseNameLabel.className = 'base-name-label';
+    baseNameLabel.textContent = 'Every file starts with';
+    const baseNameValue = document.createElement('code');
+    baseNameValue.className = 'base-name-value';
+    baseNameBox.appendChild(baseNameLabel);
+    baseNameBox.appendChild(baseNameValue);
+    main.appendChild(baseNameBox);
 
     const conditionsTable = document.createElement('div');
     conditionsTable.className = 'conditions-table';
@@ -180,28 +292,39 @@ export const designStep = {
         issuesList.appendChild(li);
       }
 
+      baseNameValue.textContent = baseNameFor(store);
+
       conditionsTable.textContent = '';
       const rows = expandConditions(design);
       if (rows.length === 0) {
+        // With zero factors AND zero arm levels this design still expands to
+        // exactly one unconditioned row (see conditions.js), so an empty
+        // TABLE here always means a real issue is already listed above (a
+        // factor/arm with zero usable levels, or the row cap) -- there is no
+        // separate "you haven't added anything yet" case to explain.
         const empty = document.createElement('p');
         empty.className = 'conditions-empty';
-        empty.textContent = (design.factors || []).length === 0
-          ? 'Add at least one factor to see condition rows.'
-          : 'No rows to show -- see the issues above.';
+        empty.textContent = 'No rows to show -- see the issues above.';
         conditionsTable.appendChild(empty);
         return;
       }
 
       const hasIdSchemeIssue = issues.some((issue) => issue.field === 'idScheme');
+      const pathIssues = [];
       for (const row of rows) {
         const rowEl = document.createElement('div');
         rowEl.className = 'condition-row';
 
         const summary = document.createElement('span');
         summary.className = 'condition-summary';
-        const parts = Object.entries(row.factorLevels).map(([k, v]) => `${k}=${v}`);
-        parts.push(`replicate=${row.replicate}`);
-        summary.textContent = parts.join(', ');
+        const parts = [];
+        if (row.group !== null && row.group !== undefined) parts.push(`group=${row.group}`);
+        parts.push(...Object.entries(row.factorLevels).map(([k, v]) => `${k}=${v}`));
+        const bioToken = formatReplicateToken('B', row.bioRep);
+        const techToken = formatReplicateToken('T', row.techRep);
+        if (bioToken) parts.push(`bio=${bioToken}`);
+        if (techToken) parts.push(`tech=${techToken}`);
+        summary.textContent = parts.join(', ') || '(unconditioned)';
         rowEl.appendChild(summary);
 
         const sampleIdEl = document.createElement('code');
@@ -213,13 +336,33 @@ export const designStep = {
           filenameEl.textContent = '(fix the id scheme above)';
         } else {
           try {
-            // buildSampleId is called ONCE per row and its result reused for
-            // both the sample-id column and the filename, rather than
-            // calling it twice (which would double the defense-in-depth
-            // try/catch and risk the two columns disagreeing on failure).
-            const sampleId = buildSampleId(row, design.idScheme || '');
-            sampleIdEl.textContent = sampleId;
-            filenameEl.textContent = filenameForRow(row, design, store, sampleId);
+            // The group label is built ONCE per row and reused for both the
+            // group column and the filename, so the two can never disagree.
+            //
+            // Default path (no custom scheme): buildGroupLabel, which keeps
+            // one separated segment per arm/factor (replicates render through
+            // their own {biorep}/{techrep} slots, not through this label). A
+            // custom idScheme is honoured as an explicit override, but it is
+            // no longer required -- and it is no longer the thing that
+            // silently welds 'CT' and 'NAM 50mM' into 'CTNAM50MM'.
+            const groupLabel = design.idScheme
+              ? buildSampleId(row, design.idScheme)
+              : buildGroupLabel(row, design);
+            // Displayed through normalizeFields (the SAME casing authority
+            // filenameForRow uses below), not the raw groupLabel -- otherwise
+            // this column shows the arm exactly as typed ('ct') while the
+            // filename two columns over embeds it uppercased ('CT'), and a
+            // reader has no way to know those are the same value.
+            sampleIdEl.textContent = normalizeFields({ group: groupLabel }, NAMING_CONFIG).group;
+            const filename = filenameForRow(row, design, store, groupLabel);
+            filenameEl.textContent = filename;
+            // The Design step is where MANY names are generated at once, so
+            // it is where a long base name actually bites -- validateTargetPath
+            // already existed (wired only into the single-name Naming step)
+            // and is reused here unchanged, never reimplemented.
+            for (const issue of validateTargetPath(filename)) {
+              pathIssues.push(issue);
+            }
           } catch (err) {
             // Defense-in-depth: conditionIssues should already have caught an
             // unknown id-scheme token, but buildSampleId's throw must never
@@ -233,21 +376,29 @@ export const designStep = {
 
         conditionsTable.appendChild(rowEl);
       }
+
+      // Rendered as its own trailing group rather than interleaved with the
+      // design issues above: a path-length warning is about the FILENAME
+      // (and where it will land on disk), not the design's own structure, and
+      // deduping identical messages keeps N identically-long rows from
+      // producing N copies of the same warning.
+      for (const message of new Set(pathIssues.map((issue) => issue.message))) {
+        const li = document.createElement('li');
+        li.className = 'issue issue-warning';
+        li.textContent = `target_path: ${message}`;
+        issuesList.appendChild(li);
+      }
     }
 
     function renderAll() {
       const design = currentDesign();
-      replicatesInput.value = design.replicates ?? '';
+      groupsInput.value = (design.groups && design.groups.levels ? design.groups.levels : []).join(', ');
+      bioRepInput.value = design.biologicalReplicates ?? '';
+      techRepInput.value = design.technicalReplicates ?? '';
       idSchemeInput.value = design.idScheme || '';
       renderFactors();
       renderConditions();
     }
-
-    replicatesInput.addEventListener('input', () => {
-      const raw = replicatesInput.value;
-      store.setPath('design.replicates', raw === '' ? null : Number(raw), 'user');
-      renderConditions();
-    });
 
     idSchemeInput.addEventListener('input', () => {
       store.setPath('design.idScheme', idSchemeInput.value, 'user');

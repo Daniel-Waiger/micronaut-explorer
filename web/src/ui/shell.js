@@ -29,7 +29,7 @@ function osPrefersLight() {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches;
 }
 
-export function renderShell(root, store, router) {
+export function renderShell(root, store, router, { onReset } = {}) {
   root.textContent = '';
 
   const header = document.createElement('header');
@@ -62,7 +62,31 @@ export function renderShell(root, store, router) {
     saveTheme(currentTheme);
     themeToggle.textContent = currentTheme === 'dark' ? 'Light mode' : 'Dark mode';
   });
-  header.appendChild(themeToggle);
+  const headerActions = document.createElement('div');
+  headerActions.className = 'header-actions';
+
+  // Everything is autosaved to localStorage, so a page refresh deliberately
+  // RESTORES the previous session rather than clearing it. That is the right
+  // default (nobody wants to lose a design to a stray F5) but it leaves no
+  // way to start a genuinely new experiment -- hence an explicit control.
+  // Confirmed, because it is destructive and unrecoverable.
+  if (onReset) {
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'theme-toggle reset-button';
+    resetBtn.textContent = 'Start over';
+    resetBtn.title = 'Discard this experiment and start from an empty one';
+    resetBtn.addEventListener('click', () => {
+      const ok = window.confirm(
+        'Discard the current experiment and start over?\n\nThis clears every answer, factor, and naming field. It cannot be undone.'
+      );
+      if (ok) onReset();
+    });
+    headerActions.appendChild(resetBtn);
+  }
+
+  headerActions.appendChild(themeToggle);
+  header.appendChild(headerActions);
 
   const body = document.createElement('div');
   body.className = 'shell-body';

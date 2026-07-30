@@ -38,6 +38,14 @@ from pathlib import Path
 MAX_OUTPUT_BYTES = 2 * 1024 * 1024
 
 IMPORT_RE = re.compile(r"^\s*import\s*\{\s*([^}]*?)\s*\}\s*from\s*['\"](\.[^'\"]+)['\"]\s*;?\s*$")
+# A multi-line `import {\n  a,\n  b,\n} from '...'` -- what Prettier produces the
+# moment a named-import list gets long enough to wrap. IMPORT_RE is anchored
+# ^...$ against ONE line, so a wrapped import never matched it and passed
+# through verbatim into the assembled classic script, where `import` is a
+# SyntaxError that kills the whole bundle at parse time. These two let
+# parse_module fold a wrapped import back into one logical line first.
+IMPORT_START_RE = re.compile(r"^\s*import\s*\{")
+IMPORT_END_RE = re.compile(r"\}\s*from\s*['\"](\.[^'\"]+)['\"]\s*;?\s*$")
 EXPORT_DEFAULT_RE = re.compile(r"^\s*export\s+default\b")
 EXPORT_LIST_RE = re.compile(r"^\s*export\s*\{\s*([^}]*?)\s*\}\s*;?\s*$")
 EXPORT_DECL_RE = re.compile(
@@ -54,6 +62,17 @@ AWAIT_RE = re.compile(r"\bawait\b")
 FORBIDDEN_IN_OUTPUT = [
     (re.compile(r'type\s*=\s*["\']module["\']'), 'type="module"'),
     (re.compile(r"\bimport\s*\("), "a dynamic import()"),
+    # A STATIC import surviving the flattening step. This gate exists because
+    # its absence was not theoretical: a wrapped multi-line import slipped
+    # through IMPORT_RE, and every other gate still passed, so the build
+    # reported success while emitting a bundle that threw
+    # "Cannot use import statement outside a module" before rendering a single
+    # pixel. Anchored per-line so `// import ...` prose and ` * import` in doc
+    # comments do not trip it.
+    (
+        re.compile(r"""(?m)^\s*import\s+[{*'"A-Za-z_$]"""),
+        "a static import statement",
+    ),
 ]
 
 
@@ -209,10 +228,38 @@ def _collect_top_level_declared_names(body_lines: list[str]) -> list[str]:
     return names
 
 
+def _join_multiline_imports(path: Path, lines: list[str]) -> list[str]:
+    """Fold each wrapped `import { ... } from '...'` back onto one logical line.
+
+    Only import statements are touched; every other line is passed through
+    unchanged, so this cannot perturb module bodies.
+    """
+    out: list[str] = []
+    pending: list[str] | None = None
+    for line in lines:
+        if pending is None:
+            # A single-line import already ends with its `from '...'` clause and
+            # needs no folding -- leave it for IMPORT_RE to match directly.
+            if IMPORT_START_RE.match(line) and not IMPORT_END_RE.search(line):
+                pending = [line.rstrip()]
+            else:
+                out.append(line)
+            continue
+
+        pending.append(line.strip())
+        if IMPORT_END_RE.search(line):
+            out.append(" ".join(pending))
+            pending = None
+
+    if pending is not None:
+        raise BuildError(f"{path}: unterminated multi-line import statement")
+    return out
+
+
 def parse_module(path: Path) -> Module:
     mod = Module(path)
     text = path.read_text(encoding="utf-8")
-    for line in text.splitlines():
+    for line in _join_multiline_imports(path, text.splitlines()):
         m_import = IMPORT_RE.match(line)
         if m_import:
             spec = m_import.group(2)

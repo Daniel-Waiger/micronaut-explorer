@@ -68,6 +68,16 @@ export function loadQuestions(raw) {
       field,
       type: entry.type,
       options: Array.isArray(entry.options) ? entry.options.slice() : undefined,
+      // Whether an 'Other...' free-text fallback is offered alongside the
+      // curated options -- meaningless for non-choice types, so coerced to a
+      // real boolean rather than passed through, the same normalize-not-copy
+      // treatment every other field here gets. loadQuestions builds an
+      // explicit whitelist object rather than spreading `entry`, so a new
+      // question-bank property (this one included, when it was first added)
+      // is silently DROPPED here unless it is added to this list by name --
+      // that is deliberate (unknown properties should not leak into the
+      // engine unexamined), but it means every new property needs this line.
+      allowOther: entry.allowOther === true,
       askWhen: entry.askWhen,
       priority: typeof entry.priority === 'number' ? entry.priority : 0,
       tag: typeof entry.tag === 'string' && entry.tag ? entry.tag : DEFAULT_ANSWER_TAG,
@@ -140,6 +150,48 @@ export function nextQuestions(questions, experiment, limit) {
   }
 
   return askable;
+}
+
+/** Un-skip `questionId`, making it askable again. Mutates in place. */
+export function unskipQuestion(experiment, questionId) {
+  const provenance = experiment && experiment.provenance;
+  if (provenance && Array.isArray(provenance.skipped)) {
+    provenance.skipped = provenance.skipped.filter((id) => id !== questionId);
+  }
+  return experiment;
+}
+
+/**
+ * The exact complement of nextQuestions: every question the user has already
+ * DEALT WITH -- answered (its slot now carries a STRONG tag) or explicitly
+ * skipped -- carrying the value currently stored for it.
+ *
+ * This exists because nextQuestions deliberately drops a question the moment
+ * its slot goes STRONG, which is correct for "what should I ask next" and
+ * wrong as a whole UI: without this, answering a question makes it vanish with
+ * no way to see what you said, let alone change it. An interview the user
+ * cannot revise is a data-entry trap, not an interview.
+ *
+ * Returned in the question bank's own order (not priority order) so the review
+ * list stays stable as answers change -- a list that reshuffles under the
+ * user's cursor while they are editing it is unusable.
+ */
+export function answeredQuestions(questions, experiment) {
+  const reviewable = [];
+  for (const question of questions) {
+    const skipped = isSkipped(experiment, question.id);
+    const tag = slotTag(experiment, question.field);
+    const answered = STRONG_TAGS.has(tag);
+    if (!skipped && !answered) continue;
+
+    reviewable.push({
+      ...question,
+      currentValue: answered ? getPath(experiment, question.field) : undefined,
+      status: skipped ? 'skipped' : 'answered',
+      tag,
+    });
+  }
+  return reviewable;
 }
 
 /**

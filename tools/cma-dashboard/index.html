@@ -147,18 +147,15 @@ const EMBEDDED = {
   "run": "planner-web P1 — interview engine + deterministic parsing",
   "orchestrator": "Claude Opus",
   "active_model": "Claude Opus",
-  "active_status": "running",
-  "phase": "Fixing Opus-found defects",
-  "state_note": "Second Opus adversarial pass over full P1 diff found 8 defects (D1-D8) + 2 minor UX gaps. All fixed in working tree, unit tests green (174/174 JS, 330/10 Python, ruff+black clean) -- NOT YET COMMITTED. Live re-verification of D2 (remove-factor button) hit an unexplained anomaly (mid-diagnosis when session paused for handover).",
-  "current_task": {
-    "id": "C1-6",
-    "title": "Live-verify D2 fix (anomaly under diagnosis)"
-  },
+  "active_status": "done",
+  "phase": "Arm-axis + two-stage filename restructure",
+  "state_note": "Arm-axis + two-stage filename restructure complete and verified. Adversarial self-verification pass (Opus, per master decision rule) caught one real defect the implementation's own live checks had missed: the row's 'Group' column (case-preserving by design) and the embedded filename token (uppercased) could disagree for the SAME value ('ct' vs 'CT'), because the two displays went through different formatting authorities. Fixed by routing the display column through normalizeFields, the same authority the filename uses. 216 JS tests, 332 Python, all green. Not yet committed.",
+  "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "174 passed",
+      "v": "216 passed",
       "tone": "ok"
     },
     {
@@ -167,7 +164,7 @@ const EMBEDDED = {
     },
     {
       "k": "Py tests",
-      "v": "330 passed, 10 deselected",
+      "v": "332 passed, 10 deselected",
       "tone": "ok"
     }
   ],
@@ -218,6 +215,20 @@ const EMBEDDED = {
       "id": "D7",
       "location": "web/src/ui/steps/describe.js",
       "title": "Accept button gave no feedback when setPath refused a write over a stronger existing value",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D9",
+      "location": "tools/build_single_file.py",
+      "title": "Wrapped multi-line import survived the flattener; built bundle threw 'Cannot use import statement outside a module' and rendered a blank page, while every build gate still reported success",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D10",
+      "location": "web/src/ui/steps/design.js",
+      "title": "Filename collapsed every design dimension into one sample token, merging control and treatment arms indistinguishably",
       "body": "",
       "repro": ""
     }
@@ -334,9 +345,29 @@ const EMBEDDED = {
     {
       "time": "16:55:11",
       "msg": "Second Opus adversarial pass over full P1 diff (C1-1..C1-6): 8 defects (D1-D8) + 2 minor UX gaps found. All fixed, unit-tested green. D2's live re-verification hit an anomaly (extra blank factor row after Remove) -- paused for /handover mid-diagnosis, not yet committed."
+    },
+    {
+      "time": "21:49:29",
+      "msg": "Two-stage naming shipped: base name rendered once, group segments separated by '-' so arms never merge. Inliner now folds wrapped imports AND hard-fails on any surviving static import (falsification-tested). Answers are now reviewable/editable/re-askable, plus a confirmed 'Start over'. 190 JS + 332 Py green; verified live against the BUILT artifact."
+    },
+    {
+      "time": "21:49:29",
+      "msg": "Lessons 47 + 48 distilled: line-anchored source regexes break on formatter line-wrapping and output gates must assert absence, not that a step ran; and a dev server's module registry can serve fresh bytes while executing stale exports -- verify the shipped artifact."
+    },
+    {
+      "time": "23:30:26",
+      "msg": "Planned via docs/plans/planner-web-mvp-usecases.md, then C:/Users/dwaig/.claude/plans/wobbly-splashing-cookie.md (plan mode). Implemented warm-context (well-scoped, no subagent dispatch needed). Verified live against the BUILT artifact over http: 9-row CT/NAM25MM/NAM50MM x 3-biorep design renders exactly per spec, allowOther round-trips through the answered-list re-edit path, and a hand-seeded v1 autosave correctly migrates to v2 and re-persists cleanly."
+    },
+    {
+      "time": "23:30:26",
+      "msg": "docs/plans/planner-web-mvp-usecases.md written to map MVP use cases (UC-1..UC-7) and resolve the if/then-rules-vs-hardcoding question: rules belong in the knowledge pack as data (predicate.js already exists for this), code stays a generic evaluator. K-5 (control rules) still needed before controls can be generated."
+    },
+    {
+      "time": "23:36:25",
+      "msg": "Adversarial verification pass (required by the master decision rule even for warm-context runs) found+fixed D13. See docs/cma-lessons.md lesson 49. All 6 planned work items (schema v2, conditions engine rework, naming+design UI, allowOther, build+verify) done and green."
     }
   ],
-  "snapshot_at": "2026-07-30 16:55"
+  "snapshot_at": "2026-07-30 23:36"
 };
 /* CMA:EMBEDDED:END */
 

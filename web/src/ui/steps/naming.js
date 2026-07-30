@@ -1,23 +1,45 @@
 import { finalizeFields, renderName } from '../../engine/naming.js';
 import { validateFields, validateTargetPath } from '../../engine/validation.js';
 import { editTagFor } from '../../core/provenance.js';
+import { formatReplicateToken } from '../../engine/conditions.js';
 
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
 // default_config()/default_profile() so behaviour matches Classic today.
+//
+// Stage 1 (the base name, shared by every file in the experiment) is the
+// leading {date}_{modality}_{exptype}_{markers}_{magnification}. Stage 2 is
+// what distinguishes THIS file: {group}_{sample}_{biorep}_{techrep}. {notes}
+// stays trailing. Kept byte-identical to schema.js's DEFAULT_NAMING_TEMPLATE
+// -- see BASE_TEMPLATE below for the split point the Design step uses.
+//
+// {group}/{biorep}/{techrep}/{notes} are OPTIONAL: an experiment with no
+// arms, or no technical replicates (common for SEM/TEM/Raman), omits that
+// token entirely rather than padding the name with a placeholder -- see
+// engine/naming.js's optionalFields handling.
 export const NAMING_CONFIG = {
-  template: '{date}_{exptype}_{sample}_{magnification}_{markers}_{notes}{ext}',
+  template:
+    '{date}_{modality}_{exptype}_{markers}_{magnification}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}',
   defaults: {
     date: '1970-01-01',
+    modality: 'UNKNOWN',
     exptype: 'UNKNOWN',
-    sample: 'UNKNOWN',
-    magnification: 'UNKNOWN',
     markers: 'UNKNOWN',
-    notes: 'UNSPECIFIED',
+    magnification: 'UNKNOWN',
+    sample: 'UNKNOWN',
   },
-  uppercaseFields: ['exptype', 'sample', 'magnification', 'markers'],
+  optionalFields: ['group', 'biorep', 'techrep', 'notes'],
+  uppercaseFields: ['modality', 'exptype', 'sample', 'magnification', 'markers', 'group'],
   safeCharPattern: '[^A-Za-z0-9_-]+',
 };
+
+// Stage 1 on its own: NAMING_CONFIG.template up to (not including) the
+// {group} slot, and without {ext}. The Design step renders this ONCE above
+// the condition table -- it is the stem every file in the experiment shares
+// -- so each row only has to show the part that actually distinguishes it.
+// Rendering it through renderName with this template yields no extension
+// (fields.ext won't match the tail), which is what we want for a stem.
+export const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
 
 const DEFAULT_PROFILE = {
   allowedExperimentTypes: [],
@@ -28,12 +50,25 @@ const DEFAULT_PROFILE = {
   unknownMarkerPolicy: 'warn',
 };
 
+// Prefixes formatReplicateToken uses for the two number-typed replicate
+// fields -- kept alongside FIELD_DEFS so currentRawFields() can look one up
+// by key rather than hardcoding a branch per field.
+const REPLICATE_PREFIXES = { biorep: 'B', techrep: 'T' };
+
 const FIELD_DEFS = [
   { key: 'date', label: 'Date', placeholder: 'YYYY-MM-DD' },
+  { key: 'modality', label: 'Modality', placeholder: 'e.g. CONFOCAL' },
   { key: 'exptype', label: 'Experiment type', placeholder: 'e.g. CT' },
-  { key: 'sample', label: 'Sample', placeholder: 'e.g. E02' },
-  { key: 'magnification', label: 'Magnification', placeholder: 'e.g. X90' },
   { key: 'markers', label: 'Markers', placeholder: 'e.g. GFP-DAPI' },
+  { key: 'magnification', label: 'Magnification', placeholder: 'e.g. X90' },
+  {
+    key: 'group',
+    label: 'Group',
+    placeholder: 'e.g. CT, NAM50MM -- set per-row by the Design step, or type one here',
+  },
+  { key: 'sample', label: 'Sample', placeholder: 'e.g. E02' },
+  { key: 'biorep', label: 'Biological replicate #', placeholder: 'optional', type: 'number' },
+  { key: 'techrep', label: 'Technical replicate #', placeholder: 'optional', type: 'number' },
   { key: 'notes', label: 'Notes', placeholder: 'optional' },
 ];
 
@@ -93,7 +128,7 @@ export const namingStep = {
       row.appendChild(labelText);
 
       const input = document.createElement('input');
-      input.type = 'text';
+      input.type = field.type || 'text';
       input.className = 'field-input';
       input.placeholder = field.placeholder;
       input.value = store.getPath(`naming.fields.${field.key}`) || '';
@@ -144,11 +179,20 @@ export const namingStep = {
       // finalizeFields merges {...config.defaults, ...raw}, so an included
       // blank string would OVERRIDE a sensible default (e.g. exptype's
       // 'UNKNOWN') with 'UNSPECIFIED' instead of leaving the default in
-      // place until the field is genuinely filled in.
+      // place until the field is genuinely filled in. For an OPTIONAL field
+      // (group/biorep/techrep/notes) an omitted key is what makes the token
+      // disappear from the name entirely -- see engine/naming.js.
       const raw = {};
       for (const field of FIELD_DEFS) {
         const value = inputs[field.key].value;
-        if (value) raw[field.key] = value;
+        if (!value) continue;
+        const prefix = REPLICATE_PREFIXES[field.key];
+        // biorep/techrep are stored as the raw typed NUMBER (so the number
+        // input can redisplay it), formatted to 'B01'/'T03' only here, at the
+        // boundary right before finalizeFields -- the single formatting
+        // authority is formatReplicateToken, reused by design.js's per-row
+        // rendering so the two paths can never format replicates differently.
+        raw[field.key] = prefix ? formatReplicateToken(prefix, Number(value)) : value;
       }
       return raw;
     }

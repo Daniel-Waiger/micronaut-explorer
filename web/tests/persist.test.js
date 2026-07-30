@@ -10,6 +10,8 @@ import {
   markExported,
   saveExperiment,
   serializeExperiment,
+  clearAll,
+  STORAGE_PREFIX,
 } from '../src/core/persist.js';
 import { emptyExperiment } from '../src/core/schema.js';
 
@@ -24,6 +26,14 @@ function makeFakeStorage() {
     },
     removeItem(key) {
       map.delete(key);
+    },
+    // length/key() complete the real Storage interface -- clearAll enumerates
+    // keys by index rather than reconstructing them from the ring index.
+    get length() {
+      return map.size;
+    },
+    key(index) {
+      return [...map.keys()][index] ?? null;
     },
   };
 }
@@ -124,4 +134,44 @@ test('storage backend is injectable, not hard-wired to globalThis.localStorage',
   const id = saveExperiment(emptyExperiment(), { storage });
   assert.ok(loadExperiment(id, { storage }));
   assert.equal(typeof globalThis.localStorage, 'undefined');
+});
+
+test('clearAll removes every key this app owns', () => {
+  const storage = makeFakeStorage();
+  saveExperiment(emptyExperiment(), { storage });
+  saveExperiment(emptyExperiment(), { storage });
+  markChanged({ storage });
+  assert.ok(storage.length > 0);
+  assert.ok(listSaved({ storage }).length > 0);
+
+  clearAll({ storage });
+
+  assert.equal(storage.length, 0);
+  assert.deepEqual(listSaved({ storage }), []);
+  assert.equal(changesSinceExport({ storage }), 0);
+});
+
+test('clearAll leaves foreign keys in the same storage untouched', () => {
+  const storage = makeFakeStorage();
+  saveExperiment(emptyExperiment(), { storage });
+  storage.setItem('someOtherApp.session', 'keep me');
+
+  clearAll({ storage });
+
+  assert.equal(storage.getItem('someOtherApp.session'), 'keep me');
+  assert.deepEqual(listSaved({ storage }), []);
+});
+
+test('clearAll also removes an orphaned slot missing from the ring index', () => {
+  // The reason clearAll sweeps by prefix instead of walking the ring index: a
+  // slot orphaned by an interrupted write would survive an index-driven clear
+  // and then be resurrected by the next listSaved().
+  const storage = makeFakeStorage();
+  saveExperiment(emptyExperiment(), { storage });
+  storage.setItem(STORAGE_PREFIX + 'slot.orphan', '{"schemaVersion":1}');
+
+  clearAll({ storage });
+
+  assert.equal(storage.getItem(STORAGE_PREFIX + 'slot.orphan'), null);
+  assert.equal(storage.length, 0);
 });

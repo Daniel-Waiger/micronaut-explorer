@@ -72,7 +72,13 @@ function proposeReplicates(text) {
   for (const { re, value } of REPLICATE_PATTERNS) {
     const match = re.exec(text);
     if (match) {
-      return freeTextProposal('design.replicates', value(match), match);
+      // 'n=3' / 'triplicate' / 'X replicates' in a methods paragraph mean
+      // BIOLOGICAL replicates by convention -- schema v2 split the old
+      // single design.replicates into biologicalReplicates/technicalReplicates
+      // (this path is the schema's real field; writing to the old
+      // 'design.replicates' would silently propose into a slot that no
+      // longer exists anywhere the store or the UI reads from).
+      return freeTextProposal('design.biologicalReplicates', value(match), match);
     }
   }
   return null;

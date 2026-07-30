@@ -2,7 +2,7 @@ import { emptyExperiment, migrate } from './core/schema.js';
 import { createStore } from './core/store.js';
 import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
-import { listSaved, loadExperiment, saveExperiment } from './core/persist.js';
+import { clearAll, listSaved, loadExperiment, saveExperiment } from './core/persist.js';
 import { indexKb, loadKb } from './core/kb.js';
 import { namingStep } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
@@ -61,7 +61,16 @@ function init() {
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
-  const { main, showToast } = renderShell(root, store, router);
+  const { main, showToast } = renderShell(root, store, router, {
+    // Clear persisted state BEFORE reloading. Resetting the in-memory store
+    // instead would immediately trip the autosave subscription below and write
+    // the empty experiment back as a NEW ring entry, leaving the old slots in
+    // place for listSaved() to resurrect on the next load.
+    onReset: () => {
+      clearAll();
+      window.location.reload();
+    },
+  });
 
   if (kb.issues.length > 0) {
     showToast(`Knowledge pack loaded with ${kb.issues.length} issue(s) -- some markers may be unavailable.`);

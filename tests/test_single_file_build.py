@@ -362,3 +362,47 @@ def test_script_imports_only_stdlib() -> None:
         # tokens like: ['from', 'pathlib', 'import', 'Path'] or ['import', 'sys']
         module = tokens[1]
         assert module in stdlib_modules, f"non-stdlib import found: {line}"
+
+
+def test_multiline_import_is_flattened(tmp_path: Path) -> None:
+    """A wrapped named-import list must flatten like a single-line one.
+
+    Regression: IMPORT_RE is anchored ^...$ against ONE line, so the
+    Prettier-style wrapped form below never matched, passed through verbatim,
+    and made the assembled classic script die at parse time with
+    "Cannot use import statement outside a module" -- while every other build
+    gate still reported success.
+    """
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": "export const FOO = 1;\nexport const BAZ = 3;\n",
+            "b.js": (
+                "import {\n"
+                "  FOO,\n"
+                "  BAZ,\n"
+                "} from './a.js';\n"
+                "export const BAR = FOO + BAZ;\n"
+            ),
+        },
+    )
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+
+    assert "const BAR = FOO + BAZ;" in output
+    # Dependency order must still be resolved from the folded import.
+    assert output.index("src/a.js") < output.index("src/b.js")
+
+
+def test_surviving_static_import_fails_the_build(tmp_path: Path) -> None:
+    """The output gate must reject any static import that reaches the bundle.
+
+    This is the backstop the multi-line bug slipped past: a bare-specifier
+    import is never rewritten by the flattener (it resolves no local module),
+    so if it is not rejected it ships in a bundle that cannot parse.
+    """
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": "import x from 'left-pad';\nexport const FOO = 1;\n"})
+    with pytest.raises(Exception) as excinfo:
+        build(web_dir, tmp_path / "dist")
+    assert "import" in str(excinfo.value).lower()

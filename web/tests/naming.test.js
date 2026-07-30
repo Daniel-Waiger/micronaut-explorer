@@ -215,3 +215,83 @@ test('renderName does not repair non-reserved stems', () => {
 
   assert.equal(renderName(fields, config), 'CONSOLE.tif');
 });
+
+// --- Optional fields: a token that disappears rather than defaulting -----
+// New capability (planner-web arm-axis + filename restructure): an axis an
+// experiment does not use (e.g. no technical replicates, common for
+// SEM/TEM/Raman) must omit its token entirely, not render a placeholder like
+// every other field does. defaultConfig() above is left untouched -- it is a
+// byte-for-byte pin of the Classic conformance suite -- these tests use their
+// own config with optionalFields added.
+
+function optionalFieldsConfig() {
+  return {
+    ...defaultConfig(),
+    template: '{date}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}',
+    optionalFields: ['group', 'biorep', 'techrep', 'notes'],
+  };
+}
+
+test('an omitted optional field renders as the empty string, not a placeholder default', () => {
+  const config = optionalFieldsConfig();
+  const finalized = finalizeFields('e.tif', { date: '2026-06-15', sample: 'E02' }, config);
+  assert.equal(finalized.biorep, '');
+  assert.equal(finalized.techrep, '');
+  assert.equal(finalized.notes, '');
+});
+
+test('the omitted token disappears from the rendered name entirely, with no orphaned separators', () => {
+  const config = optionalFieldsConfig();
+  const name = buildFilename('e.tif', { date: '2026-06-15', sample: 'E02' }, config);
+  assert.equal(name, '2026-06-15_E02.tif');
+  assert.ok(!name.includes('__'), `expected no doubled separator, got '${name}'`);
+});
+
+test('a SUPPLIED optional field renders normally, sanitized like any other field', () => {
+  const config = optionalFieldsConfig();
+  const name = buildFilename(
+    'e.tif',
+    { date: '2026-06-15', sample: 'E02', biorep: 'B01', notes: 'first pass' },
+    config
+  );
+  // 'notes' is not in this config's uppercaseFields (matching the real app
+  // config), so it is sanitized (space -> '_') but stays lower-case -- only
+  // 'sample' (in uppercaseFields) is forced upper here.
+  assert.equal(name, '2026-06-15_E02_B01_first_pass.tif');
+});
+
+test('a non-optional field is unaffected by optionalFields and keeps defaulting as before', () => {
+  const config = optionalFieldsConfig();
+  const finalized = finalizeFields('e.tif', {}, config);
+  // 'sample' is NOT in optionalFields -- it must still fall back to its
+  // config.defaults entry exactly like every field does today.
+  assert.equal(finalized.sample, 'UNKNOWN');
+});
+
+test('an optional field omitted at the very start of the template leaves no leading separator', () => {
+  const config = {
+    ...defaultConfig(),
+    template: '{group}_{sample}{ext}',
+    optionalFields: ['group'],
+  };
+  const name = buildFilename('e.tif', { sample: 'E02' }, config);
+  assert.equal(name, 'E02.tif');
+  assert.ok(!name.startsWith('_'), `expected no leading separator, got '${name}'`);
+});
+
+// --- Casing consistency between a display column and the embedded token ---
+// Adversarial-review catch: design.js shows a row's group label in its own
+// column via buildGroupLabel/buildSampleId (case-preserving on purpose, per
+// conditions.js's own docs) and ALSO embeds it in the rendered filename via
+// finalizeFields/normalizeFields (which uppercases per uppercaseFields) --
+// two DIFFERENT casing treatments of the same value, side by side in the UI.
+// design.js now routes the displayed label through normalizeFields too, so
+// both columns agree. This pins the underlying engine behaviour that fix
+// relies on, independent of any DOM.
+test('normalizeFields uppercases a single field the same way whether called directly or via finalizeFields', () => {
+  const config = { ...defaultConfig(), uppercaseFields: [...defaultConfig().uppercaseFields, 'group'] };
+  const direct = normalizeFields({ group: 'ct' }, config).group;
+  const finalized = finalizeFields('e.tif', { group: 'ct' }, config).group;
+  assert.equal(direct, 'CT');
+  assert.equal(direct, finalized, 'a display column using normalizeFields directly must match finalizeFields\' own result');
+});

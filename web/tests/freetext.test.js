@@ -56,7 +56,7 @@ test('the same ambiguous words ARE real hits when spelled as an unambiguous alia
 test('replicates: n=3, "n = 3", "3 replicates", and "triplicate" all yield 3', () => {
   for (const text of ['n=3', 'n = 3', '3 replicates', 'we ran this in triplicate']) {
     const result = parseFreeText(text, index);
-    const replicateProposal = result.proposals.find((p) => p.path === 'design.replicates');
+    const replicateProposal = result.proposals.find((p) => p.path === 'design.biologicalReplicates');
     assert.ok(replicateProposal, `expected a replicates proposal for: ${text}`);
     assert.equal(replicateProposal.value, 3, `for: ${text}`);
   }
@@ -64,7 +64,7 @@ test('replicates: n=3, "n = 3", "3 replicates", and "triplicate" all yield 3', (
 
 test('replicates: "duplicate" yields 2', () => {
   const result = parseFreeText('samples were run in duplicate', index);
-  const replicateProposal = result.proposals.find((p) => p.path === 'design.replicates');
+  const replicateProposal = result.proposals.find((p) => p.path === 'design.biologicalReplicates');
   assert.equal(replicateProposal.value, 2);
 });
 

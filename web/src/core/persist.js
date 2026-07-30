@@ -94,6 +94,32 @@ export function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceed
   writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded);
 }
 
+/**
+ * Delete EVERY key this app owns -- all ring slots, the ring index, and the
+ * change counter -- so the next load genuinely starts from emptyExperiment().
+ *
+ * Keys are matched by STORAGE_PREFIX rather than reconstructed from the ring
+ * index, because a slot orphaned by an earlier interrupted write would survive
+ * an index-driven sweep and then be picked up by the next listSaved() -- a
+ * "start over" that silently restores the old experiment is worse than none.
+ * Foreign keys sharing the same storage are left untouched.
+ */
+export function clearAll({ storage = defaultBackend(), onQuotaExceeded } = {}) {
+  if (!storage) return;
+  const doomed = [];
+  for (let i = 0; i < storage.length; i += 1) {
+    const key = storage.key(i);
+    if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX)) {
+      doomed.push(key);
+    }
+  }
+  // Collect first, delete second: removing while iterating by index reindexes
+  // the remaining keys and silently skips every other one.
+  for (const key of doomed) {
+    removeKey(storage, key, onQuotaExceeded);
+  }
+}
+
 export function markChanged({ storage = defaultBackend(), onQuotaExceeded } = {}) {
   const current = readJSON(storage, CHANGES_KEY, 0);
   writeJSON(storage, CHANGES_KEY, current + 1, onQuotaExceeded);

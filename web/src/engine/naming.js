@@ -53,8 +53,18 @@ export function sanitizeToken(value, config) {
 }
 
 export function normalizeFields(fields, config) {
+  const optional = config.optionalFields || [];
   const normalized = {};
   for (const [key, value] of Object.entries(fields)) {
+    // An OPTIONAL field that carries no value renders as the empty string
+    // rather than sanitizeToken's 'UNSPECIFIED' fallback. renderName's
+    // existing `_{2,}` -> `_` collapse then removes the orphaned separator,
+    // so the token disappears from the name entirely instead of padding it
+    // with a placeholder for an axis this experiment simply does not use.
+    if (optional.includes(key) && (value === undefined || value === null || value === '')) {
+      normalized[key] = '';
+      continue;
+    }
     let token = sanitizeToken(String(value), config);
     if (config.uppercaseFields.includes(key)) {
       token = token.toUpperCase();
@@ -104,6 +114,16 @@ export function compoundExt(name) {
  */
 export function finalizeFields(sourceName, extracted, config) {
   const merged = { ...config.defaults, ...extracted };
+  // Optional fields get NO default: config.defaults may still list one (so a
+  // caller can opt a field back into being required by dropping it from
+  // optionalFields), but an optional field the caller did not supply must
+  // stay absent rather than inheriting a placeholder.
+  for (const key of config.optionalFields || []) {
+    const supplied = extracted && extracted[key];
+    if (supplied === undefined || supplied === null || supplied === '') {
+      merged[key] = '';
+    }
+  }
   const ext = compoundExt(sourceName);
 
   const normalized = normalizeFields(merged, config);
@@ -127,6 +147,11 @@ export function renderName(fields, config) {
   // Collapse duplicate separators and strip separator around extension.
   rawName = rawName.replace(/_{2,}/g, '_');
   rawName = rawName.replaceAll('_.', '.');
+  // An omitted OPTIONAL field at the very START of the template leaves a
+  // leading separator, which the collapse above cannot see (there is only one
+  // of it). Harmless today -- {date} leads and is required -- but a filename
+  // must never begin with '_' if the template is ever reordered.
+  rawName = rawName.replace(/^_+/, '');
 
   // Reject/repair Windows reserved device names as the filename STEM --
   // "CON.tif" is unusable on Windows exactly like bare "CON" is. Split off

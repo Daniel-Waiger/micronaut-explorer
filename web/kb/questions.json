@@ -84,20 +84,30 @@
   {
     "id": "modality",
     "prompt": "What imaging modality is this?",
-    "why": "Modality drives modality-specific guidance later -- confocal, widefield and STED have different pitfalls worth flagging.",
+    "why": "Modality drives modality-specific guidance later -- confocal, widefield and STED have different pitfalls worth flagging. Not every modality is optical: SEM/TEM/Raman samples typically have no biological or technical replicates in the usual sense, which is why those are separate, independently-optional questions.",
     "field": "acquisition.modality",
     "type": "choice",
-    "options": ["confocal", "widefield", "STED", "light-sheet", "other"],
+    "options": ["confocal", "widefield", "STED", "light-sheet", "SEM", "TEM", "Raman"],
+    "allowOther": true,
     "priority": 100,
     "tag": "user"
   },
   {
-    "id": "replicates",
+    "id": "biologicalReplicates",
     "prompt": "How many biological replicates?",
     "why": "Determines how many condition rows the design expands into and whether the sample size is worth flagging as low.",
-    "field": "design.replicates",
+    "field": "design.biologicalReplicates",
     "type": "number",
     "priority": 110,
+    "tag": "user"
+  },
+  {
+    "id": "technicalReplicates",
+    "prompt": "How many technical replicates per biological replicate, if any?",
+    "why": "Technical replicates (repeat acquisitions of the same biological sample) get their own token in the filename, separate from biological replicates -- leave this blank if you didn't take any.",
+    "field": "design.technicalReplicates",
+    "type": "number",
+    "priority": 111,
     "tag": "user"
   },
   {

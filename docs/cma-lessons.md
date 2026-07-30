@@ -276,6 +276,55 @@ Format per lesson: **practice — evidence — why it matters.**
     snapshot -- the interaction to test is EDITING SIBLING FIELDS IN SEQUENCE, not each field
     in isolation.
 
+47. **A source-transforming tool that parses line-by-line with anchored regexes treats the
+    code formatter as an adversary -- and its output gate must assert the ABSENCE of the
+    forbidden construct, not merely that the transform ran.** — 2026-07-30: `build_single_file.py`
+    strips imports with `IMPORT_RE`, anchored `^...$` against ONE line. Adding a fourth name to
+    an import list made Prettier wrap it across four lines; the wrapped form matched nothing,
+    passed through verbatim, and the assembled *classic* script died at parse time on
+    `Cannot use import statement outside a module` -- so the app rendered a blank page. Every
+    existing gate still reported success (the build printed a byte count and a sha256), because
+    the gates checked for `type="module"` and dynamic `import(` but never for a surviving STATIC
+    import. Both halves were fixed: fold wrapped imports onto one logical line before matching,
+    AND add an output gate that rejects any line-initial `import`. The gate was then
+    falsification-tested by disabling the folding and confirming the build FAILS. — Generalizes:
+    (a) any regex that parses real source line-by-line is one `prettier --write` away from
+    silently not matching, so fold logical statements before matching; (b) a build gate that
+    verifies "the step ran" is worthless next to one that verifies "the forbidden thing is not
+    in the output"; (c) always falsification-test a new gate by reintroducing the bug -- a gate
+    that has never been seen to fail is an assumption, not a check.
+
+48. **"Verified live" against a dev server can be a lie the server tells you; only the shipped
+    artifact counts.** — 2026-07-30: re-verifying the two-stage naming change, the dev server's
+    ES-module registry served FRESH bytes to `fetch(url, {cache:'no-store'})` while `import`
+    still returned STALE exports -- one module (`naming.js`) had updated and another
+    (`design.js`) had not, so the page showed a half-new, half-old UI that matched neither the
+    old nor the new code. Independently, opening the built file over `file://` in the preview
+    pane rendered a non-executing static snapshot (`#app` empty, zero console errors), which
+    looks exactly like a boot crash. The only trustworthy check was the BUILT single-file
+    artifact served over http -- and that is precisely what exposed lesson 47's parse error.
+    — Generalizes: when a live check disagrees with the source you just wrote, suspect the
+    delivery path before the code; and verify the artifact you actually ship, not a
+    module-server approximation of it. A brand-new DOM class name (here `.base-name-box`) is a
+    cheap freshness oracle -- if it is absent, you are looking at stale code, not a bug.
+
+49. **A single value rendered through two different code paths for two different UI columns
+    will disagree the moment either path changes -- go looking for the second path, don't
+    assume it matches.** — 2026-07-30: the arm-axis fix displayed a condition row's group label
+    two ways: `buildGroupLabel`/`buildSampleId` (conditions.js, deliberately case-preserving,
+    for the row's own "Group" column) and `finalizeFields`/`normalizeFields` (naming.js,
+    uppercases per `uppercaseFields`, for the embedded filename). Both were individually
+    correct and individually tested -- the defect only existed in the GAP between them: typing
+    a lowercase arm ('ct') showed 'ct' in one column and 'CT' three columns over in the same
+    row, with nothing to tell a reader they were the same value. Found only by an adversarial
+    self-review pass specifically hunting for "two paths rendering one fact" rather than by
+    re-running the tests that already passed. Fixed by routing the display column through the
+    SAME casing authority (`normalizeFields`) the filename uses, rather than duplicating the
+    uppercase policy. — Generalizes: when a plan splits one underlying value into "shown in the
+    UI" and "embedded in an artifact," audit whether both renders share a formatting authority;
+    if they don't, they are two independent implementations of the same rule and will drift the
+    first time either one is edited without the other in mind.
+
 ## E. This repo's invariants (microscopy-naming-assistant)
 
 Proven 2026-07-26/27/28 against the real 1.02GB LIF unless noted. When an E lesson proves
