@@ -144,167 +144,121 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "planner-web-v1 — P0 complete",
+  "run": "planner-web P1 — interview engine + deterministic parsing",
   "orchestrator": "Claude Sonnet 5 (direct continuation)",
-  "active_model": "Claude Sonnet 5",
+  "active_model": "Claude Sonnet 5 (direct continuation)",
   "active_status": "idle",
-  "phase": "P0 complete",
-  "state_note": "P0 vertical slice done, Opus-verified, 9 defects found and fixed. Dashboard now generalist: update.py auto-syncs the offline snapshot.",
+  "phase": "Batch 1+2 done",
+  "state_note": "Monthly spend limit hit on both batch-2 subagent dispatches (C1-3 retry, C1-4). Per lesson 42: not retrying dispatch -- implementing both directly in warm context instead, same verification rigor, substitution declared here.",
   "current_task": null,
-  "crit_title": "Live defects — none open on this run",
+  "crit_title": "Open defects",
   "stats": [
     {
-      "k": "Orchestrator",
-      "v": "Sonnet 5",
-      "tone": "sm"
-    },
-    {
       "k": "JS tests",
-      "v": "82 passed",
+      "v": "166 passed",
       "tone": "ok"
     },
     {
-      "k": "Live defects",
-      "v": "0",
-      "tone": "ok"
-    },
-    {
-      "k": "Branch",
-      "v": "feat/safe-renaming…",
-      "tone": "sm"
-    },
-    {
-      "k": "Run status",
-      "v": "P0 verified + fixed",
-      "tone": "ok"
+      "k": "Tasks",
+      "v": "5 / 6"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "C0-1",
+      "id": "C1-1",
       "phase": "Batch 1",
-      "title": "Experiment schema + JSON-path utility",
-      "status": "done",
-      "by": "Sonnet · resumed, wrote schema.test.js, 19 tests pass"
+      "title": "Knowledge pack: generated marker KB + pure loader/validate/index",
+      "status": "verifying",
+      "by": "Sonnet · 76-marker generated KB, staleness gate falsification-tested, 26 tests"
     },
     {
-      "id": "C0-3",
+      "id": "C1-2",
       "phase": "Batch 1",
-      "title": "Port naming.py to engine/naming.js",
-      "status": "done",
-      "by": "Sonnet · wrote naming.test.js verbatim vs tests/test_naming.py, 17 tests pass"
+      "title": "Predicate DSL: total, eval-free rule evaluation against the Experiment",
+      "status": "verifying",
+      "by": "Sonnet · 23 tests, totality proven by execution; found+avoided a depth-cap negation-parity bug"
     },
     {
-      "id": "C0-5",
+      "id": "C1-5",
       "phase": "Batch 1",
-      "title": "Single-file inliner + build gates",
-      "status": "done",
-      "by": "Sonnet · 15/15 pytest gates pass, ruff+black clean, committed baaef04"
+      "title": "Condition matrix: factors x levels x replicates -> condition rows -> sample IDs",
+      "status": "verifying",
+      "by": "Sonnet · 15 tests, row order pinned by deepEqual; 4 published deviations"
     },
     {
-      "id": "C0-2",
+      "id": "C1-4",
       "phase": "Batch 2",
-      "title": "Store + tiered provenance",
-      "status": "done",
-      "by": "Sonnet · store.js+provenance.js, 22 tests pass (refusal path + notify-batching proven)"
+      "title": "Deterministic free-text ingest: paragraph -> provisional field proposals",
+      "status": "resolved",
+      "by": "direct (spend-limit substitution) · freetext.js, 15 JS + 2 Python tests, B2/B3 overlap proven live against real extractor"
     },
     {
-      "id": "C0-4",
+      "id": "C1-3",
       "phase": "Batch 2",
-      "title": "Port validation.py + compileFullMatch + shared regex fixture",
-      "status": "done",
-      "by": "Sonnet · validation.js port + shared regex_conformance.json fixture (landmine cases proven both languages), 12 tests pass"
+      "title": "Interview engine: question bank, next-question selection, answer recording",
+      "status": "resolved",
+      "by": "direct (spend-limit substitution) · interview.js+questions.json, 15 tests, freetext-composition proven"
     },
     {
-      "id": "C0-6",
+      "id": "C1-6",
       "phase": "Batch 3",
-      "title": "App shell, hash router, CSS with print stylesheet",
-      "status": "done",
-      "by": "Sonnet · router.js+shell.js+app.css, verified live in browser (nav render, hash routing, reload, theme toggle)"
-    },
-    {
-      "id": "C0-7",
-      "phase": "Batch 3",
-      "title": "Persistence: autosave ring buffer, loud quota failure, import/export",
-      "status": "done",
-      "by": "Sonnet · persist.js, 82 tests pass (ring eviction, quota-error callback, round-trip, counter)"
-    },
-    {
-      "id": "C0-8",
-      "phase": "Batch 4",
-      "title": "P0 vertical slice: name builder runs from file://",
-      "status": "done",
-      "by": "Sonnet · main.js+naming.js wired; verified via file:// -- live preview, validation, reload-persistence; fixed 1 inliner bug (comment false-positive) + 1 UI bug (blank-field default override) found during verification"
+      "title": "P1 vertical slice: paste a paragraph, answer questions, get sample IDs and filenames",
+      "status": "pending",
+      "by": "queued"
     }
   ],
   "log": [
     {
-      "time": "note",
-      "msg": "Previous run (T1-T11 describer/metadata-picker) fully closed out and LEARN-distilled (commit 3410e33) before this pivot began."
+      "time": "10:44:33",
+      "msg": "P1 started. P0 shipped and pushed. Planning pass underway: authoring docs/plans/planner-web-p1.md + task graph with real scope/verification per task."
     },
     {
-      "time": "note",
-      "msg": "User approved the planner-web pivot (docs/plans/planner-web.md + task graph); web/ scaffolding started, then the 5-hour window ended mid-Batch-1."
+      "time": "10:48:03",
+      "msg": "Task graph authored: 6 tasks in 3 batches. C1-6 (UI wiring) deliberately alone in the last batch per lesson 4. K-1 content prerequisite discharged structurally by C1-1's generated KB."
     },
     {
-      "time": "resume",
-      "msg": "Session resumed 2026-07-29. Found web/src/core/{schema,paths,ids}.js and web/src/engine/naming.js already written but only paths.test.js existed (10 tests)."
+      "time": "10:48:25",
+      "msg": "Dispatched batch 1 in parallel: C1-1 (KB export+loader), C1-2 (predicate DSL), C1-5 (condition matrix). File-disjoint."
     },
     {
-      "time": "resume",
-      "msg": "Wrote web/tests/schema.test.js (9 tests) and web/tests/naming.test.js (17 tests, verbatim-intent port of tests/test_naming.py). Full web/tests suite: 36/36 passing."
+      "time": "10:58:14",
+      "msg": "C1-5 executed: conditions.js + 15 tests. Reconciled design shape against schema.js's existing design slot (good - lesson 33). FLAG for verification: buildSampleId THROWS on an unknown scheme token rather than returning an issue; conditionIssues catches it first, but a direct call from C1-6 could white-screen. Verify the composition order is actually safe."
     },
     {
-      "time": "resume",
-      "msg": "Building C0-5: tools/build_single_file.py (stdlib-only inliner with hard-fail gates), web/index.html (dev shell + build template with BUILD:STYLE/KB/SCRIPT markers), tests/test_single_file_build.py."
+      "time": "10:58:59",
+      "msg": "C1-2 executed: predicate.js + 23 tests. Notable: the executor rejected the spec's literal 'return false at the depth cap' because an enclosing chain of not-wrappers re-negates that false -- an even parity would flip a runaway predicate back to TRUE. Used a throw-and-unwind instead so the cap always forces the whole evaluation false. Verified with 33- and 34-deep chains. Correct reasoning; the literal spec text would have shipped a live bug."
     },
     {
-      "time": "note",
-      "msg": "User codified the CMA model assignment as an installed skill: Fable plans, Sonnet executes, Opus verifies, Haiku for quick/short-context ops (git/GitHub housekeeping etc). Installed at ~/.claude/skills/cma-run and this repo's .claude/skills/cma-run; docs/cma-lessons.md lesson 43 added."
+      "time": "11:09:23",
+      "msg": "Batch 1 complete: C1-1 (76-marker generated KB + loader, 26 tests, falsification step confirmed the staleness gate fails when markers.py is edited without re-export), C1-2 (predicate DSL, 23 tests), C1-5 (condition matrix, 15 tests). 136/136 JS, 328 Python, zero regressions. Dispatching batch 2: C1-4 (free-text ingest) + C1-3 (interview engine), both depend on C1-1/C1-2 which are now satisfied."
     },
     {
-      "time": "23:18:20",
-      "msg": "Batch 1 fully committed (b7bb7ce CMA-skill codification, baaef04 C0-1/C0-3/C0-5). 36/36 JS tests, 309 passed/10 deselected Python, ruff+black clean."
+      "time": "11:09:46",
+      "msg": "Dispatched batch 2 in parallel: C1-4 (free-text ingest) + C1-3 (interview engine). File-disjoint."
     },
     {
-      "time": "23:29:40",
-      "msg": "C0-4 done: validation.js ported, tests/fixtures/regex_conformance.json shared by both languages, landmine (unanchored-pattern) cases proven in both. C0-2 underway: provenance.js (tiered tags, canOverwrite, promoteOnUserEdit) written."
+      "time": "11:12:03",
+      "msg": "C1-3's first dispatch failed: it reported 'completed' but produced NONE of its deliverable files (interview.js/questions.json/interview.test.js). Its final result was a raw nested Agent() tool-call artifact, not a real report -- it appears to have tried spawning its own sub-agent for reconnaissance reading instead of reading the files directly, and that went wrong. Confirmed via direct filesystem check, not trusting the notification. Redispatching with an explicit no-nested-agents instruction."
     },
     {
-      "time": "23:36:15",
-      "msg": "Batch 2 fully committed (5985c23). 68/68 JS tests, 311 Python tests, inliner verified against real cross-module imports (store.js -> paths.js+provenance.js)."
+      "time": "11:12:49",
+      "msg": "C1-3 redispatched (2nd attempt) with an explicit instruction not to spawn nested sub-agents and to read all spec/API files directly."
     },
     {
-      "time": "23:36:15",
-      "msg": "User asked why Orchestrator showed Sonnet: this session ran warm-context-first with Sonnet doing both planning and execution directly, rather than a separate Fable/Opus orchestrator. Handing off remaining P0 tasks (C0-6, C0-7, C0-8) to a real Opus orchestrator agent to match the standing scheme."
+      "time": "15:36:01",
+      "msg": "SPEND LIMIT HIT: both C1-3 (2nd attempt) and C1-4 subagent dispatches failed with 'monthly spend limit'. This also likely explains C1-3's first garbled failure (probably cut off mid-task, not a real reasoning error). Switching to direct warm-context implementation for both remaining batch-2 tasks per lesson 42 -- retrying dispatch would just fail again on a monthly (non-transient) limit."
     },
     {
-      "time": "23:57:00",
-      "msg": "Batch 3+4 committed (c5be14c inliner bugfix, 49d516b C0-6/C0-7/C0-8, b5a6181 master-decision-rule docs). P0 vertical slice done: dist/index.html runs the name builder from file:// with zero console errors."
+      "time": "15:39:44",
+      "msg": "C1-3 done directly (lesson-42 substitution, not subagent-dispatched): interview.js + 12-question bank + 15 tests. Composition proven: a freetext-tagged slot is still asked and carries suggestedDefault; a STRONG-tagged slot is not re-asked; recordAnswer performs zero mutation (proven by JSON snapshot compare); real questions.json loads with zero issues; empty-experiment nextQuestions(limit=8) covers all 5 naming-critical fields."
     },
     {
-      "time": "23:57:00",
-      "msg": "Dispatching Opus adversarial verification over the full session diff (f8441b4..HEAD) before /handover."
-    },
-    {
-      "time": "00:41:23",
-      "msg": "Opus verification found 9 defects across C0-1/C0-5/C0-2/C0-8 (D1-D9). All fixed: prototype pollution in paths.js, comment/regex handling + duplicate-name gate in the inliner, false-provenance lock in store.js, swallowed quota error + per-keystroke ring saturation + unused migrate() in main.js, theme OS-preference + router hash-correction, and the task graph's broken documented gate command. 82/82 JS, 318 Python, re-verified live via file:// (theme, bogus-hash correction, field-clear provenance, quota toast)."
-    },
-    {
-      "time": "00:41:23",
-      "msg": "Lesson 44 distilled: a green self-tested run still needs the mandatory Opus verification pass -- it caught what self-testing structurally cannot."
-    },
-    {
-      "time": "10:36:05",
-      "msg": "Dashboard generalised: update.py now auto-syncs index.html's offline snapshot on every call (no more hand-editing), and --new-run/--from-task-graph seed a fresh board straight from a plan task graph."
-    },
-    {
-      "time": "10:39:51",
-      "msg": "Snapshot now stamped with capture time so an offline view on another PC shows how fresh it is."
+      "time": "15:45:43",
+      "msg": "Batch 2 complete: C1-3 (interview engine + 12-question bank, 15 tests) and C1-4 (free-text ingest, 15 JS + 2 Python conformance tests) both done DIRECTLY after subagent dispatch hit the monthly spend limit twice -- substituted per lesson 42, declared explicitly. 166/166 JS, 330 Python, ruff+black clean, build succeeds at 98KB. Remaining: C1-6 (UI vertical slice) deferred to next session -- deliberately not starting the highest-risk task this late in the budget."
     }
   ],
-  "snapshot_at": "2026-07-30 10:39"
+  "snapshot_at": "2026-07-30 15:45"
 };
 /* CMA:EMBEDDED:END */
 

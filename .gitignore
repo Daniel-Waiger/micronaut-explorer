@@ -17,3 +17,8 @@ dist/
 
 # CMA dashboard live run state (per-machine; status.seed.json is the tracked snapshot)
 tools/cma-dashboard/status.json
+
+# Generated dev-mode knowledge-pack aggregate (tools/export_markers_kb.py);
+# the built dist/index.html embeds the KB directly, so this is only needed
+# for opening web/index.html unbuilt.
+web/kb.dev.js
