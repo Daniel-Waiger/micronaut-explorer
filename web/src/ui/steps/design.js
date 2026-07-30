@@ -9,9 +9,9 @@ function parseLevels(text) {
     .filter((s) => s.length > 0);
 }
 
-function filenameForRow(row, design, store) {
+function filenameForRow(row, design, store, sampleId) {
   const namingFields = store.getPath('naming.fields') || {};
-  const raw = { ...namingFields, sample: buildSampleId(row, design.idScheme || '') };
+  const raw = { ...namingFields, sample: sampleId };
   const finalized = finalizeFields('experiment.tif', raw, NAMING_CONFIG);
   return renderName(finalized, NAMING_CONFIG);
 }
@@ -153,7 +153,14 @@ export const designStep = {
         removeBtn.className = 'remove-factor-button';
         removeBtn.textContent = 'Remove';
         removeBtn.addEventListener('click', () => {
-          writeFactorsStructure(factors.filter((_, i) => i !== index));
+          // Same reason as the name/levels handlers above: read the CURRENT
+          // store state, not the `factors` snapshot from this renderFactors()
+          // call. Any name/levels edit made on ANOTHER row since this row was
+          // drawn used writeFactorsData (no rebuild), so this closure's
+          // `factors` array is stale and filtering it would silently discard
+          // those edits when written back.
+          const latest = currentDesign().factors || [];
+          writeFactorsStructure(latest.filter((_, i) => i !== index));
         });
         row.appendChild(removeBtn);
 
@@ -197,20 +204,31 @@ export const designStep = {
         summary.textContent = parts.join(', ');
         rowEl.appendChild(summary);
 
+        const sampleIdEl = document.createElement('code');
+        sampleIdEl.className = 'condition-sample-id';
         const filenameEl = document.createElement('code');
         filenameEl.className = 'condition-filename';
         if (hasIdSchemeIssue) {
+          sampleIdEl.textContent = '';
           filenameEl.textContent = '(fix the id scheme above)';
         } else {
           try {
-            filenameEl.textContent = filenameForRow(row, design, store);
+            // buildSampleId is called ONCE per row and its result reused for
+            // both the sample-id column and the filename, rather than
+            // calling it twice (which would double the defense-in-depth
+            // try/catch and risk the two columns disagreeing on failure).
+            const sampleId = buildSampleId(row, design.idScheme || '');
+            sampleIdEl.textContent = sampleId;
+            filenameEl.textContent = filenameForRow(row, design, store, sampleId);
           } catch (err) {
             // Defense-in-depth: conditionIssues should already have caught an
             // unknown id-scheme token, but buildSampleId's throw must never
             // reach the user as a white screen regardless.
+            sampleIdEl.textContent = '';
             filenameEl.textContent = `(${err.message})`;
           }
         }
+        rowEl.appendChild(sampleIdEl);
         rowEl.appendChild(filenameEl);
 
         conditionsTable.appendChild(rowEl);

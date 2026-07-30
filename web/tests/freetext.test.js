@@ -83,6 +83,33 @@ test('magnification: a keyword-anchored value is also recognized', () => {
   assert.equal(magProposal.value, 'X40');
 });
 
+test('magnification: a "NUMBER x NUMBER" dimension pair is NOT proposed as a magnification (D1)', () => {
+  // metadata.py's own comment on _extract_magnification explicitly warns:
+  // "dimension strings like '512 x 512' would be misread as a
+  // magnification" -- that is exactly why its bare-x form is gated off
+  // general prose (allow_bare_x=False by default). This module's trailing-x
+  // form is a deliberate extension beyond that default (needed for '63x' in
+  // free-flowing prose), so it must reject the dimension-pair shape itself.
+  for (const text of [
+    'the field of view was 512 x 512 pixels',
+    'we ran 100 x 100 tiles',
+    'imaged at 1024 x 768 resolution',
+  ]) {
+    const result = parseFreeText(text, index);
+    const magProposal = result.proposals.find((p) => p.path === 'naming.fields.magnification');
+    assert.equal(magProposal, undefined, `expected no magnification proposal for: ${text}`);
+  }
+});
+
+test('magnification: a genuine trailing-x mention still works even near other numbers', () => {
+  // The dimension-pair guard must not overreach: '63x' followed by
+  // something that is NOT a second number (a comma, a word) is still a
+  // legitimate magnification mention.
+  const result = parseFreeText('Confocal of mouse cortex at 63x, n=3 replicates.', index);
+  const magProposal = result.proposals.find((p) => p.path === 'naming.fields.magnification');
+  assert.equal(magProposal.value, 'X63');
+});
+
 test('date: an ISO date is proposed', () => {
   const result = parseFreeText('Acquired on 2026-07-30 in the morning.', index);
   const dateProposal = result.proposals.find((p) => p.path === 'naming.fields.date');

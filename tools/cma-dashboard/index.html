@@ -145,67 +145,125 @@
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
   "run": "planner-web P1 — interview engine + deterministic parsing",
-  "orchestrator": "Claude Sonnet 5 (direct continuation)",
-  "active_model": "Claude Sonnet 5 (direct continuation)",
-  "active_status": "idle",
-  "phase": "P1 Batch 3 done",
-  "state_note": "P1 (all 6 tasks) committed. Full demo verified live: paragraph -> 3 proposals (X63/DAPI-ALEXA488/n=3) -> accept -> flows into Naming step filename; Design step 2x3 factor expansion -> 6 sample IDs + filenames; reload-persistence confirmed on both steps. One real bug found+fixed during live testing: editing name then levels on the same factor row clobbered the first edit (stale-closure bug in design.js) -- caught only by actually driving the UI, not by unit tests (none exist for UI wiring).",
-  "current_task": null,
+  "orchestrator": "Claude Opus",
+  "active_model": "Claude Opus",
+  "active_status": "running",
+  "phase": "Fixing Opus-found defects",
+  "state_note": "Second Opus adversarial pass over full P1 diff found 8 defects (D1-D8) + 2 minor UX gaps. All fixed in working tree, unit tests green (174/174 JS, 330/10 Python, ruff+black clean) -- NOT YET COMMITTED. Live re-verification of D2 (remove-factor button) hit an unexplained anomaly (mid-diagnosis when session paused for handover).",
+  "current_task": {
+    "id": "C1-6",
+    "title": "Live-verify D2 fix (anomaly under diagnosis)"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "166 passed",
+      "v": "174 passed",
       "tone": "ok"
     },
     {
       "k": "Tasks",
       "v": "6 / 6"
+    },
+    {
+      "k": "Py tests",
+      "v": "330 passed, 10 deselected",
+      "tone": "ok"
     }
   ],
-  "defects": [],
+  "defects": [
+    {
+      "id": "D1",
+      "location": "web/src/engine/freetext.js",
+      "title": "Magnification false-positive on dimension pairs (512 x 512)",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D2",
+      "location": "web/src/ui/steps/design.js",
+      "title": "Remove-factor button: 3rd instance of lesson-46 stale-closure bug, missed in the commit that fixed the other two sibling controls",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D3",
+      "location": "web/src/engine/conditions.js",
+      "title": "Undefined/null factor level not flagged as invalid",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D4",
+      "location": "web/src/engine/conditions.js",
+      "title": "buildSampleId: scheme token matching Object.prototype member (toString etc.) leaks the function instead of throwing",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D5",
+      "location": "web/src/engine/conditions.js",
+      "title": "Factor named 'replicate' collides with the reserved replicate token, silently duplicating sample IDs",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D6",
+      "location": "web/src/core/provenance.js",
+      "title": "Hand-editing a naming field never retagged user_edited, so WEAK/PROVISIONAL flags could never clear",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D7",
+      "location": "web/src/ui/steps/describe.js",
+      "title": "Accept button gave no feedback when setPath refused a write over a stronger existing value",
+      "body": "",
+      "repro": ""
+    }
+  ],
   "tasks": [
     {
       "id": "C1-1",
       "phase": "Batch 1",
       "title": "Knowledge pack: generated marker KB + pure loader/validate/index",
-      "status": "verifying",
-      "by": "Sonnet · 76-marker generated KB, staleness gate falsification-tested, 26 tests"
+      "status": "done",
+      "by": "Opus re-verified PASS, all 76 markers spot-checked"
     },
     {
       "id": "C1-2",
       "phase": "Batch 1",
       "title": "Predicate DSL: total, eval-free rule evaluation against the Experiment",
-      "status": "verifying",
-      "by": "Sonnet · 23 tests, totality proven by execution; found+avoided a depth-cap negation-parity bug"
+      "status": "done",
+      "by": "Opus re-verified, no new defects"
     },
     {
       "id": "C1-5",
       "phase": "Batch 1",
       "title": "Condition matrix: factors x levels x replicates -> condition rows -> sample IDs",
-      "status": "verifying",
-      "by": "Sonnet · 15 tests, row order pinned by deepEqual; 4 published deviations"
+      "status": "done",
+      "by": "Sonnet · D3 (reserved-name collision), D4 (prototype-chain token injection), D5 (invalid-level) fixed+tested"
     },
     {
       "id": "C1-4",
       "phase": "Batch 2",
       "title": "Deterministic free-text ingest: paragraph -> provisional field proposals",
-      "status": "resolved",
-      "by": "direct (spend-limit substitution) · freetext.js, 15 JS + 2 Python tests, B2/B3 overlap proven live against real extractor"
+      "status": "done",
+      "by": "Sonnet · D1 (magnification/dimension-pair false positive) fixed+tested, needed 2 iterations"
     },
     {
       "id": "C1-3",
       "phase": "Batch 2",
       "title": "Interview engine: question bank, next-question selection, answer recording",
-      "status": "resolved",
-      "by": "direct (spend-limit substitution) · interview.js+questions.json, 15 tests, freetext-composition proven"
+      "status": "done",
+      "by": "Opus re-verified, no new defects"
     },
     {
       "id": "C1-6",
       "phase": "Batch 3",
       "title": "P1 vertical slice: paste a paragraph, answer questions, get sample IDs and filenames",
-      "status": "resolved",
-      "by": "direct · describe.js+design.js wired, verified live over file:// (proposals, interview, 6-row design expansion, reload-persistence)"
+      "status": "verifying",
+      "by": "Sonnet · D2 (remove-factor stale closure), D6 (retag on edit), D7 (refused-write toast) fixed+unit-tested; D2 LIVE re-verify anomaly unresolved"
     }
   ],
   "log": [
@@ -268,9 +326,17 @@ const EMBEDDED = {
     {
       "time": "16:14:46",
       "msg": "C1-6 done: describe.js (paste-a-paragraph, reviewable Accept/Dismiss proposals, interview panel with why+skip) + design.js (factors/levels/replicates, live condition table) wired into main.js's router alongside naming.js. Live file:// verification caught and fixed a real UI bug (stale closure clobbering a factor's other field on edit). All P1 (C1-1 through C1-6) now committed. 166 JS / 330 Python tests, zero regressions."
+    },
+    {
+      "time": "16:20:52",
+      "msg": "Dispatching Opus verification over P1 (dbe8718, 8bf53b7 + lesson commits)."
+    },
+    {
+      "time": "16:55:11",
+      "msg": "Second Opus adversarial pass over full P1 diff (C1-1..C1-6): 8 defects (D1-D8) + 2 minor UX gaps found. All fixed, unit-tested green. D2's live re-verification hit an anomaly (extra blank factor row after Remove) -- paused for /handover mid-diagnosis, not yet committed."
     }
   ],
-  "snapshot_at": "2026-07-30 16:14"
+  "snapshot_at": "2026-07-30 16:55"
 };
 /* CMA:EMBEDDED:END */
 

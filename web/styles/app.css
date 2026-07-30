@@ -470,6 +470,12 @@ button:focus-visible {
   font-size: 13.5px;
 }
 
+.condition-sample-id {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .condition-filename {
   font-family: var(--mono);
   color: var(--accent);

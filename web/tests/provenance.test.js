@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   TAG_TIERS,
   canOverwrite,
+  editTagFor,
   isProvisional,
   promoteOnUserEdit,
   tagSlot,
@@ -106,4 +107,21 @@ test('promoteOnUserEdit on a slot with no prior entry still creates one', () => 
   const slot = experiment.provenance.slots['naming.fields.notes'];
   assert.equal(slot.tag, 'user_edited');
   assert.equal(slot.needsReview, false);
+});
+
+test('editTagFor: a first-ever entry (no existing tag) writes plain "user"', () => {
+  assert.equal(editTagFor(null), 'user');
+  assert.equal(editTagFor(undefined), 'user');
+});
+
+test('editTagFor: correcting a WEAK or PROVISIONAL value writes "user_edited"', () => {
+  for (const weak of ['freetext', 'kb-default', 'derived', 'default', 'llm', 'llm_freetext']) {
+    assert.equal(editTagFor(weak), 'user_edited', `for existing tag: ${weak}`);
+  }
+});
+
+test('editTagFor: a slot already STRONG stays plain "user" (no need to re-promote)', () => {
+  for (const strong of ['user', 'user_edited', 'imported']) {
+    assert.equal(editTagFor(strong), 'user', `for existing tag: ${strong}`);
+  }
 });

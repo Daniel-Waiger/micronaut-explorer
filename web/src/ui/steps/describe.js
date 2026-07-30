@@ -92,7 +92,14 @@ export function createDescribeStep(kb) {
           text.appendChild(valueSpan);
           const evidenceSpan = document.createElement('span');
           evidenceSpan.className = 'proposal-evidence';
-          evidenceSpan.textContent = ` -- from "${proposal.evidence}"`;
+          // A markers proposal can carry several distinct hits (e.g.
+          // ATTO647N + ATTO647) folded into one joined `value` -- show
+          // every match's evidence, not just the first, so the user can see
+          // what actually justified each part of the proposed value.
+          const evidenceText = Array.isArray(proposal.matches)
+            ? proposal.matches.map((m) => `"${m.evidence}"`).join(', ')
+            : `"${proposal.evidence}"`;
+          evidenceSpan.textContent = ` -- from ${evidenceText}`;
           text.appendChild(evidenceSpan);
           row.appendChild(text);
 
@@ -104,10 +111,18 @@ export function createDescribeStep(kb) {
           acceptBtn.className = 'proposal-accept';
           acceptBtn.textContent = 'Accept';
           acceptBtn.addEventListener('click', () => {
-            store.setPath(proposal.path, proposal.value, proposal.tag);
+            const applied = store.setPath(proposal.path, proposal.value, proposal.tag);
             pendingProposals = pendingProposals.filter((p) => p !== proposal);
             renderProposals();
             renderInterview();
+            // setPath's return value is the ONLY signal that a write was
+            // refused (a stronger value already occupies that slot) -- a
+            // refused Accept must not look identical to a successful one.
+            if (!applied && showToast) {
+              showToast(
+                `Couldn't apply "${displayValue(proposal.value)}" -- a stronger value is already set there.`
+              );
+            }
           });
           actions.appendChild(acceptBtn);
 

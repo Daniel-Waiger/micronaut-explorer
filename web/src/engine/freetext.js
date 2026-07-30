@@ -24,11 +24,31 @@ const REPLICATE_PATTERNS = [
 // metadata.py's _extract_magnification allow_bare_x form). Trying all three
 // is what makes '63x'/'63X'/'x63' normalize identically, per this task's
 // spec.
-const MAGNIFICATION_PATTERNS = [
-  /(?:MAGNIFICATION|OBJECTIVE|ZOOM)[^0-9]{0,10}(\d{1,3}(?:\.\d+)?)/i,
-  /\b(\d{1,3}(?:\.\d+)?)\s?[xX]\b/,
-  /\b[xX]\s?(\d{1,3}(?:\.\d+)?)\b/,
-];
+const MAGNIFICATION_KEYWORD_RE = /(?:MAGNIFICATION|OBJECTIVE|ZOOM)[^0-9]{0,10}(\d{1,3}(?:\.\d+)?)/i;
+const MAGNIFICATION_TRAILING_X_RE = /\b(\d{1,3}(?:\.\d+)?)\s?[xX]\b/;
+const MAGNIFICATION_LEADING_X_RE = /\b[xX]\s?(\d{1,3}(?:\.\d+)?)\b/;
+
+// The trailing-x form ("63x") is a deliberate EXTENSION beyond metadata.py's
+// own prose path, which never enables the bare-x forms outside a filename
+// stem (allow_bare_x=False by default) -- its own comment explains why:
+// "dimension strings like '512 x 512' would be misread as a magnification".
+// Allowing '63x' in free-flowing prose (this task's own spec) reopens
+// exactly that hole, so a trailing-x match immediately followed by ANOTHER
+// number ("512 x 512", "100x100") is rejected as a dimension pair rather
+// than a magnification. A genuine magnification mention is never
+// immediately followed by a second number.
+function isDimensionPair(text, matchEndIndex) {
+  return /^\s*\d/.test(text.slice(matchEndIndex));
+}
+
+// Mirror check for the leading-x form: in "512 x 512", rejecting the
+// trailing-x half ("512 x") as a dimension pair still leaves the SECOND
+// half ("x 512") matchable by the leading-x pattern on its own -- so that
+// match must equally be rejected when it is immediately preceded by another
+// number.
+function isPrecededByNumber(text, matchStartIndex) {
+  return /\d\s*$/.test(text.slice(0, matchStartIndex));
+}
 
 // ISO form only (YYYY-MM-DD). Deliberately does NOT attempt ambiguous
 // formats like '03/04/2026', whose meaning (day-first vs month-first)
@@ -59,15 +79,30 @@ function proposeReplicates(text) {
 }
 
 function proposeMagnification(text) {
-  for (const re of MAGNIFICATION_PATTERNS) {
-    const match = re.exec(text);
-    if (match) {
-      const number = Number.parseFloat(match[1]);
-      if (Number.isFinite(number) && number > 0) {
-        return freeTextProposal('naming.fields.magnification', `X${Math.trunc(number)}`, match);
-      }
+  const keywordMatch = MAGNIFICATION_KEYWORD_RE.exec(text);
+  if (keywordMatch) {
+    const number = Number.parseFloat(keywordMatch[1]);
+    if (Number.isFinite(number) && number > 0) {
+      return freeTextProposal('naming.fields.magnification', `X${Math.trunc(number)}`, keywordMatch);
     }
   }
+
+  const trailingMatch = MAGNIFICATION_TRAILING_X_RE.exec(text);
+  if (trailingMatch && !isDimensionPair(text, trailingMatch.index + trailingMatch[0].length)) {
+    const number = Number.parseFloat(trailingMatch[1]);
+    if (Number.isFinite(number) && number > 0) {
+      return freeTextProposal('naming.fields.magnification', `X${Math.trunc(number)}`, trailingMatch);
+    }
+  }
+
+  const leadingMatch = MAGNIFICATION_LEADING_X_RE.exec(text);
+  if (leadingMatch && !isPrecededByNumber(text, leadingMatch.index)) {
+    const number = Number.parseFloat(leadingMatch[1]);
+    if (Number.isFinite(number) && number > 0) {
+      return freeTextProposal('naming.fields.magnification', `X${Math.trunc(number)}`, leadingMatch);
+    }
+  }
+
   return null;
 }
 

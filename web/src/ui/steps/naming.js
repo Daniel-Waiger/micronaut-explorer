@@ -1,5 +1,6 @@
 import { finalizeFields, renderName } from '../../engine/naming.js';
 import { validateFields, validateTargetPath } from '../../engine/validation.js';
+import { editTagFor } from '../../core/provenance.js';
 
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
@@ -97,7 +98,13 @@ export const namingStep = {
       input.placeholder = field.placeholder;
       input.value = store.getPath(`naming.fields.${field.key}`) || '';
       input.addEventListener('input', () => {
-        store.setPath(`naming.fields.${field.key}`, input.value, 'user');
+        const path = `naming.fields.${field.key}`;
+        // 'user_edited' when correcting an existing WEAK/PROVISIONAL value
+        // (e.g. one filled in from an accepted free-text proposal), plain
+        // 'user' for a first-ever entry or one already STRONG -- see
+        // core/provenance.js editTagFor.
+        const existingTag = store.get().provenance?.slots?.[path]?.tag ?? null;
+        store.setPath(path, input.value, editTagFor(existingTag));
         update();
       });
       inputs[field.key] = input;

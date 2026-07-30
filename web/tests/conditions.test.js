@@ -208,6 +208,56 @@ test('buildSampleId renders a multi-token scheme and sanitizes the whole result'
   assert.equal(buildSampleId(row, scheme), expected);
 });
 
+test('a factor named "replicate" is flagged (D5): it collides with the built-in replicate token', () => {
+  const design = {
+    factors: [{ name: 'replicate', levels: ['A', 'B'] }],
+    replicates: 1,
+    idScheme: '{replicate}',
+  };
+
+  const issues = conditionIssues(design);
+  assert.ok(
+    issues.some((i) => i.field === 'factors' && /reserved/i.test(i.message)),
+    `expected a reserved-name issue, got ${JSON.stringify(issues)}`
+  );
+
+  // Prove the collision is real, not just theoretical: two distinct
+  // conditions render the IDENTICAL sample id because the factor's own
+  // level is shadowed by the row's actual replicate number.
+  const rows = expandConditions(design);
+  const ids = rows.map((row) => buildSampleId(row, design.idScheme));
+  assert.equal(new Set(ids).size, 1, `expected a collision, got distinct ids ${JSON.stringify(ids)}`);
+});
+
+test('a factor with an undefined/null level is flagged (D3), not just an empty-levels-array', () => {
+  const design = {
+    factors: [{ name: 'genotype', levels: [undefined, 'KO'] }],
+    replicates: 1,
+    idScheme: '{genotype}',
+  };
+  const issues = conditionIssues(design);
+  assert.ok(
+    issues.some(
+      (i) => i.field === 'factors' && i.message.includes('genotype') && i.message.includes('invalid level')
+    ),
+    `expected an invalid-level issue, got ${JSON.stringify(issues)}`
+  );
+});
+
+test('buildSampleId rejects a scheme token matching an inherited Object.prototype member (D4)', () => {
+  const row = { factorLevels: { genotype: 'WT' }, replicate: 1 };
+  // 'toString'/'constructor'/'valueOf' are not own properties of the fields
+  // object buildSampleId builds, but `token in fields` would find them on
+  // the prototype chain anyway -- hasOwnProperty must be what gates this.
+  for (const badToken of ['toString', 'constructor', 'valueOf', 'hasOwnProperty']) {
+    assert.throws(
+      () => buildSampleId(row, `{${badToken}}`),
+      /Unknown token/,
+      `expected {${badToken}} to be rejected as unknown, not resolved via the prototype chain`
+    );
+  }
+});
+
 test('conditionIssues returns no issues for a well-formed design', () => {
   const design = {
     factors: [

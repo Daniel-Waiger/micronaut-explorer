@@ -137,13 +137,44 @@ export function conditionIssues(design) {
     } else {
       seenNames.add(name);
     }
+    // 'replicate' is the built-in key buildSampleId merges into a row's
+    // token map for the replicate NUMBER -- a factor of the same name would
+    // silently shadow it (or be shadowed by it), producing two distinct
+    // conditions with the identical rendered token and therefore identical
+    // sample IDs/filenames, with no other signal that anything went wrong.
+    if (name === 'replicate') {
+      issues.push(
+        makeConditionIssue('factors', "Factor cannot be named 'replicate' -- that name is reserved for the replicate number.")
+      );
+    }
   }
 
   for (const factor of factors) {
-    if (levelsOf(factor).length === 0) {
-      const name = factor && factor.name;
+    const name = factor && factor.name;
+    const levels = levelsOf(factor);
+    if (levels.length === 0) {
       issues.push(makeConditionIssue('factors', `Factor '${name}' has zero levels.`));
+      continue;
     }
+    // A level that isn't a genuine non-empty value can't be substituted into
+    // an id-scheme token: buildSampleId would throw "Unknown token" for it
+    // (see its `fields[token] === undefined` check), which is a misleading
+    // message for "the token IS known, its value just isn't usable" -- and
+    // conditionIssues is supposed to be the thing that catches this BEFORE
+    // buildSampleId ever runs, not just for genuinely unknown tokens.
+    levels.forEach((level, index) => {
+      const isUsable =
+        (typeof level === 'string' && level.length > 0) ||
+        (typeof level === 'number' && Number.isFinite(level));
+      if (!isUsable) {
+        issues.push(
+          makeConditionIssue(
+            'factors',
+            `Factor '${name}' has an invalid level at position ${index} (must be a non-empty value).`
+          )
+        );
+      }
+    });
   }
 
   const rawReplicates = design && design.replicates;
@@ -197,7 +228,13 @@ export function conditionIssues(design) {
 export function buildSampleId(row, scheme) {
   const fields = { ...(row && row.factorLevels), replicate: row && row.replicate };
   const rendered = String(scheme).replace(TEMPLATE_TOKEN_RE, (match, token) => {
-    if (!(token in fields) || fields[token] === undefined) {
+    // hasOwnProperty, not `token in fields`: the `in` operator also matches
+    // inherited Object.prototype members ('toString', 'constructor',
+    // 'valueOf', ...), so a scheme like '{toString}' would silently render
+    // that function's own source instead of being rejected as an unknown
+    // token -- the same prototype-chain class of bug as paths.js's
+    // __proto__ hole, recurring one module over.
+    if (!Object.prototype.hasOwnProperty.call(fields, token) || fields[token] === undefined) {
       throw new Error(`Unknown token '{${token}}' in id scheme '${scheme}'.`);
     }
     return String(fields[token]);

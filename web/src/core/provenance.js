@@ -29,6 +29,21 @@ export function isProvisional(tag) {
 }
 
 /**
+ * The tag a UI hand-edit through a text field should write: 'user_edited'
+ * when the slot already held a WEAK/PROVISIONAL value (the user is
+ * correcting a machine-sourced guess -- a free-text proposal, a KB default,
+ * an LLM suggestion), 'user' for a first-ever entry or a slot already
+ * STRONG. Both tiers are equally STRONG for canOverwrite's purposes; this
+ * is purely the historical distinction the provenance record keeps, and is
+ * what C1-6's own verification text (and repo lesson E8) require: a value
+ * the user corrected must be distinguishable from one they typed fresh.
+ */
+export function editTagFor(existingTag) {
+  if (existingTag == null) return 'user';
+  return tierOf(existingTag) === 'STRONG' ? 'user' : 'user_edited';
+}
+
+/**
  * True if a value tagged `newTag` may overwrite a slot currently tagged
  * `existingTag`. A STRONG-tagged slot can never be overwritten by anything
  * that isn't itself STRONG -- e.g. a `freetext` (WEAK) write must never
