@@ -101,12 +101,34 @@ conforming filename with no file metadata required.
 ### Open-weights model support (near-term candidate)
 Add support for local and open-weights models such as Qwen 3.5 and Gemma 30, allowing users to run the metadata enhancer and experiment describer without relying on closed-source APIs or sending data externally.
 
-### Web app re-platform (under discussion)
+### Web app re-platform — APPROVED and IN PROGRESS (2026-07-29)
+Superseded the file-picker/local-bioio idea below: a bigger pivot is underway,
+codenamed **planner-web**. Rather than extracting naming fields out of microscopy
+files after acquisition, the web app is a static, zero-install **experiment
+planner** that walks design intent → panel/controls/acquisition → naming as a
+downstream artifact of a finished design, deleting metadata extraction from the
+web product entirely (that pipeline stays fragile and was the only reason the app
+needed bioio/JVM/dask/Streamlit at all). Vanilla ES modules, flattened at build to
+one self-contained HTML file (`tools/build_single_file.py`) that runs from `file://`
+or GitHub Pages with identical bytes; zero npm dependencies (`node --test`);
+renaming itself stays out of the web app (Micronaut Classic, `src/`, keeps that job
+and is frozen going forward except bug fixes). See
+[docs/plans/planner-web.md](docs/plans/planner-web.md) for the full plan and
+[docs/plans/planner-web-task-graph.json](docs/plans/planner-web-task-graph.json)
+for the authoritative per-task spec. P0 (schema, naming/validation ports, the
+inliner, store+provenance, app shell, persistence, and a working name-builder
+vertical slice) is done as of this writing. Next: P1 (interview engine +
+deterministic free-text parsing).
+
+<details>
+<summary>Original idea (superseded, kept for history)</summary>
+
 Deliver naming as a static website: naming rules/masks, the planner, and OME-TIFF
 metadata read client-side in the browser (no upload, no install); vendor formats
 (CZI/LIF/ND2) read locally via bioio through a run-without-install command
 (`uvx mna …`), with the UI explaining why a local step is needed. Open decisions:
 web language (TypeScript-native vs Pyodide), and whether to allow any upload fallback.
+</details>
 
 ### Microscopy experimental-design assistant (vision)
 Grow beyond naming into a broader experimental-design suite that advises on the
