@@ -25,6 +25,7 @@ function validRule(overrides = {}) {
     id: 'sted-photobleaching',
     surfaces: ['design', 'naming'],
     kind: 'pitfall',
+    concept: 'photobleaching',
     title: 'STED bleaches far faster than confocal',
     body: 'The depletion beam deposits far more energy per pixel than excitation alone, so photostability outweighs brightness when picking a dye.',
     when: { matches: ['acquisition.modality', '[Ss][Tt][Ee][Dd]'] },
@@ -145,6 +146,25 @@ for (const kind of ADVICE_KINDS) {
   });
 }
 
+test('missing or blank concept is dropped and reported', () => {
+  // The concept is the note's REASON ('spectral spillover'), as distinct
+  // from its trigger condition ('modality is confocal'). It is required
+  // precisely because it cannot be derived from `when` -- a rule without one
+  // can only explain when it applies, never why it exists.
+  const noConcept = validRule();
+  delete noConcept.concept;
+  for (const rule of [noConcept, validRule({ concept: '' }), validRule({ concept: '   ' })]) {
+    const { rules, issues } = loadAdvisorRules({ rules: [rule] });
+    assert.equal(rules.length, 0);
+    assert.match(issues[0].message, /non-empty concept/);
+  }
+});
+
+test('a concept is trimmed, like every other authored string field', () => {
+  const { rules } = loadAdvisorRules({ rules: [validRule({ concept: '  spectral spillover  ' })] });
+  assert.equal(rules[0].concept, 'spectral spillover');
+});
+
 test('missing or blank title is dropped and reported', () => {
   for (const title of [undefined, '', '   ']) {
     const { rules, issues } = loadAdvisorRules({ rules: [validRule({ title })] });
@@ -208,7 +228,7 @@ test('the normalized rule shape is EXACTLY the whitelist, regardless of what ext
   });
   assert.deepEqual(
     Object.keys(rules[0]).sort(),
-    ['body', 'id', 'kind', 'priority', 'surfaces', 'title', 'when'].sort()
+    ['body', 'concept', 'id', 'kind', 'priority', 'surfaces', 'title', 'when'].sort()
   );
 });
 
@@ -560,6 +580,39 @@ test('every modality-gated rule targets at least one EXACT spelling from the rea
     });
     assert.ok(matchesAnOption, `rule '${rule.id}' is modality-gated but matches none of ${JSON.stringify(modalityOptions)}`);
   }
+});
+
+test('every committed rule names a concept, and never just restates its trigger', () => {
+  // The user-facing point of `concept`: a note must say WHY it exists
+  // (spectral spillover) and not merely echo WHEN it applies (modality is
+  // confocal). A concept that is just the modality name would be the exact
+  // conflation this field was added to fix.
+  const modalityOptions = (realQuestionsRaw.find((q) => q.id === 'modality')?.options || []).map((o) =>
+    o.toLowerCase()
+  );
+  const { rules } = loadAdvisorRules(realAdvisorRaw);
+  for (const rule of rules) {
+    assert.ok(rule.concept && rule.concept.length > 2, `rule '${rule.id}' has no usable concept`);
+    assert.ok(
+      !modalityOptions.includes(rule.concept.toLowerCase()),
+      `rule '${rule.id}' uses the modality '${rule.concept}' as its concept -- that is its trigger, not its reason`
+    );
+  }
+});
+
+test('committed concepts are reused across rules where the phenomenon genuinely is the same', () => {
+  // Not a style rule -- a correctness signal. Two rules about undersampling
+  // (STED and confocal) SHOULD share the concept string, because a reader
+  // scanning for "have I thought about sampling?" is looking for one idea,
+  // not two spellings of it. This asserts the vocabulary stays a small
+  // controlled set rather than 16 bespoke phrases.
+  const { rules } = loadAdvisorRules(realAdvisorRaw);
+  const concepts = rules.map((r) => r.concept);
+  const distinct = new Set(concepts);
+  assert.ok(
+    distinct.size < concepts.length,
+    `expected at least one concept shared between rules, got ${distinct.size} distinct across ${concepts.length} rules`
+  );
 });
 
 test('every committed rule produces a non-null summarizeTrigger clause', () => {

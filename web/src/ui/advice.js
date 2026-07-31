@@ -26,22 +26,28 @@ import { describePredicate } from '../engine/predicate.js';
 
 const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 
-// Every note shows a PLAIN-ENGLISH trigger clause by default (.advice-trigger
-// below, via engine/advisor.js's summarizeTrigger) -- a user reading a note
-// in isolation has no way to tell whether it is always shown or shown
-// because of something they entered, and "shown because modality is STED"
-// answers exactly that. summarizeTrigger is derived mechanically from the
-// SAME predicate the engine evaluates, so it cannot disagree with the real
-// trigger condition (see its own docstring).
+// A note answers TWO different questions, and they must not be conflated:
+//
+//   WHY does this note exist?  -> its `concept` ("spectral spillover",
+//     "photobleaching"). Authored content; no predicate encodes it. This is
+//     the note's actual reason and the thing a reader needs to recognize.
+//   WHEN does it apply?  -> summarizeTrigger(note.when) ("modality is
+//     STED"). Derived mechanically from the predicate so it cannot drift.
+//     Useful, but strictly secondary -- it only tells you the note is
+//     conditional on something you entered rather than shown to everyone.
+//
+// An earlier version rendered only the second and labelled it "Shown
+// because ...", which reads as a reason and is not one: "modality is STED"
+// says nothing about why STED warrants the warning.
 //
 // The RAW predicate text (describePredicate, engine/predicate.js) is a
-// SEPARATE, debug-only tier behind this flag -- mirrors shell.js's
-// THEME_KEY pattern, read through a try/catch so a disabled/unavailable
-// localStorage degrades to "off" rather than throwing. Unconditionally
-// showing raw predicate syntax (`acquisition.modality is one of [...]`)
-// would put developer-facing text in front of a scientist for no benefit
-// beyond what the friendly summary already gives; it stays reserved for
-// whoever is authoring or debugging a rule.
+// THIRD, debug-only tier behind this flag -- mirrors shell.js's THEME_KEY
+// pattern, read through a try/catch so a disabled/unavailable localStorage
+// degrades to "off" rather than throwing. Unconditionally showing raw
+// predicate syntax (`acquisition.modality is one of [...]`) would put
+// developer-facing text in front of a scientist for no benefit beyond what
+// the two tiers above already give; it stays reserved for whoever is
+// authoring or debugging a rule.
 const ADVISOR_DEBUG_KEY = 'micronaut.advisorDebug';
 
 function advisorDebugEnabled() {
@@ -56,9 +62,19 @@ function appendAdviceNote(list, note) {
   const item = document.createElement('div');
   item.className = `advice-note advice-${note.kind}`;
 
+  // Kind ("Pitfall"/"Tip") and concept ("spectral spillover") on one line.
+  // The CONCEPT is the note's actual reason for existing and is what makes a
+  // list of notes scannable -- you can see at a glance that one is about
+  // spillover and another about photobleaching, without reading either body.
   const kind = document.createElement('div');
   kind.className = 'advice-kind';
-  kind.textContent = ADVICE_KIND_LABELS[note.kind] || note.kind;
+  const kindLabel = document.createElement('span');
+  kindLabel.textContent = ADVICE_KIND_LABELS[note.kind] || note.kind;
+  kind.appendChild(kindLabel);
+  const concept = document.createElement('span');
+  concept.className = 'advice-concept';
+  concept.textContent = note.concept;
+  kind.appendChild(concept);
   item.appendChild(kind);
 
   const title = document.createElement('div');
@@ -71,13 +87,15 @@ function appendAdviceNote(list, note) {
   body.textContent = note.body;
   item.appendChild(body);
 
-  // Visible by default -- see the module-header comment on why this is a
-  // separate, friendlier tier from the raw debug-only reason below.
+  // "Applies when ...", NOT "Shown because ..." -- this is the note's
+  // APPLICABILITY condition, not its reason. The reason is the concept
+  // rendered above. Labelling a trigger condition as a reason is precisely
+  // the mistake an earlier version of this file made.
   const trigger = summarizeTrigger(note.when);
   if (trigger) {
     const triggerEl = document.createElement('div');
     triggerEl.className = 'advice-trigger';
-    triggerEl.textContent = `Shown because ${trigger}.`;
+    triggerEl.textContent = `Applies when ${trigger}.`;
     item.appendChild(triggerEl);
   }
 

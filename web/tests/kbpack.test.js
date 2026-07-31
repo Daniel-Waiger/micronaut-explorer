@@ -14,6 +14,7 @@ function validAdvisorRule() {
     id: 'sted-photobleaching',
     surfaces: ['design'],
     kind: 'pitfall',
+    concept: 'photobleaching',
     title: 'STED bleaches far faster than confocal',
     body: 'The depletion beam deposits far more energy per pixel than excitation alone, so photostability outweighs brightness.',
     when: { matches: ['acquisition.modality', '[Ss][Tt][Ee][Dd]'] },

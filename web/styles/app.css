@@ -342,11 +342,29 @@ button:focus-visible {
 }
 
 .advice-kind {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
   margin-bottom: 4px;
+}
+
+/* The concept -- the phenomenon the note is about. Carries the accent
+   colour because it, not the kind label, is what makes a stack of notes
+   scannable ("this one is spillover, that one is photobleaching"). */
+.advice-concept {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.advice-concept::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--line);
+  font-weight: 400;
 }
 
 .advice-title {

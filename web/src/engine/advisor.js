@@ -31,7 +31,16 @@ const MIN_ADVICE_BODY_LENGTH = 40;
 // Object.keys(entry) so an unrecognized key (a typo like 'surface' for
 // 'surfaces', or a leftover 'text' from copy-pasting a question-bank entry)
 // is reported rather than silently ignored -- see the module-header comment.
-const KNOWN_ADVISOR_RULE_KEYS = new Set(['id', 'surfaces', 'kind', 'title', 'body', 'when', 'priority']);
+const KNOWN_ADVISOR_RULE_KEYS = new Set([
+  'id',
+  'surfaces',
+  'kind',
+  'concept',
+  'title',
+  'body',
+  'when',
+  'priority',
+]);
 
 function advisorIssue(field, message) {
   return { field, message, severity: 'error' };
@@ -78,6 +87,21 @@ function normalizeAdvisorRule(entry, index, issues, seenIds) {
 
   if (!ADVICE_KINDS.includes(entry.kind)) {
     issues.push(advisorIssue(id, `advisor rule 'kind' must be one of ${ADVICE_KINDS.join(', ')}, got '${String(entry.kind)}'`));
+    return null;
+  }
+
+  // The underlying phenomenon this note is ABOUT -- 'spectral spillover',
+  // 'photobleaching', 'phototoxicity'. Required, and deliberately NOT
+  // derivable from `when`: the trigger condition (modality is confocal) says
+  // when a note applies; the concept says why it exists at all, and only the
+  // latter is the thing a user actually needs to recognize. Conflating the
+  // two is what made an earlier version render "Shown because modality is
+  // STED" as though that were a reason.
+  const concept = typeof entry.concept === 'string' ? entry.concept.trim() : '';
+  if (!concept) {
+    issues.push(
+      advisorIssue(id, "advisor rule is missing a non-empty concept (the phenomenon it is about, e.g. 'spectral spillover')")
+    );
     return null;
   }
 
@@ -129,6 +153,7 @@ function normalizeAdvisorRule(entry, index, issues, seenIds) {
     id,
     surfaces: entry.surfaces.slice(),
     kind: entry.kind,
+    concept,
     title,
     body,
     when: entry.when,
@@ -206,18 +231,25 @@ export function selectAdvice(rules, experiment, surface) {
 const TRIGGER_FIELD_LABELS = { 'acquisition.modality': 'modality' };
 
 /**
- * A short, plain-English explanation of why a note fired -- "modality is
- * STED", "modality is SEM or TEM" -- for display ALONGSIDE every note, not
- * behind the debug flag describePredicate (engine/predicate.js) sits behind.
+ * A short, plain-English rendering of a rule's APPLICABILITY condition --
+ * "modality is STED", "modality is SEM or TEM".
+ *
+ * This is NOT the note's reason, and must never be presented as one. The
+ * reason a note exists is its `concept` (spectral spillover, photobleaching)
+ * -- authored content that no predicate encodes. This function only answers
+ * "when does this apply", which is a useful but strictly secondary question:
+ * it tells a reader the note is conditional on something they entered rather
+ * than shown to everyone.
  *
  * Deliberately derived MECHANICALLY from the predicate rather than
- * hand-authored per rule: a hand-written trigger string is a second,
+ * hand-authored: a hand-written applicability string is a second,
  * independent rendering of the same fact `when` already encodes, and this
  * codebase has already shipped that exact defect shape twice (a display
  * column disagreeing with an embedded filename token, a value written under
  * one store path and read under another -- docs/cma-lessons.md lessons 49
  * and 50). Deriving from `rule.when` itself means this text CANNOT disagree
- * with the actual trigger condition the engine evaluates, by construction.
+ * with the actual condition the engine evaluates, by construction. The
+ * `concept`, by contrast, is NOT derivable and so is authored per rule.
  *
  * TOTAL: only the two simplest predicate shapes this pack currently uses
  * (`eq`, `in`, both on a single string path) are summarized. Anything else

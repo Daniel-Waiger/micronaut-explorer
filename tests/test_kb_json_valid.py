@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 KB_DIR = ROOT / "web" / "kb"
 ADVISOR_JSON = KB_DIR / "advisor.json"
 
-REQUIRED_RULE_KEYS = {"id", "surfaces", "kind", "title", "body", "when"}
+REQUIRED_RULE_KEYS = {"id", "surfaces", "kind", "concept", "title", "body", "when"}
 KNOWN_KINDS = {"pitfall", "tip"}
 # Mirrors ADVICE_SURFACES in web/src/engine/advisor.js. Kept as a local
 # literal, not imported (this is Python; that module is JS) -- if the two
@@ -75,6 +75,19 @@ def test_every_advisor_rule_kind_and_surfaces_are_known() -> None:
         assert isinstance(surfaces, list) and surfaces, f"{rule['id']!r}: empty/non-list surfaces"
         unknown = set(surfaces) - KNOWN_SURFACES
         assert not unknown, f"rule {rule['id']!r} references unknown surface(s): {unknown}"
+
+
+def test_every_advisor_rule_concept_is_a_non_empty_string() -> None:
+    # The concept names the phenomenon a note is about ("spectral spillover")
+    # -- its reason for existing, as opposed to `when`, which only says when
+    # it applies. Required, and checked here because this is the gate CI
+    # actually runs.
+    data = json.loads(ADVISOR_JSON.read_text(encoding="utf-8"))
+    for rule in data["rules"]:
+        concept = rule["concept"]
+        assert (
+            isinstance(concept, str) and concept.strip()
+        ), f"rule {rule['id']!r} has an empty or non-string concept: {concept!r}"
 
 
 def test_every_advisor_rule_body_is_substantive() -> None:
