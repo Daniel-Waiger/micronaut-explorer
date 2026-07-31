@@ -1,12 +1,7 @@
-import {
-  buildGroupLabel,
-  buildSampleId,
-  conditionIssues,
-  expandConditions,
-  formatReplicateToken,
-} from '../../engine/conditions.js';
-import { finalizeFields, normalizeFields, renderName } from '../../engine/naming.js';
+import { conditionIssues, formatReplicateToken } from '../../engine/conditions.js';
+import { finalizeFields, renderName } from '../../engine/naming.js';
 import { validateTargetPath } from '../../engine/validation.js';
+import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
 function parseLevels(text) {
@@ -20,37 +15,14 @@ function parseLevels(text) {
  * Stage 1: the stem every file in this experiment shares. Rendered once, above
  * the condition table, so the reader can see what is common before scanning
  * what differs.
+ *
+ * Uses effectiveNamingFields (not raw naming.fields) so the base name shows
+ * the modality the interview collected as acquisition.modality, matching what
+ * the per-row filenames below actually embed.
  */
 function baseNameFor(store) {
-  const namingFields = store.getPath('naming.fields') || {};
-  const finalized = finalizeFields('experiment.tif', namingFields, NAMING_CONFIG);
+  const finalized = finalizeFields('experiment.tif', effectiveNamingFields(store.get()), NAMING_CONFIG);
   return renderName(finalized, { ...NAMING_CONFIG, template: BASE_TEMPLATE });
-}
-
-/**
- * Stage 1 + stage 2: the full filename for one condition row. `groupLabel` is
- * computed by the caller (once per row) and dropped into the template's
- * {group} slot -- it arrives already segment-separated, so distinct arms can
- * never collapse into one indistinguishable token.
- *
- * bioRep/techRep are ALSO overridden here from the row itself (formatted via
- * the same formatReplicateToken every other replicate token goes through),
- * never from naming.fields -- each row has its OWN replicate numbers; a
- * single shared naming.fields value would render the same B01 on every row.
- * naming.fields.sample (the specimen id) and .notes are left as whatever the
- * Naming step holds, since -- unlike group/biorep/techrep -- neither varies
- * row to row within one design.
- */
-function filenameForRow(row, design, store, groupLabel) {
-  const namingFields = store.getPath('naming.fields') || {};
-  const raw = {
-    ...namingFields,
-    group: groupLabel,
-    biorep: formatReplicateToken('B', row.bioRep),
-    techrep: formatReplicateToken('T', row.techRep),
-  };
-  const finalized = finalizeFields('experiment.tif', raw, NAMING_CONFIG);
-  return renderName(finalized, NAMING_CONFIG);
 }
 
 export const designStep = {
@@ -295,8 +267,10 @@ export const designStep = {
       baseNameValue.textContent = baseNameFor(store);
 
       conditionsTable.textContent = '';
-      const rows = expandConditions(design);
-      if (rows.length === 0) {
+      // The SAME planner the Name builder renders its table from, so the two
+      // steps cannot drift: one implementation, two views of it.
+      const planned = planFilenames(store.get(), NAMING_CONFIG);
+      if (planned.length === 0) {
         // With zero factors AND zero arm levels this design still expands to
         // exactly one unconditioned row (see conditions.js), so an empty
         // TABLE here always means a real issue is already listed above (a
@@ -309,9 +283,9 @@ export const designStep = {
         return;
       }
 
-      const hasIdSchemeIssue = issues.some((issue) => issue.field === 'idScheme');
-      const pathIssues = [];
-      for (const row of rows) {
+      const pathMessages = new Set();
+      for (const entry of planned) {
+        const row = entry.row;
         const rowEl = document.createElement('div');
         rowEl.className = 'condition-row';
 
@@ -329,46 +303,18 @@ export const designStep = {
 
         const sampleIdEl = document.createElement('code');
         sampleIdEl.className = 'condition-sample-id';
+        sampleIdEl.textContent = entry.groupLabel;
         const filenameEl = document.createElement('code');
         filenameEl.className = 'condition-filename';
-        if (hasIdSchemeIssue) {
-          sampleIdEl.textContent = '';
-          filenameEl.textContent = '(fix the id scheme above)';
-        } else {
-          try {
-            // The group label is built ONCE per row and reused for both the
-            // group column and the filename, so the two can never disagree.
-            //
-            // Default path (no custom scheme): buildGroupLabel, which keeps
-            // one separated segment per arm/factor (replicates render through
-            // their own {biorep}/{techrep} slots, not through this label). A
-            // custom idScheme is honoured as an explicit override, but it is
-            // no longer required -- and it is no longer the thing that
-            // silently welds 'CT' and 'NAM 50mM' into 'CTNAM50MM'.
-            const groupLabel = design.idScheme
-              ? buildSampleId(row, design.idScheme)
-              : buildGroupLabel(row, design);
-            // Displayed through normalizeFields (the SAME casing authority
-            // filenameForRow uses below), not the raw groupLabel -- otherwise
-            // this column shows the arm exactly as typed ('ct') while the
-            // filename two columns over embeds it uppercased ('CT'), and a
-            // reader has no way to know those are the same value.
-            sampleIdEl.textContent = normalizeFields({ group: groupLabel }, NAMING_CONFIG).group;
-            const filename = filenameForRow(row, design, store, groupLabel);
-            filenameEl.textContent = filename;
-            // The Design step is where MANY names are generated at once, so
-            // it is where a long base name actually bites -- validateTargetPath
-            // already existed (wired only into the single-name Naming step)
-            // and is reused here unchanged, never reimplemented.
-            for (const issue of validateTargetPath(filename)) {
-              pathIssues.push(issue);
-            }
-          } catch (err) {
-            // Defense-in-depth: conditionIssues should already have caught an
-            // unknown id-scheme token, but buildSampleId's throw must never
-            // reach the user as a white screen regardless.
-            sampleIdEl.textContent = '';
-            filenameEl.textContent = `(${err.message})`;
+        // planFilenames never throws for a bad id scheme -- it returns the
+        // message per row -- so one malformed scheme cannot blank the table.
+        filenameEl.textContent = entry.filename || `(${entry.error})`;
+        if (entry.filename) {
+          // The Design step is where MANY names are generated at once, so it
+          // is where a long base name actually bites. validateTargetPath is
+          // reused unchanged, never reimplemented.
+          for (const issue of validateTargetPath(entry.filename)) {
+            pathMessages.add(issue.message);
           }
         }
         rowEl.appendChild(sampleIdEl);
@@ -382,7 +328,7 @@ export const designStep = {
       // (and where it will land on disk), not the design's own structure, and
       // deduping identical messages keeps N identically-long rows from
       // producing N copies of the same warning.
-      for (const message of new Set(pathIssues.map((issue) => issue.message))) {
+      for (const message of pathMessages) {
         const li = document.createElement('li');
         li.className = 'issue issue-warning';
         li.textContent = `target_path: ${message}`;

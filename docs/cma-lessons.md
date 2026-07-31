@@ -325,6 +325,23 @@ Format per lesson: **practice — evidence — why it matters.**
     if they don't, they are two independent implementations of the same rule and will drift the
     first time either one is edited without the other in mind.
 
+50. **A field WRITTEN under one path and READ under another is a silent disconnect no test
+    catches, because both halves pass their own tests.** — 2026-07-30, seen alongside lesson
+    49 and the same underlying shape one level up: the interview collected modality as
+    `acquisition.modality` (correct), while the filename template read
+    `naming.fields.modality` (also correct) -- so answering the modality question left the
+    Name builder rendering `UNKNOWN` for a fact the user had already stated. Same for
+    `design.biologicalReplicates` vs `naming.fields.biorep`. Every unit test passed: the
+    interview wrote where it said it would, the renderer read where it said it would, and
+    nothing tested that the two paths were the SAME path. Found only by driving the real
+    end-to-end flow (answer a question, walk to the consuming screen, look) -- the check no
+    unit test performs. Fixed with a read-time fallback in one shared module rather than a
+    write, so an explicit override still wins and provenance is untouched. — Generalizes: when
+    a value is produced on one screen and consumed on another, the integration point is a
+    NAMED PATH, and a path is exactly the kind of thing two correct components can disagree
+    about forever. Grep the producer's path against the consumer's before trusting that data
+    flows; and when a feature spans screens, walk it end-to-end at least once.
+
 ## E. This repo's invariants (microscopy-naming-assistant)
 
 Proven 2026-07-26/27/28 against the real 1.02GB LIF unless noted. When an E lesson proves

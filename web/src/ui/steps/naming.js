@@ -1,7 +1,8 @@
-import { finalizeFields, renderName } from '../../engine/naming.js';
+import { finalizeFields } from '../../engine/naming.js';
 import { validateFields, validateTargetPath } from '../../engine/validation.js';
 import { editTagFor } from '../../core/provenance.js';
 import { formatReplicateToken } from '../../engine/conditions.js';
+import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
@@ -118,6 +119,11 @@ export const namingStep = {
     main.appendChild(grid);
 
     const inputs = {};
+    // Pre-fill through effectiveNamingFields, not raw naming.fields, so a
+    // value the user already gave elsewhere (modality, collected by the
+    // interview as acquisition.modality) shows up in the box it feeds rather
+    // than leaving the box blank while the filename below quietly uses it.
+    const prefill = effectiveNamingFields(store.get());
     for (const field of FIELD_DEFS) {
       const row = document.createElement('label');
       row.className = 'field-row';
@@ -131,7 +137,7 @@ export const namingStep = {
       input.type = field.type || 'text';
       input.className = 'field-input';
       input.placeholder = field.placeholder;
-      input.value = store.getPath(`naming.fields.${field.key}`) || '';
+      input.value = prefill[field.key] ?? '';
       input.addEventListener('input', () => {
         const path = `naming.fields.${field.key}`;
         // 'user_edited' when correcting an existing WEAK/PROVISIONAL value
@@ -147,32 +153,52 @@ export const namingStep = {
       grid.appendChild(row);
     }
 
-    const previewBox = document.createElement('div');
-    previewBox.className = 'preview-box';
-    const previewLabel = document.createElement('div');
-    previewLabel.className = 'preview-label';
-    previewLabel.textContent = 'Filename preview';
-    const previewName = document.createElement('code');
-    previewName.className = 'preview-name';
+    // The planned-names table. With a design this is every file the
+    // experiment will produce; with no design at all it is exactly one row --
+    // the single name the boxes above build. Same widget either way, so the
+    // step works as a standalone one-off name tool OR as the end of the full
+    // workflow, with nothing to switch between.
+    const plannedBox = document.createElement('div');
+    plannedBox.className = 'planned-box';
+
+    const plannedHead = document.createElement('div');
+    plannedHead.className = 'planned-head';
+
+    const plannedLabel = document.createElement('div');
+    plannedLabel.className = 'planned-label';
+    plannedHead.appendChild(plannedLabel);
+
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
     copyBtn.className = 'copy-button';
-    copyBtn.textContent = 'Copy filename';
+    copyBtn.textContent = 'Copy all';
     copyBtn.addEventListener('click', async () => {
-      const ok = await copyToClipboard(previewName.textContent);
+      // One name per line: the shape that pastes straight into a lab
+      // notebook, a spreadsheet column, or a shell loop.
+      const ok = await copyToClipboard(currentFilenames().join('\n'));
+      const original = copyBtn.textContent;
       copyBtn.textContent = ok ? 'Copied!' : 'Copy failed';
       window.setTimeout(() => {
-        copyBtn.textContent = 'Copy filename';
+        copyBtn.textContent = original;
       }, 1500);
     });
-    previewBox.appendChild(previewLabel);
-    previewBox.appendChild(previewName);
-    previewBox.appendChild(copyBtn);
-    main.appendChild(previewBox);
+    plannedHead.appendChild(copyBtn);
+    plannedBox.appendChild(plannedHead);
+
+    const plannedList = document.createElement('div');
+    plannedList.className = 'planned-list';
+    plannedBox.appendChild(plannedList);
+    main.appendChild(plannedBox);
 
     const issuesList = document.createElement('ul');
     issuesList.className = 'issues-list';
     main.appendChild(issuesList);
+
+    let lastPlanned = [];
+
+    function currentFilenames() {
+      return lastPlanned.filter((entry) => entry.filename).map((entry) => entry.filename);
+    }
 
     function currentRawFields() {
       // Only include a field once the user has actually typed something --
@@ -190,7 +216,7 @@ export const namingStep = {
         // biorep/techrep are stored as the raw typed NUMBER (so the number
         // input can redisplay it), formatted to 'B01'/'T03' only here, at the
         // boundary right before finalizeFields -- the single formatting
-        // authority is formatReplicateToken, reused by design.js's per-row
+        // authority is formatReplicateToken, reused by the planner's per-row
         // rendering so the two paths can never format replicates differently.
         raw[field.key] = prefix ? formatReplicateToken(prefix, Number(value)) : value;
       }
@@ -198,19 +224,61 @@ export const namingStep = {
     }
 
     function update() {
-      const raw = currentRawFields();
-      const finalized = finalizeFields('experiment.tif', raw, NAMING_CONFIG);
-      const filename = renderName(finalized, NAMING_CONFIG);
-      previewName.textContent = filename;
+      // Plan against a VIEW of the experiment whose naming fields are what
+      // the boxes currently hold. Reading the store directly would lag by one
+      // keystroke on the very first character of a field (setPath runs before
+      // update(), but a field the user has cleared must read as cleared), and
+      // more importantly this is what lets the table react to typing even
+      // when nothing has been persisted yet.
+      const experiment = store.get();
+      const view = {
+        ...experiment,
+        naming: { ...(experiment.naming || {}), fields: currentRawFields() },
+      };
+      lastPlanned = planFilenames(view, NAMING_CONFIG);
 
-      const issues = validateFields(finalized, DEFAULT_PROFILE).concat(
-        validateTargetPath(filename)
-      );
+      const count = lastPlanned.length;
+      plannedLabel.textContent =
+        count === 1 ? 'Planned filename' : `Planned filenames (${count} files)`;
+      copyBtn.textContent = count === 1 ? 'Copy filename' : 'Copy all';
+      copyBtn.disabled = currentFilenames().length === 0;
+
+      plannedList.textContent = '';
+      if (count === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'planned-empty';
+        empty.textContent = 'No names to show -- see the issues in the Design step.';
+        plannedList.appendChild(empty);
+      }
+      for (const entry of lastPlanned) {
+        const line = document.createElement('code');
+        line.className = 'planned-name';
+        line.textContent = entry.filename || `(${entry.error})`;
+        plannedList.appendChild(line);
+      }
+
+      // Field-level validation runs against the fields as typed. The
+      // path-length check runs per PLANNED NAME, deduped: with a design, the
+      // longest row is the one that actually risks exceeding MAX_PATH, and N
+      // equally-long rows should not produce N copies of one warning.
+      const finalized = finalizeFields('experiment.tif', currentRawFields(), NAMING_CONFIG);
+      const issues = validateFields(finalized, DEFAULT_PROFILE);
+      const pathMessages = new Set();
+      for (const name of currentFilenames()) {
+        for (const issue of validateTargetPath(name)) pathMessages.add(issue.message);
+      }
+
       issuesList.textContent = '';
       for (const issue of issues) {
         const li = document.createElement('li');
         li.className = 'issue issue-' + issue.severity;
         li.textContent = `${issue.field}: ${issue.message}`;
+        issuesList.appendChild(li);
+      }
+      for (const message of pathMessages) {
+        const li = document.createElement('li');
+        li.className = 'issue issue-warning';
+        li.textContent = `target_path: ${message}`;
         issuesList.appendChild(li);
       }
     }

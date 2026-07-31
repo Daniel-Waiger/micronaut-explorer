@@ -234,11 +234,10 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
-.preview-box {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
+/* The planned-names table. One row when there is no design (the standalone
+   one-off name), N rows when a design is driving it -- same widget, so there
+   is no visual mode-switch between "tool box" and "full workflow". */
+.planned-box {
   background: var(--panel-2);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -246,19 +245,41 @@ button:focus-visible {
   margin-bottom: 20px;
 }
 
-.preview-label {
+.planned-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.planned-label {
   font-size: 12.5px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
-  flex-basis: 100%;
 }
 
-.preview-name {
+.planned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* A large design can plan hundreds of names; scroll the list rather than
+     letting it push the field boxes and issues off-screen. */
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.planned-name {
   font-family: var(--mono);
-  font-size: 17px;
+  font-size: 15px;
   color: var(--accent);
   word-break: break-all;
+}
+
+.planned-empty {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
 }
 
 .copy-button {
@@ -275,6 +296,12 @@ button:focus-visible {
 
 .copy-button:hover {
   filter: brightness(1.05);
+}
+
+.copy-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
 }
 
 .issues-list {
