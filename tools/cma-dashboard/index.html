@@ -148,14 +148,14 @@ const EMBEDDED = {
   "orchestrator": "Claude Opus",
   "active_model": "Claude Opus",
   "active_status": "done",
-  "phase": "Advisor slice 1: modality guidance",
+  "phase": "Advisor slice 1 + concept field",
   "state_note": "First slice of the experimental-design assistant vision (controls/panel/modality guidance) implemented and verified. Architecture: rules are DATA in web/kb/advisor.json, evaluated by the ALREADY-BUILT predicate engine (engine/predicate.js) -- zero engine changes needed, proving the rules-as-data pattern the rest of the vision depends on. New engine/advisor.js (loader mirrors interview.js's loadQuestions discipline: explicit whitelist, drop-and-report, never spread the raw entry) plus engine/kbpack.js (extracts shapeAppKb from main.js's previously-untestable inline loadAppKb -- this is what a future KB key needs to avoid repeating the allowOther silent-drop bug). New ui/advice.js: a shared, non-focusable advice panel wired into all three steps (describe/design/naming) at verified real re-render seams, not the ones that looked obvious -- design.js's renderAll() is called exactly once at mount; the real funnel is renderConditions(). 16 modality rules drafted (STED, confocal, widefield, light-sheet, SEM/TEM, Raman), each with a title (the pitfall) and a body of at least 40 characters (the why), gated on acquisition.modality via exact-canonical-value predicates. 277 JS tests (up from 229), 341 Python. Verified live against the built artifact over http: STED notes route correctly to Design and Naming, swapping to SEM live-updates all three surfaces with zero reload and zero residue, per-keystroke re-render on Naming preserves focus and cursor position, empty experiment shows zero notes anywhere, console clean throughout.",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "277 passed",
+      "v": "289 passed",
       "tone": "ok"
     },
     {
@@ -164,7 +164,7 @@ const EMBEDDED = {
     },
     {
       "k": "Py tests",
-      "v": "341 passed, 10 deselected",
+      "v": "342 passed, 10 deselected",
       "tone": "ok"
     },
     {
@@ -173,71 +173,7 @@ const EMBEDDED = {
       "tone": "ok"
     }
   ],
-  "defects": [
-    {
-      "id": "D1",
-      "location": "web/src/engine/freetext.js",
-      "title": "Magnification false-positive on dimension pairs (512 x 512)",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D2",
-      "location": "web/src/ui/steps/design.js",
-      "title": "Remove-factor button: 3rd instance of lesson-46 stale-closure bug, missed in the commit that fixed the other two sibling controls",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D3",
-      "location": "web/src/engine/conditions.js",
-      "title": "Undefined/null factor level not flagged as invalid",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D4",
-      "location": "web/src/engine/conditions.js",
-      "title": "buildSampleId: scheme token matching Object.prototype member (toString etc.) leaks the function instead of throwing",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D5",
-      "location": "web/src/engine/conditions.js",
-      "title": "Factor named 'replicate' collides with the reserved replicate token, silently duplicating sample IDs",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D6",
-      "location": "web/src/core/provenance.js",
-      "title": "Hand-editing a naming field never retagged user_edited, so WEAK/PROVISIONAL flags could never clear",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D7",
-      "location": "web/src/ui/steps/describe.js",
-      "title": "Accept button gave no feedback when setPath refused a write over a stronger existing value",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D9",
-      "location": "tools/build_single_file.py",
-      "title": "Wrapped multi-line import survived the flattener; built bundle threw 'Cannot use import statement outside a module' and rendered a blank page, while every build gate still reported success",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D10",
-      "location": "web/src/ui/steps/design.js",
-      "title": "Filename collapsed every design dimension into one sample token, merging control and treatment arms indistinguishably",
-      "body": "",
-      "repro": ""
-    }
-  ],
+  "defects": [],
   "tasks": [
     {
       "id": "C1-1",
@@ -382,9 +318,17 @@ const EMBEDDED = {
     {
       "time": "12:57:23",
       "msg": "D14 and D15 fixed and verified (write_kb_dev_js now names the offending file on malformed JSON; ci.yml now runs node --test web/tests/*.test.js)."
+    },
+    {
+      "time": "16:02:57",
+      "msg": "Board hygiene: cleared D1-D7, D9, D10. All nine were fixed in earlier rounds (D1-D7 committed in 8997446, D9/D10 in 1c8fa6e) but never defect-cleared, so the board was showing nine resolved defects as open. Spot-verified each against current source before clearing."
+    },
+    {
+      "time": "16:02:57",
+      "msg": "Advice notes now carry a required 'concept' (the phenomenon: spectral spillover, photobleaching) rendered as the note's reason, distinct from the mechanically-derived 'Applies when ...' trigger clause. User correction: a trigger condition is not a reason."
     }
   ],
-  "snapshot_at": "2026-07-31 12:57"
+  "snapshot_at": "2026-07-31 16:02"
 };
 /* CMA:EMBEDDED:END */
 

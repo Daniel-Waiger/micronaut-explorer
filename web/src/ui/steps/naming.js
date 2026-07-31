@@ -57,21 +57,77 @@ const DEFAULT_PROFILE = {
 // by key rather than hardcoding a branch per field.
 const REPLICATE_PREFIXES = { biorep: 'B', techrep: 'T' };
 
+// `hint` is a plain-language explanation for people who aren't sure what a
+// field is asking for -- wired to the input's `title` attribute below, so it
+// shows as the browser's native hover tooltip on top of (not instead of) the
+// `placeholder` example text. Written for a biologist who has never touched
+// this tool before, not for someone who already knows the naming jargon --
+// no "token", "schema", "canonical". If a field's meaning depends on
+// modality (e.g. markers meaning a contrast agent for SEM/TEM), say so in
+// plain terms rather than assuming fluorescence imaging.
 const FIELD_DEFS = [
-  { key: 'date', label: 'Date', placeholder: 'YYYY-MM-DD' },
-  { key: 'modality', label: 'Modality', placeholder: 'e.g. CONFOCAL' },
-  { key: 'exptype', label: 'Experiment type', placeholder: 'e.g. CT' },
-  { key: 'markers', label: 'Markers', placeholder: 'e.g. GFP-DAPI' },
-  { key: 'magnification', label: 'Magnification', placeholder: 'e.g. X90' },
+  {
+    key: 'date',
+    label: 'Date',
+    placeholder: 'YYYY-MM-DD',
+    hint: 'The date you acquired these images. Keeps your files sorted in the order you took them.',
+  },
+  {
+    key: 'modality',
+    label: 'Modality',
+    placeholder: 'e.g. CONFOCAL',
+    hint: 'The type of microscope or imaging method you used -- for example confocal, widefield, or STED.',
+  },
+  {
+    key: 'exptype',
+    label: 'Experiment type',
+    placeholder: 'e.g. CT',
+    hint: 'A short label for what kind of experiment this is, so related files end up grouped together (for example "CT" for a control).',
+  },
+  {
+    key: 'markers',
+    label: 'Markers',
+    placeholder: 'e.g. GFP-DAPI',
+    hint: 'The stains, dyes, or fluorescent proteins you imaged, like DAPI or GFP. For SEM/TEM with no fluorescence, use this for your contrast agent instead (like uranyl acetate).',
+  },
+  {
+    key: 'magnification',
+    label: 'Magnification',
+    placeholder: 'e.g. X90',
+    hint: 'The zoom level or objective you used, like 40x or 100x.',
+  },
   {
     key: 'group',
     label: 'Group',
     placeholder: 'e.g. CT, NAM50MM -- set per-row by the Design step, or type one here',
+    hint: 'Which experimental group this file belongs to, such as your control or a treatment arm. Usually filled in for you from the Design page.',
   },
-  { key: 'sample', label: 'Sample', placeholder: 'e.g. E02' },
-  { key: 'biorep', label: 'Biological replicate #', placeholder: 'optional', type: 'number' },
-  { key: 'techrep', label: 'Technical replicate #', placeholder: 'optional', type: 'number' },
-  { key: 'notes', label: 'Notes', placeholder: 'optional' },
+  {
+    key: 'sample',
+    label: 'Sample',
+    placeholder: 'e.g. E02',
+    hint: 'A unique ID for this specimen or animal, so two files from the same experiment never get mixed up.',
+  },
+  {
+    key: 'biorep',
+    label: 'Biological replicate #',
+    placeholder: 'optional',
+    type: 'number',
+    hint: 'Which biological replicate this is -- a repeat done with a different animal, dish, or sample. Leave blank if this doesn’t apply to your experiment.',
+  },
+  {
+    key: 'techrep',
+    label: 'Technical replicate #',
+    placeholder: 'optional',
+    type: 'number',
+    hint: 'Which technical replicate this is -- a repeat measurement of the SAME sample. Leave blank if this doesn’t apply.',
+  },
+  {
+    key: 'notes',
+    label: 'Notes',
+    placeholder: 'optional',
+    hint: 'Anything else worth remembering about this file. Totally optional.',
+  },
 ];
 
 /**
@@ -138,6 +194,10 @@ export const namingStep = {
       input.type = field.type || 'text';
       input.className = 'field-input';
       input.placeholder = field.placeholder;
+      // Native browser tooltip, on top of (not instead of) the placeholder
+      // example above -- shows on hover regardless of whether the field is
+      // filled in yet.
+      if (field.hint) input.title = field.hint;
       input.value = prefill[field.key] ?? '';
       input.addEventListener('input', () => {
         const path = `naming.fields.${field.key}`;

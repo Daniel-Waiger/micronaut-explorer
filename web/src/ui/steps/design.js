@@ -94,6 +94,9 @@ export const designStep = {
     // crossed against each other in the first place. Every level here is one
     // ARM; a sample belongs to exactly one.
     groupsInput.placeholder = 'e.g. CT, NAM25MM, NAM50MM -- a sample is exactly ONE of these';
+    // Native browser tooltip, on top of the placeholder example above.
+    groupsInput.title =
+      'Your experimental groups, such as control vs. treated. Every sample belongs to exactly one -- list them separated by commas.';
     groupsInput.addEventListener('input', () => {
       writeGroups(parseLevels(groupsInput.value));
     });
@@ -122,7 +125,7 @@ export const designStep = {
     // Two INDEPENDENT axes, each optional -- not every sample has both kinds
     // of replicate, and some (SEM/TEM/Raman) commonly have neither. Blank on
     // either input means that axis is omitted, not "default to 1".
-    function makeReplicatesRow(label, storePath) {
+    function makeReplicatesRow(label, storePath, hint) {
       const row = document.createElement('label');
       row.className = 'field-row';
       const labelEl = document.createElement('span');
@@ -134,6 +137,7 @@ export const designStep = {
       input.className = 'field-input';
       input.min = '1';
       input.placeholder = 'blank = not used';
+      input.title = hint;
       input.addEventListener('input', () => {
         const raw = input.value;
         store.setPath(storePath, raw === '' ? null : Number(raw), 'user');
@@ -144,8 +148,16 @@ export const designStep = {
       return input;
     }
 
-    const bioRepInput = makeReplicatesRow('Biological replicates', 'design.biologicalReplicates');
-    const techRepInput = makeReplicatesRow('Technical replicates', 'design.technicalReplicates');
+    const bioRepInput = makeReplicatesRow(
+      'Biological replicates',
+      'design.biologicalReplicates',
+      'How many biological replicates you have -- different animals, dishes, or samples. Leave blank if this doesn’t apply to your experiment.'
+    );
+    const techRepInput = makeReplicatesRow(
+      'Technical replicates',
+      'design.technicalReplicates',
+      'How many technical replicates you have -- repeat measurements of the SAME sample. Leave blank if this doesn’t apply.'
+    );
 
     const idSchemeRow = document.createElement('label');
     idSchemeRow.className = 'field-row';
@@ -162,6 +174,7 @@ export const designStep = {
     // replicates are NOT part of this label; they render through their own
     // {biorep}/{techrep} slots regardless of this override.
     idSchemeInput.placeholder = 'Blank = one segment per arm/factor (e.g. CT-NAM50MM). Tokens: {group} {biorep} {techrep} + factor names';
+    idSchemeInput.title = 'Advanced, optional: customize how your group name gets built into the filename. Most people can leave this blank.';
     idSchemeRow.appendChild(idSchemeInput);
     main.appendChild(idSchemeRow);
 
@@ -211,6 +224,8 @@ export const designStep = {
         nameInput.type = 'text';
         nameInput.className = 'field-input factor-name';
         nameInput.placeholder = 'Factor name (e.g. genotype)';
+        nameInput.title =
+          'Something in your experiment that varies on its own, separate from your groups above -- for example genotype or timepoint.';
         nameInput.value = factor.name || '';
         nameInput.addEventListener('input', () => {
           // Read the CURRENT store state, not the `factors` snapshot this
@@ -229,6 +244,8 @@ export const designStep = {
         levelsInput.type = 'text';
         levelsInput.className = 'field-input factor-levels';
         levelsInput.placeholder = 'Levels, comma-separated (e.g. WT, KO)';
+        levelsInput.title =
+          'The different values this factor can take, separated by commas -- for example WT, KO for a genotype factor.';
         levelsInput.value = (factor.levels || []).join(', ');
         levelsInput.addEventListener('input', () => {
           const latest = currentDesign().factors || [];

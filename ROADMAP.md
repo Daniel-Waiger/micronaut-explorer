@@ -130,13 +130,28 @@ metadata read client-side in the browser (no upload, no install); vendor formats
 web language (TypeScript-native vs Pyodide), and whether to allow any upload fallback.
 </details>
 
-### Microscopy experimental-design assistant (vision)
+### Microscopy experimental-design assistant (vision) — slice 1 shipped 2026-07-31
 Grow beyond naming into a broader experimental-design suite that advises on the
 "why", not just the "what":
+- **Modality-specific guidance (e.g. STED, confocal, widefield): probe/dye selection,
+  acquisition settings, and common pitfalls — DONE.** Rules live as data in
+  `web/kb/advisor.json`, evaluated by the predicate engine that already backed question
+  `askWhen` clauses; a small advice panel (`web/src/ui/advice.js`) surfaces them on the
+  Describe/Design/Naming steps. 16 rules across STED/confocal/widefield/light-sheet/
+  SEM-TEM/Raman.
 - Recommend the required experimental groups and controls for a given design, with
-  the rationale for each.
-- Help plan a fluorophore/color panel to minimize spectral spillover.
-- Modality-specific guidance (e.g. STED, confocal, widefield): probe/dye selection,
-  acquisition settings, and common pitfalls.
-- Broadly: encode microscopy-core expertise so users design sound experiments before
-  they acquire data.
+  the rationale for each — not started (`web/kb/controls.json` + proposed condition
+  rows inside Design, per `docs/plans/planner-web-mvp-usecases.md` §6 step 4).
+- Help plan a fluorophore/color panel to minimize spectral spillover — not started;
+  its own page (the one part of this vision that earns one — see the plan doc), rules
+  qualitative-first, no spectral overlap integrals yet.
+
+**⚠ Parked: review the wording in `web/kb/advisor.json`.** Every rule's `concept`
+(the phenomenon, e.g. "spectral spillover") and `body` (the mechanism explanation) is
+Claude-drafted per the standing "Claude drafts, Daniel corrects" instruction for this
+content — not yet reviewed for terminology a FACSI user would actually recognize.
+Specific spots already flagged: "spillover" vs. "crosstalk" vs. "bleed-through" (the
+confocal rule's own body uses "bleed-through" while its concept says "spectral
+spillover" — worth reconciling either way), and whether "shadow striping" /
+"spherical aberration" are the right register. See `product-vision` memory for the
+full rule-by-concept list.
