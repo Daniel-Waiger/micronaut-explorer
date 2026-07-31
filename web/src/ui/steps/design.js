@@ -2,6 +2,7 @@ import { conditionIssues, formatReplicateToken } from '../../engine/conditions.j
 import { finalizeFields, renderName } from '../../engine/naming.js';
 import { validateTargetPath } from '../../engine/validation.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
+import { createAdvicePanel } from '../advice.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
 function parseLevels(text) {
@@ -28,7 +29,7 @@ function baseNameFor(store) {
 export const designStep = {
   id: 'design',
   title: 'Design',
-  render(main, store) {
+  render(main, store, { advisor } = {}) {
     main.textContent = '';
 
     const heading = document.createElement('h1');
@@ -164,6 +165,12 @@ export const designStep = {
     idSchemeRow.appendChild(idSchemeInput);
     main.appendChild(idSchemeRow);
 
+    // advisor may be undefined (a caller that hasn't wired it, or a KB that
+    // failed to load) -- createAdvicePanel([], ...) is completely inert, not
+    // a missing-argument crash.
+    const advicePanel = createAdvicePanel(advisor || [], 'design');
+    main.appendChild(advicePanel.element);
+
     const issuesList = document.createElement('ul');
     issuesList.className = 'issues-list';
     main.appendChild(issuesList);
@@ -255,6 +262,15 @@ export const designStep = {
     function renderConditions() {
       const design = currentDesign();
       const issues = conditionIssues(design);
+
+      // renderConditions() is the verified funnel EVERY write path in this
+      // step actually calls -- factor edits, arm/replicate edits, the id
+      // scheme input, and mount via renderAll() (which itself calls this).
+      // renderAll() is called exactly once, at mount, so hooking the advice
+      // panel there instead would render it once and silently never update
+      // again. Passing store.get() directly (not a cached snapshot) matters
+      // because store.patch() rebinds the experiment root.
+      advicePanel.update(store.get());
 
       issuesList.textContent = '';
       for (const issue of issues) {

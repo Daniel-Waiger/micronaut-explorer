@@ -212,7 +212,17 @@ def write_kb_dev_js(kb_dir: Path = KB_DIR, out_path: Path = KB_DEV_JS_PATH) -> s
     """
     kb: dict[str, object] = {}
     for f in sorted(kb_dir.glob("*.json")):
-        kb[f.stem] = json.loads(f.read_text(encoding="utf-8"))
+        try:
+            kb[f.stem] = json.loads(f.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            # Without this, main() has already rewritten markers.json by the
+            # time a malformed NEW kb file (e.g. a trailing comma while
+            # hand-editing web/kb/advisor.json) raises here -- the traceback
+            # names json.loads, not the file, and kb.dev.js is left stale
+            # from the PREVIOUS run while the dev page keeps serving it with
+            # no indication anything failed. Naming the file turns a
+            # confusing partial-failure into an immediately actionable one.
+            raise ValueError(f"{f} is not valid JSON: {exc}") from exc
     kb_json = json.dumps(kb, sort_keys=True, separators=(",", ":"))
     text = f"globalThis.__MICRONAUT_KB__ = {kb_json};\n"
     out_path.write_text(text, encoding="utf-8", newline="\n")

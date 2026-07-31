@@ -59,6 +59,25 @@ jobs:
       - name: Run tests
         run: python -m pytest -q -m "not integration"
 
+  web-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # No `npm install` -- web/ is a deliberately zero-dependency, no
+      # node_modules ES-module project (docs/plans/planner-web.md). The glob
+      # is required: bare `node --test web/tests/` fails with
+      # MODULE_NOT_FOUND on node v22.
+      - name: Run web/ tests
+        run: node --test web/tests/*.test.js
+
   integration:
     runs-on: ubuntu-latest
     continue-on-error: true

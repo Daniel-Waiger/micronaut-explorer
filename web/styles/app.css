@@ -304,6 +304,72 @@ button:focus-visible {
   filter: none;
 }
 
+/* The advice panel -- deliberately its OWN vocabulary, not a reuse of
+   .issue/.issue-warning/.issue-error. Those are validation output; this is
+   guidance. --danger/--warn stay reserved for validation alone, so a
+   pitfall note is never mistakable for a warning just because it's amber. */
+.advice-section {
+  margin-bottom: 20px;
+}
+
+.advice-heading {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.advice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.advice-note {
+  border-radius: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.advice-pitfall {
+  border-left: 3px solid var(--accent);
+}
+
+.advice-tip {
+  border-left: 3px solid var(--line);
+}
+
+.advice-kind {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.advice-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.advice-body {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.advice-reason {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 6px;
+  opacity: 0.7;
+}
+
 .issues-list {
   list-style: none;
   margin: 0;

@@ -3,6 +3,7 @@ import { validateFields, validateTargetPath } from '../../engine/validation.js';
 import { editTagFor } from '../../core/provenance.js';
 import { formatReplicateToken } from '../../engine/conditions.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
+import { createAdvicePanel } from '../advice.js';
 
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
@@ -106,7 +107,7 @@ async function copyToClipboard(text) {
 export const namingStep = {
   id: 'naming',
   title: 'Naming',
-  render(main, store) {
+  render(main, store, { advisor } = {}) {
     main.textContent = '';
 
     const heading = document.createElement('h1');
@@ -190,6 +191,13 @@ export const namingStep = {
     plannedBox.appendChild(plannedList);
     main.appendChild(plannedBox);
 
+    // advisor may be undefined (a caller that hasn't wired it, or a KB that
+    // failed to load) -- createAdvicePanel([], ...) is a completely inert
+    // panel (selectAdvice on an empty rule array is always empty), not a
+    // missing-argument crash.
+    const advicePanel = createAdvicePanel(advisor || [], 'naming');
+    main.appendChild(advicePanel.element);
+
     const issuesList = document.createElement('ul');
     issuesList.className = 'issues-list';
     main.appendChild(issuesList);
@@ -223,19 +231,27 @@ export const namingStep = {
       return raw;
     }
 
-    function update() {
-      // Plan against a VIEW of the experiment whose naming fields are what
-      // the boxes currently hold. Reading the store directly would lag by one
-      // keystroke on the very first character of a field (setPath runs before
-      // update(), but a field the user has cleared must read as cleared), and
-      // more importantly this is what lets the table react to typing even
-      // when nothing has been persisted yet.
+    // The single snapshot every consumer of "the current naming state" reads
+    // from -- planFilenames below AND the advice panel. Reading the store
+    // directly would lag by one keystroke on the very first character of a
+    // field (setPath runs before update(), but a field the user has just
+    // cleared must read as cleared already), and more importantly this is
+    // what lets the table react to typing even when nothing has been
+    // persisted yet. Extracted to one function specifically so the table and
+    // the advice panel cannot evaluate two DIFFERENT experiments and quietly
+    // disagree -- see docs/plans -- Advisor slice 1, Decision 4.
+    function currentExperimentView() {
       const experiment = store.get();
-      const view = {
+      return {
         ...experiment,
         naming: { ...(experiment.naming || {}), fields: currentRawFields() },
       };
+    }
+
+    function update() {
+      const view = currentExperimentView();
       lastPlanned = planFilenames(view, NAMING_CONFIG);
+      advicePanel.update(view);
 
       const count = lastPlanned.length;
       plannedLabel.textContent =

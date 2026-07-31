@@ -8,6 +8,7 @@ import {
   unskipQuestion,
 } from '../../engine/interview.js';
 import { editTagFor } from '../../core/provenance.js';
+import { createAdvicePanel } from '../advice.js';
 
 const INTERVIEW_LIMIT = 8;
 
@@ -128,7 +129,7 @@ export function createDescribeStep(kb) {
   return {
     id: 'describe',
     title: 'Describe',
-    render(main, store, { showToast } = {}) {
+    render(main, store, { showToast, advisor } = {}) {
       main.textContent = '';
 
       const heading = document.createElement('h1');
@@ -148,6 +149,17 @@ export function createDescribeStep(kb) {
       readButton.className = 'read-button';
       readButton.textContent = 'Read it';
       main.appendChild(readButton);
+
+      // advisor may be undefined (a caller that hasn't wired it, or a KB
+      // that failed to load) -- createAdvicePanel([], ...) is completely
+      // inert, not a missing-argument crash. Guidance sits above the
+      // Proposals section: something worth knowing before you start
+      // answering, not after.
+      const advicePanel = createAdvicePanel(advisor || [], 'describe');
+      main.appendChild(advicePanel.element);
+      function updateAdvice() {
+        advicePanel.update(store.get());
+      }
 
       const proposalsHeading = document.createElement('div');
       proposalsHeading.className = 'proposals-heading';
@@ -256,6 +268,11 @@ export function createDescribeStep(kb) {
       }
 
       function renderInterview() {
+        // Called from both renderInterview and renderAnswered below (they
+        // are always called in pairs at every call site today) rather than
+        // at each individual call site -- fewer places to maintain, and it
+        // stays correct even if a future call site calls only one of the two.
+        updateAdvice();
         interviewList.textContent = '';
         const askable = nextQuestions(questionBank, store.get(), INTERVIEW_LIMIT);
         if (askable.length === 0) {
@@ -323,6 +340,7 @@ export function createDescribeStep(kb) {
        * STRONG, so without this list an answer is write-once and invisible.
        */
       function renderAnswered() {
+        updateAdvice(); // see the matching comment in renderInterview above
         answeredList.textContent = '';
         const reviewable = answeredQuestions(questionBank, store.get());
         if (reviewable.length === 0) {
@@ -404,12 +422,17 @@ export function createDescribeStep(kb) {
 
       textarea.addEventListener('input', () => {
         store.setPath('narrative.text', textarea.value, 'user');
+        // narrative.text has no dedicated renderX() of its own -- without
+        // this call, a rule keyed on the narrative would never update while
+        // the user is actually typing it.
+        updateAdvice();
       });
 
       readButton.addEventListener('click', () => {
         const result = parseFreeText(textarea.value, kb.index);
         pendingProposals = result.proposals;
         renderProposals();
+        updateAdvice();
         if (showToast) {
           showToast(
             pendingProposals.length > 0

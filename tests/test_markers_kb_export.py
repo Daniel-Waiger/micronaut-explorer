@@ -98,6 +98,42 @@ def test_protein_and_indicator_classes() -> None:
         assert kb["markers"][canonical]["class"] == "indicator"
 
 
+def test_write_kb_dev_js_aggregates_every_kb_json_by_filename_stem(tmp_path: Path) -> None:
+    kb_dir = tmp_path / "kb"
+    kb_dir.mkdir()
+    (kb_dir / "markers.json").write_text('{"version": 1}', encoding="utf-8")
+    (kb_dir / "questions.json").write_text("[]", encoding="utf-8")
+    (kb_dir / "advisor.json").write_text('{"version": 1, "rules": []}', encoding="utf-8")
+
+    out_path = tmp_path / "kb.dev.js"
+    export_markers_kb.write_kb_dev_js(kb_dir, out_path)
+
+    text = out_path.read_text(encoding="utf-8")
+    assert text.startswith("globalThis.__MICRONAUT_KB__ = ")
+    payload = json.loads(text[len("globalThis.__MICRONAUT_KB__ = ") : -2])
+    assert set(payload.keys()) == {"markers", "questions", "advisor"}
+    assert payload["advisor"] == {"version": 1, "rules": []}
+
+
+def test_write_kb_dev_js_names_the_offending_file_on_malformed_json(tmp_path: Path) -> None:
+    """A trailing comma (or any JSON syntax error) in a hand-edited kb file
+    used to raise a bare json.JSONDecodeError with no indication of WHICH
+    file under web/kb/ was at fault -- and since write_markers_json() has
+    already run by the time main() calls this, kb.dev.js was left silently
+    stale from the previous successful run while the exporter reported
+    failure. This pins that the raised error names the file."""
+    kb_dir = tmp_path / "kb"
+    kb_dir.mkdir()
+    # Trailing comma -- deliberately malformed JSON.
+    (kb_dir / "advisor.json").write_text('{"version": 1, "rules": [],}', encoding="utf-8")
+
+    try:
+        export_markers_kb.write_kb_dev_js(kb_dir, tmp_path / "kb.dev.js")
+        assert False, "expected a ValueError for the malformed JSON"
+    except ValueError as exc:
+        assert "advisor.json" in str(exc)
+
+
 def test_committed_file_is_valid_json_with_the_documented_shape() -> None:
     data = json.loads(COMMITTED_MARKERS_JSON.read_text(encoding="utf-8"))
     assert data["version"] == 1

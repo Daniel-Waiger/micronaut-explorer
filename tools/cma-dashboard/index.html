@@ -148,14 +148,14 @@ const EMBEDDED = {
   "orchestrator": "Claude Opus",
   "active_model": "Claude Opus",
   "active_status": "done",
-  "phase": "Arm-axis + two-stage filename restructure",
-  "state_note": "Arm-axis + two-stage filename restructure complete and verified. Adversarial self-verification pass (Opus, per master decision rule) caught one real defect the implementation's own live checks had missed: the row's 'Group' column (case-preserving by design) and the embedded filename token (uppercased) could disagree for the SAME value ('ct' vs 'CT'), because the two displays went through different formatting authorities. Fixed by routing the display column through normalizeFields, the same authority the filename uses. 216 JS tests, 332 Python, all green. Not yet committed.",
+  "phase": "Advisor slice 1: modality guidance",
+  "state_note": "First slice of the experimental-design assistant vision (controls/panel/modality guidance) implemented and verified. Architecture: rules are DATA in web/kb/advisor.json, evaluated by the ALREADY-BUILT predicate engine (engine/predicate.js) -- zero engine changes needed, proving the rules-as-data pattern the rest of the vision depends on. New engine/advisor.js (loader mirrors interview.js's loadQuestions discipline: explicit whitelist, drop-and-report, never spread the raw entry) plus engine/kbpack.js (extracts shapeAppKb from main.js's previously-untestable inline loadAppKb -- this is what a future KB key needs to avoid repeating the allowOther silent-drop bug). New ui/advice.js: a shared, non-focusable advice panel wired into all three steps (describe/design/naming) at verified real re-render seams, not the ones that looked obvious -- design.js's renderAll() is called exactly once at mount; the real funnel is renderConditions(). 16 modality rules drafted (STED, confocal, widefield, light-sheet, SEM/TEM, Raman), each with a title (the pitfall) and a body of at least 40 characters (the why), gated on acquisition.modality via exact-canonical-value predicates. 277 JS tests (up from 229), 341 Python. Verified live against the built artifact over http: STED notes route correctly to Design and Naming, swapping to SEM live-updates all three surfaces with zero reload and zero residue, per-keystroke re-render on Naming preserves focus and cursor position, empty experiment shows zero notes anywhere, console clean throughout.",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "216 passed",
+      "v": "277 passed",
       "tone": "ok"
     },
     {
@@ -164,7 +164,12 @@ const EMBEDDED = {
     },
     {
       "k": "Py tests",
-      "v": "332 passed, 10 deselected",
+      "v": "341 passed, 10 deselected",
+      "tone": "ok"
+    },
+    {
+      "k": "Advisor rules",
+      "v": "16",
       "tone": "ok"
     }
   ],
@@ -365,9 +370,21 @@ const EMBEDDED = {
     {
       "time": "23:36:25",
       "msg": "Adversarial verification pass (required by the master decision rule even for warm-context runs) found+fixed D13. See docs/cma-lessons.md lesson 49. All 6 planned work items (schema v2, conditions engine rework, naming+design UI, allowOther, build+verify) done and green."
+    },
+    {
+      "time": "12:55:31",
+      "msg": "Planned via C:/Users/dwaig/.claude/plans/curried-chasing-flamingo.md (plan mode, Explore+Plan subagents dispatched to verify the predicate engine/KB pipeline/UI seams before committing to a design). Executed warm-context (well-scoped after planning). Two Plan-agent-caught corrections proved out during implementation: design.js's real re-render funnel is renderConditions() not renderAll(), and store.patch() rebinds the experiment root so no experiment reference may ever be cached."
+    },
+    {
+      "time": "12:55:31",
+      "msg": "Content: 16 rules drafted by Claude per the user's explicit 'I draft, you correct' instruction -- domain content awaits Daniel's review before being treated as authoritative."
+    },
+    {
+      "time": "12:57:23",
+      "msg": "D14 and D15 fixed and verified (write_kb_dev_js now names the offending file on malformed JSON; ci.yml now runs node --test web/tests/*.test.js)."
     }
   ],
-  "snapshot_at": "2026-07-30 23:36"
+  "snapshot_at": "2026-07-31 12:57"
 };
 /* CMA:EMBEDDED:END */
 
