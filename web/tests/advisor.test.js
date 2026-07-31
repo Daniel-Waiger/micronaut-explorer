@@ -8,7 +8,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { ADVICE_KINDS, ADVICE_SURFACES, loadAdvisorRules, selectAdvice } from '../src/engine/advisor.js';
+import {
+  ADVICE_KINDS,
+  ADVICE_SURFACES,
+  loadAdvisorRules,
+  selectAdvice,
+  summarizeTrigger,
+} from '../src/engine/advisor.js';
 import { describePredicate } from '../src/engine/predicate.js';
 import { compileFullMatch } from '../src/engine/validation.js';
 import { emptyExperiment } from '../src/core/schema.js';
@@ -262,6 +268,78 @@ test('selectAdvice mutates neither the rules array nor the experiment', () => {
   assert.equal(JSON.stringify(exp), expBefore);
 });
 
+// --- summarizeTrigger: the plain-English "why did this fire" clause -------
+// Deliberately derived FROM the predicate, not hand-authored, so it cannot
+// disagree with the real trigger condition -- these tests pin the mapping,
+// not a duplicate content author's opinion of it.
+
+test('summarizeTrigger on a single-value `in` predicate', () => {
+  assert.equal(
+    summarizeTrigger({ in: ['acquisition.modality', ['STED']] }),
+    'modality is STED'
+  );
+});
+
+test('summarizeTrigger on a two-value `in` predicate joins with "or"', () => {
+  assert.equal(
+    summarizeTrigger({ in: ['acquisition.modality', ['SEM', 'TEM']] }),
+    'modality is SEM or TEM'
+  );
+});
+
+test('summarizeTrigger on a three-plus-value `in` predicate uses a comma list before the final "or"', () => {
+  assert.equal(
+    summarizeTrigger({ in: ['acquisition.modality', ['STED', 'SEM', 'TEM']] }),
+    'modality is STED, SEM or TEM'
+  );
+});
+
+test('summarizeTrigger on an `eq` predicate', () => {
+  assert.equal(summarizeTrigger({ eq: ['acquisition.modality', 'STED'] }), 'modality is STED');
+});
+
+test('summarizeTrigger returns null for a path not in the curated label map', () => {
+  // Confirms it never leaks a raw dotted path into the sentence -- an
+  // unmapped path is an OMITTED clause, not 'naming.fields.sample is E02'.
+  assert.equal(summarizeTrigger({ eq: ['naming.fields.sample', 'E02'] }), null);
+});
+
+test('summarizeTrigger returns null for every predicate shape it does not summarize', () => {
+  const unsummarizable = [
+    { matches: ['acquisition.modality', 'STED'] },
+    { gt: ['design.biologicalReplicates', 1] },
+    { lt: ['design.biologicalReplicates', 1] },
+    { exists: 'acquisition.modality' },
+    { empty: 'acquisition.modality' },
+    { ne: ['acquisition.modality', 'STED'] },
+    { all: [{ eq: ['acquisition.modality', 'STED'] }] },
+    { any: [{ eq: ['acquisition.modality', 'STED'] }] },
+    { not: { eq: ['acquisition.modality', 'STED'] } },
+    true,
+    false,
+    undefined,
+    null,
+    'not an object',
+    42,
+    [],
+    { eq: ['acquisition.modality', 'STED'], ne: ['a', 'b'] }, // two keys -- malformed
+    { eq: ['acquisition.modality'] }, // wrong arity
+    { eq: [123, 'STED'] }, // non-string path
+    { in: ['acquisition.modality', []] }, // empty value list
+    { in: ['acquisition.modality', [1, 2]] }, // non-string values
+    { eq: ['acquisition.modality', 42] }, // non-string value
+  ];
+  for (const pred of unsummarizable) {
+    assert.equal(summarizeTrigger(pred), null, JSON.stringify(pred));
+  }
+});
+
+test('summarizeTrigger never throws on any input, malformed or not', () => {
+  for (const pred of [Symbol('x'), () => {}, new Date(), { in: null }, { eq: undefined }]) {
+    assert.doesNotThrow(() => summarizeTrigger(pred));
+  }
+});
+
 // ============================================================================
 // Committed content: reads the REAL web/kb/advisor.json, mirroring how
 // interview.test.js reads the real web/kb/questions.json. These guard the
@@ -481,6 +559,20 @@ test('every modality-gated rule targets at least one EXACT spelling from the rea
       return selectAdvice([rule], exp, null).length > 0;
     });
     assert.ok(matchesAnOption, `rule '${rule.id}' is modality-gated but matches none of ${JSON.stringify(modalityOptions)}`);
+  }
+});
+
+test('every committed rule produces a non-null summarizeTrigger clause', () => {
+  // All 16 rules currently use the simple {in: ['acquisition.modality', [...]]}
+  // shape, which summarizeTrigger recognizes -- pins that today's content
+  // actually gets the "Shown because ..." clause, not a silently omitted one.
+  // A future rule using a composite/unrecognized shape is EXPECTED to make
+  // this fail loudly rather than ship with no visible trigger explanation --
+  // when that happens, either broaden summarizeTrigger or accept the gap
+  // consciously by narrowing this assertion, not by deleting it.
+  const { rules } = loadAdvisorRules(realAdvisorRaw);
+  for (const rule of rules) {
+    assert.ok(summarizeTrigger(rule.when) !== null, `rule '${rule.id}' has no summarizable trigger`);
   }
 });
 

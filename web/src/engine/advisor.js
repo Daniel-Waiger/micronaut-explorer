@@ -197,3 +197,54 @@ export function selectAdvice(rules, experiment, surface) {
     .sort((a, b) => a.rule.priority - b.rule.priority || a.index - b.index)
     .map(({ rule }) => rule);
 }
+
+// Maps a predicate PATH to the plain-English field name summarizeTrigger
+// uses. Deliberately small and curated -- covers only paths advisor rules
+// actually reference today. An unmapped path makes summarizeTrigger return
+// null (see below) rather than leaking a raw dotted path like
+// 'acquisition.modality' into user-facing text.
+const TRIGGER_FIELD_LABELS = { 'acquisition.modality': 'modality' };
+
+/**
+ * A short, plain-English explanation of why a note fired -- "modality is
+ * STED", "modality is SEM or TEM" -- for display ALONGSIDE every note, not
+ * behind the debug flag describePredicate (engine/predicate.js) sits behind.
+ *
+ * Deliberately derived MECHANICALLY from the predicate rather than
+ * hand-authored per rule: a hand-written trigger string is a second,
+ * independent rendering of the same fact `when` already encodes, and this
+ * codebase has already shipped that exact defect shape twice (a display
+ * column disagreeing with an embedded filename token, a value written under
+ * one store path and read under another -- docs/cma-lessons.md lessons 49
+ * and 50). Deriving from `rule.when` itself means this text CANNOT disagree
+ * with the actual trigger condition the engine evaluates, by construction.
+ *
+ * TOTAL: only the two simplest predicate shapes this pack currently uses
+ * (`eq`, `in`, both on a single string path) are summarized. Anything else
+ * -- composite `all`/`any`/`not`, `matches`, `gt`/`lt`, `exists`/`empty`, or
+ * a path not in TRIGGER_FIELD_LABELS -- returns null. The caller omits the
+ * clause entirely in that case rather than showing something misleading or
+ * falling back to raw predicate syntax.
+ */
+export function summarizeTrigger(predicate) {
+  if (predicate === null || typeof predicate !== 'object' || Array.isArray(predicate)) return null;
+  const keys = Object.keys(predicate);
+  if (keys.length !== 1) return null;
+  const [op] = keys;
+  const arg = predicate[op];
+  if ((op !== 'eq' && op !== 'in') || !Array.isArray(arg) || arg.length !== 2) return null;
+
+  const [path, value] = arg;
+  if (typeof path !== 'string') return null;
+  const label = TRIGGER_FIELD_LABELS[path];
+  if (!label) return null;
+
+  if (op === 'eq') {
+    if (typeof value !== 'string') return null;
+    return `${label} is ${value}`;
+  }
+  // op === 'in'
+  if (!Array.isArray(value) || value.length === 0 || !value.every((v) => typeof v === 'string')) return null;
+  if (value.length === 1) return `${label} is ${value[0]}`;
+  return `${label} is ${value.slice(0, -1).join(', ')} or ${value[value.length - 1]}`;
+}

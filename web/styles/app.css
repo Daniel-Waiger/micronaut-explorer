@@ -362,6 +362,15 @@ button:focus-visible {
   line-height: 1.4;
 }
 
+/* Visible by default -- a plain-English "why is this showing" clause,
+   distinct from .advice-reason below (raw predicate syntax, debug-only). */
+.advice-trigger {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
 .advice-reason {
   font-family: var(--mono);
   font-size: 11.5px;

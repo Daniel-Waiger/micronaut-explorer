@@ -21,20 +21,27 @@
 // digit rule count, evaluatePredicate's depth-capped tree walk is free;
 // recomputing from scratch on every call is correct, not merely acceptable.
 
-import { selectAdvice } from '../engine/advisor.js';
+import { selectAdvice, summarizeTrigger } from '../engine/advisor.js';
 import { describePredicate } from '../engine/predicate.js';
 
 const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 
-// Mirrors shell.js's THEME_KEY pattern: a localStorage flag, read through a
-// try/catch so a disabled/unavailable localStorage degrades to "off" rather
-// than throwing. Unconditionally showing WHY a note fired would put
-// developer-facing predicate text (`acquisition.modality is one of [...]`)
-// in front of a scientist, and it would become a second, driftable
-// rendering of "why this applies" next to the rule's own prose `body` --
-// exactly the two-renderings-of-one-fact shape this project has already
-// been bitten by once. Behind a flag, it costs nothing and helps nobody but
-// the person authoring rules.
+// Every note shows a PLAIN-ENGLISH trigger clause by default (.advice-trigger
+// below, via engine/advisor.js's summarizeTrigger) -- a user reading a note
+// in isolation has no way to tell whether it is always shown or shown
+// because of something they entered, and "shown because modality is STED"
+// answers exactly that. summarizeTrigger is derived mechanically from the
+// SAME predicate the engine evaluates, so it cannot disagree with the real
+// trigger condition (see its own docstring).
+//
+// The RAW predicate text (describePredicate, engine/predicate.js) is a
+// SEPARATE, debug-only tier behind this flag -- mirrors shell.js's
+// THEME_KEY pattern, read through a try/catch so a disabled/unavailable
+// localStorage degrades to "off" rather than throwing. Unconditionally
+// showing raw predicate syntax (`acquisition.modality is one of [...]`)
+// would put developer-facing text in front of a scientist for no benefit
+// beyond what the friendly summary already gives; it stays reserved for
+// whoever is authoring or debugging a rule.
 const ADVISOR_DEBUG_KEY = 'micronaut.advisorDebug';
 
 function advisorDebugEnabled() {
@@ -63,6 +70,16 @@ function appendAdviceNote(list, note) {
   body.className = 'advice-body';
   body.textContent = note.body;
   item.appendChild(body);
+
+  // Visible by default -- see the module-header comment on why this is a
+  // separate, friendlier tier from the raw debug-only reason below.
+  const trigger = summarizeTrigger(note.when);
+  if (trigger) {
+    const triggerEl = document.createElement('div');
+    triggerEl.className = 'advice-trigger';
+    triggerEl.textContent = `Shown because ${trigger}.`;
+    item.appendChild(triggerEl);
+  }
 
   if (advisorDebugEnabled()) {
     const reason = document.createElement('div');
