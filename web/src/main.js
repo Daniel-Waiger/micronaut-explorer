@@ -1,8 +1,8 @@
-import { emptyExperiment, migrate } from './core/schema.js';
+import { emptyExperiment } from './core/schema.js';
 import { createStore } from './core/store.js';
 import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
-import { clearAll, listSaved, loadExperiment, saveExperiment } from './core/persist.js';
+import { clearAll, loadMostRecentRecoverable, saveExperiment } from './core/persist.js';
 import { shapeAppKb } from './engine/kbpack.js';
 import { namingStep } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
@@ -27,30 +27,25 @@ function loadAppKb() {
   return shapeAppKb(rawKb);
 }
 
+/**
+ * The thin wrapper around core/persist.js's loadMostRecentRecoverable that
+ * supplies main.js's own console.error logging and the emptyExperiment()
+ * fallback -- persist.js deliberately doesn't know what an empty
+ * experiment looks like, so `experiment: null` means "start fresh" here.
+ */
 function loadInitialExperiment() {
-  const saved = listSaved();
-  if (saved.length > 0) {
-    const raw = loadExperiment(saved[0]);
-    if (raw) {
-      try {
-        // Runs the C0-1 schema-version guard on the actual load path, not
-        // just in its own unit tests -- otherwise a future schema bump
-        // would be silently misread as the current version instead of
-        // raising the clear error migrate() exists to give.
-        return migrate(raw);
-      } catch (err) {
-        console.error('Discarding an unreadable autosave, starting fresh:', err);
-      }
-    }
-  }
-  return emptyExperiment();
+  const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
+    onUnreadable: (id, err) =>
+      console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
+  });
+  return { experiment: experiment || emptyExperiment(), skippedCount, totalSaved };
 }
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
 // top-level await since the released artifact is one classic (non-module,
 // non-async) IIFE.
 function init() {
-  const initialExperiment = loadInitialExperiment();
+  const { experiment: initialExperiment, skippedCount, totalSaved } = loadInitialExperiment();
   const store = createStore(initialExperiment);
 
   const kb = loadAppKb();
@@ -73,6 +68,18 @@ function init() {
   if (kb.issues.length > 0) {
     showToast(
       `Knowledge pack loaded with ${kb.issues.length} issue(s) -- some markers or guidance may be unavailable.`
+    );
+  }
+
+  // Shown AFTER the KB toast (shell.js's showToast is a single status
+  // element, not a queue -- the later call wins the visible window), since
+  // a possible-data-loss message is rarer and more consequential than a
+  // KB-content issue.
+  if (skippedCount > 0) {
+    showToast(
+      skippedCount < totalSaved
+        ? `Recovered your work -- skipped ${skippedCount} unreadable autosave(s) and used an older one instead.`
+        : `Couldn't read any of your ${totalSaved} saved experiment(s) -- starting fresh. Nothing was deleted.`
     );
   }
 

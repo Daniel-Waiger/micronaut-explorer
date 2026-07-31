@@ -18,6 +18,7 @@ import {
 import { describePredicate } from '../src/engine/predicate.js';
 import { compileFullMatch } from '../src/engine/validation.js';
 import { emptyExperiment } from '../src/core/schema.js';
+import { assayView, firstAssayId } from '../src/core/assay.js';
 import { getPath } from '../src/core/paths.js';
 
 function validRule(overrides = {}) {
@@ -394,7 +395,15 @@ function collectPaths(obj, prefix, out) {
 
 function legalAdvisorPaths() {
   const paths = new Set();
-  collectPaths(emptyExperiment(), '', paths);
+  // assayView(), not the raw study object -- advisor.json is written in the
+  // flat v2-shaped vocabulary assayView() exists to keep alive. Walking the
+  // raw emptyExperiment() would silently drop acquisition/design/panel/
+  // controls behind the now-nested `assays` array (collectPaths stops at
+  // any array), which would make this "legal" set legal for the wrong
+  // reason -- every rule uses acquisition.modality, which would still slip
+  // through via the question-field blind-add below regardless of whether
+  // the schema-derived half of this set actually found it.
+  collectPaths(assayView(emptyExperiment(), firstAssayId(emptyExperiment())), '', paths);
   paths.delete('');
   for (const q of realQuestionsRaw) {
     if (typeof q.field === 'string') paths.add(q.field);
@@ -448,9 +457,15 @@ function collectPredicatePaths(node, out) {
 // tests are the ones that must be examined and deliberately updated -- not
 // silently broken.
 
-test('every questions.json field resolves to a REAL path on emptyExperiment() (or a naming.fields.<token>)', () => {
+test('every questions.json field resolves to a REAL path on the assay view (or a naming.fields.<token>)', () => {
+  // Validated against assayView(), not the raw study object -- questions.json
+  // is written in the flat v2-shaped vocabulary (acquisition.modality,
+  // naming.fields.sample) that assayView() exists to keep alive for every KB
+  // consumer. The raw emptyExperiment() is now a nested per-assay study and
+  // was never the right thing to validate a KB path against.
+  const view = assayView(emptyExperiment(), firstAssayId(emptyExperiment()));
   const realPaths = new Set();
-  collectPaths(emptyExperiment(), '', realPaths);
+  collectPaths(view, '', realPaths);
   for (const match of REAL_NAMING_TEMPLATE.matchAll(/\{([^{}]+)\}/g)) {
     realPaths.add(`naming.fields.${match[1]}`);
   }

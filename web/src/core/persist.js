@@ -1,4 +1,5 @@
 import { uuid } from './ids.js';
+import { migrate } from './schema.js';
 
 // localStorage is a CONVENIENCE, never the record of truth: two users on a
 // shared-scope PC share one storage bucket under file://, IT can clear
@@ -86,6 +87,49 @@ export function listSaved({ storage = defaultBackend() } = {}) {
 
 export function loadExperiment(id, { storage = defaultBackend() } = {}) {
   return readJSON(storage, slotKey(id), null);
+}
+
+/**
+ * Load the most recent RECOVERABLE saved experiment, walking the ring
+ * newest to oldest rather than giving up after the newest slot. Without
+ * this, a single unmigrateable slot (corrupt JSON, or a bug in a
+ * migration) silently discards the WHOLE session -- every other, possibly
+ * perfectly good, ring slot along with it. A schema-version bump (like the
+ * v2->v3 assay tier) is exactly the kind of change this protects against:
+ * a bug in a fresh migration would previously have looked identical to "no
+ * autosave ever existed."
+ *
+ * Extracted here rather than living inline in main.js's loadInitialExperiment
+ * for the same reason engine/kbpack.js's shapeAppKb was extracted from
+ * main.js's loadAppKb: main.js calls init() at module scope, so nothing
+ * inside it can ever be imported by a test. This function's only dependency
+ * on schema.js is migrate() itself -- it deliberately does NOT know what an
+ * empty experiment looks like, so `experiment: null` (never
+ * emptyExperiment()) signals "nothing recoverable" and leaves the fallback
+ * decision to the caller.
+ *
+ * Returns { experiment, skippedCount, totalSaved }: `skippedCount` and
+ * `totalSaved` let a caller distinguish "recovered using an older save"
+ * from "every save was unreadable" -- materially different, and more
+ * worrying, messages.
+ */
+export function loadMostRecentRecoverable({ storage = defaultBackend(), onUnreadable } = {}) {
+  const saved = listSaved({ storage });
+  let skippedCount = 0;
+  for (const id of saved) {
+    const raw = loadExperiment(id, { storage });
+    if (!raw) {
+      skippedCount += 1;
+      continue;
+    }
+    try {
+      return { experiment: migrate(raw), skippedCount, totalSaved: saved.length };
+    } catch (err) {
+      if (onUnreadable) onUnreadable(id, err);
+      skippedCount += 1;
+    }
+  }
+  return { experiment: null, skippedCount, totalSaved: saved.length };
 }
 
 export function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceeded } = {}) {

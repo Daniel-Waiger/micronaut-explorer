@@ -9,6 +9,7 @@ import {
 } from '../../engine/interview.js';
 import { editTagFor } from '../../core/provenance.js';
 import { createAdvicePanel } from '../advice.js';
+import { assayView, scopeWrite } from '../../core/assay.js';
 
 const INTERVIEW_LIMIT = 8;
 
@@ -132,6 +133,12 @@ export function createDescribeStep(kb) {
     render(main, store, { showToast, advisor } = {}) {
       main.textContent = '';
 
+      // Commit 1 of the assay tier (schema v3): every experiment has
+      // exactly one assay and no switcher exists yet, so the active assay
+      // never changes for the lifetime of one render -- caching its id once
+      // here is safe, matching design.js/naming.js's identical idiom.
+      const assayId = store.get().activeAssayId;
+
       const heading = document.createElement('h1');
       heading.className = 'step-heading';
       heading.textContent = 'Describe what you did';
@@ -158,7 +165,7 @@ export function createDescribeStep(kb) {
       const advicePanel = createAdvicePanel(advisor || [], 'describe');
       main.appendChild(advicePanel.element);
       function updateAdvice() {
-        advicePanel.update(store.get());
+        advicePanel.update(assayView(store.get(), assayId));
       }
 
       const proposalsHeading = document.createElement('div');
@@ -236,7 +243,11 @@ export function createDescribeStep(kb) {
           acceptBtn.className = 'proposal-accept';
           acceptBtn.textContent = 'Accept';
           acceptBtn.addEventListener('click', () => {
-            const applied = store.setPath(proposal.path, proposal.value, proposal.tag);
+            // proposal.path is a v2-shaped path from engine/freetext.js
+            // (e.g. 'naming.fields.markers') -- assay-scoped like every
+            // question field, so it needs scopeWrite too.
+            const { path, slotKey } = scopeWrite(store.get(), proposal.path, assayId);
+            const applied = store.setPath(path, proposal.value, proposal.tag, { slotKey });
             pendingProposals = pendingProposals.filter((p) => p !== proposal);
             renderProposals();
             renderInterview();
@@ -274,7 +285,11 @@ export function createDescribeStep(kb) {
         // stays correct even if a future call site calls only one of the two.
         updateAdvice();
         interviewList.textContent = '';
-        const askable = nextQuestions(questionBank, store.get(), INTERVIEW_LIMIT);
+        // assayView() also carries the study-level provenance.skipped array
+        // through unchanged (see core/assay.js's projectProvenance), so
+        // nextQuestions' isSkipped check is unaffected by the assay scoping
+        // below -- only the per-question field paths need it.
+        const askable = nextQuestions(questionBank, assayView(store.get(), assayId), INTERVIEW_LIMIT);
         if (askable.length === 0) {
           const done = document.createElement('p');
           done.className = 'interview-empty';
@@ -311,7 +326,8 @@ export function createDescribeStep(kb) {
             const raw = control.getValue();
             if (!raw) return;
             const descriptor = recordAnswer(store.get(), question, coerceAnswer(question, raw));
-            store.setPath(descriptor.path, descriptor.value, descriptor.tag);
+            const { path, slotKey } = scopeWrite(store.get(), descriptor.path, assayId);
+            store.setPath(path, descriptor.value, descriptor.tag, { slotKey });
             renderInterview();
             renderAnswered();
           });
@@ -342,7 +358,7 @@ export function createDescribeStep(kb) {
       function renderAnswered() {
         updateAdvice(); // see the matching comment in renderInterview above
         answeredList.textContent = '';
-        const reviewable = answeredQuestions(questionBank, store.get());
+        const reviewable = answeredQuestions(questionBank, assayView(store.get(), assayId));
         if (reviewable.length === 0) {
           const empty = document.createElement('p');
           empty.className = 'interview-empty';
@@ -385,12 +401,12 @@ export function createDescribeStep(kb) {
             // provisional value and plain 'user' otherwise -- same rule the
             // naming step uses, so provenance stays consistent no matter which
             // surface the correction was made from.
-            const path = question.field;
-            const existingTag = store.get().provenance?.slots?.[path]?.tag ?? null;
+            const { path, slotKey } = scopeWrite(store.get(), question.field, assayId);
+            const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
             // Un-skip first: a skipped question being answered here must stop
             // being skipped, or it stays out of the ask list forever.
             unskipQuestion(store.get(), question.id);
-            store.setPath(path, coerceAnswer(question, raw), editTagFor(existingTag));
+            store.setPath(path, coerceAnswer(question, raw), editTagFor(existingTag), { slotKey });
             renderInterview();
             renderAnswered();
           });
@@ -406,8 +422,9 @@ export function createDescribeStep(kb) {
           reaskBtn.addEventListener('click', () => {
             const experiment = store.get();
             unskipQuestion(experiment, question.id);
+            const { slotKey } = scopeWrite(experiment, question.field, assayId);
             if (experiment.provenance?.slots) {
-              delete experiment.provenance.slots[question.field];
+              delete experiment.provenance.slots[slotKey];
             }
             store.patch({}); // notify/autosave for the in-place mutations above
             renderInterview();

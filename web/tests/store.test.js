@@ -15,10 +15,10 @@ test('get returns the current experiment', () => {
 
 test('getPath delegates to core/paths getPath against current state', () => {
   const experiment = emptyExperiment();
-  experiment.naming.fields.sample = 'E02';
+  experiment.assays[0].naming.fields.sample = 'E02';
   const store = createStore(experiment);
-  assert.equal(store.getPath('naming.fields.sample'), 'E02');
-  assert.equal(store.getPath('naming.fields.missing'), undefined);
+  assert.equal(store.getPath('assays[0].naming.fields.sample'), 'E02');
+  assert.equal(store.getPath('assays[0].naming.fields.missing'), undefined);
 });
 
 test('patch merges a partial object into state', () => {
@@ -146,4 +146,65 @@ test('a refused setPath does not schedule a notification by itself', async () =>
 
   assert.equal(ok, false);
   assert.equal(calls, 0);
+});
+
+// --- slotKey: provenance identity separate from the object write address --
+// Added for schema v3's assay tier (core/assay.js). A per-assay write's real
+// object address is index-based (assays[2].acquisition.modality), but an
+// array index is not a stable identity -- deleting assay 0 would silently
+// repoint every surviving slot at a different assay's provenance. slotKey
+// lets a caller track provenance by a stable id instead of by array index.
+
+test('setPath without a slotKey option behaves exactly as before (slotKey defaults to path)', () => {
+  const store = createStore(emptyExperiment());
+  store.setPath('naming.fields.sample', 'E02', 'user');
+  assert.equal(store.get().provenance.slots['naming.fields.sample'].tag, 'user');
+});
+
+test('setPath writes the VALUE at path but tags provenance at slotKey, when they differ', () => {
+  const store = createStore(emptyExperiment());
+  const ok = store.setPath('assays[0].acquisition.modality', 'STED', 'user', {
+    slotKey: 'assay:a1.acquisition.modality',
+  });
+  assert.equal(ok, true);
+  assert.equal(store.getPath('assays[0].acquisition.modality'), 'STED');
+  // Nothing under the literal path itself gets a provenance entry.
+  assert.equal(store.get().provenance.slots['assays[0].acquisition.modality'], undefined);
+  assert.equal(store.get().provenance.slots['assay:a1.acquisition.modality'].tag, 'user');
+});
+
+test('a STRONG write at slotKey refuses a later WEAK write at the SAME slotKey, even if the object path differs', () => {
+  // The scenario slotKey exists for: assay 0 gets deleted and a later assay
+  // is renumbered into index 0, but the id-based slotKey still correctly
+  // refers to the ORIGINAL assay's provenance.
+  const store = createStore(emptyExperiment());
+  store.setPath('assays[0].acquisition.modality', 'STED', 'user', { slotKey: 'assay:a1.acquisition.modality' });
+
+  const ok = store.setPath('assays[0].acquisition.modality', 'confocal', 'freetext', {
+    slotKey: 'assay:a1.acquisition.modality',
+  });
+
+  assert.equal(ok, false);
+  assert.equal(store.getPath('assays[0].acquisition.modality'), 'STED');
+});
+
+test('two different slotKeys are independent even when nothing else distinguishes the writes', () => {
+  const store = createStore(emptyExperiment());
+  store.setPath('assays[0].acquisition.modality', 'STED', 'user', { slotKey: 'assay:a1.acquisition.modality' });
+
+  // A different assay's slot, addressed at the SAME object path (a1 was
+  // deleted, a2 renumbered into index 0) -- must be a fresh, unwritten slot.
+  const ok = store.setPath('assays[0].acquisition.modality', 'confocal', 'user', {
+    slotKey: 'assay:a2.acquisition.modality',
+  });
+  assert.equal(ok, true);
+  assert.equal(store.get().provenance.slots['assay:a1.acquisition.modality'].tag, 'user');
+  assert.equal(store.get().provenance.slots['assay:a2.acquisition.modality'].tag, 'user');
+});
+
+test('clearing a value still tags default (WEAK) at slotKey, not at path', () => {
+  const store = createStore(emptyExperiment());
+  store.setPath('assays[0].acquisition.modality', 'STED', 'user', { slotKey: 'assay:a1.acquisition.modality' });
+  store.setPath('assays[0].acquisition.modality', '', 'user', { slotKey: 'assay:a1.acquisition.modality' });
+  assert.equal(store.get().provenance.slots['assay:a1.acquisition.modality'].tag, 'default');
 });

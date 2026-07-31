@@ -39,9 +39,19 @@ export function createStore(initialExperiment) {
 
   /**
    * Write `value` at `path`, tagged with the given provenance `tag`.
-   * Refuses (returns false, leaves state unchanged) when the slot at `path`
-   * already carries a STRONG tag and `tag` is not itself STRONG. Returns
-   * true and notifies subscribers on a successful write.
+   * Refuses (returns false, leaves state unchanged) when the slot at
+   * `slotKey` already carries a STRONG tag and `tag` is not itself STRONG.
+   * Returns true and notifies subscribers on a successful write.
+   *
+   * `slotKey` (default: `path`) is the provenance identity, kept separate
+   * from `path` (the object write address) for the assay tier (schema v3):
+   * a per-assay write's real address is index-based (`assays[2].acquisition
+   * .modality`, from core/assay.js's scopeWrite), but an array index is not
+   * a stable identity -- deleting assay 0 would silently repoint every
+   * surviving slot at a different assay's value. `slotKey` stays id-based
+   * (`assay:<id>.acquisition.modality`) so provenance tracks WHICH assay,
+   * not WHERE in the array it currently sits. Callers outside the assay
+   * tier never pass this and get the pre-v3 behaviour unchanged.
    *
    * An empty value (the user clearing a field) is a deliberate exception:
    * it always succeeds, regardless of the existing tag, and is tagged
@@ -54,17 +64,17 @@ export function createStore(initialExperiment) {
    * forever. There is no user action that could ever clear a lock like
    * that, which is exactly the deadlock repo lesson 37 warns against.
    */
-  function setValueAtPath(path, value, tag) {
+  function setValueAtPath(path, value, tag, { slotKey = path } = {}) {
     const isClearing = value === '' || value === null || value === undefined;
     const effectiveTag = isClearing ? 'default' : tag;
     if (!isClearing) {
-      const existingTag = state.provenance?.slots?.[path]?.tag ?? null;
+      const existingTag = state.provenance?.slots?.[slotKey]?.tag ?? null;
       if (!canOverwrite(existingTag, effectiveTag)) {
         return false;
       }
     }
     setPath(state, path, value);
-    tagSlot(state, path, effectiveTag);
+    tagSlot(state, slotKey, effectiveTag);
     scheduleNotify();
     return true;
   }

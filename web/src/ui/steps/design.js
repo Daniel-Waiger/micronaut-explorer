@@ -3,6 +3,7 @@ import { finalizeFields, renderName } from '../../engine/naming.js';
 import { validateTargetPath } from '../../engine/validation.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 import { createAdvicePanel } from '../advice.js';
+import { assayView, scopeWrite } from '../../core/assay.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
 function parseLevels(text) {
@@ -21,8 +22,12 @@ function parseLevels(text) {
  * the modality the interview collected as acquisition.modality, matching what
  * the per-row filenames below actually embed.
  */
-function baseNameFor(store) {
-  const finalized = finalizeFields('experiment.tif', effectiveNamingFields(store.get()), NAMING_CONFIG);
+function baseNameFor(store, assayId) {
+  const finalized = finalizeFields(
+    'experiment.tif',
+    effectiveNamingFields(assayView(store.get(), assayId)),
+    NAMING_CONFIG
+  );
   return renderName(finalized, { ...NAMING_CONFIG, template: BASE_TEMPLATE });
 }
 
@@ -32,6 +37,12 @@ export const designStep = {
   render(main, store, { advisor } = {}) {
     main.textContent = '';
 
+    // Commit 1 of the assay tier (schema v3): every experiment has exactly
+    // one assay and no switcher exists yet, so the active assay never
+    // changes for the lifetime of one render -- caching its id once here is
+    // safe, matching naming.js's identical snapshot-per-render idiom.
+    const assayId = store.get().activeAssayId;
+
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
     heading.textContent = 'Experimental design';
@@ -39,7 +50,7 @@ export const designStep = {
 
     function currentDesign() {
       return (
-        store.getPath('design') || {
+        assayView(store.get(), assayId).design || {
           groups: { levels: [] },
           factors: [],
           biologicalReplicates: null,
@@ -50,18 +61,26 @@ export const designStep = {
       );
     }
 
+    // Every write below goes through scopeWrite: the real object address is
+    // this assay's index-addressed slot (assays[n].design....), but
+    // provenance tracks the stable, id-addressed slotKey -- see
+    // core/assay.js's module header on why an array index is not a safe
+    // provenance identity.
+
     // Two write paths, deliberately: editing a factor's name/levels text
     // must NOT rebuild factorsList's DOM (that would destroy the very input
     // the user is mid-keystroke in, losing focus and cursor position on
     // every character). Only a structural change -- add/remove a factor --
     // needs the list rebuilt.
     function writeFactorsData(factors) {
-      store.setPath('design.factors', factors, 'user');
+      const { path, slotKey } = scopeWrite(store.get(), 'design.factors', assayId);
+      store.setPath(path, factors, 'user', { slotKey });
       renderConditions();
     }
 
     function writeFactorsStructure(factors) {
-      store.setPath('design.factors', factors, 'user');
+      const { path, slotKey } = scopeWrite(store.get(), 'design.factors', assayId);
+      store.setPath(path, factors, 'user', { slotKey });
       renderFactors();
       renderConditions();
     }
@@ -71,7 +90,8 @@ export const designStep = {
     // nothing structural to add/remove, so unlike factors there is only ever
     // one write path and no stale-closure risk from a sibling control.
     function writeGroups(levels) {
-      store.setPath('design.groups', { levels }, 'user');
+      const { path, slotKey } = scopeWrite(store.get(), 'design.groups', assayId);
+      store.setPath(path, { levels }, 'user', { slotKey });
       renderConditions();
     }
 
@@ -140,7 +160,8 @@ export const designStep = {
       input.title = hint;
       input.addEventListener('input', () => {
         const raw = input.value;
-        store.setPath(storePath, raw === '' ? null : Number(raw), 'user');
+        const { path, slotKey } = scopeWrite(store.get(), storePath, assayId);
+        store.setPath(path, raw === '' ? null : Number(raw), 'user', { slotKey });
         renderConditions();
       });
       row.appendChild(input);
@@ -285,9 +306,11 @@ export const designStep = {
       // scheme input, and mount via renderAll() (which itself calls this).
       // renderAll() is called exactly once, at mount, so hooking the advice
       // panel there instead would render it once and silently never update
-      // again. Passing store.get() directly (not a cached snapshot) matters
-      // because store.patch() rebinds the experiment root.
-      advicePanel.update(store.get());
+      // again. Reading store.get() fresh on every call (never a cached
+      // snapshot) matters because store.patch() rebinds the experiment
+      // root. assayView() hoists this assay's slices flat -- advisor rules
+      // read acquisition.modality etc. and must never learn assays exist.
+      advicePanel.update(assayView(store.get(), assayId));
 
       issuesList.textContent = '';
       for (const issue of issues) {
@@ -297,12 +320,12 @@ export const designStep = {
         issuesList.appendChild(li);
       }
 
-      baseNameValue.textContent = baseNameFor(store);
+      baseNameValue.textContent = baseNameFor(store, assayId);
 
       conditionsTable.textContent = '';
       // The SAME planner the Name builder renders its table from, so the two
       // steps cannot drift: one implementation, two views of it.
-      const planned = planFilenames(store.get(), NAMING_CONFIG);
+      const planned = planFilenames(assayView(store.get(), assayId), NAMING_CONFIG);
       if (planned.length === 0) {
         // With zero factors AND zero arm levels this design still expands to
         // exactly one unconditioned row (see conditions.js), so an empty
@@ -380,7 +403,8 @@ export const designStep = {
     }
 
     idSchemeInput.addEventListener('input', () => {
-      store.setPath('design.idScheme', idSchemeInput.value, 'user');
+      const { path, slotKey } = scopeWrite(store.get(), 'design.idScheme', assayId);
+      store.setPath(path, idSchemeInput.value, 'user', { slotKey });
       renderConditions();
     });
 

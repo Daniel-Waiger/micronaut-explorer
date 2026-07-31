@@ -13,11 +13,25 @@ import {
   answeredQuestions,
   unskipQuestion,
 } from '../src/engine/interview.js';
-import { emptyExperiment } from '../src/core/schema.js';
-
 const here = path.dirname(fileURLToPath(import.meta.url));
 const questionsPath = path.join(here, '..', 'kb', 'questions.json');
 const realQuestionsRaw = JSON.parse(readFileSync(questionsPath, 'utf-8'));
+
+/**
+ * interview.js is generic over whatever plain object it is given -- it only
+ * ever reads/writes through dotted-path lookups, never assumes the real v3
+ * Study shape (schema.js's own emptyExperiment() is now a per-assay NESTED
+ * shape; interview.js doesn't know or care). These tests build the minimal
+ * flat shape sampleQuestions()'s fields actually need, the same way
+ * plan.test.js/advisor.test.js duplicate a local fixture instead of relying
+ * on the real schema's exact, and now nested, structure.
+ */
+function bareExperiment() {
+  return {
+    naming: { fields: {} },
+    provenance: { slots: {}, unanswered: [], skipped: [] },
+  };
+}
 
 function withSlot(experiment, field, tag, value) {
   const next = JSON.parse(JSON.stringify(experiment));
@@ -95,28 +109,28 @@ test('loadQuestions defaults allowOther to false when absent, and coerces a trut
 
 test('a question whose askWhen predicate is false is NOT returned', () => {
   const questions = sampleQuestions();
-  const experiment = emptyExperiment(); // sample is '', so q3's eq-'E02' askWhen is false
+  const experiment = bareExperiment(); // sample is '', so q3's eq-'E02' askWhen is false
   const askable = nextQuestions(questions, experiment, 10);
   assert.ok(!askable.some((q) => q.id === 'q3'));
 });
 
 test('a question whose askWhen predicate becomes true IS returned', () => {
   const questions = sampleQuestions();
-  const experiment = withSlot(emptyExperiment(), 'naming.fields.sample', 'user', 'E02');
+  const experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'user', 'E02');
   const askable = nextQuestions(questions, experiment, 10);
   assert.ok(askable.some((q) => q.id === 'q3'));
 });
 
 test('a question whose slot holds a STRONG (user) tag is NOT re-asked', () => {
   const questions = sampleQuestions();
-  const experiment = withSlot(emptyExperiment(), 'naming.fields.sample', 'user', 'E02');
+  const experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'user', 'E02');
   const askable = nextQuestions(questions, experiment, 10);
   assert.ok(!askable.some((q) => q.id === 'q1'));
 });
 
 test('a question whose slot holds only a freetext (WEAK) tag IS still asked, with a suggestedDefault', () => {
   const questions = sampleQuestions();
-  const experiment = withSlot(emptyExperiment(), 'naming.fields.sample', 'freetext', 'E02');
+  const experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'freetext', 'E02');
   const askable = nextQuestions(questions, experiment, 10);
   const q1 = askable.find((q) => q.id === 'q1');
   assert.ok(q1, 'freetext-tagged slot must still be askable');
@@ -125,7 +139,7 @@ test('a question whose slot holds only a freetext (WEAK) tag IS still asked, wit
 
 test('skipping a question removes it from nextQuestions and lands in provenance.skipped', () => {
   const questions = sampleQuestions();
-  let experiment = emptyExperiment();
+  let experiment = bareExperiment();
   assert.ok(nextQuestions(questions, experiment, 10).some((q) => q.id === 'q1'));
 
   experiment = skipQuestion(experiment, 'q1');
@@ -140,7 +154,7 @@ test('nextQuestions respects priority order', () => {
     { id: 'high', field: 'b', type: 'text', priority: 1 },
     { id: 'mid', field: 'c', type: 'text', priority: 50 },
   ]);
-  const ids = nextQuestions(questions, emptyExperiment(), 10).map((q) => q.id);
+  const ids = nextQuestions(questions, bareExperiment(), 10).map((q) => q.id);
   assert.deepEqual(ids, ['high', 'mid', 'low']);
 });
 
@@ -150,12 +164,12 @@ test('nextQuestions respects limit', () => {
     { id: 'b', field: 'b', type: 'text', priority: 2 },
     { id: 'c', field: 'c', type: 'text', priority: 3 },
   ]);
-  assert.equal(nextQuestions(questions, emptyExperiment(), 2).length, 2);
+  assert.equal(nextQuestions(questions, bareExperiment(), 2).length, 2);
 });
 
 test('recordAnswer performs ZERO mutation on the experiment', () => {
   const question = { id: 'q1', field: 'naming.fields.sample', tag: 'user' };
-  const experiment = emptyExperiment();
+  const experiment = bareExperiment();
   const before = JSON.stringify(experiment);
 
   const descriptor = recordAnswer(experiment, question, 'E02');
@@ -165,7 +179,7 @@ test('recordAnswer performs ZERO mutation on the experiment', () => {
 });
 
 test('recordAnswer defaults to the user tag when a question carries none', () => {
-  const descriptor = recordAnswer(emptyExperiment(), { field: 'x' }, 'v');
+  const descriptor = recordAnswer(bareExperiment(), { field: 'x' }, 'v');
   assert.equal(descriptor.tag, 'user');
 });
 
@@ -203,7 +217,7 @@ test('an empty Experiment: nextQuestions(limit=8) returns at most 8, covering th
   const { questions, issues } = loadQuestions(realQuestionsRaw);
   assert.deepEqual(issues, []);
 
-  const askable = nextQuestions(questions, emptyExperiment(), 8);
+  const askable = nextQuestions(questions, bareExperiment(), 8);
   assert.ok(askable.length <= 8);
 
   const fields = askable.map((q) => q.field);
@@ -220,7 +234,7 @@ test('an empty Experiment: nextQuestions(limit=8) returns at most 8, covering th
 
 test('interviewProgress counts answered, skipped, askable and total', () => {
   const questions = sampleQuestions();
-  let experiment = withSlot(emptyExperiment(), 'naming.fields.sample', 'user', 'E02');
+  let experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'user', 'E02');
   experiment = skipQuestion(experiment, 'q2');
 
   const progress = interviewProgress(questions, experiment);
@@ -235,12 +249,12 @@ test('interviewProgress counts answered, skipped, askable and total', () => {
 // ability to put it back into play.
 
 test('answeredQuestions is empty on a fresh experiment', () => {
-  assert.deepEqual(answeredQuestions(sampleQuestions(), emptyExperiment()), []);
+  assert.deepEqual(answeredQuestions(sampleQuestions(), bareExperiment()), []);
 });
 
 test('answeredQuestions returns an answered question with its current value', () => {
   const questions = sampleQuestions();
-  const experiment = withSlot(emptyExperiment(), 'naming.fields.sample', 'user', 'E02');
+  const experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'user', 'E02');
 
   const reviewable = answeredQuestions(questions, experiment);
   const q1 = reviewable.find((q) => q.id === 'q1');
@@ -254,7 +268,7 @@ test('answeredQuestions returns an answered question with its current value', ()
 
 test('answeredQuestions reports a skipped question as skipped, with no value', () => {
   const questions = sampleQuestions();
-  const experiment = emptyExperiment();
+  const experiment = bareExperiment();
   skipQuestion(experiment, 'q2');
 
   const q2 = answeredQuestions(questions, experiment).find((q) => q.id === 'q2');
@@ -268,7 +282,7 @@ test('a WEAK freetext slot is NOT treated as answered -- it is still askable', (
   // the user to confirm them; counting those as "answered" would hide exactly
   // the values that most need review.
   const questions = sampleQuestions();
-  const experiment = withSlot(emptyExperiment(), 'naming.fields.sample', 'freetext', 'E02');
+  const experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'freetext', 'E02');
 
   assert.ok(!answeredQuestions(questions, experiment).some((q) => q.id === 'q1'));
   assert.ok(nextQuestions(questions, experiment, 10).some((q) => q.id === 'q1'));
@@ -276,7 +290,7 @@ test('a WEAK freetext slot is NOT treated as answered -- it is still askable', (
 
 test('unskipQuestion puts a skipped question back into the ask list', () => {
   const questions = sampleQuestions();
-  const experiment = emptyExperiment();
+  const experiment = bareExperiment();
 
   skipQuestion(experiment, 'q2');
   assert.ok(isSkipped(experiment, 'q2'));
@@ -289,7 +303,7 @@ test('unskipQuestion puts a skipped question back into the ask list', () => {
 });
 
 test('unskipQuestion is a no-op for a question that was never skipped', () => {
-  const experiment = emptyExperiment();
+  const experiment = bareExperiment();
   unskipQuestion(experiment, 'q9');
   assert.deepEqual(experiment.provenance.skipped, []);
 });
@@ -298,7 +312,7 @@ test('dropping an answered slot returns the question to the ask list', () => {
   // What the "Ask me again" control does: clearing the STRONG tag is what
   // makes nextQuestions willing to offer the question a second time.
   const questions = sampleQuestions();
-  const experiment = withSlot(emptyExperiment(), 'naming.fields.sample', 'user', 'E02');
+  const experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'user', 'E02');
   assert.ok(!nextQuestions(questions, experiment, 10).some((q) => q.id === 'q1'));
 
   delete experiment.provenance.slots['naming.fields.sample'];

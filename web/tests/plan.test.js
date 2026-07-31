@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { effectiveNamingFields, planFilenames } from '../src/engine/plan.js';
 import { emptyExperiment } from '../src/core/schema.js';
+import { assayView } from '../src/core/assay.js';
 
 // Mirrors ui/steps/naming.js's NAMING_CONFIG. Kept as a local literal rather
 // than imported: naming.js is a UI module that touches `document`, and the
@@ -28,12 +29,20 @@ function planConfig() {
   };
 }
 
+// planFilenames/effectiveNamingFields are pure v2-shaped functions that must
+// never learn assays exist (schema v3's assay tier -- see core/assay.js).
+// So this builds a real v3 study, sets the assay's own fields, and returns
+// it through assayView() -- the SAME path ui/steps/naming.js and design.js
+// use in the real app -- rather than grafting design/naming.fields/
+// acquisition onto a study's root, which would silently exercise a shape
+// the app never actually constructs.
 function experimentWith({ design = {}, fields = {}, acquisition = {} } = {}) {
-  const exp = emptyExperiment();
-  exp.design = { ...exp.design, ...design };
-  exp.naming.fields = fields;
-  exp.acquisition = { ...exp.acquisition, ...acquisition };
-  return exp;
+  const study = emptyExperiment();
+  const assay = study.assays[0];
+  assay.design = { ...assay.design, ...design };
+  assay.naming.fields = fields;
+  assay.acquisition = { ...assay.acquisition, ...acquisition };
+  return assayView(study, study.activeAssayId);
 }
 
 // --- effectiveNamingFields: the interview/name-builder path bridge ---------

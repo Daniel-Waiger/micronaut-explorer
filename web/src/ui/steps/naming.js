@@ -4,6 +4,7 @@ import { editTagFor } from '../../core/provenance.js';
 import { formatReplicateToken } from '../../engine/conditions.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 import { createAdvicePanel } from '../advice.js';
+import { assayView, scopeWrite } from '../../core/assay.js';
 
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
@@ -166,6 +167,12 @@ export const namingStep = {
   render(main, store, { advisor } = {}) {
     main.textContent = '';
 
+    // Commit 1 of the assay tier (schema v3): every experiment has exactly
+    // one assay and no switcher exists yet, so the active assay never
+    // changes for the lifetime of one render -- caching its id once here is
+    // safe, matching this file's existing snapshot-per-render idiom.
+    const assayId = store.get().activeAssayId;
+
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
     heading.textContent = 'Name builder';
@@ -180,7 +187,10 @@ export const namingStep = {
     // value the user already gave elsewhere (modality, collected by the
     // interview as acquisition.modality) shows up in the box it feeds rather
     // than leaving the box blank while the filename below quietly uses it.
-    const prefill = effectiveNamingFields(store.get());
+    // assayView() hoists the active assay's slices flat, exactly the shape
+    // effectiveNamingFields (an engine function that must never learn
+    // assays exist) already expects.
+    const prefill = effectiveNamingFields(assayView(store.get(), assayId));
     for (const field of FIELD_DEFS) {
       const row = document.createElement('label');
       row.className = 'field-row';
@@ -200,13 +210,17 @@ export const namingStep = {
       if (field.hint) input.title = field.hint;
       input.value = prefill[field.key] ?? '';
       input.addEventListener('input', () => {
-        const path = `naming.fields.${field.key}`;
+        // scopeWrite translates the flat v2-shaped path into this assay's
+        // real (index-addressed) object path plus its stable (id-addressed)
+        // provenance slotKey -- see core/assay.js's module header on why
+        // the two must differ for a per-assay field.
+        const { path, slotKey } = scopeWrite(store.get(), `naming.fields.${field.key}`, assayId);
         // 'user_edited' when correcting an existing WEAK/PROVISIONAL value
         // (e.g. one filled in from an accepted free-text proposal), plain
         // 'user' for a first-ever entry or one already STRONG -- see
         // core/provenance.js editTagFor.
-        const existingTag = store.get().provenance?.slots?.[path]?.tag ?? null;
-        store.setPath(path, input.value, editTagFor(existingTag));
+        const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
+        store.setPath(path, input.value, editTagFor(existingTag), { slotKey });
         update();
       });
       inputs[field.key] = input;
@@ -301,10 +315,10 @@ export const namingStep = {
     // the advice panel cannot evaluate two DIFFERENT experiments and quietly
     // disagree -- see docs/plans -- Advisor slice 1, Decision 4.
     function currentExperimentView() {
-      const experiment = store.get();
+      const view = assayView(store.get(), assayId);
       return {
-        ...experiment,
-        naming: { ...(experiment.naming || {}), fields: currentRawFields() },
+        ...view,
+        naming: { ...(view.naming || {}), fields: currentRawFields() },
       };
     }
 
