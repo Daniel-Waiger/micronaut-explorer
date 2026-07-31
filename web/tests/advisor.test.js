@@ -433,6 +433,57 @@ function collectPredicatePaths(node, out) {
   }
 }
 
+// --- Tripwires for the assay-tier refactor (schema v3) ---------------------
+// Written and passing BEFORE any schema change, per the plan: these must
+// break LOUDLY the moment a KB path stops resolving, rather than the app
+// just going quiet. Two failure modes a refactor could introduce silently:
+//   (a) a question-bank field pointing at a path nothing owns any more
+//       (getPath returns undefined, so the question just never re-fills);
+//   (b) a KB path using an array wildcard, which core/paths.js's getPath
+//       does not support (only listPaths fans out) -- evaluatePredicate then
+//       returns false FOREVER with no error anywhere. Verified directly:
+//       evaluatePredicate({in: ['assays[*].acquisition.modality', [...]]})
+//       is false regardless of the experiment.
+// If the assay tier ever needs a path like 'assays[*].something', these two
+// tests are the ones that must be examined and deliberately updated -- not
+// silently broken.
+
+test('every questions.json field resolves to a REAL path on emptyExperiment() (or a naming.fields.<token>)', () => {
+  const realPaths = new Set();
+  collectPaths(emptyExperiment(), '', realPaths);
+  for (const match of REAL_NAMING_TEMPLATE.matchAll(/\{([^{}]+)\}/g)) {
+    realPaths.add(`naming.fields.${match[1]}`);
+  }
+  for (const q of realQuestionsRaw) {
+    assert.ok(typeof q.field === 'string' && q.field, `question '${q.id}' has no field`);
+    assert.ok(realPaths.has(q.field), `question '${q.id}' writes to a dead path '${q.field}'`);
+  }
+});
+
+test('no path anywhere in the real KB (questions.json or advisor.json) uses an array wildcard or an assays[ index', () => {
+  const suspect = (p) => typeof p === 'string' && (p.includes('[*]') || p.includes('assays['));
+
+  for (const q of realQuestionsRaw) {
+    assert.ok(!suspect(q.field), `question '${q.id}' field '${q.field}' uses a wildcard/assays[ path`);
+    if (q.askWhen) {
+      const used = new Set();
+      collectPredicatePaths(q.askWhen, used);
+      for (const p of used) {
+        assert.ok(!suspect(p), `question '${q.id}' askWhen references '${p}', a wildcard/assays[ path`);
+      }
+    }
+  }
+
+  const { rules } = loadAdvisorRules(realAdvisorRaw);
+  for (const rule of rules) {
+    const used = new Set();
+    collectPredicatePaths(rule.when, used);
+    for (const p of used) {
+      assert.ok(!suspect(p), `rule '${rule.id}' references '${p}', a wildcard/assays[ path`);
+    }
+  }
+});
+
 test('the real web/kb/advisor.json loads with ZERO issues', () => {
   const { issues } = loadAdvisorRules(realAdvisorRaw);
   assert.deepEqual(issues, []);
