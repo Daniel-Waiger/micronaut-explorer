@@ -18,15 +18,16 @@
 import { indexKb, loadKb } from '../core/kb.js';
 import { loadAdvisorRules } from './advisor.js';
 import { loadControlRules, loadReadouts } from './controls.js';
+import { loadStages } from './stages.js';
 
 /**
  * Shape the raw KB object into { index, questions, advisor, readouts,
- * controlRules, issues }.
+ * controlRules, stages, stageRules, issues }.
  *
  * `raw` is globalThis.__MICRONAUT_KB__ (or an already-defaulted `{}`):
  * an object keyed by filename stem -- `raw.markers`, `raw.questions`,
- * `raw.advisor`, `raw.readouts`, `raw.controls` -- aggregated at build/dev
- * time from web/kb/*.json.
+ * `raw.advisor`, `raw.readouts`, `raw.controls`, `raw.stages` --
+ * aggregated at build/dev time from web/kb/*.json.
  *
  * TOTAL, like every loader it composes: a missing or malformed `raw`, or any
  * missing key on it, degrades to a usable empty shape plus issues, never a
@@ -43,6 +44,7 @@ export function shapeAppKb(raw) {
   const { rules: advisor, issues: advisorIssues } = loadAdvisorRules(source.advisor);
   const { readouts, issues: readoutIssues } = loadReadouts(source.readouts);
   const { rules: controlRules, issues: controlIssues } = loadControlRules(source.controls);
+  const { stages, rules: stageRules, issues: stageIssues } = loadStages(source.stages);
 
   return {
     index,
@@ -50,6 +52,8 @@ export function shapeAppKb(raw) {
     advisor,
     readouts,
     controlRules,
-    issues: [...markerIssues, ...advisorIssues, ...readoutIssues, ...controlIssues],
+    stages,
+    stageRules,
+    issues: [...markerIssues, ...advisorIssues, ...readoutIssues, ...controlIssues, ...stageIssues],
   };
 }
