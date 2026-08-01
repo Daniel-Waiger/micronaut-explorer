@@ -172,12 +172,12 @@ export const designStep = {
     const bioRepInput = makeReplicatesRow(
       'Biological replicates',
       'design.biologicalReplicates',
-      'How many biological replicates you have -- different animals, dishes, or samples. Leave blank if this doesn’t apply to your experiment.'
+      "How many biological replicates you have -- different animals, dishes, or samples. Leave blank if this doesn't apply to your experiment."
     );
     const techRepInput = makeReplicatesRow(
       'Technical replicates',
       'design.technicalReplicates',
-      'How many technical replicates you have -- repeat measurements of the SAME sample. Leave blank if this doesn’t apply.'
+      "How many technical replicates you have -- repeat measurements of the SAME sample. Leave blank if this doesn't apply."
     );
 
     const idSchemeRow = document.createElement('label');

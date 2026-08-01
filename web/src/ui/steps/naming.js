@@ -114,14 +114,14 @@ const FIELD_DEFS = [
     label: 'Biological replicate #',
     placeholder: 'optional',
     type: 'number',
-    hint: 'Which biological replicate this is -- a repeat done with a different animal, dish, or sample. Leave blank if this doesn’t apply to your experiment.',
+    hint: "Which biological replicate this is -- a repeat done with a different animal, dish, or sample. Leave blank if this doesn't apply to your experiment.",
   },
   {
     key: 'techrep',
     label: 'Technical replicate #',
     placeholder: 'optional',
     type: 'number',
-    hint: 'Which technical replicate this is -- a repeat measurement of the SAME sample. Leave blank if this doesn’t apply.',
+    hint: "Which technical replicate this is -- a repeat measurement of the SAME sample. Leave blank if this doesn't apply.",
   },
   {
     key: 'notes',

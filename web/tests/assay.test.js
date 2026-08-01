@@ -177,6 +177,20 @@ test('scopeWrite treats naming.fields.* as scoped but naming.template as study-l
   assert.equal(scopeWrite(study, 'naming.template', 'a1').path, 'naming.template');
 });
 
+test('scopeWrite also scopes the BARE naming.fields container, not just a leaf field beneath it', () => {
+  // Regression: isNamingFieldPath originally required a trailing '.', so
+  // 'naming.fields' itself (as opposed to 'naming.fields.sample') fell
+  // through as study-level and would have auto-vivified a phantom
+  // naming.fields object at the study root on write -- no caller hits this
+  // path today (both UI steps always write a specific leaf field), but a
+  // future bulk write ('clear all naming fields') would have hit it silently.
+  const study = studyWith();
+  assert.deepEqual(scopeWrite(study, 'naming.fields', 'a1'), {
+    path: 'assays[0].naming.fields',
+    slotKey: 'assay:a1.naming.fields',
+  });
+});
+
 test('scopeWrite passes a study-level path through with path === slotKey', () => {
   const study = studyWith();
   assert.deepEqual(scopeWrite(study, 'narrative.text', 'a1'), {

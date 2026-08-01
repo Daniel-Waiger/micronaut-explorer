@@ -12,7 +12,7 @@
 // (assayView/scopeWrite) that lets every engine module and every KB path
 // stay written against the flat v2 shape forever.
 
-import { ASSAY_SCOPED_ROOTS, emptyAssay } from './assay.js';
+import { emptyAssay, isAssayScopedPath } from './assay.js';
 import { shortId } from './ids.js';
 
 export const SCHEMA_VERSION = 3;
@@ -191,6 +191,10 @@ function migrateV2toV3(obj) {
  * Move every v2 provenance slot whose path now lives under an assay to the
  * v3-shaped 'assay:<id>.<path>' key -- exactly what core/assay.js's
  * scopeWrite would have produced had the write happened after migration.
+ * Uses core/assay.js's isAssayScopedPath rather than a second copy of that
+ * check, so a migrated slot's scoping can never disagree with a live
+ * write's scoping -- see that function's own docstring for why a near-miss
+ * on this exact duplication is what prompted exporting it.
  *
  * Skipping this is the single easiest way to break the migration
  * invisibly: interview.js looks up a slot by the LITERAL field path, so a
@@ -203,9 +207,7 @@ function rescopeProvenance(provenance, assayId) {
   const slots = src.slots && typeof src.slots === 'object' ? src.slots : {};
   const next = {};
   for (const [slotPath, slot] of Object.entries(slots)) {
-    const root = String(slotPath).split(/[.[]/)[0];
-    const scoped = ASSAY_SCOPED_ROOTS.has(root) || String(slotPath).startsWith('naming.fields.');
-    next[scoped ? `assay:${assayId}.${slotPath}` : slotPath] = slot;
+    next[isAssayScopedPath(slotPath) ? `assay:${assayId}.${slotPath}` : slotPath] = slot;
   }
   return {
     slots: next,

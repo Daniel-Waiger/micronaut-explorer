@@ -18,20 +18,33 @@
 // weak-tagged write, keeps that check possible while still making the
 // common case (every assay uses the same arms) a one-click "apply to all".
 //
-// Pure module: no DOM, no store. Imports only core/paths.js (unused
-// directly today, kept out of the import list to stay a true leaf) and
-// core/ids.js's shortId for assay identity.
+// Pure module: no DOM, no store, no imports at all -- a true leaf.
 
 // The v2 roots that move under each assay. `naming.fields` moves too but is
 // handled separately below (naming.template/plannedNames stay study-level,
 // so it isn't a whole top-level root).
 export const ASSAY_SCOPED_ROOTS = new Set(['specimen', 'design', 'panel', 'acquisition', 'controls']);
 
+// Matches the bare container ('naming.fields' itself, e.g. a future bulk
+// write) AND any leaf beneath it ('naming.fields.sample'). Missing the bare
+// case used to mean scopeWrite(exp, 'naming.fields', id) fell through as
+// study-level and landed in a phantom naming.fields object at the study
+// root -- exactly the auto-vivify-on-write hazard this module exists to
+// prevent, just for the one scoped path that isn't a whole top-level root.
 function isNamingFieldPath(path) {
-  return typeof path === 'string' && path.startsWith('naming.fields.');
+  return typeof path === 'string' && (path === 'naming.fields' || path.startsWith('naming.fields.'));
 }
 
-function isAssayScopedPath(path) {
+/**
+ * True if `path` addresses something that lives on an assay rather than the
+ * study. Exported so every caller that needs this predicate -- scopeWrite
+ * below, and schema.js's migration-time provenance rescoping -- shares the
+ * ONE implementation. Two copies of this exact check once nearly happened
+ * (see git history); a KB path's scoping and a migrated slot's scoping
+ * disagreeing would be the same two-renderings-of-one-fact defect this
+ * project has already shipped twice (lessons 49, 50).
+ */
+export function isAssayScopedPath(path) {
   const root = typeof path === 'string' ? path.split(/[.[]/)[0] : '';
   return ASSAY_SCOPED_ROOTS.has(root) || isNamingFieldPath(path);
 }
