@@ -16,8 +16,14 @@
     {
       "name": "planner-web-dev",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8778", "--directory", "web"],
-      "port": 8778
+      "runtimeArgs": ["tools/serve_dir.py", "web"],
+      "autoPort": true
+    },
+    {
+      "name": "planner-web-dist",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8779", "--directory", "dist"],
+      "port": 8779
     }
   ]
 }
