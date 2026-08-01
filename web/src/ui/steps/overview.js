@@ -45,12 +45,20 @@ function appendLabeledNode(parent, className, text) {
 }
 
 /**
- * The controls sub-tree: THREE-STATE rendering is mandatory (Decision 5,
- * docs/plans/planner-web-assay-tier.md) -- an empty controls list must
- * never look identical to "nothing to show", since silence there reads as
- * "this assay needs no controls," the most dangerous false negative a
- * controls advisor can produce. Each of the three states gets its OWN
- * visible text, never a shared blank state.
+ * The controls sub-tree: THREE(-plus-one)-STATE rendering is mandatory
+ * (Decision 5, docs/plans/planner-web-assay-tier.md) -- an empty controls
+ * list must never look identical to "nothing to show", since silence there
+ * reads as "this assay needs no controls," the most dangerous false
+ * negative a controls advisor can produce. `controls.readoutMessage` is the
+ * SINGLE resolved string for whichever state applies
+ * (engine/studydoc.js's readoutMessageFor) -- read here verbatim, never
+ * re-derived, so this can never disagree with render/markdown.js's
+ * rendering of the identical fact. An adversarial pass on an earlier
+ * version of this commit found exactly that divergence (a recognized
+ * readout with zero matching rules read as "not recognized" in one
+ * renderer and "no guidance yet" in the other) -- lesson 49/50's failure
+ * shape recurring inside the commit that names those lessons as its
+ * motivation. This is the structural fix, not a second discipline.
  */
 function renderControlsNode(parent, controls) {
   const box = document.createElement('div');
@@ -61,29 +69,15 @@ function renderControlsNode(parent, controls) {
   heading.textContent = 'Controls';
   box.appendChild(heading);
 
-  if (controls.panel.length === 0 && controls.readout.length === 0) {
-    const empty = document.createElement('p');
-    empty.className = 'overview-controls-empty';
-    empty.textContent =
-      controls.state === 'unanswered'
-        ? 'Readout not answered yet -- answer it on the Describe step to see readout-specific control guidance.'
-        : `"${controls.readoutText}" is not a readout this app recognizes -- controls here are yours to specify.`;
-    box.appendChild(empty);
-  }
-
-  for (const group of [
-    { items: controls.panel, label: 'Panel-derived' },
-    { items: controls.readout, label: 'Readout-specific' },
-  ]) {
-    if (group.items.length === 0) continue;
+  if (controls.panel.length > 0) {
     const groupLabel = document.createElement('div');
     groupLabel.className = 'overview-controls-group-label';
-    groupLabel.textContent = group.label;
+    groupLabel.textContent = 'Panel-derived';
     box.appendChild(groupLabel);
 
     const list = document.createElement('ul');
     list.className = 'overview-controls-list';
-    for (const control of group.items) {
+    for (const control of controls.panel) {
       const li = document.createElement('li');
       const strong = document.createElement('strong');
       strong.textContent = control.title;
@@ -94,9 +88,34 @@ function renderControlsNode(parent, controls) {
     box.appendChild(list);
   }
 
+  const readoutLabel = document.createElement('div');
+  readoutLabel.className = 'overview-controls-group-label';
+  readoutLabel.textContent = 'Readout-specific';
+  box.appendChild(readoutLabel);
+
+  if (controls.readout.length > 0) {
+    const list = document.createElement('ul');
+    list.className = 'overview-controls-list';
+    for (const control of controls.readout) {
+      const li = document.createElement('li');
+      const strong = document.createElement('strong');
+      strong.textContent = control.title;
+      li.appendChild(strong);
+      li.appendChild(document.createTextNode(` — ${control.why}`));
+      list.appendChild(li);
+    }
+    box.appendChild(list);
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'overview-controls-empty';
+    empty.textContent = controls.readoutMessage;
+    box.appendChild(empty);
+  }
+
   parent.appendChild(box);
 }
 
+/** The fixed 5-stage backbone, rendered ONCE for the whole study -- see engine/studydoc.js's stageNotes comment for why. */
 function renderLadderNode(parent, ladder) {
   const box = document.createElement('div');
   box.className = 'overview-ladder';
@@ -120,19 +139,38 @@ function renderLadderNode(parent, ladder) {
     body.textContent = stage.body;
     li.appendChild(body);
 
-    if (stage.notes.length > 0) {
-      const notes = document.createElement('ul');
-      notes.className = 'overview-ladder-notes';
-      for (const note of stage.notes) {
-        const noteLi = document.createElement('li');
-        noteLi.textContent = note;
-        notes.appendChild(noteLi);
-      }
-      li.appendChild(notes);
-    }
     ol.appendChild(li);
   }
   box.appendChild(ol);
+  parent.appendChild(box);
+}
+
+/** Per-assay STUDY-SPECIFIC notes only -- omitted entirely when an assay has none, per engine/studydoc.js's stageNotes. */
+function renderStageNotesNode(parent, stageNotes) {
+  if (stageNotes.length === 0) return;
+  const box = document.createElement('div');
+  box.className = 'overview-ladder';
+
+  const heading = document.createElement('div');
+  heading.className = 'overview-node-title';
+  heading.textContent = 'Notes for this assay';
+  box.appendChild(heading);
+
+  for (const stage of stageNotes) {
+    const title = document.createElement('div');
+    title.className = 'overview-ladder-title';
+    title.textContent = stage.stageTitle;
+    box.appendChild(title);
+
+    const notes = document.createElement('ul');
+    notes.className = 'overview-ladder-notes';
+    for (const note of stage.notes) {
+      const li = document.createElement('li');
+      li.textContent = note;
+      notes.appendChild(li);
+    }
+    box.appendChild(notes);
+  }
   parent.appendChild(box);
 }
 
@@ -165,7 +203,7 @@ function renderAssayNode(parent, assay) {
   }
 
   renderControlsNode(box, assay.controls);
-  renderLadderNode(box, assay.ladder);
+  renderStageNotesNode(box, assay.stageNotes);
 
   const filesHeading = document.createElement('div');
   filesHeading.className = 'overview-node-title';
@@ -249,6 +287,10 @@ export function createOverviewStep(kb) {
         }
         main.appendChild(issuesList);
       }
+
+      // Rendered ONCE for the whole study -- see engine/studydoc.js's
+      // stageNotes comment for why this moved out of the per-assay loop.
+      renderLadderNode(main, doc.ladder);
 
       const tree = document.createElement('div');
       tree.className = 'overview-tree';

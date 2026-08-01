@@ -33,6 +33,37 @@ function assayLabel(assay, index) {
 }
 
 /**
+ * The SINGLE resolved three(-plus-one)-state message for the readout-
+ * specific controls section, or `null` when the fired `readout` list itself
+ * is what should render. Computed ONCE here so both renderers (overview.js,
+ * render/markdown.js) display a string rather than each re-deriving the
+ * gating condition -- an adversarial verification pass on this exact commit
+ * found the two renderers had drifted on this precise case (a recognized
+ * readout with zero matching rules read as "not recognized" in one renderer
+ * and "no guidance yet" in the other), which is lesson 49/50's failure shape
+ * recurring inside the commit that names those lessons as its motivation.
+ * Moving the text here removes the possibility structurally, not by
+ * discipline -- see this module's header.
+ *
+ * Three real states plus the "known but nothing fired" case Decision 5
+ * (docs/plans/planner-web-assay-tier.md) requires never render as silence:
+ *   unanswered   -> prompt to answer the question
+ *   unrecognized -> the readout doesn't match the vocabulary
+ *   known, 0 rules -> genuinely no authored guidance for this readout yet
+ *   known, >0 rules -> null; the caller renders the list itself
+ */
+function readoutMessageFor(state, readoutText, readoutLabel, readoutRuleCount) {
+  if (state === 'unanswered') {
+    return 'Readout not answered yet -- answer it on the Describe step to see readout-specific control guidance.';
+  }
+  if (state === 'unrecognized') {
+    return `"${readoutText}" is not a readout this app recognizes -- controls here are yours to specify.`;
+  }
+  // state === 'known'
+  return readoutRuleCount > 0 ? null : `No control guidance for ${readoutLabel} yet.`;
+}
+
+/**
  * Build the full study document. `kb` is the shaped knowledge pack
  * (engine/kbpack.js's shapeAppKb output: readouts, controlRules, stages,
  * stageRules). `config` is the naming config (ui/steps/naming.js's
@@ -64,19 +95,31 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
     const readoutLabel = canonical && readouts[canonical] ? readouts[canonical].label : null;
 
     const firedControls = selectControls(controlRules, view);
+    const readoutControls = firedControls
+      .filter((r) => r.kind === 'readout')
+      .map((r) => ({ id: r.id, title: r.title, why: r.why }));
     const controls = {
       state: rState,
       readoutText: view.readoutText || '',
       panel: firedControls.filter((r) => r.kind === 'panel').map((r) => ({ id: r.id, title: r.title, why: r.why })),
-      readout: firedControls.filter((r) => r.kind === 'readout').map((r) => ({ id: r.id, title: r.title, why: r.why })),
+      readout: readoutControls,
+      readoutMessage: readoutMessageFor(rState, view.readoutText || '', readoutLabel, readoutControls.length),
     };
 
-    const ladder = buildLadder(stages, stageRules, view).map((stage) => ({
-      id: stage.id,
-      title: stage.title,
-      body: stage.body,
-      notes: stage.notes,
-    }));
+    // Per-assay STUDY-SPECIFIC NOTES only -- the fixed 5-stage backbone
+    // (title/body) is identical for every assay by construction (it is
+    // static content from web/kb/stages.json, not derived from the
+    // experiment), so it is hoisted to `doc.ladder` below and rendered
+    // ONCE. Repeating five paragraphs of identical boilerplate per assay
+    // was a real defect an adversarial pass caught: the oregano default
+    // study's Markdown export showed the same "How to run this project"
+    // section four times verbatim, in the document whose whole purpose is
+    // being shown to a person. Only non-empty stages survive the filter --
+    // an assay with no study-specific notes contributes nothing here,
+    // which is correct (the ladder's fixed body already covers it once).
+    const stageNotes = buildLadder(stages, stageRules, view)
+      .filter((stage) => stage.notes.length > 0)
+      .map((stage) => ({ stageId: stage.id, stageTitle: stage.title, notes: stage.notes }));
 
     return {
       id: assay.id,
@@ -101,7 +144,7 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
         issues: designIssues,
       },
       controls,
-      ladder,
+      stageNotes,
       namingFields: effectiveNamingFields(view),
       filenames: filenamePlan.map((entry) => ({
         groupLabel: entry.groupLabel,
@@ -118,6 +161,10 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
       researchQuestion: exp.researchQuestion || '',
       armVocabulary: (exp.armVocabulary && Array.isArray(exp.armVocabulary.levels) ? exp.armVocabulary.levels : []).slice(),
     },
+    // The fixed 5-stage "how to run this project" backbone, ONCE for the
+    // whole study -- see the stageNotes comment above for why this is
+    // study-level rather than repeated per assay.
+    ladder: stages.map((stage) => ({ id: stage.id, title: stage.title, body: stage.body })),
     assays: assayDocs,
     crossAssayIssues: studyNameIssues(exp, config, baseTemplate),
   };

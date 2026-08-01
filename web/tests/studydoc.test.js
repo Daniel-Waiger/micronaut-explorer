@@ -161,20 +161,70 @@ test('an unrecognized readout answer resolves to "unrecognized", not silence', (
   assert.deepEqual(doc.assays[0].controls.readout, []);
 });
 
-test('every assay gets the full 5-stage ladder, with per-modality notes attached to the right stage', () => {
+test('the study gets the full 5-stage ladder ONCE, not per assay', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  assert.deepEqual(
+    doc.ladder.map((s) => s.id),
+    ['idea', 'pilot', 'validate-controls', 'acquisition-settings', 'advanced-modality']
+  );
+  // Every stage has real body text, and the ladder does NOT live on the
+  // assay objects -- regression guard for the bug an adversarial pass
+  // found: the identical 5-paragraph ladder rendered four times verbatim
+  // in the Markdown export, once per assay, because it lived on the assay
+  // instead of the study.
+  for (const stage of doc.ladder) assert.ok(stage.body.length > 0);
+  for (const assay of doc.assays) assert.equal(assay.ladder, undefined);
+});
+
+test('every default-study assay has zero stageNotes (none use STED/light-sheet/SEM/TEM)', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   for (const assay of doc.assays) {
-    assert.deepEqual(
-      assay.ladder.map((s) => s.id),
-      ['idea', 'pilot', 'validate-controls', 'acquisition-settings', 'advanced-modality']
-    );
+    assert.deepEqual(assay.stageNotes, [], `assay '${assay.label}' unexpectedly has study-specific notes for modality '${assay.modality}'`);
   }
-  // All 4 default-study assays use 'confocal' or 'live-cell phase contrast'
-  // -- neither is STED/light-sheet/SEM/TEM, so no pilot notes should fire.
+});
+
+test('a STED assay gets a pilot stageNote, scoped to that assay only', () => {
+  const study = createDefaultStudy();
+  study.assays[0].acquisition = { ...study.assays[0].acquisition, modality: 'STED' };
+  const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const [viability, ...rest] = doc.assays;
+  assert.equal(viability.stageNotes.length, 1);
+  assert.equal(viability.stageNotes[0].stageId, 'pilot');
+  assert.ok(viability.stageNotes[0].notes[0].includes('confocal'));
+  for (const assay of rest) assert.deepEqual(assay.stageNotes, []);
+});
+
+// --- The exact bug an adversarial pass found: renderer parity on the
+// "known readout, zero matching control rules" case ------------------------
+
+test('controls.readoutMessage is null exactly when the readout list is non-empty, never both or neither', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   for (const assay of doc.assays) {
-    const pilotStage = assay.ladder.find((s) => s.id === 'pilot');
-    assert.deepEqual(pilotStage.notes, [], `assay '${assay.label}' unexpectedly has a pilot note for modality '${assay.modality}'`);
+    if (assay.controls.readout.length > 0) {
+      assert.equal(assay.controls.readoutMessage, null);
+    } else {
+      assert.equal(typeof assay.controls.readoutMessage, 'string');
+    }
   }
+});
+
+test('a KNOWN readout with zero matching control rules gets "no guidance yet", not "not recognized"', () => {
+  // Synthesize a kb where a readout is real (in the vocabulary) but has no
+  // control rule at all -- exactly the case the adversarial pass used to
+  // reproduce the HTML/Markdown divergence.
+  const kb = realKb();
+  kb.readouts = { ...kb.readouts, 'no-rules-readout': { label: 'No Rules Readout', aliases: [] } };
+  const study = createDefaultStudy();
+  study.assays[0].readoutText = 'No Rules Readout';
+  study.assays[0].readout = 'no-rules-readout';
+  study.assays[0].naming = { fields: {} }; // no markers -> zero panel controls too
+  const doc = buildStudyDocument(study, kb, NAMING_CONFIG, BASE_TEMPLATE);
+  const assay = doc.assays[0];
+  assert.equal(assay.readout.state, 'known');
+  assert.deepEqual(assay.controls.panel, []);
+  assert.deepEqual(assay.controls.readout, []);
+  assert.equal(assay.controls.readoutMessage, 'No control guidance for No Rules Readout yet.');
+  assert.doesNotMatch(assay.controls.readoutMessage, /not recognize/);
 });
 
 // --- Markdown rendering: the three-state controls rule survives to text --
@@ -183,6 +233,18 @@ test('renderMarkdown never renders an empty controls section as silence', () => 
   const doc = buildStudyDocument(emptyExperiment(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const md = renderMarkdown(doc);
   assert.match(md, /Readout not answered yet/);
+});
+
+test('renderMarkdown renders the "How to run this project" ladder EXACTLY ONCE, not once per assay', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const md = renderMarkdown(doc);
+  assert.equal(doc.assays.length, 4, 'sanity: the default study has 4 assays');
+  const headingCount = (md.match(/^## How to run this project$/gm) || []).length;
+  assert.equal(headingCount, 1, `expected exactly one ladder heading, got ${headingCount}`);
+  // The ladder's first stage body is long and distinctive enough that a
+  // count of 1 here directly falsifies the old per-assay duplication bug.
+  const bodyOccurrences = md.split(doc.ladder[0].body).length - 1;
+  assert.equal(bodyOccurrences, 1, `expected the ladder body to appear once, got ${bodyOccurrences}`);
 });
 
 test('renderMarkdown embeds a ```mermaid fenced block containing the mermaid source', () => {

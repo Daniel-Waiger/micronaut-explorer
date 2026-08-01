@@ -46,45 +46,51 @@ function designSection(design) {
 }
 
 /**
- * Controls section: the three-state rendering is mandatory (Decision 5,
- * docs/plans/planner-web-assay-tier.md) -- an empty list must never render
- * as silence, since silence reads as "this assay needs no controls," the
- * most dangerous false negative a controls advisor can produce.
+ * Controls section: the three(-plus-one)-state rendering is mandatory
+ * (Decision 5, docs/plans/planner-web-assay-tier.md) -- an empty list must
+ * never render as silence, since silence reads as "this assay needs no
+ * controls," the most dangerous false negative a controls advisor can
+ * produce. `controls.readoutMessage` is the SINGLE resolved string for
+ * whichever state applies (studydoc.js's readoutMessageFor) -- read here
+ * verbatim rather than re-derived, so this can never disagree with
+ * ui/steps/overview.js's rendering of the identical fact (an adversarial
+ * pass on an earlier version of this commit found exactly that divergence).
  */
 function controlsSection(controls) {
   const lines = ['**Controls:**'];
-  if (controls.panel.length === 0 && controls.readout.length === 0 && controls.state !== 'known') {
-    if (controls.state === 'unanswered') {
-      lines.push('- Readout not answered yet -- answer it on the Describe step to see readout-specific control guidance.');
-    } else {
-      lines.push(`- "${controls.readoutText}" is not a readout this app recognizes -- controls here are yours to specify.`);
-    }
-  }
   if (controls.panel.length > 0) {
     lines.push('- Panel-derived:');
     for (const c of controls.panel) lines.push(`  - **${c.title}** -- ${c.why}`);
   }
+  lines.push('- Readout-specific:');
   if (controls.readout.length > 0) {
-    lines.push('- Readout-specific:');
     for (const c of controls.readout) lines.push(`  - **${c.title}** -- ${c.why}`);
-  } else if (controls.state === 'known') {
-    lines.push('- No readout-specific control guidance for this readout yet.');
+  } else {
+    lines.push(`  - ${controls.readoutMessage}`);
   }
   return lines.join('\n');
 }
 
+/** The fixed 5-stage backbone, rendered ONCE for the whole study -- see studydoc.js's stageNotes comment for why. */
 function ladderSection(ladder) {
   const lines = [];
   for (const stage of ladder) {
-    lines.push(heading(4, stage.title));
+    lines.push(heading(3, stage.title));
     lines.push(stage.body);
-    if (stage.notes.length > 0) {
-      lines.push('');
-      lines.push(bulletList(stage.notes));
-    }
     lines.push('');
   }
   return lines.join('\n').trimEnd();
+}
+
+/** Per-assay STUDY-SPECIFIC notes only -- omitted entirely when an assay has none, per studydoc.js's stageNotes. */
+function stageNotesSection(stageNotes) {
+  if (stageNotes.length === 0) return null;
+  const lines = ['**Notes for this assay:**'];
+  for (const stage of stageNotes) {
+    lines.push(`- ${stage.stageTitle}:`);
+    for (const note of stage.notes) lines.push(`  - ${note}`);
+  }
+  return lines.join('\n');
 }
 
 function filenamesSection(filenames) {
@@ -114,6 +120,12 @@ export function renderMarkdown(doc) {
     sections.push(bulletList(doc.crossAssayIssues.map((i) => `(${i.severity}) ${i.field}: ${i.message}`)));
   }
 
+  // Rendered ONCE for the whole study, not per assay -- see studydoc.js's
+  // stageNotes comment. Assay-specific extras follow inside each assay's
+  // own section below.
+  sections.push(heading(2, 'How to run this project'));
+  sections.push(ladderSection(doc.ladder));
+
   for (const assay of doc.assays) {
     sections.push(heading(2, `Assay ${assay.index}: ${assay.label}`));
     sections.push(readoutSection(assay.readout));
@@ -124,8 +136,8 @@ export function renderMarkdown(doc) {
     sections.push(designSection(assay.design));
     sections.push(controlsSection(assay.controls));
 
-    sections.push(heading(3, 'How to run this project'));
-    sections.push(ladderSection(assay.ladder));
+    const notes = stageNotesSection(assay.stageNotes);
+    if (notes) sections.push(notes);
 
     sections.push(heading(3, 'Planned filenames'));
     sections.push(filenamesSection(assay.filenames));
