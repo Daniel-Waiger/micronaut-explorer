@@ -58,7 +58,8 @@ microscopy_naming_assistant = ["py.typed"]
 [tool.pytest.ini_options]
 timeout = 60
 markers = [
-  "integration: needs Java/real readers"
+  "integration: needs Java/real readers",
+  "smoke: streamlit AppTest UI smoke tests"
 ]
 
 [tool.black]

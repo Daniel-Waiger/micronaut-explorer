@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from microscopy_naming_assistant.llm import DEFAULT_PREFERRED_MODELS
+
 
 @dataclass
 class NamingConfig:
@@ -28,7 +30,7 @@ class NamingConfig:
         default_factory=lambda: {
             "enabled": False,
             "model": "auto",
-            "preferred_models": ["llama3.1:8b", "qwen2.5-coder:7b", "phi3:mini"],
+            "preferred_models": list(DEFAULT_PREFERRED_MODELS),
             "endpoint": "http://localhost:11434/api/chat",
             "timeout_seconds": 30,
         }

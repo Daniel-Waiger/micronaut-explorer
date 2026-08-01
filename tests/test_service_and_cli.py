@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -86,7 +87,108 @@ def test_plan_batch_detects_collisions(tmp_path: Path, monkeypatch) -> None:
     assert len(result.skipped) == 0
     targets = [p[1].name for p in result.planned]
     assert "DUPLICATE.tif" in targets
+    # The default "suffix" strategy no longer uses a bare `_NN` counter (A4):
+    # two DIFFERENT sources colliding on the same target must get a
+    # distinguishable (content-derived) suffix instead of ambiguous `_01`.
+    other = [t for t in targets if t != "DUPLICATE.tif"]
+    assert len(other) == 1
+    assert re.fullmatch(r"DUPLICATE_[0-9a-f]{8}\.tif", other[0])
+    assert other[0] != "DUPLICATE_01.tif"
+
+
+def test_plan_batch_suffix_numeric_keeps_legacy_bare_counter(tmp_path: Path, monkeypatch) -> None:
+    """The legacy `_NN` behaviour stays reachable via conflict_strategy='suffix_numeric'."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    f1 = tmp_path / "a.tif"
+    f2 = tmp_path / "b.tif"
+    f1.write_bytes(b"a")
+    f2.write_bytes(b"b")
+
+    def fake_suggest(
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
+    ):
+        return service.SuggestionResult(
+            source=file_path,
+            target_name="DUPLICATE.tif",
+            fields={},
+            issues=[],
+        )
+
+    monkeypatch.setattr(service, "suggest_for_file", fake_suggest)
+
+    result = service.plan_batch(
+        input_dir=tmp_path,
+        pattern="*.tif",
+        config_path=config_path,
+        conflict_strategy="suffix_numeric",
+    )
+    targets = [p[1].name for p in result.planned]
+    assert "DUPLICATE.tif" in targets
     assert "DUPLICATE_01.tif" in targets
+
+
+def test_recalculate_batch_treats_case_only_targets_as_colliding(tmp_path: Path) -> None:
+    """On Windows, 'A.tif' and 'a.tif' are the SAME file -- two suggestions
+    that render to targets differing only by case must not both plan as
+    non-colliding, or the second apply_batch rename would silently overwrite
+    the first (A4 point 2)."""
+    src_a = tmp_path / "one.tif"
+    src_b = tmp_path / "two.tif"
+    src_a.write_bytes(b"a")
+    src_b.write_bytes(b"b")
+
+    suggestion_a = service.SuggestionResult(source=src_a, target_name="A.tif", fields={}, issues=[])
+    suggestion_b = service.SuggestionResult(source=src_b, target_name="a.tif", fields={}, issues=[])
+
+    result = service.recalculate_batch(input_dir=tmp_path, suggestions=[suggestion_a, suggestion_b])
+
+    assert len(result.planned) == 2
+    target_names = [dst.name for _, dst in result.planned]
+    # The two planned targets must not be a case-only pair -- casefolding
+    # them must yield two DISTINCT keys, or apply_batch's rename loop would
+    # have the second rename silently collide with/overwrite the first on a
+    # real Windows filesystem.
+    casefolded = {name.casefold() for name in target_names}
+    assert len(casefolded) == 2
+
+
+def test_recalculate_batch_warns_on_max_path_exceeded(tmp_path: Path) -> None:
+    """A full target path over 260 chars must surface a ValidationIssue, not
+    be silently truncated (A4 point 3)."""
+    long_name = "A" * 300 + ".tif"
+    src = tmp_path / "short.tif"
+    src.write_bytes(b"x")
+
+    suggestion = service.SuggestionResult(source=src, target_name=long_name, fields={}, issues=[])
+
+    result = service.recalculate_batch(input_dir=tmp_path, suggestions=[suggestion])
+
+    assert len(result.planned) == 1
+    _, dst = result.planned[0]
+    # Never truncated: the full (unsafe) name must survive intact.
+    assert dst.name == long_name
+    assert any(
+        issue.severity == "warning" and "MAX_PATH" in issue.message for issue in suggestion.issues
+    )
+
+
+def test_recalculate_batch_does_not_warn_on_short_path(tmp_path: Path) -> None:
+    src = tmp_path / "short.tif"
+    src.write_bytes(b"x")
+    suggestion = service.SuggestionResult(
+        source=src, target_name="short_result.tif", fields={}, issues=[]
+    )
+
+    service.recalculate_batch(input_dir=tmp_path, suggestions=[suggestion])
+
+    assert not any("MAX_PATH" in issue.message for issue in suggestion.issues)
 
 
 def test_plan_batch_default_is_not_recursive(tmp_path: Path, monkeypatch) -> None:
@@ -164,6 +266,120 @@ def test_plan_batch_recursive_true_includes_nested_files(tmp_path: Path, monkeyp
     assert sources == {top, nested}
 
 
+def _fake_suggest_renamed_prefix(
+    file_path,
+    config_path,
+    use_llm=False,
+    profile_path=None,
+    llm_model_override=None,
+    user_description=None,
+):
+    return service.SuggestionResult(
+        source=file_path,
+        target_name=f"RENAMED_{file_path.name}",
+        fields={},
+        issues=[],
+    )
+
+
+def test_plan_batch_excludes_own_ledger_and_history_survives_broad_pattern(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A8: reproduces the proven self-consumption defect. A broad pattern
+    (`*`) run in a folder that already has a real ledger must NEVER plan a
+    rename of `.original_names.json` itself -- doing so lets `apply_batch`
+    physically rename the ledger file, so `update_ledger` finds it missing,
+    silently degrades to `{}`, and overwrites it with a brand-new
+    history-free ledger, permanently orphaning every prior batch's
+    true-original mapping. A real data file and a plain user `.json` file
+    must still be planned -- the exclusion must not over-filter."""
+    from microscopy_naming_assistant import original_name
+
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    input_dir = tmp_path / "data"
+    input_dir.mkdir()
+
+    # Pre-existing ledger holding REAL history from a prior batch: this file
+    # was already renamed once, from "important_file_A.tif" to "A_renamed.tif".
+    important = input_dir / "A_renamed.tif"
+    important.write_bytes(b"a")
+    original_name.update_ledger(input_dir, [(input_dir / "important_file_A.tif", important)])
+    assert original_name.load_ledger(input_dir) == {"A_renamed.tif": "important_file_A.tif"}
+
+    # A legitimate user file that merely happens to have a `.json` extension
+    # -- must NOT be swept up by the ledger exclusion.
+    user_json = input_dir / "user_data.json"
+    user_json.write_bytes(b"{}")
+
+    monkeypatch.setattr(service, "suggest_for_file", _fake_suggest_renamed_prefix)
+
+    batch = service.plan_batch(input_dir=input_dir, pattern="*", config_path=config_path)
+
+    planned_source_names = {src.name for src, _ in batch.planned}
+    # The ledger itself must never be a rename candidate...
+    assert original_name.LEDGER_FILENAME not in planned_source_names
+    # ...while the real data file it describes, and an ordinary user .json
+    # file, are still planned like any other match.
+    assert "A_renamed.tif" in planned_source_names
+    assert "user_data.json" in planned_source_names
+
+    # Exactly the real, non-excluded files got planned -- no more, no fewer.
+    real_files = [
+        p for p in input_dir.iterdir() if p.is_file() and p.name != original_name.LEDGER_FILENAME
+    ]
+    assert len(batch.planned) == len(real_files)
+
+    service.apply_batch(input_dir, batch.planned)
+
+    # The ledger file was never renamed off its well-known path.
+    assert original_name.ledger_path(input_dir).exists()
+
+    ledger_after = original_name.load_ledger(input_dir)
+    # The stale intermediate key is gone (the file really was renamed away)...
+    assert "A_renamed.tif" not in ledger_after
+    # ...but the TRUE ORIGINAL mapping survived the batch, correctly chained
+    # forward to whatever "A_renamed.tif" became.
+    assert ledger_after.get("RENAMED_A_renamed.tif") == "important_file_A.tif"
+
+
+def test_plan_batch_excludes_manifests_dir_under_recursive(tmp_path: Path, monkeypatch) -> None:
+    """A8: `.manifests/` holds A1's rollback journals. Under `recursive=True`
+    a broad pattern must not sweep them into the plan the way it must not
+    sweep up the ledger."""
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    input_dir = tmp_path / "data"
+    input_dir.mkdir()
+
+    real = input_dir / "sample.tif"
+    real.write_bytes(b"x")
+
+    manifests_dir = input_dir / ".manifests"
+    manifests_dir.mkdir()
+    journal = manifests_dir / "rename_manifest_20260101_000000.json"
+    journal.write_text("[]", encoding="utf-8")
+
+    monkeypatch.setattr(service, "suggest_for_file", _fake_suggest_renamed_prefix)
+
+    batch = service.plan_batch(
+        input_dir=input_dir, pattern="*", config_path=config_path, recursive=True
+    )
+
+    planned_sources = {src for src, _ in batch.planned}
+    assert journal not in planned_sources
+    assert real in planned_sources
+    assert len(batch.planned) == 1
+
+    service.apply_batch(input_dir, batch.planned)
+
+    # The journal was never touched.
+    assert journal.exists()
+    assert journal.read_text(encoding="utf-8") == "[]"
+
+
 def test_apply_batch_renames_files(tmp_path: Path) -> None:
     src = tmp_path / "old.tif"
     dst = tmp_path / "new.tif"
@@ -175,6 +391,105 @@ def test_apply_batch_renames_files(tmp_path: Path) -> None:
     assert not src.exists()
     assert manifest_path is not None
     assert manifest_path.exists()
+
+
+def test_apply_batch_empty_plan_returns_zero_and_none(tmp_path: Path) -> None:
+    renamed, manifest_path = service.apply_batch(tmp_path, [])
+    assert (renamed, manifest_path) == (0, None)
+
+
+def test_apply_batch_all_noop_plan_returns_zero_and_none(tmp_path: Path) -> None:
+    same = tmp_path / "same.tif"
+    same.write_bytes(b"x")
+
+    renamed, manifest_path = service.apply_batch(tmp_path, [(same, same)])
+    assert (renamed, manifest_path) == (0, None)
+    assert same.exists()
+
+
+def test_apply_batch_rolls_back_on_mid_batch_failure(tmp_path: Path, monkeypatch) -> None:
+    """A.1's core guarantee: a failure partway through a batch must leave the
+    filesystem exactly as it started (all-or-nothing), the ORIGINAL exception
+    must propagate to the caller unchanged, and the manifest written BEFORE
+    any rename (the intent journal) must still be on disk describing the
+    full attempted batch."""
+    files = []
+    for i in range(4):
+        p = tmp_path / f"f{i}.tif"
+        p.write_bytes(b"x")
+        files.append(p)
+    targets = [tmp_path / f"g{i}.tif" for i in range(4)]
+    planned = list(zip(files, targets))
+
+    original_rename = Path.rename
+    call_count = {"n": 0}
+
+    def flaky_rename(self, target):
+        call_count["n"] += 1
+        if call_count["n"] == 3:
+            raise OSError("simulated failure at file 3")
+        return original_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", flaky_rename)
+
+    with pytest.raises(OSError, match="simulated failure at file 3"):
+        service.apply_batch(tmp_path, planned)
+
+    # Every already-renamed file (the first two) is back at its original name.
+    for src in files:
+        assert src.exists()
+    for dst in targets:
+        assert not dst.exists()
+
+    # The intent journal was written before any rename and still describes
+    # the full attempted batch, even though the batch itself failed.
+    manifest_files = list((tmp_path / ".manifests").glob("rename_manifest_*.json"))
+    assert len(manifest_files) == 1
+    manifest_data = json.loads(manifest_files[0].read_text(encoding="utf-8"))
+    assert len(manifest_data) == 4
+
+
+def test_apply_batch_surfaces_unrestorable_files_when_rollback_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """If the undo itself fails, that failure must never be swallowed: the
+    raised error must name the file that could not be restored, and it must
+    be chained from the original failure rather than replacing it."""
+    f0 = tmp_path / "f0.tif"
+    f1 = tmp_path / "f1.tif"
+    f0.write_bytes(b"x")
+    f1.write_bytes(b"x")
+    g0 = tmp_path / "g0.tif"
+    g1 = tmp_path / "g1.tif"
+    planned = [(f0, g0), (f1, g1)]
+
+    original_rename = Path.rename
+    call_count = {"n": 0}
+
+    def flaky_rename(self, target):
+        call_count["n"] += 1
+        if call_count["n"] == 2:
+            raise OSError("simulated failure at file 2")
+        if call_count["n"] > 2:
+            # Every rename attempted while unwinding (rollback) also fails.
+            raise OSError("simulated rollback failure")
+        return original_rename(self, target)
+
+    monkeypatch.setattr(Path, "rename", flaky_rename)
+
+    with pytest.raises(RuntimeError, match="could not fully restore") as excinfo:
+        service.apply_batch(tmp_path, planned)
+
+    assert isinstance(excinfo.value.__cause__, OSError)
+    assert "simulated failure at file 2" in str(excinfo.value.__cause__)
+    assert "g0.tif" in str(excinfo.value)
+
+    # f0->g0's rollback failed, so g0 is left in its renamed state (surfaced,
+    # not silently lost); f1 was never touched.
+    assert g0.exists()
+    assert not f0.exists()
+    assert f1.exists()
+    assert not g1.exists()
 
 
 def test_cli_parser_accepts_llm_model_option() -> None:
@@ -300,6 +615,212 @@ def test_cmd_suggest_json_includes_sources_map(tmp_path: Path, monkeypatch, caps
 
     payload = json.loads(captured.out)
     assert payload["sources"] == known_sources
+
+
+def test_provisional_fields_and_date_is_weak_helpers() -> None:
+    # C2: named helpers, not inline string comparisons, so `cmd_suggest` and
+    # `cmd_batch` can never drift on which provenance tags count as
+    # provisional/weak.
+    sources = {
+        "markers": "llm_description",
+        "sample": "metadata",
+        "notes": "llm",
+        "date": "mtime",
+    }
+    assert cli._provisional_fields(sources) == ["markers"]
+    assert cli._date_is_weak(sources) is True
+    assert cli._date_is_weak({"date": "metadata"}) is False
+    assert cli._date_is_weak({}) is False
+    assert cli._provenance_payload(sources) == {
+        "provisional_fields": ["markers"],
+        "date_is_weak": True,
+    }
+
+
+def test_cmd_suggest_json_carries_provisional_and_weak_date_info(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    # C2: --json must surface the C1 "llm_description" (provisional) and A5
+    # "mtime" (weak date) provenance tags explicitly -- not just leave them
+    # buried inside the raw `sources` map for a caller to notice.
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    described_sources = {
+        "sample": "metadata",
+        "markers": "llm_description",
+        "date": "mtime",
+    }
+
+    def fake_suggest_for_file(
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
+    ):
+        return service.SuggestionResult(
+            source=file_path,
+            target_name="TEST_E01_GFP.tif",
+            fields={"sample": "E01", "markers": "GFP", "date": "2025-01-02"},
+            issues=[],
+            sources=described_sources,
+        )
+
+    monkeypatch.setattr(cli, "suggest_for_file", fake_suggest_for_file)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "suggest",
+            "--input",
+            str(source),
+            "--config",
+            str(config_path),
+            "--json",
+            "--describe",
+            "stained for GFP",
+        ]
+    )
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+
+    payload = json.loads(captured.out)
+    assert payload["provisional_fields"] == ["markers"]
+    assert payload["date_is_weak"] is True
+
+    # A metadata/filename-only file carries neither flag.
+    def fake_suggest_for_file_clean(
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
+    ):
+        return service.SuggestionResult(
+            source=file_path,
+            target_name="TEST_E01.tif",
+            fields={"sample": "E01", "date": "2025-01-02"},
+            issues=[],
+            sources={"sample": "metadata", "date": "metadata"},
+        )
+
+    monkeypatch.setattr(cli, "suggest_for_file", fake_suggest_for_file_clean)
+    args = parser.parse_args(
+        ["suggest", "--input", str(source), "--config", str(config_path), "--json"]
+    )
+    exit_code = cli.cmd_suggest(args)
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["provisional_fields"] == []
+    assert payload["date_is_weak"] is False
+
+
+def test_cmd_suggest_text_mode_prints_provisional_and_weak_date(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    def fake_suggest_for_file(
+        file_path,
+        config_path,
+        use_llm=False,
+        profile_path=None,
+        llm_model_override=None,
+        user_description=None,
+    ):
+        return service.SuggestionResult(
+            source=file_path,
+            target_name="TEST_E01_GFP.tif",
+            fields={"sample": "E01", "markers": "GFP", "date": "2025-01-02"},
+            issues=[],
+            sources={"sample": "metadata", "markers": "llm_description", "date": "mtime"},
+        )
+
+    monkeypatch.setattr(cli, "suggest_for_file", fake_suggest_for_file)
+
+    parser = build_parser()
+    args = parser.parse_args(["suggest", "--input", str(source), "--config", str(config_path)])
+    exit_code = cli.cmd_suggest(args)
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    assert "PROVISIONAL" in captured.out
+    assert "markers" in captured.out
+    assert "WEAK" in captured.out
+
+
+def test_cmd_batch_json_carries_per_file_provenance(tmp_path: Path, monkeypatch, capsys) -> None:
+    # C2: batch --json must carry per-file provisional/date-weak info without
+    # disturbing the existing "planned"/"issues"/"skipped" keys (additive
+    # only -- see the byte-identical --report gate covered separately).
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "a.tif"
+    target = tmp_path / "A.tif"
+
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name=target.name,
+        fields={"sample": "E01", "date": "2025-01-02"},
+        issues=[],
+        sources={"sample": "llm_description", "date": "mtime"},
+    )
+    fake_batch = service.BatchResult(
+        planned=[(source, target)],
+        suggestions=[suggestion],
+        skipped=[],
+    )
+
+    def fake_plan_batch(
+        input_dir,
+        pattern,
+        config_path,
+        recursive=False,
+        use_llm=False,
+        profile_path=None,
+        strict=False,
+        llm_model_override=None,
+        conflict_strategy="suffix",
+        user_description=None,
+    ):
+        return fake_batch
+
+    monkeypatch.setattr(cli, "plan_batch", fake_plan_batch)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        ["batch", "--input-dir", str(tmp_path), "--config", str(config_path), "--json"]
+    )
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+
+    payload = json.loads(captured.out)
+    # Existing contract is untouched.
+    assert payload["planned"] == [{"source": "a.tif", "target": "A.tif"}]
+    # New, additive provenance block.
+    assert payload["provenance"] == [
+        {
+            "source": "a.tif",
+            "sources": {"sample": "llm_description", "date": "mtime"},
+            "provisional_fields": ["sample"],
+            "date_is_weak": True,
+        }
+    ]
 
 
 def test_cmd_suggest_json_strict_mode_blocks_without_human_line(
@@ -617,6 +1138,69 @@ def test_cmd_batch_report_json_parses_to_expected_list(tmp_path: Path, monkeypat
     # --json mode suppresses the human-readable "Report written to" line.
     captured = capsys.readouterr()
     assert "Report written to" not in captured.out
+
+
+def test_cmd_batch_report_csv_with_empty_planned_still_has_header(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # E5/C2: a batch can legitimately plan nothing (e.g. --strict with every
+    # file failing validation) while still having suggestions -- the report
+    # must still be a header-only CSV, never a bare/headerless file, since
+    # `_write_batch_report` passes REPORT_COLUMNS explicitly regardless of
+    # `batch.planned`'s length. This is a regression guard on the UNCHANGED
+    # --report code path C2 must not touch.
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "a.tif"
+    report_path = tmp_path / "out.csv"
+
+    suggestion = service.SuggestionResult(
+        source=source,
+        target_name="A.tif",
+        fields={"sample": "E01"},
+        issues=[ValidationIssue(field="sample", message="bad", severity="error")],
+    )
+    fake_batch = service.BatchResult(
+        planned=[],
+        suggestions=[suggestion],
+        skipped=["a.tif: validation failed in strict mode"],
+    )
+
+    def fake_plan_batch(
+        input_dir,
+        pattern,
+        config_path,
+        recursive=False,
+        use_llm=False,
+        profile_path=None,
+        strict=False,
+        llm_model_override=None,
+        conflict_strategy="suffix",
+        user_description=None,
+    ):
+        return fake_batch
+
+    monkeypatch.setattr(cli, "plan_batch", fake_plan_batch)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--report",
+            str(report_path),
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+    assert exit_code == 0
+
+    assert report_path.exists()
+    lines = report_path.read_text(encoding="utf-8").splitlines()
+    assert lines == ["source,target,issues"]
 
 
 def _fake_plan_batch_returning(fake_batch: service.BatchResult):
@@ -1051,6 +1635,125 @@ def test_suggest_for_file_tags_llm_filled_field_as_llm(tmp_path: Path, monkeypat
     assert result.sources["date"] == "filename"
 
 
+def test_suggest_for_file_tags_described_field_as_provisional(tmp_path: Path, monkeypatch) -> None:
+    # C1: a field the model filled with the help of a user-supplied free-text
+    # description carries strictly weaker evidence than a metadata/filename-
+    # grounded one, so it must land under a distinct provenance tag -- never
+    # plain "llm" -- so a described field can be surfaced as provisional /
+    # needs-review rather than presented as ground truth.
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        return (
+            {"date": "2025-01-02", "sample": "E03"},
+            {"date": "filename", "sample": "filename"},
+            metadata.ExtractionDetail(),
+        )
+
+    def fake_suggest_fields_with_ollama(**kwargs):
+        assert kwargs["user_description"] == "stained for GFP"
+        return {"markers": "GFP"}
+
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
+    monkeypatch.setattr(service, "suggest_fields_with_ollama", fake_suggest_fields_with_ollama)
+
+    result = service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+        use_llm=True,
+        user_description="stained for GFP",
+    )
+
+    assert result.fields["markers"] == "GFP"
+    assert result.sources["markers"] == "llm_description"
+    assert result.sources["markers"] != "llm"
+    # Untouched fields keep their original (stronger) source unaffected.
+    assert result.sources["date"] == "filename"
+
+
+def test_suggest_for_file_description_cannot_overwrite_metadata_field(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # The existing "enhancer, not originator" guardrail must hold identically
+    # for the describer path: a value real extracted metadata already
+    # supplied is never overwritten by a description-derived guess, no matter
+    # how confident the model sounds. A described field may only fill a
+    # genuine gap.
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        return (
+            {"markers": "GFP", "sample": "E03"},
+            {"markers": "metadata", "sample": "metadata"},
+            metadata.ExtractionDetail(metadata_text="ChannelName = GFP"),
+        )
+
+    def fake_suggest_fields_with_ollama(**kwargs):
+        return {"markers": "MCHERRY", "exptype": "IHC"}
+
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
+    monkeypatch.setattr(service, "suggest_fields_with_ollama", fake_suggest_fields_with_ollama)
+
+    result = service.suggest_for_file(
+        file_path=source,
+        config_path=config_path,
+        use_llm=True,
+        user_description="mCherry stain, IHC protocol",
+    )
+
+    # markers was already supplied by metadata -- untouched.
+    assert result.fields["markers"] == "GFP"
+    assert result.sources["markers"] == "metadata"
+    # exptype was a genuine gap -- filled and tagged provisional.
+    assert result.fields["exptype"] == "IHC"
+    assert result.sources["exptype"] == "llm_description"
+
+
+def test_suggest_for_file_empty_description_keeps_plain_llm_tag(
+    tmp_path: Path, monkeypatch
+) -> None:
+    # An empty/absent description must change nothing about existing
+    # behaviour: LLM-filled fields keep the plain "llm" tag exactly as before
+    # C1, never the new description-specific tag.
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    def fake_extract_metadata_detailed(file_path, **kwargs):
+        return {}, {}, metadata.ExtractionDetail()
+
+    def fake_suggest_fields_with_ollama(**kwargs):
+        return {"markers": "GFP"}
+
+    monkeypatch.setattr(service, "extract_metadata_detailed", fake_extract_metadata_detailed)
+    monkeypatch.setattr(service, "suggest_fields_with_ollama", fake_suggest_fields_with_ollama)
+
+    for absent_description in (None, ""):
+        result = service.suggest_for_file(
+            file_path=source,
+            config_path=config_path,
+            use_llm=True,
+            user_description=absent_description,
+        )
+        assert result.sources["markers"] == "llm"
+
+
 @pytest.mark.integration
 def test_suggest_for_file_with_profile_generates_issues(tmp_path: Path) -> None:
     config = default_config()
@@ -1254,3 +1957,259 @@ def test_build_series_rows_never_leaks_into_batch_planned(tmp_path: Path) -> Non
 
     assert len(batch.planned) == 1
     assert [src for src, _ in batch.planned] == [suggestion.source]
+
+
+# A-4: `--describe` is silently discarded today in BOTH `cmd_suggest` and
+# `cmd_batch` whenever the LLM isn't active -- there is no argparse
+# dependency linking `--describe` to `--llm`/`config.llm['enabled']`, so a
+# typed description simply has no effect, with exit code 0 and no message.
+# These tests cover both commands x both ways the guard can fire (missing
+# `--llm`, and `--llm` present but `config.llm.enabled` false), plus the
+# no-`--describe` and genuinely-active-LLM cases that must stay silent.
+
+
+def _fake_suggest_for_file_minimal(
+    file_path,
+    config_path,
+    use_llm=False,
+    profile_path=None,
+    llm_model_override=None,
+    user_description=None,
+):
+    return service.SuggestionResult(
+        source=file_path,
+        target_name="TEST.tif",
+        fields={},
+        issues=[],
+    )
+
+
+def test_cmd_suggest_warns_when_describe_used_without_llm_flag(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())  # llm.enabled defaults to False
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    monkeypatch.setattr(cli, "suggest_for_file", _fake_suggest_for_file_minimal)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "suggest",
+            "--input",
+            str(source),
+            "--config",
+            str(config_path),
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" in captured.err
+    assert "--describe" in captured.err
+
+
+def test_cmd_suggest_warns_when_llm_flag_set_but_config_disabled(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    # Same hole, other half of the condition: --llm was passed but the
+    # config's llm.enabled is false -- service.suggest_for_file's own guard
+    # (`use_llm and bool(config.llm.get("enabled", False))`) would refuse to
+    # call the model here too, so the CLI must still warn, not stay silent.
+    config = default_config()
+    config.llm["enabled"] = False
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    monkeypatch.setattr(cli, "suggest_for_file", _fake_suggest_for_file_minimal)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "suggest",
+            "--input",
+            str(source),
+            "--config",
+            str(config_path),
+            "--llm",
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" in captured.err
+    assert "--describe" in captured.err
+
+
+def test_cmd_suggest_no_warning_without_describe(tmp_path: Path, monkeypatch, capsys) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    monkeypatch.setattr(cli, "suggest_for_file", _fake_suggest_for_file_minimal)
+
+    parser = build_parser()
+    args = parser.parse_args(["suggest", "--input", str(source), "--config", str(config_path)])
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.err == ""
+
+
+def test_cmd_suggest_no_warning_when_describe_reaches_an_active_llm(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    # Falsify the mechanism, not just the surface (lesson 20): the guard
+    # must stay silent in the one case where --describe genuinely DOES
+    # reach the model, or it would just be permanently noisy.
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    source = tmp_path / "test_E1.tif"
+    source.write_bytes(b"x")
+
+    monkeypatch.setattr(cli, "suggest_for_file", _fake_suggest_for_file_minimal)
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "suggest",
+            "--input",
+            str(source),
+            "--config",
+            str(config_path),
+            "--llm",
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_suggest(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" not in captured.err
+
+
+def test_cmd_batch_warns_when_describe_used_without_llm_flag(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())  # llm.enabled defaults to False
+
+    empty_batch = service.BatchResult(planned=[], suggestions=[], skipped=[])
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(empty_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" in captured.err
+    assert "--describe" in captured.err
+
+
+def test_cmd_batch_warns_when_llm_flag_set_but_config_disabled(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config = default_config()
+    config.llm["enabled"] = False
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    empty_batch = service.BatchResult(planned=[], suggestions=[], skipped=[])
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(empty_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--llm",
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" in captured.err
+    assert "--describe" in captured.err
+
+
+def test_cmd_batch_no_warning_without_describe(tmp_path: Path, monkeypatch, capsys) -> None:
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, default_config())
+
+    empty_batch = service.BatchResult(planned=[], suggestions=[], skipped=[])
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(empty_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(["batch", "--input-dir", str(tmp_path), "--config", str(config_path)])
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert captured.err == ""
+
+
+def test_cmd_batch_no_warning_when_describe_reaches_an_active_llm(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config = default_config()
+    config.llm["enabled"] = True
+    config_path = tmp_path / "naming_scheme.json"
+    save_config(config_path, config)
+
+    empty_batch = service.BatchResult(planned=[], suggestions=[], skipped=[])
+    monkeypatch.setattr(cli, "plan_batch", _fake_plan_batch_returning(empty_batch))
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch",
+            "--input-dir",
+            str(tmp_path),
+            "--config",
+            str(config_path),
+            "--llm",
+            "--describe",
+            "CT electroporation, gfp dapi",
+        ]
+    )
+    exit_code = cli.cmd_batch(args)
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "WARNING" not in captured.err

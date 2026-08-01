@@ -1,0 +1,132 @@
+{
+  "run": "planner-web-v1",
+  "generated": "2026-07-29",
+  "plan_doc": "docs/plans/planner-web.md",
+  "objective": "Pivot Micronaut from a metadata-driven file renamer to a static, zero-install microscopy experiment planner that emits the naming convention as a downstream artifact of a finished design.",
+  "decisions": {
+    "delivery": "single self-contained HTML, file:// + GitHub Pages, same bytes both ways",
+    "framework": "none - vanilla ES modules, flattened to one classic script at build",
+    "llm": "optional, off by default; deterministic tier always on; manual paste-provider ships v1",
+    "interview": "deterministic question bank; the LLM never originates a domain fact",
+    "renaming": "NOT in the web app - Micronaut Classic keeps that job",
+    "js_tests": "node --test web/tests/*.test.js (verified on node v22.21.0; the bare 'node --test web/tests/' form fails with MODULE_NOT_FOUND on this machine -- use the glob or 'cd web && node --test'), zero npm install, 3-line package.json"
+  },
+  "invariants": [
+    "web/ never imports from src/ - the two products share data files only",
+    "No fetch() in the released artifact",
+    "No type=module, dynamic import, or top-level await in the released artifact",
+    "Every exported symbol name is unique across web/src/**",
+    "Every feature fully usable with the LLM disabled",
+    "Every computed number carries basis + inputs",
+    "The LLM may only emit IDs present in the vocabulary the app supplied",
+    "Never write into a STRONG-provenance slot from a weaker source",
+    "Python gate: pytest -q -m 'not integration' stays green (Classic must not regress)",
+    "JS gate: node --test web/tests, no node_modules ever created"
+  ],
+  "out_of_scope": [
+    "metadata extraction",
+    "file renaming in the browser",
+    "multi-user",
+    "server",
+    "auth",
+    "scheduling",
+    "sample tracking",
+    "ELN/LIMS",
+    "cloud LLM providers"
+  ],
+  "batches": [
+    ["C0-1", "C0-3", "C0-5"],
+    ["C0-2", "C0-4"],
+    ["C0-6", "C0-7"],
+    ["C0-8"]
+  ],
+  "tasks": [
+    {
+      "id": "C0-1",
+      "title": "Experiment schema + JSON-path utility",
+      "phase": "P0",
+      "depends_on": [],
+      "files": ["web/src/core/schema.js", "web/src/core/paths.js", "web/src/core/ids.js", "web/package.json", "web/tests/schema.test.js", "web/tests/paths.test.js"],
+      "scope": "Create the web/ directory root and the Experiment data model. (1) web/package.json containing EXACTLY {\"type\":\"module\",\"private\":true} - no dependencies, ever. (2) web/src/core/paths.js: getPath(obj,'a.b[0].c'), setPath(obj,path,value) creating intermediate objects/arrays as needed, and listPaths(obj,'a.b[*].c') fan-out returning concrete paths. (3) web/src/core/ids.js: slugify(s), shortId(), uuid() using crypto.randomUUID() with a Math.random fallback (file:// safety). (4) web/src/core/schema.js: SCHEMA_VERSION=1, emptyExperiment() returning the full nested Experiment object (meta, narrative, specimen, design{factors,replicates,idScheme,conditions}, panel{targets,channels}, acquisition, controls, naming{template,fields,plannedNames}, provenance{slots,unanswered,skipped}, derived, interview, conformance), and migrate(obj) that no-ops at the current version and throws a clear error on a future version. Default naming.template is '{date}_{exptype}_{sample}_{magnification}_{markers}_{notes}{ext}'. Write node --test tests in web/tests/ covering paths (nested create, array index, [*] fan-out, missing path returns undefined) and schema (emptyExperiment shape, migrate no-op, migrate rejects future version).",
+      "verification": "From the repo root, `node --test web/tests/*.test.js` passes with zero failures and creates no node_modules directory. web/package.json is exactly the 2-key object. getPath/setPath handle 'a.b[0].c' round-trip. listPaths resolves [*] fan-out over arrays. emptyExperiment() returns an object whose top-level keys include meta, narrative, specimen, design, panel, acquisition, controls, naming, provenance, derived, interview. migrate() no-ops at SCHEMA_VERSION and throws on version+1. All exported symbol names are unique across the files created.",
+      "out_of_scope": ["UI", "persistence", "store", "knowledge pack"]
+    },
+    {
+      "id": "C0-3",
+      "title": "Port naming.py to engine/naming.js",
+      "phase": "P0",
+      "depends_on": [],
+      "files": ["web/src/engine/naming.js", "web/tests/naming.test.js"],
+      "scope": "Port src/microscopy_naming_assistant/naming.py to web/src/engine/naming.js as a faithful, behaviour-identical JS module. READ THE PYTHON FILE FIRST. Export: RESERVED_WINDOWS_STEMS (Set of CON, PRN, AUX, NUL, COM1-9, LPT1-9), isReservedWindowsStem(stem) (whole-stem, case-insensitive, trimmed), repairReservedStem(stem) (appends '_FILE'), sanitizeToken(value, config) (trim, spaces->underscore, strip config.safeCharPattern, empty->'UNSPECIFIED'), normalizeFields(fields, config) (uppercase only fields in config.uppercaseFields), compoundExt(name) (preserves .ome.tif/.ome.tiff, lowercases, defaults to '.tif'), finalizeFields(sourceName, extracted, config) (merge config.defaults then extracted, attach ext, normalize), and renderName(fields, config) (template substitution, collapse /_{2,}/ to '_', replace '_.' with '.', then repair a reserved stem using fields.ext rather than a naive suffix split). Note the JS naming convention change from snake_case to camelCase is intentional; behaviour must be identical. Port the assertions from tests/test_naming.py into web/tests/naming.test.js VERBATIM in intent - especially reserved stems including 'CON.tif', .ome.tif compound extension preservation, duplicate-separator collapse, and the '_.' repair.",
+      "verification": "`node --test web/tests/naming.test.js` passes. Cross-check behaviour against the Python original by reading tests/test_naming.py: every assertion there has a JS counterpart. Specifically confirm: renderName produces 'CON_FILE.tif' not 'CON.tif'; a source named 'x.ome.tif' yields ext '.ome.tif' not '.tif'; a template rendering with an empty middle field collapses '__' to '_'; sanitizeToken('') returns 'UNSPECIFIED'. No import of anything outside this file. No default exports.",
+      "out_of_scope": ["profiles", "validation", "the naming UI"]
+    },
+    {
+      "id": "C0-5",
+      "title": "Single-file inliner + build gates",
+      "phase": "P0",
+      "depends_on": [],
+      "files": ["tools/build_single_file.py", "web/index.html", "tests/test_single_file_build.py"],
+      "scope": "Write tools/build_single_file.py (Python 3.10+, STDLIB ONLY) that flattens the web/src ES module graph into ONE self-contained HTML file that runs from file://. This is the riskiest component - if it does not work, everything after it is built on sand. Algorithm: scan web/src/**/*.js; parse single-line static relative imports of the form `import { a, b } from './x.js';`; build a dependency graph; topologically sort; strip every import line; strip the leading `export ` keyword from declarations; concatenate all module bodies inside ONE IIFE; substitute into web/index.html at marker comments. web/index.html is both the dev shell and the build template and must contain the markers `<!-- BUILD:STYLE -->...<!-- /BUILD:STYLE -->`, `<!-- BUILD:KB --><!-- /BUILD:KB -->`, and `<!-- BUILD:SCRIPT -->...<!-- /BUILD:SCRIPT -->`; in dev those hold a real <link rel=stylesheet> and <script type=module src=./src/main.js>, and the build replaces them with inline <style>, an embedded knowledge-pack <script>globalThis.__MICRONAUT_KB__={...}</script> (empty object if web/kb/ does not exist yet), and one classic <script>. CLI: --out DIR (default dist/). BUILD GATES that must HARD-FAIL with a clear message: duplicate exported symbol name across modules; import cycle; any `type=\"module\"`, dynamic `import(`, or top-level `await` surviving into the output; output larger than 2 MB. Print the output byte size and SHA-256, and produce byte-identical output across two consecutive runs (sort keys, no timestamps). Also write tests/test_single_file_build.py (pytest) driving the inliner against a temporary fixture module tree.",
+      "verification": "`python tools/build_single_file.py --out dist/` succeeds and writes dist/index.html. `python -m pytest -q tests/test_single_file_build.py` passes. The pytest file must prove, on a temporary fixture module tree: correct topological flattening order; duplicate exported symbol raises a hard error; an import cycle raises a hard error; the output contains no 'type=\"module\"' and no 'import(' ; two consecutive runs produce byte-identical output. Confirm the script imports only from the Python standard library. Confirm web/index.html contains all three marker pairs.",
+      "out_of_scope": ["GitHub Pages workflow", "the knowledge pack content"]
+    },
+    {
+      "id": "C0-2",
+      "title": "Store + tiered provenance",
+      "phase": "P0",
+      "depends_on": ["C0-1"],
+      "files": ["web/src/core/store.js", "web/src/core/provenance.js", "web/tests/store.test.js", "web/tests/provenance.test.js"],
+      "scope": "web/src/core/provenance.js: the tag vocabulary and tier logic. Tags and tiers: STRONG = user, user_edited, imported; WEAK = freetext, kb-default, derived, default; PROVISIONAL = llm, llm_freetext. Export TAG_TIERS, tierOf(tag), isProvisional(tag), canOverwrite(existingTag, newTag) returning false when existingTag is STRONG and newTag is not STRONG, tagSlot(experiment, path, tag, detail) writing into experiment.provenance.slots, and promoteOnUserEdit(experiment, path) which retags to user_edited and clears needsReview. This last one is load-bearing: repo lesson E8 proves that without a retag on user edit, a provenance gate can never clear. web/src/core/store.js: createStore(initialExperiment) exposing get(), getPath(p), patch(partialOrFn), setPath(path, value, tag), subscribe(fn) returning an unsubscribe, and notifying subscribers at most once per microtask batch rather than once per write. setPath must consult canOverwrite and refuse a weaker write, returning a boolean so callers can tell. Tests must cover the refusal path and the notify-batching.",
+      "verification": "`node --test web/tests/*.test.js` passes entirely (including the C0-1 tests, still green). Prove by direct test execution: a `freetext` write into a slot already tagged `user` is REFUSED and the value is unchanged; a `user_edited` write over an `llm` slot SUCCEEDS and clears needsReview; three synchronous setPath calls notify subscribers ONCE, not three times. Confirm store.js and provenance.js import only from core/ and have no DOM references.",
+      "out_of_scope": ["localStorage", "UI", "the knowledge pack"]
+    },
+    {
+      "id": "C0-4",
+      "title": "Port validation.py + compileFullMatch + shared regex fixture",
+      "phase": "P0",
+      "depends_on": ["C0-3"],
+      "files": ["web/src/engine/validation.js", "tests/fixtures/regex_conformance.json", "tests/test_regex_conformance.py", "web/tests/regex_conformance.test.js", "web/tests/validation.test.js"],
+      "scope": "Port src/microscopy_naming_assistant/validation.py to web/src/engine/validation.js. READ THE PYTHON FILE FIRST. Export MAX_PATH_LENGTH=260, a ValidationIssue factory {field,message,severity}, splitMarkers(value) splitting on /[-,;|\\/]+/ and uppercasing, validateFields(fields, profile), and validateTargetPath(pathString) which WARNS (never truncates, never blocks). Honour unknown_marker_policy: 'warn' -> warning severity, 'allow' -> no issue at all, anything else -> error. An empty allow-list means no restriction for that field. THE CRITICAL PORTABILITY LANDMINE: Python's re.fullmatch anchors the whole string but JS's RegExp.test does not, so '[A-Za-z0-9_-]+' full-matches in Python yet partially matches in JS. Export compileFullMatch(pattern) returning new RegExp('^(?:' + pattern + ')$', 'u') and use it for every profile pattern check. Then create tests/fixtures/regex_conformance.json - a shared array of {pattern, input, expected} triples covering the facsi profile patterns ('^E\\\\d{2}$', '^X\\\\d{2,3}$', '^[A-Za-z0-9_-]+$') plus unanchored patterns, partial-match traps, and empty strings - and read that SAME file from BOTH tests/test_regex_conformance.py (using re.fullmatch) and web/tests/regex_conformance.test.js (using compileFullMatch). Both languages must agree on every triple. This shared fixture is the only deliberate cross-language coupling in the design.",
+      "verification": "Both gates pass: `node --test web/tests/*.test.js` and `python -m pytest -q tests/test_regex_conformance.py`. Prove the fixture is genuinely shared - both test files must read tests/fixtures/regex_conformance.json rather than embedding their own copies. Prove the landmine is actually covered: the fixture MUST contain at least one unanchored pattern whose naive JS .test() would return true but whose correct full-match answer is false, and that case must pass in both languages. Confirm validateTargetPath returns severity 'warning' and never mutates its input. Confirm the three unknown_marker_policy branches behave as specified.",
+      "out_of_scope": ["profile editing UI", "the naming plan"]
+    },
+    {
+      "id": "C0-6",
+      "title": "App shell, hash router, CSS with print stylesheet",
+      "phase": "P0",
+      "depends_on": ["C0-2"],
+      "files": ["web/src/ui/shell.js", "web/src/core/router.js", "web/styles/app.css"],
+      "scope": "web/src/core/router.js: createRouter(steps) using hash routing (#/step-id), exposing navigate(id), current(), onChange(fn), and a guard hook so a step can declare it is not yet reachable. Must survive a page reload (read location.hash on init) and default to the first step. web/src/ui/shell.js: renderShell(root, store, router) drawing a header (product name), a left step nav reflecting router state, a main content area the steps render into, a theme toggle persisting to localStorage, and a toast/status area. Vanilla DOM only - no innerHTML with untrusted data, no framework, no template library. web/styles/app.css: use CSS custom properties for the palette with a light and a dark theme following the pattern already proven in tools/cma-dashboard/index.html (READ IT FIRST for the custom-property and dark/light approach). Include a real @media print block that hides the nav and chrome and renders content as a clean single-page card - this is the bench-card delivery mechanism and there will be no PDF library.",
+      "verification": "Serve web/ with `python -m http.server` and confirm the dev page loads with no console errors and the nav renders. Confirm hash routing: navigating sets location.hash, and reloading at a hash lands on that same step. Confirm app.css defines custom properties under both a light and a dark selector and contains an @media print block that sets display:none on the nav. Confirm shell.js contains no innerHTML assignment of dynamic/user data. Confirm no new dependencies were added anywhere.",
+      "out_of_scope": ["step content", "the interview", "the knowledge pack"]
+    },
+    {
+      "id": "C0-7",
+      "title": "Persistence: autosave ring buffer, loud quota failure, import/export",
+      "phase": "P0",
+      "depends_on": ["C0-2"],
+      "files": ["web/src/core/persist.js", "web/tests/persist.test.js"],
+      "scope": "web/src/core/persist.js - localStorage is a CONVENIENCE, never the record of truth; this module must make that structurally true. Export: STORAGE_PREFIX (version- and instance-namespaced, because Chrome shares one storage bucket across ALL file:// pages so two users on a shared scope PC would otherwise collide), saveExperiment(exp) writing into a 5-slot ring buffer under separate keys so one bad state cannot destroy history, listSaved(), loadExperiment(id), deleteExperiment(id), exportToFile(exp) triggering a real <a download> click for a .micronaut.json (works on file://, needs no API and no permission), importFromFile(file) via FileReader, and an unexported-changes counter (markChanged/markExported/changesSinceExport). EVERY localStorage write must be wrapped in try/catch and surface a QuotaExceededError LOUDLY through a callback - never swallow it. Tests run under node --test where localStorage does not exist, so the module must accept an injectable storage backend (default globalThis.localStorage) and the tests supply an in-memory fake plus a fake that throws QuotaExceededError.",
+      "verification": "`node --test web/tests/*.test.js` passes entirely. Prove with executed tests: the ring buffer keeps exactly 5 entries and evicts oldest-first; a storage backend that throws QuotaExceededError causes the error callback to fire and does NOT throw out of saveExperiment; export followed by import round-trips an Experiment to a deeply-equal object; the changes-since-export counter increments on change and resets on export. Confirm the storage backend is injectable (no hard reference to globalThis.localStorage at module scope that would break under node).",
+      "out_of_scope": ["File System Access API", "UI wiring"]
+    },
+    {
+      "id": "C0-8",
+      "title": "P0 vertical slice: name builder runs from file://",
+      "phase": "P0",
+      "depends_on": ["C0-3", "C0-4", "C0-5", "C0-6", "C0-7"],
+      "files": ["web/src/main.js", "web/src/ui/steps/naming.js"],
+      "scope": "Wire everything P0 built into one working screen and prove the built artifact runs from file://. web/src/main.js: an init() bootstrap (NOT top-level await - the inliner forbids it) that builds the empty Experiment, creates the store, loads any autosaved experiment, creates the router, renders the shell, and registers the naming step. web/src/ui/steps/naming.js: the at-the-scope NAME BUILDER - the single highest-value screen in the product. Large, touch-friendly controls for each naming field (date, exptype, sample, magnification, markers, notes), a live-updating preview of the exact resulting filename computed through engine/naming.js renderName, validation issues from engine/validation.js rendered inline, and a prominent Copy button that copies the filename to the clipboard (navigator.clipboard with a document.execCommand fallback, since clipboard API can be restricted on file://). Field edits must write through the store with the 'user' provenance tag. State must survive a reload via the C0-7 persistence layer.",
+      "verification": "Run `python tools/build_single_file.py --out dist/`, then OPEN dist/index.html VIA THE file:// PROTOCOL (not http://localhost - the file:// path is the one that must work) and confirm: the page renders with ZERO console errors; typing into the naming fields updates the filename preview live; the preview matches what engine/naming.js renderName produces for those inputs; an invalid sample like 'XYZ' against '^E\\d{2}$' surfaces a validation issue; the Copy button is present and wired; reloading the page restores the entered state. Also confirm `node --test web/tests/*.test.js` and `python -m pytest -q -m 'not integration'` both still pass - Classic must not have regressed.",
+      "out_of_scope": ["the interview", "the knowledge pack", "panel", "spillover", "controls", "exports"]
+    }
+  ],
+  "later_phases": {
+    "P1": ["C1-1 KB loader/validate/index", "C1-2 predicate DSL", "C1-3 interview engine", "C1-4 deterministic free-text ingest", "C1-5 condition matrix -> sample IDs"],
+    "P2": ["C2-1 optics math", "C2-2 panel assembly", "C2-3 spillover", "C2-4 controls engine", "C2-5 acquisition guidance"],
+    "P3": ["C3-1 exports", "C3-2 LLM adapter/filter/manual provider", "C3-3 Ollama + diagnostics", "C3-4 conformance check"],
+    "P4": ["C4-1 Pages workflow", "C4-2 Playwright file:// artifact smoke", "C4-3 freeze Micronaut Classic"],
+    "content_tasks_owned_by_user": ["K-1 seed ~90 fluorophore identities from markers.py", "K-2 ex/em + recommended lines for top 30 dyes", "K-3 FACSI instruments/objectives/lines/detectors", "K-4 question bank v1 (~30)", "K-5 control rules v1 (~15)", "K-6 15 golden experiments as regression fixtures", "K-7 modality profiles + guidance"]
+  }
+}

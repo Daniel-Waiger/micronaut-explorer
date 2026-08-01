@@ -1,0 +1,431 @@
+<meta charset="utf-8" />
+<title>Model Activity Monitor — CMA run</title>
+<style>
+  :root{
+    --bg:#0B0E14; --panel:#141925; --panel-2:#1B2233; --line:#232C40;
+    --ink:#E6EBF5; --muted:#8B97AD; --accent:#5B8CFF;
+    --run:#FFB020; --done:#35D07F; --verifying:#22D3EE; --resolved:#A78BFA; --fail:#FF5470; --pend:#5A6680;
+    --crit-bg:rgba(255,84,112,.09); --crit-line:rgba(255,84,112,.38);
+    --mono:ui-monospace,"Cascadia Code",Consolas,"SF Mono",monospace;
+    --sans:ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:light){
+    :root{
+      --bg:#F6F7FA; --panel:#FFFFFF; --panel-2:#FFFFFF; --line:#DFE3EC;
+      --ink:#161C28; --muted:#5D6879; --accent:#2C5FE0;
+      --run:#B26A00; --done:#12794A; --verifying:#0E7490; --resolved:#6D45C7; --fail:#C4243C; --pend:#8892A4;
+      --crit-bg:rgba(196,36,60,.06); --crit-line:rgba(196,36,60,.32);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B0E14; --panel:#141925; --panel-2:#1B2233; --line:#232C40;
+    --ink:#E6EBF5; --muted:#8B97AD; --accent:#5B8CFF;
+    --run:#FFB020; --done:#35D07F; --verifying:#22D3EE; --resolved:#A78BFA; --fail:#FF5470; --pend:#5A6680;
+    --crit-bg:rgba(255,84,112,.09); --crit-line:rgba(255,84,112,.38);
+  }
+  :root[data-theme="light"]{
+    --bg:#F6F7FA; --panel:#FFFFFF; --panel-2:#FFFFFF; --line:#DFE3EC;
+    --ink:#161C28; --muted:#5D6879; --accent:#2C5FE0;
+    --run:#B26A00; --done:#12794A; --verifying:#0E7490; --resolved:#6D45C7; --fail:#C4243C; --pend:#8892A4;
+    --crit-bg:rgba(196,36,60,.06); --crit-line:rgba(196,36,60,.32);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 var(--sans);padding:26px 20px 70px;}
+  .wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:20px;}
+  h1{font-size:15px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0;}
+  .eyebrow{font-size:11.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin:0;}
+  code{font-family:var(--mono);}
+
+  /* hero */
+  .hero{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:22px 24px;
+        display:flex;flex-direction:column;gap:14px;}
+  .model-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--pend);flex:none;}
+  .dot.running{background:var(--run);box-shadow:0 0 0 0 rgba(255,176,32,.55);animation:pulse 1.6s infinite;}
+  .dot.done{background:var(--done);} .dot.idle{background:var(--accent);} .dot.paused{background:var(--run);}
+  @media (prefers-reduced-motion:reduce){.dot.running{animation:none;}}
+  @keyframes pulse{70%{box-shadow:0 0 0 12px rgba(255,176,32,0);}100%{box-shadow:0 0 0 0 rgba(255,176,32,0);}}
+  .model{font-size:30px;font-weight:700;letter-spacing:-.015em;}
+  .state{margin-left:auto;font-size:12px;color:var(--muted);font-family:var(--mono);text-align:right;}
+  .now{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--line);}
+  .now .tid{font-family:var(--mono);font-weight:700;color:var(--accent);}
+  .now .none{color:var(--muted);}
+  .meta{display:flex;gap:10px;flex-wrap:wrap;}
+  .stat{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:9px 13px;flex:1 1 150px;}
+  .stat .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);}
+  .stat .v{font-size:17px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:3px;}
+  .stat .v.ok{color:var(--done);} .stat .v.bad{color:var(--fail);} .stat .v.sm{font-size:13px;font-family:var(--mono);}
+
+  /* defects */
+  .crit{background:var(--crit-bg);border:1px solid var(--crit-line);border-radius:13px;padding:18px 20px;
+        display:flex;flex-direction:column;gap:13px;}
+  .crit h2{margin:0;font-size:13.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--fail);}
+  .defect{display:flex;flex-direction:column;gap:5px;padding:12px 14px;background:var(--panel);
+          border:1px solid var(--line);border-left:3px solid var(--fail);border-radius:8px;}
+  .defect .top{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;}
+  .defect .tid{font-family:var(--mono);font-weight:700;color:var(--fail);}
+  .defect .ttl{font-weight:600;}
+  .defect .loc{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto;}
+  .defect p{margin:0;font-size:13.5px;color:var(--muted);}
+  .defect .repro{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--panel-2);
+                 border:1px solid var(--line);border-radius:6px;padding:7px 9px;overflow-x:auto;white-space:pre;}
+
+  /* board */
+  .phase{font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);margin:14px 0 3px;}
+  .task{display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);
+        border-radius:9px;padding:10px 13px;flex-wrap:wrap;margin-bottom:7px;}
+  .task.failed{border-color:var(--crit-line);}
+  .task.verifying{border-color:rgba(34,211,238,.4);}
+  .task.running{border-color:var(--run);}
+  .task.resolved{border-color:rgba(167,139,250,.45);}
+  .task.done{opacity:.82;}
+  .pill{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;
+        border-radius:999px;flex:none;min-width:70px;text-align:center;}
+  .pill.done{background:rgba(53,208,127,.14);color:var(--done);}
+  .pill.resolved{background:rgba(167,139,250,.16);color:var(--resolved);}
+  .pill.verifying{background:rgba(34,211,238,.16);color:var(--verifying);}
+  .pill.failed{background:rgba(255,84,112,.16);color:var(--fail);}
+  .pill.running{background:rgba(255,176,32,.16);color:var(--run);}
+  .pill.pending{background:rgba(90,102,128,.18);color:var(--pend);}
+  .task .tid{font-family:var(--mono);font-weight:700;color:var(--accent);min-width:44px;}
+  .task .ttl{flex:1 1 260px;}
+  .task .by{font-size:12px;color:var(--muted);font-family:var(--mono);}
+
+  /* log */
+  .log{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .log h2{margin:0 0 11px;font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);}
+  .log ul{margin:0;padding:0;max-height:300px;overflow-y:auto;}
+  .log li{font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--line);list-style:none;}
+  .log li:last-child{border-bottom:none;}
+  .log .t{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-right:9px;}
+
+  .foot{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;
+        border-top:1px solid var(--line);padding-top:14px;}
+  .live{width:8px;height:8px;border-radius:50%;background:var(--done);flex:none;}
+  .live.snap{background:var(--accent);} .live.stale{background:var(--fail);}
+</style>
+
+<div class="wrap">
+  <h1>Model Activity Monitor</h1>
+
+  <section class="hero">
+    <p class="eyebrow" id="runName">CMA run</p>
+    <div class="model-row">
+      <span id="dot" class="dot idle"></span>
+      <span id="model" class="model">—</span>
+      <span id="state" class="state"></span>
+    </div>
+    <div class="now" id="now"><span class="none">Idle</span></div>
+    <div class="meta" id="stats"></div>
+  </section>
+
+  <section class="crit" id="crit" hidden>
+    <h2 id="critTitle">Open defects</h2>
+    <div id="defects"></div>
+  </section>
+
+  <div class="board" id="board"></div>
+
+  <section class="log">
+    <h2>Run log</h2>
+    <ul id="logBody"></ul>
+  </section>
+
+  <p class="foot"><span id="liveDot" class="live"></span><span id="liveText">loading…</span></p>
+</div>
+
+<script>
+// Embedded snapshot -- the fallback used when no ./status.json can be fetched
+// (a published artifact, or the file opened straight off disk via file://).
+//
+// DO NOT HAND-EDIT. `update.py` rewrites everything between the BEGIN/END
+// markers below from status.json on every single call, so the snapshot can
+// never drift from the live run. Editing it by hand is how it went stale
+// before. The neutral object here is just the never-run-yet placeholder.
+/* CMA:EMBEDDED:BEGIN */
+const EMBEDDED = {
+  "run": "planner-web P1 — interview engine + deterministic parsing",
+  "orchestrator": "Claude Opus",
+  "active_model": "Claude Opus",
+  "active_status": "done",
+  "phase": "Schema v3: the assay tier (commit 1 of 4)",
+  "state_note": "First slice of the experimental-design assistant vision (controls/panel/modality guidance) implemented and verified. Architecture: rules are DATA in web/kb/advisor.json, evaluated by the ALREADY-BUILT predicate engine (engine/predicate.js) -- zero engine changes needed, proving the rules-as-data pattern the rest of the vision depends on. New engine/advisor.js (loader mirrors interview.js's loadQuestions discipline: explicit whitelist, drop-and-report, never spread the raw entry) plus engine/kbpack.js (extracts shapeAppKb from main.js's previously-untestable inline loadAppKb -- this is what a future KB key needs to avoid repeating the allowOther silent-drop bug). New ui/advice.js: a shared, non-focusable advice panel wired into all three steps (describe/design/naming) at verified real re-render seams, not the ones that looked obvious -- design.js's renderAll() is called exactly once at mount; the real funnel is renderConditions(). 16 modality rules drafted (STED, confocal, widefield, light-sheet, SEM/TEM, Raman), each with a title (the pitfall) and a body of at least 40 characters (the why), gated on acquisition.modality via exact-canonical-value predicates. 277 JS tests (up from 229), 341 Python. Verified live against the built artifact over http: STED notes route correctly to Design and Naming, swapping to SEM live-updates all three surfaces with zero reload and zero residue, per-keystroke re-render on Naming preserves focus and cursor position, empty experiment shows zero notes anywhere, console clean throughout.",
+  "current_task": null,
+  "crit_title": "Open defects",
+  "stats": [
+    {
+      "k": "JS tests",
+      "v": "334 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Tasks",
+      "v": "6 / 6"
+    },
+    {
+      "k": "Py tests",
+      "v": "342 passed, 10 deselected",
+      "tone": "ok"
+    },
+    {
+      "k": "Advisor rules",
+      "v": "16",
+      "tone": "ok"
+    }
+  ],
+  "defects": [],
+  "tasks": [
+    {
+      "id": "C1-1",
+      "phase": "Batch 1",
+      "title": "Knowledge pack: generated marker KB + pure loader/validate/index",
+      "status": "done",
+      "by": "Opus re-verified PASS, all 76 markers spot-checked"
+    },
+    {
+      "id": "C1-2",
+      "phase": "Batch 1",
+      "title": "Predicate DSL: total, eval-free rule evaluation against the Experiment",
+      "status": "done",
+      "by": "Opus re-verified, no new defects"
+    },
+    {
+      "id": "C1-5",
+      "phase": "Batch 1",
+      "title": "Condition matrix: factors x levels x replicates -> condition rows -> sample IDs",
+      "status": "done",
+      "by": "Sonnet · D3 (reserved-name collision), D4 (prototype-chain token injection), D5 (invalid-level) fixed+tested"
+    },
+    {
+      "id": "C1-4",
+      "phase": "Batch 2",
+      "title": "Deterministic free-text ingest: paragraph -> provisional field proposals",
+      "status": "done",
+      "by": "Sonnet · D1 (magnification/dimension-pair false positive) fixed+tested, needed 2 iterations"
+    },
+    {
+      "id": "C1-3",
+      "phase": "Batch 2",
+      "title": "Interview engine: question bank, next-question selection, answer recording",
+      "status": "done",
+      "by": "Opus re-verified, no new defects"
+    },
+    {
+      "id": "C1-6",
+      "phase": "Batch 3",
+      "title": "P1 vertical slice: paste a paragraph, answer questions, get sample IDs and filenames",
+      "status": "verifying",
+      "by": "Sonnet · D2 (remove-factor stale closure), D6 (retag on edit), D7 (refused-write toast) fixed+unit-tested; D2 LIVE re-verify anomaly unresolved"
+    }
+  ],
+  "log": [
+    {
+      "time": "10:44:33",
+      "msg": "P1 started. P0 shipped and pushed. Planning pass underway: authoring docs/plans/planner-web-p1.md + task graph with real scope/verification per task."
+    },
+    {
+      "time": "10:48:03",
+      "msg": "Task graph authored: 6 tasks in 3 batches. C1-6 (UI wiring) deliberately alone in the last batch per lesson 4. K-1 content prerequisite discharged structurally by C1-1's generated KB."
+    },
+    {
+      "time": "10:48:25",
+      "msg": "Dispatched batch 1 in parallel: C1-1 (KB export+loader), C1-2 (predicate DSL), C1-5 (condition matrix). File-disjoint."
+    },
+    {
+      "time": "10:58:14",
+      "msg": "C1-5 executed: conditions.js + 15 tests. Reconciled design shape against schema.js's existing design slot (good - lesson 33). FLAG for verification: buildSampleId THROWS on an unknown scheme token rather than returning an issue; conditionIssues catches it first, but a direct call from C1-6 could white-screen. Verify the composition order is actually safe."
+    },
+    {
+      "time": "10:58:59",
+      "msg": "C1-2 executed: predicate.js + 23 tests. Notable: the executor rejected the spec's literal 'return false at the depth cap' because an enclosing chain of not-wrappers re-negates that false -- an even parity would flip a runaway predicate back to TRUE. Used a throw-and-unwind instead so the cap always forces the whole evaluation false. Verified with 33- and 34-deep chains. Correct reasoning; the literal spec text would have shipped a live bug."
+    },
+    {
+      "time": "11:09:23",
+      "msg": "Batch 1 complete: C1-1 (76-marker generated KB + loader, 26 tests, falsification step confirmed the staleness gate fails when markers.py is edited without re-export), C1-2 (predicate DSL, 23 tests), C1-5 (condition matrix, 15 tests). 136/136 JS, 328 Python, zero regressions. Dispatching batch 2: C1-4 (free-text ingest) + C1-3 (interview engine), both depend on C1-1/C1-2 which are now satisfied."
+    },
+    {
+      "time": "11:09:46",
+      "msg": "Dispatched batch 2 in parallel: C1-4 (free-text ingest) + C1-3 (interview engine). File-disjoint."
+    },
+    {
+      "time": "11:12:03",
+      "msg": "C1-3's first dispatch failed: it reported 'completed' but produced NONE of its deliverable files (interview.js/questions.json/interview.test.js). Its final result was a raw nested Agent() tool-call artifact, not a real report -- it appears to have tried spawning its own sub-agent for reconnaissance reading instead of reading the files directly, and that went wrong. Confirmed via direct filesystem check, not trusting the notification. Redispatching with an explicit no-nested-agents instruction."
+    },
+    {
+      "time": "11:12:49",
+      "msg": "C1-3 redispatched (2nd attempt) with an explicit instruction not to spawn nested sub-agents and to read all spec/API files directly."
+    },
+    {
+      "time": "15:36:01",
+      "msg": "SPEND LIMIT HIT: both C1-3 (2nd attempt) and C1-4 subagent dispatches failed with 'monthly spend limit'. This also likely explains C1-3's first garbled failure (probably cut off mid-task, not a real reasoning error). Switching to direct warm-context implementation for both remaining batch-2 tasks per lesson 42 -- retrying dispatch would just fail again on a monthly (non-transient) limit."
+    },
+    {
+      "time": "15:39:44",
+      "msg": "C1-3 done directly (lesson-42 substitution, not subagent-dispatched): interview.js + 12-question bank + 15 tests. Composition proven: a freetext-tagged slot is still asked and carries suggestedDefault; a STRONG-tagged slot is not re-asked; recordAnswer performs zero mutation (proven by JSON snapshot compare); real questions.json loads with zero issues; empty-experiment nextQuestions(limit=8) covers all 5 naming-critical fields."
+    },
+    {
+      "time": "15:45:43",
+      "msg": "Batch 2 complete: C1-3 (interview engine + 12-question bank, 15 tests) and C1-4 (free-text ingest, 15 JS + 2 Python conformance tests) both done DIRECTLY after subagent dispatch hit the monthly spend limit twice -- substituted per lesson 42, declared explicitly. 166/166 JS, 330 Python, ruff+black clean, build succeeds at 98KB. Remaining: C1-6 (UI vertical slice) deferred to next session -- deliberately not starting the highest-risk task this late in the budget."
+    },
+    {
+      "time": "15:48:05",
+      "msg": "Session ending: committed, dashboard synced, memory updated. Handover follows."
+    },
+    {
+      "time": "15:51:32",
+      "msg": "User confirmed enough budget remains -- proceeding with C1-6 directly (established pattern this session, subagent dispatch still unreliable on the monthly spend limit)."
+    },
+    {
+      "time": "16:14:46",
+      "msg": "C1-6 done: describe.js (paste-a-paragraph, reviewable Accept/Dismiss proposals, interview panel with why+skip) + design.js (factors/levels/replicates, live condition table) wired into main.js's router alongside naming.js. Live file:// verification caught and fixed a real UI bug (stale closure clobbering a factor's other field on edit). All P1 (C1-1 through C1-6) now committed. 166 JS / 330 Python tests, zero regressions."
+    },
+    {
+      "time": "16:20:52",
+      "msg": "Dispatching Opus verification over P1 (dbe8718, 8bf53b7 + lesson commits)."
+    },
+    {
+      "time": "16:55:11",
+      "msg": "Second Opus adversarial pass over full P1 diff (C1-1..C1-6): 8 defects (D1-D8) + 2 minor UX gaps found. All fixed, unit-tested green. D2's live re-verification hit an anomaly (extra blank factor row after Remove) -- paused for /handover mid-diagnosis, not yet committed."
+    },
+    {
+      "time": "21:49:29",
+      "msg": "Two-stage naming shipped: base name rendered once, group segments separated by '-' so arms never merge. Inliner now folds wrapped imports AND hard-fails on any surviving static import (falsification-tested). Answers are now reviewable/editable/re-askable, plus a confirmed 'Start over'. 190 JS + 332 Py green; verified live against the BUILT artifact."
+    },
+    {
+      "time": "21:49:29",
+      "msg": "Lessons 47 + 48 distilled: line-anchored source regexes break on formatter line-wrapping and output gates must assert absence, not that a step ran; and a dev server's module registry can serve fresh bytes while executing stale exports -- verify the shipped artifact."
+    },
+    {
+      "time": "23:30:26",
+      "msg": "Planned via docs/plans/planner-web-mvp-usecases.md, then C:/Users/dwaig/.claude/plans/wobbly-splashing-cookie.md (plan mode). Implemented warm-context (well-scoped, no subagent dispatch needed). Verified live against the BUILT artifact over http: 9-row CT/NAM25MM/NAM50MM x 3-biorep design renders exactly per spec, allowOther round-trips through the answered-list re-edit path, and a hand-seeded v1 autosave correctly migrates to v2 and re-persists cleanly."
+    },
+    {
+      "time": "23:30:26",
+      "msg": "docs/plans/planner-web-mvp-usecases.md written to map MVP use cases (UC-1..UC-7) and resolve the if/then-rules-vs-hardcoding question: rules belong in the knowledge pack as data (predicate.js already exists for this), code stays a generic evaluator. K-5 (control rules) still needed before controls can be generated."
+    },
+    {
+      "time": "23:36:25",
+      "msg": "Adversarial verification pass (required by the master decision rule even for warm-context runs) found+fixed D13. See docs/cma-lessons.md lesson 49. All 6 planned work items (schema v2, conditions engine rework, naming+design UI, allowOther, build+verify) done and green."
+    },
+    {
+      "time": "12:55:31",
+      "msg": "Planned via C:/Users/dwaig/.claude/plans/curried-chasing-flamingo.md (plan mode, Explore+Plan subagents dispatched to verify the predicate engine/KB pipeline/UI seams before committing to a design). Executed warm-context (well-scoped after planning). Two Plan-agent-caught corrections proved out during implementation: design.js's real re-render funnel is renderConditions() not renderAll(), and store.patch() rebinds the experiment root so no experiment reference may ever be cached."
+    },
+    {
+      "time": "12:55:31",
+      "msg": "Content: 16 rules drafted by Claude per the user's explicit 'I draft, you correct' instruction -- domain content awaits Daniel's review before being treated as authoritative."
+    },
+    {
+      "time": "12:57:23",
+      "msg": "D14 and D15 fixed and verified (write_kb_dev_js now names the offending file on malformed JSON; ci.yml now runs node --test web/tests/*.test.js)."
+    },
+    {
+      "time": "16:02:57",
+      "msg": "Board hygiene: cleared D1-D7, D9, D10. All nine were fixed in earlier rounds (D1-D7 committed in 8997446, D9/D10 in 1c8fa6e) but never defect-cleared, so the board was showing nine resolved defects as open. Spot-verified each against current source before clearing."
+    },
+    {
+      "time": "16:02:57",
+      "msg": "Advice notes now carry a required 'concept' (the phenomenon: spectral spillover, photobleaching) rendered as the note's reason, distinct from the mechanically-derived 'Applies when ...' trigger clause. User correction: a trigger condition is not a reason."
+    },
+    {
+      "time": "07:50:47",
+      "msg": "Schema v3 (assay tier, commit 1 of 4) shipped and pushed as 49c4e2a: one study can now hold multiple assays (bacterial viability, cytoskeleton, ROS, scratch from a real uploaded paper each need their own modality/panel/specimen). Falsifiable gate held throughout: zero changes to web/src/engine/. Adversarial self-review found and fixed 4 real issues in bd24d1a (local only): duplicated scoping predicate between schema.js and assay.js, a scopeWrite gap on the bare naming.fields container, a stale header comment claiming false imports, 4 curly apostrophes breaking the plain-ASCII convention."
+    }
+  ],
+  "snapshot_at": "2026-08-01 07:50"
+};
+/* CMA:EMBEDDED:END */
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+
+function render(d){
+  $("runName").textContent = d.run || "CMA run";
+  $("model").textContent = d.active_model || "—";
+  const st = d.active_status || "idle";
+  $("dot").className = "dot " + (["running","done","idle","paused"].includes(st) ? st : "idle");
+  $("state").textContent = d.state_note || st.toUpperCase();
+
+  const ct = d.current_task;
+  $("now").innerHTML = (ct && ct.id)
+    ? '<span class="tid">' + esc(ct.id) + '</span><span>' + esc(ct.title || "") + '</span>'
+    : '<span class="none">' + esc(d.phase || "Idle") + '</span>';
+
+  const tasks = d.tasks || [];
+  const doneN = tasks.filter(t => ["done","resolved"].includes(t.status)).length;
+  const stats = d.stats && d.stats.length ? d.stats : [
+    { k:"Orchestrator", v:d.orchestrator || "—" },
+    { k:"Progress", v:doneN + " / " + tasks.length },
+    { k:"Phase", v:d.phase || "—", tone:"sm" }
+  ];
+  $("stats").innerHTML = stats.map(s =>
+    '<div class="stat"><div class="k">' + esc(s.k) + '</div><div class="v ' + esc(s.tone || "") + '">' + esc(s.v) + '</div></div>'
+  ).join("");
+
+  const defects = d.defects || [];
+  $("crit").hidden = defects.length === 0;
+  if (defects.length){
+    // Always reassign (with a generic fallback) rather than only when the run
+    // supplies a title -- otherwise a previous run's heading survives into a
+    // later one that didn't set its own.
+    $("critTitle").textContent = d.crit_title || "Open defects";
+    $("defects").innerHTML = defects.map(f =>
+      '<div class="defect"><div class="top"><span class="tid">' + esc(f.id) + '</span>' +
+      '<span class="ttl">' + esc(f.title) + '</span>' +
+      (f.location ? '<span class="loc">' + esc(f.location) + '</span>' : '') + '</div>' +
+      (f.body ? '<p>' + esc(f.body) + '</p>' : '') +
+      (f.repro ? '<div class="repro">' + esc(f.repro) + '</div>' : '') + '</div>'
+    ).join("");
+  }
+
+  const order = [], byPhase = {};
+  for (const t of tasks){
+    const p = t.phase || "Tasks";
+    if (!byPhase[p]){ byPhase[p] = []; order.push(p); }
+    byPhase[p].push(t);
+  }
+  $("board").innerHTML = tasks.length
+    ? order.map(p =>
+        '<div class="phase">' + esc(p) + '</div>' + byPhase[p].map(t =>
+          '<div class="task ' + esc(t.status) + '"><span class="pill ' + esc(t.status) + '">' + esc(t.status) + '</span>' +
+          '<span class="tid">' + esc(t.id) + '</span><span class="ttl">' + esc(t.title) + '</span>' +
+          '<span class="by">' + esc(t.by || "") + '</span></div>'
+        ).join("")
+      ).join("")
+    : '<div class="phase">Tasks</div><div class="task pending">' +
+      '<span class="pill pending">empty</span><span class="ttl">No tasks recorded yet ' +
+      '— seed them with <code>update.py --from-task-graph &lt;task-graph.json&gt;</code>.</span></div>';
+
+  const log = d.log || [];
+  $("logBody").innerHTML = log.length
+    ? log.slice().reverse().map(l =>
+        '<li><span class="t">' + esc(l.time || "") + '</span>' + esc(l.msg) + '</li>'
+      ).join("")
+    : '<li><span class="t">—</span>Nothing logged yet.</li>';
+}
+
+let lastRaw = "", lastChange = Date.now(), liveMode = false;
+async function poll(){
+  try {
+    const r = await fetch("./status.json?t=" + Date.now(), { cache:"no-store" });
+    if (!r.ok) throw new Error("no status");
+    const raw = await r.text();
+    if (raw !== lastRaw){ lastRaw = raw; lastChange = Date.now(); }
+    render(JSON.parse(raw));
+    liveMode = true;
+    const stale = Date.now() - lastChange > 25000;
+    $("liveDot").className = "live" + (stale ? " stale" : "");
+    $("liveText").textContent = "live · updated " + Math.round((Date.now() - lastChange)/1000) + "s ago";
+  } catch {
+    if (!liveMode){
+      render(EMBEDDED);
+      $("liveDot").className = "live snap";
+      $("liveText").textContent = EMBEDDED.snapshot_at
+        ? "offline snapshot · captured " + EMBEDDED.snapshot_at + " · no server running"
+        : "offline snapshot · no server running";
+    }
+  }
+}
+poll();
+setInterval(poll, 1500);
+</script>

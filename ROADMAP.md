@@ -101,20 +101,67 @@ conforming filename with no file metadata required.
 ### Open-weights model support (near-term candidate)
 Add support for local and open-weights models such as Qwen 3.5 and Gemma 30, allowing users to run the metadata enhancer and experiment describer without relying on closed-source APIs or sending data externally.
 
-### Web app re-platform (under discussion)
+### Web app re-platform — APPROVED and IN PROGRESS (2026-07-29)
+Superseded the file-picker/local-bioio idea below: a bigger pivot is underway,
+codenamed **planner-web**. Rather than extracting naming fields out of microscopy
+files after acquisition, the web app is a static, zero-install **experiment
+planner** that walks design intent → panel/controls/acquisition → naming as a
+downstream artifact of a finished design, deleting metadata extraction from the
+web product entirely (that pipeline stays fragile and was the only reason the app
+needed bioio/JVM/dask/Streamlit at all). Vanilla ES modules, flattened at build to
+one self-contained HTML file (`tools/build_single_file.py`) that runs from `file://`
+or GitHub Pages with identical bytes; zero npm dependencies (`node --test`);
+renaming itself stays out of the web app (Micronaut Classic, `src/`, keeps that job
+and is frozen going forward except bug fixes). See
+[docs/plans/planner-web.md](docs/plans/planner-web.md) for the full plan and
+[docs/plans/planner-web-task-graph.json](docs/plans/planner-web-task-graph.json)
+for the authoritative per-task spec. P0 (schema, naming/validation ports, the
+inliner, store+provenance, app shell, persistence, and a working name-builder
+vertical slice) is done as of this writing. Next: P1 (interview engine +
+deterministic free-text parsing).
+
+<details>
+<summary>Original idea (superseded, kept for history)</summary>
+
 Deliver naming as a static website: naming rules/masks, the planner, and OME-TIFF
 metadata read client-side in the browser (no upload, no install); vendor formats
 (CZI/LIF/ND2) read locally via bioio through a run-without-install command
 (`uvx mna …`), with the UI explaining why a local step is needed. Open decisions:
 web language (TypeScript-native vs Pyodide), and whether to allow any upload fallback.
+</details>
 
-### Microscopy experimental-design assistant (vision)
+### Microscopy experimental-design assistant (vision) — slice 1 shipped 2026-07-31
 Grow beyond naming into a broader experimental-design suite that advises on the
 "why", not just the "what":
+- **Modality-specific guidance (e.g. STED, confocal, widefield): probe/dye selection,
+  acquisition settings, and common pitfalls — DONE.** Rules live as data in
+  `web/kb/advisor.json`, evaluated by the predicate engine that already backed question
+  `askWhen` clauses; a small advice panel (`web/src/ui/advice.js`) surfaces them on the
+  Describe/Design/Naming steps. 16 rules across STED/confocal/widefield/light-sheet/
+  SEM-TEM/Raman.
 - Recommend the required experimental groups and controls for a given design, with
-  the rationale for each.
-- Help plan a fluorophore/color panel to minimize spectral spillover.
-- Modality-specific guidance (e.g. STED, confocal, widefield): probe/dye selection,
-  acquisition settings, and common pitfalls.
-- Broadly: encode microscopy-core expertise so users design sound experiments before
-  they acquire data.
+  the rationale for each — not started (`web/kb/controls.json` + proposed condition
+  rows inside Design, per `docs/plans/planner-web-mvp-usecases.md` §6 step 4). Now
+  gated on the assay tier below (commit 3), since controls attach per-assay.
+- Help plan a fluorophore/color panel to minimize spectral spillover — not started;
+  its own page (the one part of this vision that earns one — see the plan doc), rules
+  qualitative-first, no spectral overlap integrals yet.
+
+**The assay tier (schema v3) — commit 1 of 4 shipped 2026-07-31.** A real published study
+(uploaded by Daniel) turned out to contain FOUR assays sharing only a research question and
+a test article, each with its own modality/panel/specimen -- something the schema could not
+represent at all (one design, one panel, one acquisition, full stop). Commit 1 adds the
+schema plus the read/write machinery (`web/src/core/assay.js`) with zero visible change and
+zero changes to the engine layer; commits 2-4 (the assay switcher, the readout/controls
+vocabulary, and an exportable design document) are designed but not started. Full reasoning,
+verified facts, and remaining sequencing: `docs/plans/planner-web-assay-tier.md`.
+
+**⚠ Parked: review the wording in `web/kb/advisor.json`.** Every rule's `concept`
+(the phenomenon, e.g. "spectral spillover") and `body` (the mechanism explanation) is
+Claude-drafted per the standing "Claude drafts, Daniel corrects" instruction for this
+content — not yet reviewed for terminology a FACSI user would actually recognize.
+Specific spots already flagged: "spillover" vs. "crosstalk" vs. "bleed-through" (the
+confocal rule's own body uses "bleed-through" while its concept says "spectral
+spillover" — worth reconciling either way), and whether "shadow striping" /
+"spherical aberration" are the right register. See `product-vision` memory for the
+full rule-by-concept list.

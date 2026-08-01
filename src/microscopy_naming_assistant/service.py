@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -8,7 +9,8 @@ from .llm import suggest_fields_with_ollama
 from .metadata import extract_metadata_detailed
 from .naming import finalize_fields, render_name
 from .profiles import load_profile
-from .validation import ValidationIssue, validate_fields
+from .safety import check_source_safety
+from .validation import ValidationIssue, validate_fields, validate_target_path
 
 
 @dataclass
@@ -26,6 +28,12 @@ class SuggestionResult:
     # `field_key_provenance` maps each naming field the key map resolved to
     # the exact metadata key that supplied it (see field_map.resolve_fields).
     key_paths: dict[str, str] = field(default_factory=dict)
+    # Raw addressable metadata keys for EVERY image (one dict per series),
+    # unlike `key_paths` above (first image only) -- lets downstream code
+    # (B-2's ranker) tell whether a key VARIES across series. The two must
+    # stay consistent: `image_key_paths[0] == key_paths` whenever any image
+    # was harvested.
+    image_key_paths: list[dict[str, str]] = field(default_factory=list)
     field_key_provenance: dict[str, str] = field(default_factory=dict)
     # Per-image (per-series) resolved-field records straight from
     # ExtractionDetail.images (see metadata._per_image_records): one flat
@@ -77,11 +85,25 @@ def suggest_for_file(
             metadata_text=detail.metadata_text,
         )
         # Fill only genuinely missing fields. The LLM is an enhancer: a value we
-        # actually extracted from the file outranks anything the model proposes.
+        # actually extracted from the file (or already derived from the
+        # filename/mtime) outranks anything the model proposes -- `extracted`
+        # at this point holds exactly those genuine gaps, so this can never
+        # clobber a metadata- or filename-sourced value.
+        #
+        # A field the model justified with help from the user's free-text
+        # `user_description` carries materially weaker evidence than one
+        # grounded only in the file's own metadata/filename: prose is the
+        # user's recollection, not an instrument record. Tag such fields with
+        # the distinct `"llm_description"` provenance rather than folding them
+        # into plain `"llm"` -- collapsing the two would erase exactly the
+        # "refined an extracted value" vs. "invented from prose" distinction
+        # C2 needs to flag description-derived fields as provisional / needs
+        # review all the way to the final name.
+        llm_source_tag = "llm_description" if user_description else "llm"
         for key, value in llm_fields.items():
             if key not in extracted:
                 extracted[key] = value
-                ex_sources[key] = "llm"
+                ex_sources[key] = llm_source_tag
 
     fields = finalize_fields(file_path, extracted, config)
 
@@ -95,6 +117,13 @@ def suggest_for_file(
     if profile is not None:
         issues = validate_fields(fields, profile)
 
+    # A3: cheap, never-raising probes for a source that cannot safely be
+    # renamed right now (locked/read-only) or that lives in a cloud-synced
+    # folder. These are WARNING severity only -- they never block a plan,
+    # never change `fields`/`target_name`, and never affect which files get
+    # planned or renamed (see safety.check_source_safety).
+    issues.extend(check_source_safety(file_path))
+
     target_name = render_name(fields, config)
     return SuggestionResult(
         source=file_path,
@@ -106,9 +135,129 @@ def suggest_for_file(
         reader=detail.reader,
         extraction_error=detail.error,
         key_paths=detail.key_paths,
+        image_key_paths=detail.image_key_paths,
         field_key_provenance=detail.field_key_provenance,
         images=detail.images,
     )
+
+
+def classify_description_proposals(
+    current_fields: dict[str, str],
+    sources: dict[str, str],
+    llm_fields: dict[str, str],
+    *,
+    description_supplied: bool,
+) -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
+    """Split an LLM's proposed fields into genuine fills vs. reviewable overrides.
+
+    The guardrail that the LLM may only fill a field that is actually
+    missing is correct for the model's OWN inferences, but a user's typed
+    description is different: it is the user speaking, not the model
+    guessing, and ROADMAP.md already treats it as authoritative context. So
+    when (and ONLY when) a description was supplied, a field the model
+    proposes that disagrees with an already-populated value is classified as
+    a reviewable override PROPOSAL -- returned for a caller to show as a
+    before/after diff, never applied here and never applied silently
+    anywhere. Pure and side-effect-free: does not mutate its inputs, call
+    the LLM, or apply anything.
+
+    Returns `(fills, overrides)`:
+    - `fills`: fields whose current source is `"default"` or whose current
+      value is empty/absent -- today's existing "only fill genuine gaps"
+      behaviour, unchanged.
+    - `overrides`: `{field: (before, after)}` for fields already populated
+      from real evidence where the model proposed a DIFFERENT, non-empty
+      value. Always empty when `description_supplied` is False -- without a
+      description, disagreeing with real evidence is exactly the fabrication
+      the LLM-as-enhancer guardrail exists to forbid, not a proposal to
+      surface. A field whose source is `"user_edited"` is never proposed as
+      an override -- the human already decided it. A field can never appear
+      in both dicts.
+    """
+    fills: dict[str, str] = {}
+    overrides: dict[str, tuple[str, str]] = {}
+
+    for field_name, proposed in llm_fields.items():
+        if field_name == "ext":
+            continue
+
+        current_value = current_fields.get(field_name, "")
+        current_source = sources.get(field_name, "default")
+
+        if current_source == "default" or not current_value:
+            fills[field_name] = proposed
+            continue
+
+        if not description_supplied or current_source == "user_edited":
+            continue
+        if not proposed or proposed == current_value:
+            continue
+
+        overrides[field_name] = (current_value, proposed)
+
+    return fills, overrides
+
+
+def _casefold_key(path: Path) -> str:
+    """Collision key for `path` that treats case-only differences as the SAME
+    target, matching Windows/NTFS semantics regardless of the host OS running
+    this code (CI may run on a case-sensitive filesystem even though the
+    files this tool renames ultimately live on Windows).
+
+    Deliberately NOT `Path.__eq__`/hash: on native WindowsPath those already
+    happen to casefold, which would make this bug invisible on Windows but
+    very much alive on Linux/macOS -- an explicit string key makes the
+    semantics platform-independent and intentional rather than incidental.
+    """
+    return str(path).casefold()
+
+
+def _distinguishing_token(source: Path) -> str:
+    """A short, deterministic, content-derived token identifying `source`.
+
+    Used to disambiguate a naming collision: two different acquisitions that
+    happen to render to the same target name must not become indistinguishable
+    `_01`/`_02` siblings, since a user can no longer tell them apart (or which
+    is which) from the filename alone. Hashing the source path itself (rather
+    than e.g. current time) keeps this deterministic and dependency-free.
+    """
+    digest = hashlib.sha1(str(source).encode("utf-8", errors="surrogateescape"))
+    return digest.hexdigest()[:8]
+
+
+def _resolve_numeric_suffix_collision(target: Path, collision_keys: set[str]) -> Path:
+    """Legacy bare `_NN` disambiguation.
+
+    Kept reachable via `conflict_strategy="suffix_numeric"` for callers that
+    already depend on the old ambiguous-but-simple naming; the default
+    strategy is `_resolve_distinguishing_suffix_collision` instead.
+    """
+    original_stem = target.stem
+    ext = target.suffix
+    counter = 1
+    while _casefold_key(target) in collision_keys:
+        target = target.with_name(f"{original_stem}_{counter:02d}{ext}")
+        counter += 1
+    return target
+
+
+def _resolve_distinguishing_suffix_collision(
+    target: Path, source: Path, collision_keys: set[str]
+) -> Path:
+    """Default disambiguation: append a short content-derived token instead of
+    a bare counter, so the two targets stay distinguishable rather than
+    collapsing into ambiguous `_01`/`_02` siblings."""
+    original_stem = target.stem
+    ext = target.suffix
+    token = _distinguishing_token(source)
+    candidate = target.with_name(f"{original_stem}_{token}{ext}")
+    counter = 1
+    while _casefold_key(candidate) in collision_keys:
+        # Vanishingly unlikely hash collision fallback: keep the (still
+        # distinguishing) token and add a numeric tiebreaker after it.
+        candidate = target.with_name(f"{original_stem}_{token}_{counter:02d}{ext}")
+        counter += 1
+    return candidate
 
 
 def recalculate_batch(
@@ -117,7 +266,7 @@ def recalculate_batch(
     strict: bool = False,
     conflict_strategy: str = "suffix",
 ) -> BatchResult:
-    collisions: set[Path] = set()
+    collision_keys: set[str] = set()
     planned: list[tuple[Path, Path]] = []
     skipped: list[str] = []
 
@@ -129,23 +278,28 @@ def recalculate_batch(
 
         target = result.source.with_name(result.target_name)
 
-        if target in collisions:
+        if _casefold_key(target) in collision_keys:
             if conflict_strategy == "skip":
                 skipped.append(f"{result.source.name}: duplicate target {target.name}")
                 continue
             elif conflict_strategy == "fail":
                 skipped.append(f"{result.source.name}: collision error, failing batch")
                 continue
+            elif conflict_strategy == "suffix_numeric":
+                target = _resolve_numeric_suffix_collision(target, collision_keys)
             else:
-                counter = 1
-                original_stem = target.stem
-                ext = target.suffix
-                while target in collisions:
-                    target = target.with_name(f"{original_stem}_{counter:02d}{ext}")
-                    counter += 1
+                target = _resolve_distinguishing_suffix_collision(
+                    target, result.source, collision_keys
+                )
 
-        collisions.add(target)
+        collision_keys.add(_casefold_key(target))
         planned.append((result.source, target))
+
+        # MAX_PATH is a property of the FULL path (dir + filename), so it can
+        # only be known here, once `target` is final. Warn only -- never
+        # truncate, since that would silently destroy the identity this tool
+        # exists to preserve.
+        result.issues.extend(validate_target_path(target))
 
     return BatchResult(planned=planned, suggestions=suggestions, skipped=skipped)
 
@@ -209,8 +363,34 @@ def plan_batch(
     conflict_strategy: str = "suffix",
     user_description: str | None = None,
 ) -> BatchResult:
+    from .original_name import LEDGER_FILENAME
+
     matches = input_dir.rglob(pattern) if recursive else input_dir.glob(pattern)
-    files = [p for p in matches if p.is_file()]
+    # A2/A8: never plan a rename of the tool's OWN state -- the durable
+    # per-folder ledger (`LEDGER_FILENAME`) and anything under `.manifests/`
+    # (the rollback-journal directory `manifest.save_manifest` writes to).
+    # A broad pattern (e.g. `*` or `*.json` under `--recursive`) would
+    # otherwise match these self-written artifacts: `apply_batch` would
+    # physically rename the ledger file itself, `update_ledger` would then
+    # find it missing, silently degrade to `{}`, and overwrite it with a
+    # brand-new history-free ledger -- permanently orphaning every prior
+    # batch's true-original mapping. Report/sidecar files (`--report`/
+    # `--sidecar`) are deliberately NOT excluded here: they land at
+    # arbitrary user-chosen paths (often outside `input_dir` entirely), carry
+    # no state this tool depends on for correctness, and a generic
+    # filename-based exclusion could wrongly skip a legitimate user file that
+    # happens to share that name.
+    files = [
+        p
+        for p in matches
+        if p.is_file()
+        # A11: casefold both -- Windows/NTFS is case-insensitive, so a ledger
+        # or .manifests entry that merely differs in case (e.g. an OS/sync
+        # client that wrote `.ORIGINAL_NAMES.JSON`) must still be excluded,
+        # or the data-loss bug above reproduces via that one path.
+        and p.name.casefold() != LEDGER_FILENAME.casefold()
+        and ".manifests" not in {part.casefold() for part in p.relative_to(input_dir).parts}
+    ]
     suggestions: list[SuggestionResult] = []
 
     for file_path in files:
@@ -232,17 +412,93 @@ def plan_batch(
     )
 
 
-def apply_batch(input_dir: Path, planned: list[tuple[Path, Path]]) -> tuple[int, Path | None]:
-    from .manifest import save_manifest
+def apply_batch(
+    input_dir: Path,
+    planned: list[tuple[Path, Path]],
+    embed_original_name: bool = False,
+) -> tuple[int, Path | None]:
+    """Rename every planned pair, all-or-nothing.
 
-    renamed = 0
-    actually_renamed = []
-    for src, dst in planned:
-        if src == dst:
-            continue
-        src.rename(dst)
-        actually_renamed.append((src, dst))
-        renamed += 1
+    Contract:
+    - The manifest is written as an intent journal BEFORE any rename, so a
+      hard crash mid-batch still leaves a recoverable trail on disk (a
+      ``None`` manifest means the plan was empty / all no-op, exactly as
+      ``save_manifest`` already defines).
+    - On success, returns ``(renamed_count, manifest_path)`` exactly as
+      before.
+    - On ANY exception during renaming, every rename already completed is
+      undone (in reverse order, reusing ``rollback_manifest``'s existing
+      skip-if-original-exists semantics) and the ORIGINAL exception is
+      re-raised unchanged, so callers that already propagate it need no
+      changes.
+    - If the rollback itself cannot fully restore the files, that failure is
+      never swallowed: a ``RuntimeError`` naming the un-restorable files is
+      raised instead, chained (``raise ... from``) from the original
+      exception, since that is the one state a user must act on manually.
+    - A2 original-name preservation, run ONLY after every rename in this
+      batch has actually succeeded (never inside the try/rollback block
+      above, and never able to undo a rename):
+        * the durable per-folder ledger (`original_name.update_ledger`) is
+          ALWAYS updated, for every format, merging into any existing ledger
+          rather than replacing it;
+        * iff `embed_original_name` is True, the CHAIN-RESOLVED true original
+          filename (from `update_ledger`'s `resolved` return, not the
+          immediate `src.name`) is also written into the ImageDescription tag
+          of TIFF/OME-TIFF targets only (never CZI/LIF/ND2), so a multi-hop
+          rename embeds the true original rather than an intermediate name.
+          A failed embed is swallowed here too, as defense in depth on top of
+          `embed_original_name_in_tiff` already never raising -- the ledger,
+          not this tag, is the source of truth.
+    """
+    from .manifest import rollback_manifest, save_manifest
+    from .original_name import embed_original_name_in_tiff, update_ledger
 
-    manifest_path = save_manifest(input_dir, actually_renamed)
-    return renamed, manifest_path
+    actual_pairs = [(src, dst) for src, dst in planned if src != dst]
+
+    # Intent journal: write BEFORE renaming anything so a hard crash
+    # (power loss, kill -9) mid-batch still leaves a recoverable trail.
+    manifest_path = save_manifest(input_dir, planned)
+
+    completed: list[tuple[Path, Path]] = []
+    try:
+        for src, dst in actual_pairs:
+            src.rename(dst)
+            completed.append((src, dst))
+    except Exception as exc:
+        rollback_errors: list[str] = []
+        if manifest_path is not None:
+            _, rollback_errors = rollback_manifest(manifest_path, input_dir)
+        if rollback_errors:
+            raise RuntimeError(
+                "Apply failed and rollback could not fully restore all files: "
+                + "; ".join(rollback_errors)
+            ) from exc
+        raise
+
+    if completed:
+        # Sidecar ledger: ALWAYS, every format. Runs only once every rename
+        # above has actually succeeded, so it can never gate or roll back
+        # them; a write failure here is a ledger-write problem, not a rename
+        # problem, and is deliberately not caught so it is never silently
+        # lost -- but it happens after the filesystem is already in its
+        # final, successful state.
+        _, resolved = update_ledger(input_dir, completed)
+
+        if embed_original_name:
+            for src, dst in completed:
+                # A8: embed the CHAIN-RESOLVED true original, not `src.name`
+                # (the immediate previous filename) -- on a multi-hop rename,
+                # `src.name` is only an intermediate name, not the true
+                # original the ledger already resolved back to.
+                dst_key = str(dst.relative_to(input_dir))
+                original = resolved.get(dst_key, src.name)
+                try:
+                    embed_original_name_in_tiff(dst, original)
+                except Exception:
+                    # Opt-in convenience only (A2): even an unexpected
+                    # failure that somehow escapes the helper's own
+                    # never-raise contract must not undo an
+                    # already-successful rename.
+                    pass
+
+    return len(completed), manifest_path

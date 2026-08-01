@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "micronaut",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "streamlit", "run", "app_streamlit.py", "--server.headless", "true"],
+      "port": 8501
+    },
+    {
+      "name": "cma-dashboard",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8777", "--directory", "tools/cma-dashboard"],
+      "port": 8777
+    },
+    {
+      "name": "planner-web-dev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["tools/serve_dir.py", "web"],
+      "autoPort": true
+    },
+    {
+      "name": "planner-web-dist",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8779", "--directory", "dist"],
+      "port": 8779
+    }
+  ]
+}

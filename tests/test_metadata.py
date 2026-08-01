@@ -5,7 +5,9 @@ from pathlib import Path
 
 import pytest
 
+from microscopy_naming_assistant import metadata as metadata_module
 from microscopy_naming_assistant.metadata import (
+    MAX_METADATA_TEXT_CHARS,
     _extract_acquisition_date,
     _extract_from_mask,
     _extract_magnification,
@@ -15,6 +17,7 @@ from microscopy_naming_assistant.metadata import (
     _is_placeholder_channel,
     _join_within_budget,
     extract_metadata,
+    extract_metadata_detailed,
 )
 
 
@@ -193,6 +196,161 @@ def test_detailed_extraction_reports_reader_and_raw_metadata(tmp_path: Path) -> 
     assert detail.reader
     assert not detail.timed_out
     assert "HC PL APO 93x" in detail.metadata_text
+
+
+@pytest.mark.integration
+def test_oversized_imagej_info_block_stays_within_metadata_text_budget(tmp_path: Path) -> None:
+    # Regression: a real 210-page ImageJ hyperstack export measured a 1.36M-char
+    # Info tag (the tag repeats per slice) -- the raw shim text was appended
+    # AFTER metadata_text was already bounded to MAX_METADATA_TEXT_CHARS, so the
+    # final blob blew straight past the budget it was documented to respect.
+    path = tmp_path / "huge_info.tif"
+    _write_imagej_tif(path, "ObjectiveName = HC PL APO 93x\n" + "x" * (MAX_METADATA_TEXT_CHARS * 4))
+
+    _fields, _sources, detail = extract_metadata_detailed(path, timeout_seconds=60)
+
+    assert not detail.timed_out
+    assert len(detail.metadata_text) <= MAX_METADATA_TEXT_CHARS + 200
+
+
+class _SyncProcess:
+    """Runs `target(*args)` synchronously in-process instead of spawning.
+
+    A real `multiprocessing.get_context("spawn").Process` re-imports this
+    module in a fresh interpreter, so a `monkeypatch.setattr` on
+    `metadata._read_with_bioio` in the test process would never reach the
+    child. Running the target inline keeps the monkeypatch effective and the
+    fast-suite tests below fast (no process spawn, no JVM/bioio startup).
+    """
+
+    def __init__(self, target, args) -> None:
+        self._target = target
+        self._args = args
+
+    def start(self) -> None:
+        self._target(*self._args)
+
+    def join(self, timeout: float | None = None) -> None:
+        return None
+
+    def is_alive(self) -> bool:
+        return False
+
+    def terminate(self) -> None:
+        return None
+
+    def kill(self) -> None:
+        return None
+
+
+class _SyncContext:
+    def Queue(self):
+        import queue as queue_module
+
+        return queue_module.Queue()
+
+    def Process(self, target, args):
+        return _SyncProcess(target, args)
+
+
+def _patch_synchronous_bioio(monkeypatch, bioio_payload: dict) -> None:
+    """Bypass the real spawn+bioio path with a synchronous fake payload."""
+    monkeypatch.setattr(metadata_module.multiprocessing, "get_context", lambda kind: _SyncContext())
+    monkeypatch.setattr(
+        metadata_module,
+        "_read_with_bioio",
+        lambda file_path, field_key_map=None: bioio_payload,
+    )
+
+
+_EMPTY_BIOIO_PAYLOAD = {
+    "fields": {},
+    "metadata_text": "",
+    "reader": "fake-reader",
+    "error": "",
+    "key_paths": {},
+    "field_key_provenance": {},
+    "images": [],
+}
+
+
+def test_mtime_sourced_date_is_tagged_mtime_not_filename(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A5: when nothing else supplies a date, the mtime fallback must carry
+    its own "mtime" tag rather than being folded into "filename" -- mtime is
+    frequently the date the file was *copied*, not acquired.
+    """
+    _patch_synchronous_bioio(monkeypatch, _EMPTY_BIOIO_PAYLOAD)
+
+    # Stem has no date-shaped substring, so nothing but mtime can supply one.
+    file_path = tmp_path / "sampleE03_run.tif"
+    file_path.write_bytes(b"dummy")
+    dt = datetime(2020, 6, 15, 8, 0, 0)
+    import os
+
+    os.utime(file_path, (dt.timestamp(), dt.timestamp()))
+
+    fields, sources, _detail = extract_metadata_detailed(file_path, timeout_seconds=5)
+
+    assert fields["date"] == "2020-06-15"
+    assert sources["date"] == "mtime"
+    assert sources["date"] != "filename"
+
+
+def test_filename_sourced_date_is_tagged_filename_and_wins_over_mtime(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A5: a date parsed out of the filename stem is a stronger guess than
+    mtime and must keep the distinct "filename" tag, not "mtime".
+    """
+    _patch_synchronous_bioio(monkeypatch, _EMPTY_BIOIO_PAYLOAD)
+
+    file_path = tmp_path / "2021-03-04_sample.tif"
+    file_path.write_bytes(b"dummy")
+    # mtime deliberately disagrees with the filename date, so a passing
+    # assertion on fields["date"] proves the filename value actually won.
+    dt = datetime(2020, 6, 15, 8, 0, 0)
+    import os
+
+    os.utime(file_path, (dt.timestamp(), dt.timestamp()))
+
+    fields, sources, _detail = extract_metadata_detailed(file_path, timeout_seconds=5)
+
+    assert fields["date"] == "2021-03-04"
+    assert sources["date"] == "filename"
+    assert sources["date"] != "mtime"
+
+
+def test_metadata_sourced_date_is_unaffected_by_the_mtime_tag_split(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A5: real acquisition metadata must still override the mtime/filename
+    heuristics and keep the "metadata" tag -- splitting "filename" into
+    "filename"/"mtime" must not touch this path.
+    """
+    _patch_synchronous_bioio(
+        monkeypatch,
+        {
+            **_EMPTY_BIOIO_PAYLOAD,
+            "fields": {"date": "2025-02-03"},
+            "metadata_text": "AcquisitionDate = 2025-02-03T11:22:33",
+        },
+    )
+
+    # Filename and mtime both disagree with the metadata date, so a passing
+    # assertion proves metadata actually won, not that it happened to match.
+    file_path = tmp_path / "2099-12-31_sample.tif"
+    file_path.write_bytes(b"dummy")
+    dt = datetime(2020, 6, 15, 8, 0, 0)
+    import os
+
+    os.utime(file_path, (dt.timestamp(), dt.timestamp()))
+
+    fields, sources, _detail = extract_metadata_detailed(file_path, timeout_seconds=5)
+
+    assert fields["date"] == "2025-02-03"
+    assert sources["date"] == "metadata"
 
 
 @pytest.mark.integration

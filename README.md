@@ -1,4 +1,4 @@
-﻿# μicronaut
+# μicronaut
 
 μicronaut — a metadata-aware microscopy file naming assistant with optional local LLM suggestions.
 (The µ is the micron symbol; the project name is pronounced "Micronaut.")
@@ -66,7 +66,7 @@ ollama serve
 
 2. Pull a model (example):
 
-ollama pull qwen2.5-coder:7b
+ollama pull qwen3.5:14b
 
 3. Enable LLM in config (see below) and run commands with --llm.
 
@@ -212,7 +212,7 @@ Example LLM section:
 	"llm": {
 		"enabled": true,
 		"model": "auto",
-		"preferred_models": ["llama3.1:8b", "qwen2.5-coder:7b", "phi3:mini"],
+		"preferred_models": ["qwen3.5:14b", "gemma2:9b", "llama3.1:8b", "phi3:mini"],
 		"endpoint": "http://localhost:11434/api/chat",
 		"timeout_seconds": 30
 	}
@@ -235,3 +235,7 @@ python -m pytest -q
 This project is licensed under the Apache License, Version 2.0. See the
 [LICENSE](LICENSE) file for the full text.
 
+<!-- test update text -->
+## Test Update
+
+This section contains the test update text for task verification.

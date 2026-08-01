@@ -1,0 +1,122 @@
+[
+  {
+    "id": "date",
+    "prompt": "When was this acquired?",
+    "why": "The date is the first token in every filename this tool renders, and sorts your files chronologically without you having to name them that way.",
+    "field": "naming.fields.date",
+    "type": "text",
+    "priority": 10,
+    "tag": "user"
+  },
+  {
+    "id": "exptype",
+    "prompt": "What kind of experiment is this?",
+    "why": "The experiment type groups related acquisitions together in a folder listing (e.g. CT for a control, G1G2 for a two-generation comparison).",
+    "field": "naming.fields.exptype",
+    "type": "text",
+    "priority": 20,
+    "tag": "user"
+  },
+  {
+    "id": "sample",
+    "prompt": "What's the sample or specimen identifier?",
+    "why": "This is what tells two files with the same date and experiment type apart -- it should be unique within that experiment.",
+    "field": "naming.fields.sample",
+    "type": "text",
+    "priority": 30,
+    "tag": "user"
+  },
+  {
+    "id": "magnification",
+    "prompt": "What magnification or objective was used?",
+    "why": "Filtering by magnification later (e.g. finding every 63x acquisition) only works if it's in the filename.",
+    "field": "naming.fields.magnification",
+    "type": "text",
+    "priority": 40,
+    "tag": "user"
+  },
+  {
+    "id": "markers",
+    "prompt": "Which markers or fluorophores were imaged?",
+    "why": "Markers are the main thing collaborators search filenames for -- worth getting into the name even if it's also in the metadata.",
+    "field": "naming.fields.markers",
+    "type": "text",
+    "priority": 50,
+    "tag": "user"
+  },
+  {
+    "id": "organism",
+    "prompt": "What organism or cell line is this?",
+    "why": "Groups this experiment with others on the same model system when you're searching later.",
+    "field": "specimen.organism",
+    "type": "text",
+    "priority": 60,
+    "tag": "user"
+  },
+  {
+    "id": "sampleType",
+    "prompt": "What type of sample is it (e.g. tissue section, cell culture, whole mount)?",
+    "why": "Sample type changes what acquisition settings and controls are typical -- later steps use this to tailor their suggestions.",
+    "field": "specimen.sampleType",
+    "type": "text",
+    "priority": 70,
+    "tag": "user"
+  },
+  {
+    "id": "preparation",
+    "prompt": "How was the sample prepared?",
+    "why": "Fixation and mounting method affects which controls and settings make sense, and is easy to forget by the time you write the paper.",
+    "field": "specimen.preparation",
+    "type": "text",
+    "askWhen": { "exists": "specimen.organism" },
+    "priority": 80,
+    "tag": "user"
+  },
+  {
+    "id": "instrument",
+    "prompt": "Which instrument did you use?",
+    "why": "Ties this experiment to the instrument's known objectives, lasers, and detectors for later acquisition guidance.",
+    "field": "acquisition.instrument",
+    "type": "text",
+    "priority": 90,
+    "tag": "user"
+  },
+  {
+    "id": "modality",
+    "prompt": "What imaging modality is this?",
+    "why": "Modality drives modality-specific guidance later -- confocal, widefield and STED have different pitfalls worth flagging. Not every modality is optical: SEM/TEM/Raman samples typically have no biological or technical replicates in the usual sense, which is why those are separate, independently-optional questions.",
+    "field": "acquisition.modality",
+    "type": "choice",
+    "options": ["confocal", "widefield", "STED", "light-sheet", "SEM", "TEM", "Raman"],
+    "allowOther": true,
+    "priority": 100,
+    "tag": "user"
+  },
+  {
+    "id": "biologicalReplicates",
+    "prompt": "How many biological replicates?",
+    "why": "Determines how many condition rows the design expands into and whether the sample size is worth flagging as low.",
+    "field": "design.biologicalReplicates",
+    "type": "number",
+    "priority": 110,
+    "tag": "user"
+  },
+  {
+    "id": "technicalReplicates",
+    "prompt": "How many technical replicates per biological replicate, if any?",
+    "why": "Technical replicates (repeat acquisitions of the same biological sample) get their own token in the filename, separate from biological replicates -- leave this blank if you didn't take any.",
+    "field": "design.technicalReplicates",
+    "type": "number",
+    "priority": 111,
+    "tag": "user"
+  },
+  {
+    "id": "notes",
+    "prompt": "Anything else worth noting about this acquisition?",
+    "why": "A free-text escape hatch for anything the other questions didn't capture -- entirely optional.",
+    "field": "naming.fields.notes",
+    "type": "text",
+    "priority": 120,
+    "tag": "user"
+  }
+]

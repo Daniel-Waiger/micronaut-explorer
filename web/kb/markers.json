@@ -1,0 +1,1101 @@
+{
+  "ambiguousInFreeText": [
+    "cerulean",
+    "citrine",
+    "clip",
+    "emerald",
+    "halo",
+    "snap",
+    "tomato",
+    "venus"
+  ],
+  "markers": {
+    "ALEXA405": {
+      "aliases": [
+        "af405",
+        "alexa 405",
+        "alexa fluor 405",
+        "alexa405"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af405",
+        "alexa 405",
+        "alexa fluor 405",
+        "alexa405"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA430": {
+      "aliases": [
+        "af430",
+        "alexa 430",
+        "alexa fluor 430",
+        "alexa430"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af430",
+        "alexa 430",
+        "alexa fluor 430",
+        "alexa430"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA488": {
+      "aliases": [
+        "af488",
+        "alexa 488",
+        "alexa fluor 488",
+        "alexa488"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af488",
+        "alexa 488",
+        "alexa fluor 488",
+        "alexa488"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA514": {
+      "aliases": [
+        "af514",
+        "alexa 514",
+        "alexa fluor 514",
+        "alexa514"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af514",
+        "alexa 514",
+        "alexa fluor 514",
+        "alexa514"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA532": {
+      "aliases": [
+        "af532",
+        "alexa 532",
+        "alexa fluor 532",
+        "alexa532"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af532",
+        "alexa 532",
+        "alexa fluor 532",
+        "alexa532"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA546": {
+      "aliases": [
+        "af546",
+        "alexa 546",
+        "alexa fluor 546",
+        "alexa546"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af546",
+        "alexa 546",
+        "alexa fluor 546",
+        "alexa546"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA555": {
+      "aliases": [
+        "af555",
+        "alexa 555",
+        "alexa fluor 555",
+        "alexa555"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af555",
+        "alexa 555",
+        "alexa fluor 555",
+        "alexa555"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA568": {
+      "aliases": [
+        "af568",
+        "alexa 568",
+        "alexa fluor 568",
+        "alexa568"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af568",
+        "alexa 568",
+        "alexa fluor 568",
+        "alexa568"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA594": {
+      "aliases": [
+        "af594",
+        "alexa 594",
+        "alexa fluor 594",
+        "alexa594"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af594",
+        "alexa 594",
+        "alexa fluor 594",
+        "alexa594"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA647": {
+      "aliases": [
+        "af647",
+        "alexa 647",
+        "alexa fluor 647",
+        "alexa647"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af647",
+        "alexa 647",
+        "alexa fluor 647",
+        "alexa647"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA660": {
+      "aliases": [
+        "af660",
+        "alexa 660",
+        "alexa fluor 660",
+        "alexa660"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af660",
+        "alexa 660",
+        "alexa fluor 660",
+        "alexa660"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA680": {
+      "aliases": [
+        "af680",
+        "alexa 680",
+        "alexa fluor 680",
+        "alexa680"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af680",
+        "alexa 680",
+        "alexa fluor 680",
+        "alexa680"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA750": {
+      "aliases": [
+        "af750",
+        "alexa 750",
+        "alexa fluor 750",
+        "alexa750"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af750",
+        "alexa 750",
+        "alexa fluor 750",
+        "alexa750"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ARL": {
+      "aliases": [
+        "arl"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "arl"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO425": {
+      "aliases": [
+        "atto 425",
+        "atto425"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 425",
+        "atto425"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO488": {
+      "aliases": [
+        "atto 488",
+        "atto488"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 488",
+        "atto488"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO520": {
+      "aliases": [
+        "atto 520",
+        "atto520"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 520",
+        "atto520"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO550": {
+      "aliases": [
+        "atto 550",
+        "atto550"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 550",
+        "atto550"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO565": {
+      "aliases": [
+        "atto 565",
+        "atto565"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 565",
+        "atto565"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO590": {
+      "aliases": [
+        "atto 590",
+        "atto590"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 590",
+        "atto590"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO633": {
+      "aliases": [
+        "atto 633",
+        "atto633"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 633",
+        "atto633"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO647": {
+      "aliases": [
+        "atto 647",
+        "atto647"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 647",
+        "atto647"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO647N": {
+      "aliases": [
+        "atto 647-n",
+        "atto 647n",
+        "atto647-n",
+        "atto647n"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 647-n",
+        "atto 647n",
+        "atto647-n",
+        "atto647n"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO700": {
+      "aliases": [
+        "atto 700",
+        "atto700"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 700",
+        "atto700"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "BFP": {
+      "aliases": [
+        "bfp"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "bfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "BODIPY": {
+      "aliases": [
+        "bodipy"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "bodipy"
+      ],
+      "isFamily": true,
+      "variants": []
+    },
+    "CALCEIN": {
+      "aliases": [
+        "calcein",
+        "calcein am",
+        "calcein-am"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "calcein",
+        "calcein am",
+        "calcein-am"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLMASK": {
+      "aliases": [
+        "cell mask",
+        "cellmask"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cell mask",
+        "cellmask"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CERULEAN": {
+      "aliases": [
+        "cerulean"
+      ],
+      "class": "protein",
+      "freeTextAliases": [],
+      "isFamily": false,
+      "variants": []
+    },
+    "CFP": {
+      "aliases": [
+        "cfp"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "cfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CITRINE": {
+      "aliases": [
+        "citrine"
+      ],
+      "class": "protein",
+      "freeTextAliases": [],
+      "isFamily": false,
+      "variants": []
+    },
+    "CLIP": {
+      "aliases": [
+        "clip",
+        "clip tag",
+        "clip-tag",
+        "cliptag"
+      ],
+      "class": "tag",
+      "freeTextAliases": [
+        "clip tag",
+        "clip-tag",
+        "cliptag"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CY2": {
+      "aliases": [
+        "cy2",
+        "cyanine2"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cy2",
+        "cyanine2"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CY3": {
+      "aliases": [
+        "cy3",
+        "cyanine3"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cy3",
+        "cyanine3"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CY5": {
+      "aliases": [
+        "cy5",
+        "cyanine5"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cy5",
+        "cyanine5"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CY7": {
+      "aliases": [
+        "cy7",
+        "cyanine7"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cy7",
+        "cyanine7"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DAPI": {
+      "aliases": [
+        "dapi"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dapi"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DRAQ5": {
+      "aliases": [
+        "draq 5",
+        "draq5"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "draq 5",
+        "draq5"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DYLIGHT488": {
+      "aliases": [
+        "dylight 488",
+        "dylight488"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dylight 488",
+        "dylight488"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DYLIGHT550": {
+      "aliases": [
+        "dylight 550",
+        "dylight550"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dylight 550",
+        "dylight550"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DYLIGHT650": {
+      "aliases": [
+        "dylight 650",
+        "dylight650"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dylight 650",
+        "dylight650"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ERTRACKER": {
+      "aliases": [
+        "er tracker",
+        "er-tracker",
+        "ertracker"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "er tracker",
+        "er-tracker",
+        "ertracker"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "FITC": {
+      "aliases": [
+        "fitc"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "fitc"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "FLUO4": {
+      "aliases": [
+        "fluo 4",
+        "fluo-4",
+        "fluo4"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "fluo 4",
+        "fluo-4",
+        "fluo4"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "FURA2": {
+      "aliases": [
+        "fura 2",
+        "fura-2",
+        "fura2"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "fura 2",
+        "fura-2",
+        "fura2"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "GCAMP": {
+      "aliases": [
+        "gcamp",
+        "gcamp3",
+        "gcamp5",
+        "gcamp6",
+        "gcamp6f",
+        "gcamp6m",
+        "gcamp6s",
+        "gcamp7",
+        "gcamp7f",
+        "gcamp7s"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "gcamp",
+        "gcamp3",
+        "gcamp5",
+        "gcamp6",
+        "gcamp6f",
+        "gcamp6m",
+        "gcamp6s",
+        "gcamp7",
+        "gcamp7f",
+        "gcamp7s"
+      ],
+      "isFamily": true,
+      "variants": [
+        "gcamp3",
+        "gcamp5",
+        "gcamp6",
+        "gcamp6f",
+        "gcamp6m",
+        "gcamp6s",
+        "gcamp7",
+        "gcamp7f",
+        "gcamp7s"
+      ]
+    },
+    "GFP": {
+      "aliases": [
+        "egfp",
+        "gfp",
+        "gfp+"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "egfp",
+        "gfp",
+        "gfp+"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "HALO": {
+      "aliases": [
+        "halo",
+        "halo tag",
+        "halo-tag",
+        "halotag"
+      ],
+      "class": "tag",
+      "freeTextAliases": [
+        "halo tag",
+        "halo-tag",
+        "halotag"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "HOECHST": {
+      "aliases": [
+        "hoechst",
+        "hoechst 33258",
+        "hoechst 33342",
+        "hoechst33258",
+        "hoechst33342"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "hoechst",
+        "hoechst 33258",
+        "hoechst 33342",
+        "hoechst33258",
+        "hoechst33342"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "IRFP": {
+      "aliases": [
+        "irfp"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "irfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "JF549": {
+      "aliases": [
+        "janelia fluor 549",
+        "jf 549",
+        "jf549"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "janelia fluor 549",
+        "jf 549",
+        "jf549"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "JF646": {
+      "aliases": [
+        "janelia fluor 646",
+        "jf 646",
+        "jf646"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "janelia fluor 646",
+        "jf 646",
+        "jf646"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "LYSOTRACKER": {
+      "aliases": [
+        "lyso tracker",
+        "lysotracker",
+        "lysotracker green",
+        "lysotracker red"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "lyso tracker",
+        "lysotracker",
+        "lysotracker green",
+        "lysotracker red"
+      ],
+      "isFamily": true,
+      "variants": [
+        "lysotracker green",
+        "lysotracker red"
+      ]
+    },
+    "MCHERRY": {
+      "aliases": [
+        "mcherry"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mcherry"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MEMERALD": {
+      "aliases": [
+        "emerald",
+        "memerald"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "memerald"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MIRFP": {
+      "aliases": [
+        "mirfp"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mirfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MITOTRACKER": {
+      "aliases": [
+        "mito tracker",
+        "mitotracker",
+        "mitotracker deep red",
+        "mitotracker green",
+        "mitotracker orange",
+        "mitotracker red"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "mito tracker",
+        "mitotracker",
+        "mitotracker deep red",
+        "mitotracker green",
+        "mitotracker orange",
+        "mitotracker red"
+      ],
+      "isFamily": true,
+      "variants": [
+        "mitotracker deep red",
+        "mitotracker green",
+        "mitotracker orange",
+        "mitotracker red"
+      ]
+    },
+    "MNEONGREEN": {
+      "aliases": [
+        "mneongreen",
+        "neongreen"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mneongreen",
+        "neongreen"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MRUBY": {
+      "aliases": [
+        "mruby"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mruby"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MSCARLET": {
+      "aliases": [
+        "mscarlet"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mscarlet"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MTURQUOISE": {
+      "aliases": [
+        "mturquoise"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mturquoise"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "PHALLOIDIN": {
+      "aliases": [
+        "phalloidin"
+      ],
+      "class": "moiety",
+      "freeTextAliases": [
+        "phalloidin"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "PROPIDIUMIODIDE": {
+      "aliases": [
+        "propidium iodide",
+        "propidiumiodide"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "propidium iodide",
+        "propidiumiodide"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "RFP": {
+      "aliases": [
+        "rfp"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "rfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "SIRACTIN": {
+      "aliases": [
+        "sir actin",
+        "sir-actin",
+        "siractin"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "sir actin",
+        "sir-actin",
+        "siractin"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "SIRTUBULIN": {
+      "aliases": [
+        "sir tubulin",
+        "sir-tubulin",
+        "sirtubulin"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "sir tubulin",
+        "sir-tubulin",
+        "sirtubulin"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "SNAP": {
+      "aliases": [
+        "snap",
+        "snap tag",
+        "snap-tag",
+        "snaptag"
+      ],
+      "class": "tag",
+      "freeTextAliases": [
+        "snap tag",
+        "snap-tag",
+        "snaptag"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "SOX": {
+      "aliases": [
+        "sox"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "sox"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "SOX2": {
+      "aliases": [
+        "sox2"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "sox2"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "SYTOX": {
+      "aliases": [
+        "sytox",
+        "sytox blue",
+        "sytox green",
+        "sytox orange",
+        "sytox red"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "sytox",
+        "sytox blue",
+        "sytox green",
+        "sytox orange",
+        "sytox red"
+      ],
+      "isFamily": true,
+      "variants": [
+        "sytox blue",
+        "sytox green",
+        "sytox orange",
+        "sytox red"
+      ]
+    },
+    "TDTOMATO": {
+      "aliases": [
+        "td-tomato",
+        "tdtomato",
+        "tomato"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "td-tomato",
+        "tdtomato"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TEXASRED": {
+      "aliases": [
+        "texas red",
+        "texas-red",
+        "texasred"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "texas red",
+        "texas-red",
+        "texasred"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TRITC": {
+      "aliases": [
+        "tritc"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "tritc"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "VENUS": {
+      "aliases": [
+        "venus"
+      ],
+      "class": "protein",
+      "freeTextAliases": [],
+      "isFamily": false,
+      "variants": []
+    },
+    "WGA": {
+      "aliases": [
+        "wga"
+      ],
+      "class": "moiety",
+      "freeTextAliases": [
+        "wga"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "YFP": {
+      "aliases": [
+        "yfp"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "yfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    }
+  },
+  "version": 1
+}

@@ -15,12 +15,17 @@
     "markers"
   ],
   "safe_char_pattern": "[^A-Za-z0-9_-]+",
+  "extraction_timeout_seconds": 20,
   "llm": {
-    "enabled": false,
+    "enabled": true,
     "model": "auto",
     "preferred_models": [
+      "qwen3.5:14b",
+      "gemma2:9b",
       "llama3.1:8b",
-      "qwen2.5-coder:7b",
+      "qwen3.5:7b",
+      "gemma2:2b",
+      "qwen3.5:3b",
       "phi3:mini"
     ],
     "endpoint": "http://localhost:11434/api/chat",

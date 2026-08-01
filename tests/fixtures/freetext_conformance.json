@@ -1,0 +1,32 @@
+[
+  {
+    "note": "baseline: two unambiguous, unrelated markers",
+    "text": "Confocal image of mouse cortex stained with DAPI and Alexa 488, n=3.",
+    "expectedMarkers": ["DAPI", "ALEXA488"]
+  },
+  {
+    "note": "B2/B3 overlap-resolution proof: the SAME alias occurs twice, and a longer overlapping alias must not swallow the second occurrence. Compare as a SET -- order is not the point (repo lesson E3).",
+    "text": "ch1 ATTO 647-N ch2 ATTO 647",
+    "expectedMarkers": ["ATTO647N", "ATTO647"]
+  },
+  {
+    "note": "AMBIGUOUS_IN_FREE_TEXT proof: 'snap'/'halo'/'tomato' are real marker spellings AND common English/instrument words -- none may be proposed from prose.",
+    "text": "we took a snap of the halo around the tomato explant",
+    "expectedMarkers": []
+  },
+  {
+    "note": "the SAME words are legitimate marker hits when spelled as their unambiguous free-text alias (halotag/snap-tag are not in AMBIGUOUS_IN_FREE_TEXT, only bare 'halo'/'snap' are).",
+    "text": "Cells labeled with HaloTag and SNAP-tag constructs, imaged at 63x.",
+    "expectedMarkers": ["HALO", "SNAP"]
+  },
+  {
+    "note": "case-insensitive, word-boundary matching should not fire on a substring inside a larger token",
+    "text": "Imaging performed with a standard widefield scope, no CFP construct used, just SCFPX control plasmid mentioned in passing.",
+    "expectedMarkers": ["CFP"]
+  },
+  {
+    "note": "empty/no-marker text is a legitimate zero-marker result, not an error",
+    "text": "A short note with no marker names in it at all.",
+    "expectedMarkers": []
+  }
+]

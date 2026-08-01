@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from microscopy_naming_assistant.profiles import ProfileRules, default_profile
-from microscopy_naming_assistant.validation import validate_fields
+from microscopy_naming_assistant.validation import (
+    MAX_PATH_LENGTH,
+    validate_fields,
+    validate_target_path,
+)
 
 
 def test_validate_fields_happy_path() -> None:
@@ -133,3 +139,29 @@ def test_unknown_marker_policy_warn_and_allow() -> None:
         profile_allow,
     )
     assert not any(i.field == "markers" for i in allow_issues)
+
+
+def test_validate_target_path_warns_when_over_max_path_length() -> None:
+    long_path = Path("C:/" + ("a" * (MAX_PATH_LENGTH + 50)) + ".tif")
+    issues = validate_target_path(long_path)
+
+    assert len(issues) == 1
+    assert issues[0].severity == "warning"
+    assert issues[0].field == "target_path"
+    assert "MAX_PATH" in issues[0].message
+    # The offending path must be visible in the message, not summarized away.
+    assert str(long_path) in issues[0].message
+
+
+def test_validate_target_path_silent_when_within_limit() -> None:
+    short_path = Path("C:/data/sample.tif")
+    assert validate_target_path(short_path) == []
+
+
+def test_validate_target_path_boundary_is_inclusive() -> None:
+    # Exactly MAX_PATH_LENGTH characters must NOT warn; MAX_PATH_LENGTH + 1 must.
+    exact = Path("a" * MAX_PATH_LENGTH)
+    over = Path("a" * (MAX_PATH_LENGTH + 1))
+
+    assert validate_target_path(exact) == []
+    assert len(validate_target_path(over)) == 1

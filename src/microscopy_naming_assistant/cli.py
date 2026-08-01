@@ -4,12 +4,69 @@ import argparse
 import csv
 import io
 import json
+import sys
 from dataclasses import asdict
 from pathlib import Path
 
-from .config import default_config, load_config, save_config
+from .config import NamingConfig, default_config, load_config, save_config
 from .profiles import default_profile, save_profile
 from .service import BatchResult, apply_batch, build_series_rows, plan_batch, suggest_for_file
+
+# C1's provenance tags this CLI must surface as provisional / weak rather
+# than silently as ground truth. Kept as named sets (not inlined string
+# comparisons) so both `cmd_suggest` and `cmd_batch` stay in lockstep with
+# service.py's tagging vocabulary.
+PROVISIONAL_SOURCE_TAGS = {"llm_description"}
+WEAK_DATE_SOURCE_TAGS = {"mtime"}
+
+
+def _provisional_fields(sources: dict[str, str]) -> list[str]:
+    """Fields whose value came from the user's free-text description
+    (C1's ``"llm_description"`` provenance tag) -- materially weaker evidence
+    than metadata/filename/plain-``"llm"``, so any caller surfacing a name
+    built from these fields must flag them provisional / needs review rather
+    than presenting them as ground truth."""
+    return sorted(key for key, tag in sources.items() if tag in PROVISIONAL_SOURCE_TAGS)
+
+
+def _date_is_weak(sources: dict[str, str]) -> bool:
+    """True when ``date`` was derived only from the file's mtime (A5) --
+    frequently the date the file was *copied*, not acquired -- rather than
+    real metadata or a filename-embedded date."""
+    return sources.get("date") in WEAK_DATE_SOURCE_TAGS
+
+
+def _provenance_payload(sources: dict[str, str]) -> dict[str, object]:
+    """Shared provenance/provisional block for the `--json` payloads of both
+    `suggest` and `batch` -- one place computing it keeps the two commands'
+    JSON contracts from drifting apart."""
+    return {
+        "provisional_fields": _provisional_fields(sources),
+        "date_is_weak": _date_is_weak(sources),
+    }
+
+
+def _warn_if_describe_inert(args: argparse.Namespace, config: NamingConfig) -> None:
+    """A-4: `--describe` is silently discarded today whenever the LLM isn't
+    active -- there is no argparse dependency linking `--describe` to
+    `--llm`/`config.llm['enabled']`, so a user who types a description with
+    `--llm` omitted (or with the config's LLM disabled) gets no error, no
+    warning, exit code 0, and the description simply never reaches the
+    model. Both `cmd_suggest` and `cmd_batch` forward `args.describe`
+    straight into `suggest_for_file`/`plan_batch` with the exact same hole,
+    so this is one shared guard rather than two copies that could drift.
+
+    Never a hard error and never changes the exit code -- `--describe` stays
+    inert exactly as before, it just stops being silent about it."""
+    if not args.describe:
+        return
+    if not args.llm or not bool(config.llm.get("enabled", False)):
+        print(
+            "WARNING: --describe was ignored because the LLM is off "
+            "(pass --llm, and ensure llm.enabled is true in the config). "
+            "The description had no effect on the suggested name.",
+            file=sys.stderr,
+        )
 
 
 def cmd_init_config(args: argparse.Namespace) -> int:
@@ -43,6 +100,9 @@ def cmd_suggest(args: argparse.Namespace) -> int:
         print(f"Input file not found: {source}")
         return 1
 
+    config = load_config(config_path)
+    _warn_if_describe_inert(args, config)
+
     result = suggest_for_file(
         file_path=source,
         config_path=config_path,
@@ -63,6 +123,12 @@ def cmd_suggest(args: argparse.Namespace) -> int:
             "sources": result.sources,
             "reader": result.reader,
             "extraction_error": result.extraction_error,
+            # C2: provisional/provenance info alongside the plain `sources`
+            # map above -- a field tagged "llm_description" (from the
+            # free-text --describe input) or a "mtime"-sourced date must
+            # still read as provisional/weak once surfaced, not silently as
+            # ground truth.
+            **_provenance_payload(result.sources),
         }
         if args.show_metadata:
             payload["metadata"] = result.metadata_text
@@ -72,6 +138,12 @@ def cmd_suggest(args: argparse.Namespace) -> int:
     print(f"Source: {source.name}")
     print(f"Suggested: {result.target_name}")
     print(f"Fields: {result.fields}")
+
+    provisional = _provisional_fields(result.sources)
+    if provisional:
+        print(f"PROVISIONAL (from description, needs review): {', '.join(provisional)}")
+    if _date_is_weak(result.sources):
+        print("Date: WEAK -- derived from file mtime, not confirmed acquisition metadata.")
 
     if args.show_metadata:
         print(f"Reader: {result.reader or 'none'}")
@@ -166,6 +238,9 @@ def cmd_batch(args: argparse.Namespace) -> int:
         print(f"Input directory not found: {input_dir}")
         return 1
 
+    config = load_config(config_path)
+    _warn_if_describe_inert(args, config)
+
     batch = plan_batch(
         input_dir=input_dir,
         pattern=args.pattern,
@@ -191,7 +266,6 @@ def cmd_batch(args: argparse.Namespace) -> int:
     # written out or reflected in the printed payload below.
     sidecar_rows: list[dict[str, str]] = []
     if args.sidecar:
-        config = load_config(config_path)
         sidecar_rows = build_series_rows(batch.suggestions, config)
         if sidecar_rows:
             _write_rows(Path(args.sidecar), sidecar_rows, SIDECAR_COLUMNS)
@@ -210,6 +284,19 @@ def cmd_batch(args: argparse.Namespace) -> int:
                 for suggestion in batch.suggestions
                 for issue in suggestion.issues
             ],
+            # C2: per-file provenance, additive to "issues"/"planned" above --
+            # `sources` is the raw map (see SuggestionResult.sources) and
+            # `provisional_fields`/`date_is_weak` are the derived flags a
+            # caller needs to render a field as provisional/weak rather than
+            # as ground truth.
+            "provenance": [
+                {
+                    "source": suggestion.source.name,
+                    "sources": suggestion.sources,
+                    **_provenance_payload(suggestion.sources),
+                }
+                for suggestion in batch.suggestions
+            ],
             "applied": args.apply,
             "renamed": renamed,
             "manifest": str(manifest) if manifest else None,
@@ -221,6 +308,23 @@ def cmd_batch(args: argparse.Namespace) -> int:
 
     for src, dst in batch.planned:
         print(f"{src.name} -> {dst.name}")
+
+    provisional_by_source = {
+        suggestion.source.name: _provisional_fields(suggestion.sources)
+        for suggestion in batch.suggestions
+        if _provisional_fields(suggestion.sources)
+    }
+    if provisional_by_source:
+        print("Provisional fields (from description, needs review):")
+        for name, provisional in provisional_by_source.items():
+            print(f"- {name}: {', '.join(provisional)}")
+
+    weak_date_sources = [s.source.name for s in batch.suggestions if _date_is_weak(s.sources)]
+    if weak_date_sources:
+        print(
+            "Weak date (from file mtime, not confirmed acquisition metadata): "
+            + ", ".join(weak_date_sources)
+        )
 
     for reason in batch.skipped:
         print(f"SKIP: {reason}")

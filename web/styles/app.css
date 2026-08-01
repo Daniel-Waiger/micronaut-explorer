@@ -1,0 +1,793 @@
+/* Micronaut Planner shell styles.
+   Palette follows the custom-property + light/dark pattern proven in
+   tools/cma-dashboard/index.html: a default :root palette, an
+   @media (prefers-color-scheme) override, and explicit
+   :root[data-theme="dark"|"light"] overrides so the in-app toggle always
+   wins over the OS preference in both directions. */
+
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c2128;
+  --line: #2a313c;
+  --ink: #e6edf3;
+  --muted: #8b96a5;
+  --accent: #2dd4bf;
+  --accent-ink: #04302b;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --ok: #34d399;
+  --mono: ui-monospace, "Cascadia Code", Consolas, "SF Mono", monospace;
+  --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f7f9fa;
+    --panel: #ffffff;
+    --panel-2: #ffffff;
+    --line: #dfe4ea;
+    --ink: #1a2027;
+    --muted: #5b6572;
+    --accent: #0f9c8c;
+    --accent-ink: #ffffff;
+    --danger: #dc2626;
+    --warn: #b45309;
+    --ok: #059669;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-2: #1c2128;
+  --line: #2a313c;
+  --ink: #e6edf3;
+  --muted: #8b96a5;
+  --accent: #2dd4bf;
+  --accent-ink: #04302b;
+  --danger: #f87171;
+  --warn: #fbbf24;
+  --ok: #34d399;
+}
+
+:root[data-theme="light"] {
+  --bg: #f7f9fa;
+  --panel: #ffffff;
+  --panel-2: #ffffff;
+  --line: #dfe4ea;
+  --ink: #1a2027;
+  --muted: #5b6572;
+  --accent: #0f9c8c;
+  --accent-ink: #ffffff;
+  --danger: #dc2626;
+  --warn: #b45309;
+  --ok: #059669;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.shell-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.theme-toggle {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent);
+}
+
+.theme-toggle:focus-visible,
+.nav-step:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shell-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 0;
+  min-height: 0;
+}
+
+.shell-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 10px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.nav-step {
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.nav-step:hover {
+  background: var(--panel-2);
+  color: var(--ink);
+}
+
+.nav-step.active {
+  background: var(--panel-2);
+  color: var(--ink);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.shell-main {
+  padding: 24px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.shell-status {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.shell-status.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.step-heading {
+  margin: 0 0 20px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.naming-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field-input {
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  min-height: 44px;
+}
+
+.field-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* The planned-names table. One row when there is no design (the standalone
+   one-off name), N rows when a design is driving it -- same widget, so there
+   is no visual mode-switch between "tool box" and "full workflow". */
+.planned-box {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 20px;
+}
+
+.planned-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.planned-label {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.planned-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* A large design can plan hundreds of names; scroll the list rather than
+     letting it push the field boxes and issues off-screen. */
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.planned-name {
+  font-family: var(--mono);
+  font-size: 15px;
+  color: var(--accent);
+  word-break: break-all;
+}
+
+.planned-empty {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.copy-button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.copy-button:hover {
+  filter: brightness(1.05);
+}
+
+.copy-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
+}
+
+/* The advice panel -- deliberately its OWN vocabulary, not a reuse of
+   .issue/.issue-warning/.issue-error. Those are validation output; this is
+   guidance. --danger/--warn stay reserved for validation alone, so a
+   pitfall note is never mistakable for a warning just because it's amber. */
+.advice-section {
+  margin-bottom: 20px;
+}
+
+.advice-heading {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+.advice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.advice-note {
+  border-radius: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.advice-pitfall {
+  border-left: 3px solid var(--accent);
+}
+
+.advice-tip {
+  border-left: 3px solid var(--line);
+}
+
+.advice-kind {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+/* The concept -- the phenomenon the note is about. Carries the accent
+   colour because it, not the kind label, is what makes a stack of notes
+   scannable ("this one is spillover, that one is photobleaching"). */
+.advice-concept {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.advice-concept::before {
+  content: "·";
+  margin-right: 8px;
+  color: var(--line);
+  font-weight: 400;
+}
+
+.advice-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.advice-body {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+/* Visible by default -- a plain-English "why is this showing" clause,
+   distinct from .advice-reason below (raw predicate syntax, debug-only). */
+.advice-trigger {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.advice-reason {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 6px;
+  opacity: 0.7;
+}
+
+.issues-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.issue {
+  font-size: 13.5px;
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+}
+
+.issue-warning {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.issue-error {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.describe-textarea {
+  width: 100%;
+  min-height: 120px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  resize: vertical;
+  margin-bottom: 12px;
+}
+
+.describe-textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.read-button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  margin-bottom: 20px;
+}
+
+.read-button:hover {
+  filter: brightness(1.05);
+}
+
+.proposals-heading,
+.interview-heading,
+.design-subheading {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 20px 0 8px;
+}
+
+.proposals-empty,
+.interview-empty,
+.conditions-empty {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.proposals-list,
+.interview-list,
+.factors-list,
+.conditions-table {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.proposal-row,
+.question-row,
+.factor-row,
+.condition-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.question-row {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.proposal-text {
+  flex: 1 1 260px;
+}
+
+.proposal-evidence {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.proposal-actions,
+.question-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.proposal-accept,
+.question-answer {
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.proposal-dismiss,
+.question-skip,
+.remove-factor-button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reset-button:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.answered-row {
+  border-left: 3px solid var(--ok);
+}
+
+.question-current {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--ok);
+}
+
+.question-prompt {
+  font-weight: 600;
+}
+
+.question-why {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.question-control {
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  min-width: 220px;
+}
+
+/* An allowOther choice question: the <select> and its free-text fallback
+   stack as one visual unit rather than reading as two unrelated controls. */
+.question-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.question-other-input {
+  min-width: 220px;
+}
+
+.factor-name {
+  flex: 1 1 160px;
+}
+
+.factor-levels {
+  flex: 2 1 260px;
+}
+
+.add-factor-button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  margin-bottom: 20px;
+}
+
+.condition-summary {
+  flex: 1 1 260px;
+  font-size: 13.5px;
+}
+
+.base-name-box {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.base-name-label {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.base-name-value {
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--ink);
+  word-break: break-all;
+}
+
+.condition-sample-id {
+  font-family: var(--mono);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.condition-filename {
+  font-family: var(--mono);
+  color: var(--accent);
+  font-size: 13.5px;
+  word-break: break-all;
+}
+
+@media print {
+  .shell-header,
+  .assay-switcher-bar,
+  .shell-nav,
+  .shell-status {
+    display: none;
+  }
+
+  .shell-body {
+    display: block;
+  }
+
+  .shell-main {
+    padding: 0;
+    overflow: visible;
+  }
+
+  body {
+    background: #fff;
+    color: #000;
+  }
+}
+
+.assay-switcher-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  overflow-x: auto;
+}
+
+.assay-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.assay-pill.active {
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
+
+.assay-pill-label {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 999px 0 0 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.assay-pill.active .assay-pill-label {
+  color: var(--ink);
+}
+
+.assay-pill-delete {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 6px 10px 6px 0;
+  cursor: pointer;
+}
+
+.assay-pill-delete:hover {
+  color: var(--ink);
+}
+
+.assay-pill-add {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.assay-pill-add:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.assay-pill-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.study-divergence {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+
+.study-assay-row {
+  align-items: center;
+}
+
+.study-assay-row .field-input {
+  flex: 0 1 220px;
+}
+
+.study-assay-basename {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+/* Grouped and pinned to the row's end (margin-left: auto here, not on each
+   button) -- otherwise a button's horizontal position depends on how long
+   THIS row's base name happens to be, which reads as buttons "moving"
+   between rows as the base name's length varies. */
+.study-assay-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}

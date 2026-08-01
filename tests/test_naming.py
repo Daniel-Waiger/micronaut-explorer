@@ -6,8 +6,10 @@ from microscopy_naming_assistant.config import NamingConfig
 from microscopy_naming_assistant.naming import (
     build_filename,
     finalize_fields,
+    is_reserved_windows_stem,
     normalize_fields,
     render_name,
+    repair_reserved_stem,
     sanitize_token,
 )
 
@@ -146,3 +148,53 @@ def test_render_name_strips_separator_before_extension() -> None:
     }
 
     assert render_name(fields, config) == "2026-07-22_CT_E03_X90_ARL.tif"
+
+
+def test_is_reserved_windows_stem_matches_device_names_case_insensitively() -> None:
+    for stem in ("CON", "con", "Con", "PRN", "AUX", "NUL", "COM1", "com1", "LPT9"):
+        assert is_reserved_windows_stem(stem), stem
+
+    for stem in ("CONSOLE", "ICON", "COM10", "COMPANY", "LPT", "sample01"):
+        assert not is_reserved_windows_stem(stem), stem
+
+
+def test_repair_reserved_stem_leaves_safe_stems_unchanged() -> None:
+    assert repair_reserved_stem("2026-07-22_CT_E03") == "2026-07-22_CT_E03"
+
+
+def test_repair_reserved_stem_repairs_reserved_names() -> None:
+    repaired = repair_reserved_stem("CON")
+    assert repaired != "CON"
+    assert not is_reserved_windows_stem(repaired)
+
+    repaired_lower = repair_reserved_stem("com1")
+    assert not is_reserved_windows_stem(repaired_lower)
+
+
+def test_render_name_repairs_a_template_that_collapses_to_a_reserved_stem() -> None:
+    # A minimal template whose only content is a reserved device name -- this
+    # stands in for a lab whose "sample" field is literally e.g. "CON".
+    config = NamingConfig(template="{sample}{ext}")
+    fields = {"sample": "CON", "ext": ".tif"}
+
+    result = render_name(fields, config)
+
+    assert result != "CON.tif"
+    assert not is_reserved_windows_stem(Path(result).stem)
+
+
+def test_render_name_repairs_com1_case_insensitively() -> None:
+    config = NamingConfig(template="{sample}{ext}")
+    fields = {"sample": "com1", "ext": ".tif"}
+
+    result = render_name(fields, config)
+
+    assert result.upper() != "COM1.TIF"
+    assert not is_reserved_windows_stem(Path(result).stem)
+
+
+def test_render_name_does_not_repair_non_reserved_stems() -> None:
+    config = NamingConfig(template="{sample}{ext}")
+    fields = {"sample": "CONSOLE", "ext": ".tif"}
+
+    assert render_name(fields, config) == "CONSOLE.tif"

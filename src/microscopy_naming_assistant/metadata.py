@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .field_map import resolve_fields
-from .markers import alias_map
+from .markers import AMBIGUOUS_IN_FREE_TEXT, alias_map
 from .metadata_keys import ImageMetadata, harvest
 
 logger = logging.getLogger(__name__)
@@ -119,6 +119,15 @@ def _extract_date_from_name(stem: str) -> str | None:
         return f"20{match.group(1)}-{match.group(2)}-{match.group(3)}"
 
     return None
+
+
+def _is_str_dict(obj: object) -> bool:
+    """True iff `obj` is a plain `dict[str, str]` -- used to defensively
+    validate `image_key_paths` after it crosses the multiprocessing spawn
+    Queue, where a malformed payload must degrade rather than raise."""
+    if not isinstance(obj, dict):
+        return False
+    return all(isinstance(k, str) and isinstance(v, str) for k, v in obj.items())
 
 
 def _detect_format(file_path: Path) -> str:
@@ -375,30 +384,71 @@ def _extract_near_key(text: str, key: str) -> str | None:
 def _extract_markers(text: str, hints: list[str]) -> str | None:
     """Find canonical marker/fluorophore names in `text`.
 
-    Every known alias (see `markers.alias_map`) is searched for as a whole
-    word, case-insensitively, directly in `text` -- so "CFP" no longer
+    Every known alias (see `markers.alias_map`) except those in
+    `markers.AMBIGUOUS_IN_FREE_TEXT` is searched for as a whole word,
+    case-insensitively, directly in `text` -- so "CFP" no longer
     false-positives inside a larger token like "SCFPX", and spelled-out
     aliases (e.g. "Alexa Fluor 488") normalize to their canonical form
-    (e.g. "ALEXA488"). Matches are ordered by first occurrence in `text` and
-    deduped (first occurrence wins), then joined with "-".
+    (e.g. "ALEXA488"). `AMBIGUOUS_IN_FREE_TEXT` aliases (e.g. "snap", "halo",
+    "venus", "citrine") are real marker spellings but are ALSO common English
+    words or standard instrument/camera-software terms, so they are skipped
+    here entirely -- they still resolve through an exact metadata-value
+    lookup (`field_map.py::_canonical_marker`), which never sees surrounding
+    prose to collide with.
+
+    Longest-match-wins is a STRUCTURAL guarantee, not an accident of
+    `MARKER_ALIASES`'s dict insertion order: candidate matches are sorted by
+    `(start, -length)` and then a match is only kept if its span does not
+    overlap any already-accepted match's span. So when two aliases both
+    match at (or overlapping) the same position -- e.g. "atto 647" and
+    "atto 647-n" both matching at the start of "ATTO 647-N" -- the longer,
+    more specific alias always wins and the shorter one is discarded
+    outright, never appended as a second, spurious marker. This holds
+    regardless of which alias happens to appear first in the dict (see
+    test_markers.py for the adversarial-order proof).
+
+    Once a span is accepted, matches are ordered by first occurrence in
+    `text` and deduped by canonical (first occurrence wins), then joined
+    with "-".
 
     `hints` (format-specific metadata keys such as "Channel"/"Fluor") are
     kept as a secondary signal via `_extract_near_key`, in case a marker only
     surfaces near one of those keys and isn't otherwise picked up verbatim by
     the whole-text scan above; any it finds are appended after, only if not
-    already found.
+    already found. The same ambiguous-alias exclusion and longest-match/
+    span-overlap rules apply there too.
     """
     amap = alias_map()
 
-    matches: list[tuple[int, str]] = []
-    for alias, canonical in amap.items():
-        match = re.search(r"\b" + re.escape(alias) + r"\b", text, re.IGNORECASE)
-        if match:
-            matches.append((match.start(), canonical))
-    matches.sort(key=lambda item: item[0])
+    def _non_overlapping_matches(haystack: str, exclude: set[str]) -> list[tuple[int, int, str]]:
+        candidates: list[tuple[int, int, str]] = []
+        for alias, canonical in amap.items():
+            if alias in AMBIGUOUS_IN_FREE_TEXT or canonical in exclude:
+                continue
+            # B3: every occurrence, not just the first. re.search finds one
+            # candidate per alias, so when that one candidate happens to be
+            # nested inside a longer alias's span the overlap rule below
+            # correctly discards it -- but then nothing is left for this
+            # alias's own separate, later occurrence, silently dropping a
+            # real second marker (order-dependent: 'ch1 ATTO 647-N ch2 ATTO
+            # 647' lost channel 2's dye under re.search).
+            for match in re.finditer(r"\b" + re.escape(alias) + r"\b", haystack, re.IGNORECASE):
+                candidates.append((match.start(), match.end(), canonical))
+        # Longer alias wins any tie/overlap at the same start index -- sort by
+        # (start, -length) so it is considered, and therefore accepted, first.
+        candidates.sort(key=lambda item: (item[0], -(item[1] - item[0])))
+
+        accepted: list[tuple[int, int, str]] = []
+        accepted_spans: list[tuple[int, int]] = []
+        for start, end, canonical in candidates:
+            if any(start < a_end and end > a_start for a_start, a_end in accepted_spans):
+                continue  # overlaps an already-accepted (longer or earlier) match
+            accepted_spans.append((start, end))
+            accepted.append((start, end, canonical))
+        return accepted
 
     found: list[str] = []
-    for _, canonical in matches:
+    for _, _, canonical in _non_overlapping_matches(text, exclude=set()):
         if canonical not in found:
             found.append(canonical)
 
@@ -406,10 +456,8 @@ def _extract_markers(text: str, hints: list[str]) -> str | None:
         near = _extract_near_key(text, key)
         if not near:
             continue
-        for alias, canonical in amap.items():
-            if canonical in found:
-                continue
-            if re.search(r"\b" + re.escape(alias) + r"\b", near, re.IGNORECASE):
+        for _, _, canonical in _non_overlapping_matches(near, exclude=set(found)):
+            if canonical not in found:
                 found.append(canonical)
 
     if not found:
@@ -530,12 +578,14 @@ def _read_with_bioio(
     """Read a file's addressable metadata and return parsed fields plus the raw text.
 
     Returns `{"fields": dict, "metadata_text": str, "reader": str, "error": str,
-    "key_paths": dict, "field_key_provenance": dict, "images": list[dict]}`.
-    `metadata_text` is the full harvested blob so callers can show it to the
-    user and ground an LLM prompt in it, rather than it being scanned once and
-    thrown away. `images` is the per-series sidecar detail: one flat str->str
-    record per image (see `_per_image_records`), for containers whose series
-    disagree on a field the container-level `fields` had to omit.
+    "key_paths": dict, "image_key_paths": list[dict], "field_key_provenance": dict,
+    "images": list[dict]}`. `metadata_text` is the full harvested blob so callers
+    can show it to the user and ground an LLM prompt in it, rather than it being
+    scanned once and thrown away. `images` is the per-series sidecar detail: one
+    flat str->str record per image (see `_per_image_records`), for containers
+    whose series disagree on a field the container-level `fields` had to omit.
+    `key_paths` is the raw metadata keys for the first image only; `image_key_paths`
+    is the same raw key dict for every image, one per series.
 
     Must stay module-level and picklable (no closures, no reliance on outer
     state) so it can run in a separate process to bound its runtime (see P0-3).
@@ -561,9 +611,14 @@ def _read_with_bioio(
         # ImageJ/Fiji stashes the vendor record in the IJMetadata `Info` tag,
         # which `metadata_keys._harvest_tiff` already parses into keys -- but
         # keep the raw shim text too so users can see the untouched tag block.
+        # A hyperstack's `Info` tag repeats per-slice, so the shim alone can run
+        # into the megabytes (measured 1.36M chars on a 210-page real export) --
+        # re-join through the SAME budget rather than appending it raw, or the
+        # blob blows past MAX_METADATA_TEXT_CHARS right after being bounded to it.
         tiff_shim = _collect_metadata_text(None, file_path)
         if tiff_shim:
-            metadata_text = f"{metadata_text}\n\n{tiff_shim}" if metadata_text else tiff_shim
+            sections = [metadata_text, tiff_shim] if metadata_text else [tiff_shim]
+            metadata_text = _join_within_budget(sections, MAX_METADATA_TEXT_CHARS)
 
     resolved = _resolve_per_image(images, file_format, field_key_map)
     fields, provenance, contested = _shared_fields(
@@ -653,6 +708,11 @@ def _read_with_bioio(
         "reader": reader_name,
         "error": error,
         "key_paths": dict(images[0].keys) if images else {},
+        # Per-image raw key dicts, one per series -- unlike `key_paths` above
+        # (first image only), this lets downstream code (B-2's ranker) tell
+        # whether a key VARIES across series. Kept as a separate field so
+        # `key_paths` stays byte-identical for every existing consumer.
+        "image_key_paths": [dict(img.keys) for img in images],
         "field_key_provenance": provenance,
         "images": image_records,
     }
@@ -680,6 +740,7 @@ def _bioio_worker(
                 "reader": "",
                 "error": f"{type(exc).__name__}",
                 "key_paths": {},
+                "image_key_paths": [],
                 "field_key_provenance": {},
                 "images": [],
             }
@@ -697,6 +758,14 @@ class ExtractionDetail:
     image (see `_per_image_records`), carrying the fields the key map resolved
     for that image alone -- including any the container-level `fields` had to
     omit because series disagreed.
+
+    `key_paths` is the raw addressable metadata keys harvested for the FIRST
+    image only. `image_key_paths` is the same raw key dict for EVERY image
+    (one dict per series), which is what lets downstream code (B-2's ranker)
+    tell whether a key VARIES across series -- `key_paths` alone cannot. The
+    two must stay consistent: `image_key_paths[0] == key_paths` whenever any
+    image was harvested. Kept as separate fields so `key_paths` stays
+    byte-identical for every existing consumer.
     """
 
     metadata_text: str = ""
@@ -704,6 +773,7 @@ class ExtractionDetail:
     error: str = ""
     timed_out: bool = False
     key_paths: dict[str, str] = field(default_factory=dict)
+    image_key_paths: list[dict[str, str]] = field(default_factory=list)
     field_key_provenance: dict[str, str] = field(default_factory=dict)
     images: list[dict[str, str]] = field(default_factory=list)
 
@@ -718,13 +788,20 @@ def extract_metadata_detailed(
 
     Returns `(fields, sources)`: `fields` is identical to what
     `extract_metadata` returns. `sources` maps each key present in `fields` to
-    `"filename"` for the parent-computed heuristics (date from mtime or
-    filename, sample guessed from filename) or `"metadata"` for anything
-    supplied by the bioio worker (`_extract_bioio_fields`) -- bioio values
-    override the heuristics, so they're tagged `"metadata"` even when they
-    replace a `"filename"`-sourced value (e.g. `sample`). The one exception is
-    `extraction_mask`, a user-configured placeholder mask (see
-    `_extract_from_mask`), which is applied last and wins outright.
+    `"filename"` for parent-computed heuristics parsed out of the filename
+    itself (date/sample/markers/... guessed from the stem), `"mtime"` for the
+    weakest heuristic -- the file's modification timestamp, used only as a
+    `date` fallback when nothing else supplied one -- or `"metadata"` for
+    anything supplied by the bioio worker (`_extract_bioio_fields`). `"mtime"`
+    is deliberately distinct from `"filename"`: mtime is frequently the date a
+    file was *copied*, not acquired, so callers that would otherwise treat it
+    as a confident guess need to be able to tell the two apart (see E7 --
+    provenance must not blur a weaker origin into a stronger-sounding one).
+    bioio values override the heuristics, so they're tagged `"metadata"` even
+    when they replace a `"filename"`- or `"mtime"`-sourced value (e.g.
+    `sample`, `date`). The one exception is `extraction_mask`, a
+    user-configured placeholder mask (see `_extract_from_mask`), which is
+    applied last and wins outright.
 
     `field_key_map` overrides the curated per-format key -> field mapping (see
     `field_map.resolve_fields`); forwarded through to the worker unchanged.
@@ -741,10 +818,14 @@ def extract_metadata_detailed(
     sources: dict[str, str] = {}
     detail = ExtractionDetail()
 
-    # Always derive date from file mtime as a reliable baseline.
+    # Derive date from file mtime as a last-resort baseline. This is the
+    # weakest possible origin -- mtime is frequently the date the file was
+    # *copied*, not acquired -- so it gets its own "mtime" tag rather than
+    # being folded into "filename", which callers reasonably treat as a
+    # stronger, content-derived guess.
     mtime = datetime.fromtimestamp(file_path.stat().st_mtime)
     result["date"] = mtime.strftime("%Y-%m-%d")
-    sources["date"] = "filename"
+    sources["date"] = "mtime"
 
     date_guess = _extract_date_from_name(file_path.stem)
     if date_guess:
@@ -833,6 +914,13 @@ def extract_metadata_detailed(
     key_paths = payload.get("key_paths") or {}
     if isinstance(key_paths, dict):
         detail.key_paths = key_paths
+    # Defensive: this crosses the multiprocessing spawn Queue, so a malformed
+    # or unexpected payload (e.g. from a mismatched worker version) must
+    # degrade to the empty-list default rather than raise. Only accept a list
+    # whose entries are all plain str->str dicts.
+    image_key_paths = payload.get("image_key_paths") or []
+    if isinstance(image_key_paths, list) and all(_is_str_dict(entry) for entry in image_key_paths):
+        detail.image_key_paths = image_key_paths
     field_key_provenance = payload.get("field_key_provenance") or {}
     if isinstance(field_key_provenance, dict):
         detail.field_key_provenance = field_key_provenance

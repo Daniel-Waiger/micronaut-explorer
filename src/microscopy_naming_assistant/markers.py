@@ -48,7 +48,154 @@ MARKER_ALIASES: dict[str, list[str]] = {
     "FITC": ["fitc"],
     "TRITC": ["tritc"],
     "TEXASRED": ["texas red", "texas-red", "texasred"],
+    # Additional Alexa Fluor dyes (P2-1a broad extension).
+    "ALEXA405": ["alexa fluor 405", "alexa 405", "af405", "alexa405"],
+    "ALEXA430": ["alexa fluor 430", "alexa 430", "af430", "alexa430"],
+    "ALEXA514": ["alexa fluor 514", "alexa 514", "af514", "alexa514"],
+    "ALEXA532": ["alexa fluor 532", "alexa 532", "af532", "alexa532"],
+    "ALEXA546": ["alexa fluor 546", "alexa 546", "af546", "alexa546"],
+    "ALEXA660": ["alexa fluor 660", "alexa 660", "af660", "alexa660"],
+    "ALEXA680": ["alexa fluor 680", "alexa 680", "af680", "alexa680"],
+    "ALEXA750": ["alexa fluor 750", "alexa 750", "af750", "alexa750"],
+    # ATTO dyes. ATTO647 and ATTO647N are distinct real dyes -- both are kept
+    # as separate canonicals on purpose. Word-boundary matching alone is NOT
+    # enough to keep them apart: it blocks the shorter "atto647" alias only
+    # for the compact "atto647n" spelling (no boundary between "7" and "n"),
+    # but "atto 647" (ATTO647) is a legitimate PREFIX of "atto 647-n"
+    # (ATTO647N) and "atto647" is a prefix of "atto647-n" -- in both cases the
+    # character right after the shorter alias ("-" or " ") IS a word
+    # boundary, so both aliases match at the same start index in real text
+    # like "ATTO 647-N" or "Atto647-N". `_extract_markers` resolves this
+    # structurally (longest match wins, shorter overlapping matches are
+    # discarded -- see metadata.py), but the alias table must still list
+    # every real spelling of ATTO647N, including the hyphenated-no-space form
+    # ("atto647-n"), or ATTO647N is simply never reached and the N gets
+    # silently dropped. See test_markers.py for the execution proof of both
+    # failure modes and the fix.
+    "ATTO425": ["atto 425", "atto425"],
+    "ATTO488": ["atto 488", "atto488"],
+    "ATTO520": ["atto 520", "atto520"],
+    "ATTO550": ["atto 550", "atto550"],
+    "ATTO565": ["atto 565", "atto565"],
+    "ATTO590": ["atto 590", "atto590"],
+    "ATTO633": ["atto 633", "atto633"],
+    "ATTO647": ["atto 647", "atto647"],
+    "ATTO647N": ["atto 647n", "atto647n", "atto 647-n", "atto647-n"],
+    "ATTO700": ["atto 700", "atto700"],
+    # Janelia Fluor dyes.
+    "JF549": ["jf549", "jf 549", "janelia fluor 549"],
+    "JF646": ["jf646", "jf 646", "janelia fluor 646"],
+    # SiR (silicon-rhodamine) probes. No bare "SIR" canonical is included --
+    # see the module docstring note below on deliberately-omitted aliases.
+    "SIRTUBULIN": ["sir-tubulin", "sirtubulin", "sir tubulin"],
+    "SIRACTIN": ["sir-actin", "siractin", "sir actin"],
+    # Fluorescent proteins.
+    "MNEONGREEN": ["mneongreen", "neongreen"],
+    "MSCARLET": ["mscarlet"],
+    "MTURQUOISE": ["mturquoise"],
+    "CERULEAN": ["cerulean"],
+    "VENUS": ["venus"],
+    "CITRINE": ["citrine"],
+    "IRFP": ["irfp"],
+    "MIRFP": ["mirfp"],
+    "MEMERALD": ["memerald", "emerald"],
+    "MRUBY": ["mruby"],
+    # Self-labeling protein tags (chemical dyes are named separately).
+    "HALO": ["halotag", "halo-tag", "halo tag", "halo"],
+    "SNAP": ["snaptag", "snap-tag", "snap tag", "snap"],
+    "CLIP": ["cliptag", "clip-tag", "clip tag", "clip"],
+    # Stains and probes. "PI" (a common abbreviation for propidium iodide) is
+    # deliberately NOT included as an alias -- see the module docstring.
+    "PHALLOIDIN": ["phalloidin"],
+    "WGA": ["wga"],
+    "PROPIDIUMIODIDE": ["propidium iodide", "propidiumiodide"],
+    "DRAQ5": ["draq5", "draq 5"],
+    "SYTOX": ["sytox", "sytox green", "sytox blue", "sytox red", "sytox orange"],
+    "MITOTRACKER": [
+        "mitotracker",
+        "mito tracker",
+        "mitotracker red",
+        "mitotracker green",
+        "mitotracker deep red",
+        "mitotracker orange",
+    ],
+    "LYSOTRACKER": ["lysotracker", "lyso tracker", "lysotracker red", "lysotracker green"],
+    "ERTRACKER": ["er-tracker", "ertracker", "er tracker"],
+    "CELLMASK": ["cellmask", "cell mask"],
+    "BODIPY": ["bodipy"],
+    # Calcium indicators.
+    "FLUO4": ["fluo-4", "fluo4", "fluo 4"],
+    "FURA2": ["fura-2", "fura2", "fura 2"],
+    "GCAMP": [
+        "gcamp",
+        "gcamp3",
+        "gcamp5",
+        "gcamp6",
+        "gcamp6f",
+        "gcamp6s",
+        "gcamp6m",
+        "gcamp7",
+        "gcamp7f",
+        "gcamp7s",
+    ],
+    "CALCEIN": ["calcein", "calcein am", "calcein-am"],
 }
+
+# Deliberately-omitted aliases (checked against word-boundary substring
+# false positives before being ruled out -- see docs/plans/
+# safe-renaming-describer-openweights.md task B1):
+#   - Bare "SIR": would tie with "SIR-TUBULIN"/"SIR-ACTIN" at the same match
+#     start (all match position 0 in e.g. "SiR-tubulin" since "-" is a
+#     non-word boundary), and "Sir" is a common English honorific, so it
+#     would false-positive broadly with no reliable disambiguation.
+#   - Bare "PI" for propidium iodide: a 2-letter token far too ambiguous
+#     (Principal Investigator, the mathematical constant, etc.) for
+#     whole-word matching to disambiguate safely.
+#   - Bare "ruby"/"turquoise": common English/color words with no
+#     microscopy-specific spelling backing them (unlike "mRuby"/"mTurquoise",
+#     which ARE included), so they are left out to avoid needless false
+#     positives in free-text descriptions.
+
+# Aliases that ARE real, legitimate marker/fluorophore spellings -- unlike the
+# entries above, they stay in MARKER_ALIASES and keep resolving via an EXACT
+# metadata-value lookup (field_map.py::_canonical_marker, which only ever
+# compares a whole, vendor-prefix-stripped metadata value against the alias
+# table, never surrounding prose) -- but each one is ALSO a common English
+# word or standard microscope/camera-software term, so scanning a raw
+# metadata blob or filename stem for it as a substring produces real false
+# positives. `_extract_markers` (metadata.py) excludes exactly these aliases
+# from its free-text scan; every other alias of the same canonical (e.g.
+# "halotag", "snap-tag") is unambiguous and still matches in free text.
+AMBIGUOUS_IN_FREE_TEXT: frozenset[str] = frozenset(
+    {
+        # "Snap" is the standard single-frame-acquisition command/state in
+        # Micro-Manager, MetaMorph and NIS-Elements UI/log text (e.g. "Live/
+        # Snap acquisition", "Snap Shot triggered by user").
+        "snap",
+        # "Halo" is an optical-artifact term (lens/lamp halo) and a plain
+        # English word; also collides with "halogen" lamp descriptions in
+        # illumination metadata.
+        "halo",
+        # "Clip"/"clipping" is standard exposure/signal terminology (a
+        # clipped histogram, a clipped sensor value) as well as a common
+        # English word ("video clip").
+        "clip",
+        # Planet/mythological name; also "Venus flytrap" (a common assay
+        # organism name) in unrelated experiment-description text.
+        "venus",
+        # Gem/color name that shows up in unrelated reagent/buffer text
+        # ("citrine acid buffer").
+        "citrine",
+        # Gem/color name ("Emerald Isle", "emerald green" filter/dye
+        # descriptions unrelated to the mEmerald fluorescent protein).
+        "emerald",
+        # Common color-name word.
+        "cerulean",
+        # Common English word (also a literal specimen in plant-imaging
+        # notes, e.g. "tomato leaf cross-section").
+        "tomato",
+    }
+)
 
 
 def canonical_markers() -> list[str]:
