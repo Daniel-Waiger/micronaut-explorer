@@ -189,12 +189,14 @@ export function deserializeExperiment(text) {
 }
 
 /**
- * Trigger a real `<a download>` click for `experiment` as a .micronaut.json
- * file. Works under file:// (no fetch, no server, no permission prompt).
+ * Trigger a real `<a download>` click for arbitrary `text`. Works under
+ * file:// (no fetch, no server, no permission prompt) -- the general form
+ * exportToFile below already relied on; extracted so ui/steps/overview.js's
+ * Markdown export can reuse the same DOM mechanics rather than a second,
+ * independently-written copy of them.
  */
-export function exportToFile(experiment, filename = 'experiment.micronaut.json') {
-  const json = serializeExperiment(experiment);
-  const blob = new Blob([json], { type: 'application/json' });
+export function downloadTextFile(text, filename, mimeType) {
+  const blob = new Blob([text], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -203,6 +205,14 @@ export function exportToFile(experiment, filename = 'experiment.micronaut.json')
   anchor.click();
   document.body.removeChild(anchor);
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Trigger a real `<a download>` click for `experiment` as a .micronaut.json
+ * file. Works under file:// (no fetch, no server, no permission prompt).
+ */
+export function exportToFile(experiment, filename = 'experiment.micronaut.json') {
+  downloadTextFile(serializeExperiment(experiment), filename, 'application/json');
 }
 
 /** Read a File (e.g. from a file input) as JSON via FileReader. */

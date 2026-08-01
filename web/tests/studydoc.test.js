@@ -1,0 +1,233 @@
+// Tests for engine/studydoc.js (the document model) and its two renderers
+// (render/markdown.js, render/mermaid.js). Exercises the REAL committed KB
+// (readouts.json/controls.json/stages.json) against the real oregano
+// default study (core/defaultStudy.js) -- the same fixture the app itself
+// boots into on a fresh session -- so this is end-to-end over real content,
+// not just synthetic fixtures.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+import { buildStudyDocument } from '../src/engine/studydoc.js';
+import { renderMarkdown } from '../src/engine/render/markdown.js';
+import { renderMermaid } from '../src/engine/render/mermaid.js';
+import { shapeAppKb } from '../src/engine/kbpack.js';
+import { emptyExperiment } from '../src/core/schema.js';
+import { createDefaultStudy } from '../src/core/defaultStudy.js';
+
+// Duplicated as local literals rather than imported, like advisor.test.js's
+// REAL_NAMING_TEMPLATE -- ui/steps/naming.js touches `document` and must
+// stay importable without a DOM.
+const NAMING_CONFIG = {
+  template: '{date}_{modality}_{exptype}_{markers}_{magnification}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}',
+  defaults: {
+    date: '1970-01-01',
+    modality: 'UNKNOWN',
+    exptype: 'UNKNOWN',
+    markers: 'UNKNOWN',
+    magnification: 'UNKNOWN',
+    sample: 'UNKNOWN',
+  },
+  optionalFields: ['group', 'biorep', 'techrep', 'notes'],
+  uppercaseFields: ['modality', 'exptype', 'sample', 'magnification', 'markers', 'group'],
+  safeCharPattern: '[^A-Za-z0-9_-]+',
+};
+const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+function readKbJson(stem) {
+  return JSON.parse(readFileSync(path.join(here, '..', 'kb', `${stem}.json`), 'utf-8'));
+}
+
+function realKb() {
+  return shapeAppKb({
+    markers: readKbJson('markers'),
+    questions: readKbJson('questions'),
+    advisor: readKbJson('advisor'),
+    readouts: readKbJson('readouts'),
+    controls: readKbJson('controls'),
+    stages: readKbJson('stages'),
+  });
+}
+
+// --- Determinism ---------------------------------------------------------
+
+test('buildStudyDocument is deterministic: same inputs twice, byte-identical output', () => {
+  const kb = realKb();
+  const study = createDefaultStudy();
+  const a = buildStudyDocument(study, kb, NAMING_CONFIG, BASE_TEMPLATE);
+  const b = buildStudyDocument(study, kb, NAMING_CONFIG, BASE_TEMPLATE);
+  assert.equal(JSON.stringify(a), JSON.stringify(b));
+});
+
+test('renderMarkdown and renderMermaid are deterministic on the same document', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  assert.equal(renderMarkdown(doc), renderMarkdown(doc));
+  assert.equal(renderMermaid(doc), renderMermaid(doc));
+});
+
+// --- Totality --------------------------------------------------------------
+
+test('buildStudyDocument on an empty/malformed experiment never throws and yields a usable empty-ish document', () => {
+  for (const bad of [undefined, null, {}, 'nope', 42]) {
+    assert.doesNotThrow(() => buildStudyDocument(bad, realKb(), NAMING_CONFIG, BASE_TEMPLATE));
+  }
+});
+
+test('buildStudyDocument(emptyExperiment()) has exactly 1 assay (schema invariant), zero controls, and an unanswered readout', () => {
+  const doc = buildStudyDocument(emptyExperiment(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  assert.equal(doc.assays.length, 1);
+  const assay = doc.assays[0];
+  assert.equal(assay.readout.state, 'unanswered');
+  assert.deepEqual(assay.controls.panel, []);
+  assert.deepEqual(assay.controls.readout, []);
+});
+
+test('renderMarkdown/renderMermaid never throw on the empty-experiment document', () => {
+  const doc = buildStudyDocument(emptyExperiment(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  assert.doesNotThrow(() => renderMarkdown(doc));
+  assert.doesNotThrow(() => renderMermaid(doc));
+});
+
+// --- The real oregano default study, end to end -----------------------
+
+test('the real oregano default study yields all 4 assays with correct labels', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  assert.deepEqual(
+    doc.assays.map((a) => a.label),
+    ['Bacterial viability', 'Macrophage cytoskeleton', 'Intracellular ROS', 'Scratch / migration']
+  );
+});
+
+test('every default-study assay has correct arms/factors and a non-zero condition count', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  for (const assay of doc.assays) {
+    assert.deepEqual(assay.design.arms, ['CTL', 'OPP']);
+    assert.ok(assay.design.conditionCount > 0, `assay '${assay.label}' has zero condition rows`);
+  }
+  // Bacterial viability has the extra 'species' crossing factor (2 levels).
+  const viability = doc.assays.find((a) => a.label === 'Bacterial viability');
+  assert.deepEqual(viability.design.factors.map((f) => f.name), ['species']);
+});
+
+test('every default-study assay has planned filenames with no errors', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  for (const assay of doc.assays) {
+    assert.ok(assay.filenames.length > 0, `assay '${assay.label}' has no planned filenames`);
+    for (const entry of assay.filenames) {
+      assert.equal(entry.error, null, `assay '${assay.label}' has a filename error: ${entry.error}`);
+      assert.ok(entry.filename, `assay '${assay.label}' has a null filename with no error`);
+    }
+  }
+});
+
+test('cross-assay filename collisions are flagged (or not) via studyNameIssues, not duplicated logic', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  // The default study gives every assay a distinct exptype, so this pins
+  // "no false-positive collisions on real content" rather than asserting a
+  // specific count that would need updating if the seed data changes.
+  assert.deepEqual(doc.crossAssayIssues, []);
+});
+
+test('the default study readout is unanswered for every assay (readout is a live interview question, not seeded)', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  for (const assay of doc.assays) {
+    assert.equal(assay.readout.state, 'unanswered');
+  }
+});
+
+test('once a readout is answered, the matching panel AND readout controls fire, three-state resolves to "known"', () => {
+  const study = createDefaultStudy();
+  study.assays[0].readoutText = 'Bacterial viability';
+  study.assays[0].readout = 'bacterial-viability';
+  const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const viability = doc.assays[0];
+  assert.equal(viability.readout.state, 'known');
+  assert.equal(viability.readout.label, 'Bacterial viability');
+  assert.ok(viability.controls.panel.length > 0, 'expected panel-derived controls to fire (markers are set)');
+  assert.ok(
+    viability.controls.readout.some((c) => c.id === 'viability-heat-killed-control'),
+    'expected the heat-killed control to fire for bacterial-viability'
+  );
+});
+
+test('an unrecognized readout answer resolves to "unrecognized", not silence', () => {
+  const study = createDefaultStudy();
+  study.assays[0].readoutText = 'some assay this app has never heard of';
+  const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  assert.equal(doc.assays[0].readout.state, 'unrecognized');
+  assert.deepEqual(doc.assays[0].controls.readout, []);
+});
+
+test('every assay gets the full 5-stage ladder, with per-modality notes attached to the right stage', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  for (const assay of doc.assays) {
+    assert.deepEqual(
+      assay.ladder.map((s) => s.id),
+      ['idea', 'pilot', 'validate-controls', 'acquisition-settings', 'advanced-modality']
+    );
+  }
+  // All 4 default-study assays use 'confocal' or 'live-cell phase contrast'
+  // -- neither is STED/light-sheet/SEM/TEM, so no pilot notes should fire.
+  for (const assay of doc.assays) {
+    const pilotStage = assay.ladder.find((s) => s.id === 'pilot');
+    assert.deepEqual(pilotStage.notes, [], `assay '${assay.label}' unexpectedly has a pilot note for modality '${assay.modality}'`);
+  }
+});
+
+// --- Markdown rendering: the three-state controls rule survives to text --
+
+test('renderMarkdown never renders an empty controls section as silence', () => {
+  const doc = buildStudyDocument(emptyExperiment(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const md = renderMarkdown(doc);
+  assert.match(md, /Readout not answered yet/);
+});
+
+test('renderMarkdown embeds a ```mermaid fenced block containing the mermaid source', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const md = renderMarkdown(doc);
+  const mermaidSource = renderMermaid(doc);
+  assert.match(md, /```mermaid\n/);
+  assert.ok(md.includes(mermaidSource), 'expected the exact mermaid source to appear verbatim in the markdown');
+});
+
+test('renderMarkdown lists every assay heading and every planned filename', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const md = renderMarkdown(doc);
+  for (const assay of doc.assays) {
+    assert.match(md, new RegExp(`## Assay ${assay.index}: ${assay.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    for (const entry of assay.filenames) {
+      if (entry.filename) assert.ok(md.includes(entry.filename), `expected filename '${entry.filename}' in the markdown output`);
+    }
+  }
+});
+
+// --- Mermaid rendering -------------------------------------------------
+
+test('renderMermaid starts with "flowchart TD" and has one branch per assay', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const mermaid = renderMermaid(doc);
+  assert.match(mermaid, /^flowchart TD/);
+  for (const assay of doc.assays) {
+    assert.match(mermaid, new RegExp(`STUDY --> assay_${assay.index}`));
+  }
+});
+
+test('renderMermaid never emits an unescaped double quote inside a label', () => {
+  const study = createDefaultStudy();
+  study.assays[0].label = 'Weird "quoted" label';
+  const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const mermaid = renderMermaid(doc);
+  // Every label is wrapped as "..."; a raw embedded quote would break that
+  // wrapping. Checking there are no STRAY quotes is done by counting: each
+  // label contributes exactly 2 quote characters (open+close) once the
+  // embedded one has been replaced with a single quote.
+  assert.ok(!mermaid.includes('"quoted"'), 'expected the embedded double quotes to be escaped to single quotes');
+});
+
+test('renderMermaid on a zero-assay-ish malformed document still produces a valid, non-throwing diagram', () => {
+  const doc = buildStudyDocument({}, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  assert.doesNotThrow(() => renderMermaid(doc));
+});

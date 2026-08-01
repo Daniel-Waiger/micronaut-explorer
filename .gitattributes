@@ -1,0 +1,8 @@
+# web/kb/markers.json is a GENERATED artifact (tools/export_markers_kb.py
+# writes it with LF) and tests/test_markers_kb_export.py asserts a fresh
+# export matches the committed file BYTE FOR BYTE, per repo lesson 40. With
+# no .gitattributes, Windows checkouts under core.autocrlf=true silently
+# rewrite it to CRLF on checkout, failing that test for a reason that has
+# nothing to do with markers.py -- force LF so the byte comparison is stable
+# on every platform.
+web/kb/*.json text eol=lf
