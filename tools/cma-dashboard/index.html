@@ -148,14 +148,14 @@ const EMBEDDED = {
   "orchestrator": "Claude Opus",
   "active_model": "Claude Opus",
   "active_status": "done",
-  "phase": "Advisor slice 1 + concept field",
+  "phase": "Schema v3: the assay tier (commit 1 of 4)",
   "state_note": "First slice of the experimental-design assistant vision (controls/panel/modality guidance) implemented and verified. Architecture: rules are DATA in web/kb/advisor.json, evaluated by the ALREADY-BUILT predicate engine (engine/predicate.js) -- zero engine changes needed, proving the rules-as-data pattern the rest of the vision depends on. New engine/advisor.js (loader mirrors interview.js's loadQuestions discipline: explicit whitelist, drop-and-report, never spread the raw entry) plus engine/kbpack.js (extracts shapeAppKb from main.js's previously-untestable inline loadAppKb -- this is what a future KB key needs to avoid repeating the allowOther silent-drop bug). New ui/advice.js: a shared, non-focusable advice panel wired into all three steps (describe/design/naming) at verified real re-render seams, not the ones that looked obvious -- design.js's renderAll() is called exactly once at mount; the real funnel is renderConditions(). 16 modality rules drafted (STED, confocal, widefield, light-sheet, SEM/TEM, Raman), each with a title (the pitfall) and a body of at least 40 characters (the why), gated on acquisition.modality via exact-canonical-value predicates. 277 JS tests (up from 229), 341 Python. Verified live against the built artifact over http: STED notes route correctly to Design and Naming, swapping to SEM live-updates all three surfaces with zero reload and zero residue, per-keystroke re-render on Naming preserves focus and cursor position, empty experiment shows zero notes anywhere, console clean throughout.",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "289 passed",
+      "v": "334 passed",
       "tone": "ok"
     },
     {
@@ -326,9 +326,13 @@ const EMBEDDED = {
     {
       "time": "16:02:57",
       "msg": "Advice notes now carry a required 'concept' (the phenomenon: spectral spillover, photobleaching) rendered as the note's reason, distinct from the mechanically-derived 'Applies when ...' trigger clause. User correction: a trigger condition is not a reason."
+    },
+    {
+      "time": "07:50:47",
+      "msg": "Schema v3 (assay tier, commit 1 of 4) shipped and pushed as 49c4e2a: one study can now hold multiple assays (bacterial viability, cytoskeleton, ROS, scratch from a real uploaded paper each need their own modality/panel/specimen). Falsifiable gate held throughout: zero changes to web/src/engine/. Adversarial self-review found and fixed 4 real issues in bd24d1a (local only): duplicated scoping predicate between schema.js and assay.js, a scopeWrite gap on the bare naming.fields container, a stale header comment claiming false imports, 4 curly apostrophes breaking the plain-ASCII convention."
     }
   ],
-  "snapshot_at": "2026-07-31 16:02"
+  "snapshot_at": "2026-08-01 07:50"
 };
 /* CMA:EMBEDDED:END */
 
