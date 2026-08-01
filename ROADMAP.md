@@ -141,10 +141,20 @@ Grow beyond naming into a broader experimental-design suite that advises on the
   SEM-TEM/Raman.
 - Recommend the required experimental groups and controls for a given design, with
   the rationale for each — not started (`web/kb/controls.json` + proposed condition
-  rows inside Design, per `docs/plans/planner-web-mvp-usecases.md` §6 step 4).
+  rows inside Design, per `docs/plans/planner-web-mvp-usecases.md` §6 step 4). Now
+  gated on the assay tier below (commit 3), since controls attach per-assay.
 - Help plan a fluorophore/color panel to minimize spectral spillover — not started;
   its own page (the one part of this vision that earns one — see the plan doc), rules
   qualitative-first, no spectral overlap integrals yet.
+
+**The assay tier (schema v3) — commit 1 of 4 shipped 2026-07-31.** A real published study
+(uploaded by Daniel) turned out to contain FOUR assays sharing only a research question and
+a test article, each with its own modality/panel/specimen -- something the schema could not
+represent at all (one design, one panel, one acquisition, full stop). Commit 1 adds the
+schema plus the read/write machinery (`web/src/core/assay.js`) with zero visible change and
+zero changes to the engine layer; commits 2-4 (the assay switcher, the readout/controls
+vocabulary, and an exportable design document) are designed but not started. Full reasoning,
+verified facts, and remaining sequencing: `docs/plans/planner-web-assay-tier.md`.
 
 **⚠ Parked: review the wording in `web/kb/advisor.json`.** Every rule's `concept`
 (the phenomenon, e.g. "spectral spillover") and `body` (the mechanism explanation) is
