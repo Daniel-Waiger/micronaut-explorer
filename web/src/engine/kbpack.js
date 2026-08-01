@@ -17,19 +17,22 @@
 
 import { indexKb, loadKb } from '../core/kb.js';
 import { loadAdvisorRules } from './advisor.js';
+import { loadControlRules, loadReadouts } from './controls.js';
 
 /**
- * Shape the raw KB object into { index, questions, advisor, issues }.
+ * Shape the raw KB object into { index, questions, advisor, readouts,
+ * controlRules, issues }.
  *
  * `raw` is globalThis.__MICRONAUT_KB__ (or an already-defaulted `{}`):
  * an object keyed by filename stem -- `raw.markers`, `raw.questions`,
- * `raw.advisor` -- aggregated at build/dev time from web/kb/*.json.
+ * `raw.advisor`, `raw.readouts`, `raw.controls` -- aggregated at build/dev
+ * time from web/kb/*.json.
  *
  * TOTAL, like every loader it composes: a missing or malformed `raw`, or any
  * missing key on it, degrades to a usable empty shape plus issues, never a
- * throw. `issues` merges marker-pack issues and advisor-pack issues into one
- * list so a caller that only wants a single count (main.js's toast) does not
- * need to know how many sub-packs exist.
+ * throw. `issues` merges every sub-pack's issues into one list so a caller
+ * that only wants a single count (main.js's toast) does not need to know
+ * how many sub-packs exist.
  */
 export function shapeAppKb(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
@@ -38,6 +41,15 @@ export function shapeAppKb(raw) {
   const index = indexKb(markersKb);
   const questions = Array.isArray(source.questions) ? source.questions : [];
   const { rules: advisor, issues: advisorIssues } = loadAdvisorRules(source.advisor);
+  const { readouts, issues: readoutIssues } = loadReadouts(source.readouts);
+  const { rules: controlRules, issues: controlIssues } = loadControlRules(source.controls);
 
-  return { index, questions, advisor, issues: [...markerIssues, ...advisorIssues] };
+  return {
+    index,
+    questions,
+    advisor,
+    readouts,
+    controlRules,
+    issues: [...markerIssues, ...advisorIssues, ...readoutIssues, ...controlIssues],
+  };
 }

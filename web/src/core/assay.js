@@ -160,6 +160,12 @@ function projectProvenance(provenance, assayId) {
  * emptyExperiment() without a matching line here is a visible gap in this
  * function, not a silent leak through a spread.
  *
+ * `readout`/`readoutText` are wired in as of commit 3 (web/kb/readouts.json,
+ * engine/controls.js) -- commit 1's header comment said these were
+ * deliberately NOT included yet; they are now, verbatim from the assay, no
+ * KB logic here (this module stays a leaf; canonicalization happens in
+ * ui/steps/describe.js at answer time, where the readouts KB is available).
+ *
  * TOTAL: a malformed experiment or an unknown assayId degrades to an empty
  * assay's shape rather than throwing -- reads must never crash the app.
  * Writing to an unknown assay is a different story; see scopeWrite.
@@ -175,6 +181,8 @@ export function assayView(experiment, assayId) {
     meta: exp.meta,
     researchQuestion: exp.researchQuestion,
     narrative: exp.narrative,
+    readout: assay.readout,
+    readoutText: assay.readoutText,
     specimen: assay.specimen,
     design: assay.design,
     panel: assay.panel,

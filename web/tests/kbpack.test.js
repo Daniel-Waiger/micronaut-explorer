@@ -29,6 +29,8 @@ test('a raw.advisor pack reaches the returned advisor rules -- the exact wiring 
     markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
     questions: [],
     advisor: { version: 1, rules: [validAdvisorRule()] },
+    readouts: { version: 1, readouts: {} },
+    controls: { version: 1, rules: [] },
   });
   assert.equal(issues.length, 0);
   assert.equal(advisor.length, 1);
@@ -41,16 +43,53 @@ test('raw.questions passes through UNTOUCHED (createDescribeStep still owns load
   assert.deepEqual(questions, rawQuestions);
 });
 
+test('raw.readouts and raw.controls reach the returned readouts/controlRules -- the same wiring gap advisor once had', () => {
+  const { readouts, controlRules, issues } = shapeAppKb({
+    markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
+    advisor: { version: 1, rules: [] },
+    readouts: { version: 1, readouts: { ros: { label: 'Intracellular ROS', aliases: ['dcf'] } } },
+    controls: {
+      version: 1,
+      rules: [
+        {
+          id: 'ros-positive-control',
+          kind: 'readout',
+          title: 'H2O2-treated positive control',
+          why: 'A hydrogen-peroxide-treated sample gives DCF a known, strong oxidative signal before trusting a subtler one.',
+          when: { eq: ['readout', 'ros'] },
+          priority: 0,
+        },
+      ],
+    },
+  });
+  assert.equal(issues.length, 0);
+  assert.deepEqual(readouts.ros, { label: 'Intracellular ROS', aliases: ['dcf'] });
+  assert.equal(controlRules.length, 1);
+  assert.equal(controlRules[0].id, 'ros-positive-control');
+});
+
+test('missing raw.readouts/raw.controls degrade to empty shapes plus issues, never silence or a throw', () => {
+  const { readouts, controlRules, issues } = shapeAppKb({});
+  assert.deepEqual(readouts, {});
+  assert.deepEqual(controlRules, []);
+  assert.ok(issues.some((i) => /readouts pack is missing/.test(i.message)));
+  assert.ok(issues.some((i) => /controls pack is missing/.test(i.message) || /export_markers_kb\.py/.test(i.message)));
+});
+
 // --- Totality: every combination of absent/malformed input degrades cleanly
 
-test('a raw object with both real sub-packs present yields zero issues', () => {
-  const { index, questions, advisor, issues } = shapeAppKb({
+test('a raw object with every sub-pack present yields zero issues', () => {
+  const { index, questions, advisor, readouts, controlRules, issues } = shapeAppKb({
     markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
     questions: [],
     advisor: { version: 1, rules: [] },
+    readouts: { version: 1, readouts: {} },
+    controls: { version: 1, rules: [] },
   });
   assert.deepEqual(questions, []);
   assert.deepEqual(advisor, []);
+  assert.deepEqual(readouts, {});
+  assert.deepEqual(controlRules, []);
   assert.deepEqual(issues, []);
   assert.ok(index); // indexKb's own shape, exercised by kb.test.js
 });

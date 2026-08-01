@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "readouts": {
+    "bacterial-viability": {
+      "label": "Bacterial viability",
+      "aliases": ["viability", "live/dead", "live dead", "syto9", "syto9/pi", "syto9-pi"]
+    },
+    "macrophage-cytoskeleton": {
+      "label": "Macrophage cytoskeleton",
+      "aliases": ["cytoskeleton", "phalloidin", "actin", "f-actin"]
+    },
+    "ros": {
+      "label": "Intracellular ROS",
+      "aliases": ["reactive oxygen species", "oxidative stress", "dcf", "dcfda", "dcf-da"]
+    },
+    "scratch-migration": {
+      "label": "Scratch / migration",
+      "aliases": ["wound healing", "wound-healing", "migration", "scratch assay", "scratch"]
+    }
+  }
+}

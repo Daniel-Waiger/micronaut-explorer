@@ -93,6 +93,17 @@
     "tag": "user"
   },
   {
+    "id": "readout",
+    "prompt": "What is this assay's readout?",
+    "why": "The readout drives the control guidance on the study overview -- a viability assay, a ROS assay, and a migration assay each need a different reference control, and the app can only suggest the right ones once it knows which you're running.",
+    "field": "readoutText",
+    "type": "choice",
+    "options": ["Bacterial viability", "Macrophage cytoskeleton", "Intracellular ROS", "Scratch / migration"],
+    "allowOther": true,
+    "priority": 15,
+    "tag": "user"
+  },
+  {
     "id": "biologicalReplicates",
     "prompt": "How many biological replicates?",
     "why": "Determines how many condition rows the design expands into and whether the sample size is worth flagging as low.",
