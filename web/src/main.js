@@ -8,6 +8,7 @@ import { namingStep } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
 import { designStep } from './ui/steps/design.js';
 import { studyStep } from './ui/steps/study.js';
+import { createOverviewStep } from './ui/steps/overview.js';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -53,11 +54,15 @@ function init() {
 
   const kb = loadAppKb();
   const describeStep = createDescribeStep(kb);
+  const overviewStep = createOverviewStep(kb);
   // Study first: it is the study-level surface sitting above every assay,
   // and the discoverability point for "this app can model more than one
   // assay" -- the router lands on steps[0] by default, so this is also the
   // new landing step. See docs/plans/planner-web-assay-tier.md, commit 2.
-  const steps = [studyStep, describeStep, designStep, namingStep];
+  // Overview last: it is a pure READ over every other step's data (the
+  // shareable diagram + deterministic walkthrough), never a place new facts
+  // are entered -- see ui/steps/overview.js's module header.
+  const steps = [studyStep, describeStep, designStep, namingStep, overviewStep];
   const router = createRouter(steps);
 
   const root = document.getElementById('app');

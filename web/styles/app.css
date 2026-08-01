@@ -666,8 +666,13 @@ button:focus-visible {
   .shell-header,
   .assay-switcher-bar,
   .shell-nav,
-  .shell-status {
+  .shell-status,
+  .overview-actions {
     display: none;
+  }
+
+  .overview-assay {
+    break-inside: avoid;
   }
 
   .shell-body {
@@ -785,6 +790,100 @@ button:focus-visible {
    button) -- otherwise a button's horizontal position depends on how long
    THIS row's base name happens to be, which reads as buttons "moving"
    between rows as the base name's length varies. */
+.overview-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.overview-research-question {
+  font-style: italic;
+  color: var(--muted);
+  margin: 4px 0 16px;
+}
+
+.overview-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.overview-assay {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: var(--panel);
+}
+
+.overview-assay-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.overview-node {
+  font-size: 13.5px;
+  color: var(--ink);
+  margin: 4px 0;
+}
+
+.overview-node-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin: 14px 0 4px;
+}
+
+.overview-controls-empty {
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.overview-controls-group-label {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 6px 0 2px;
+}
+
+.overview-controls-list {
+  margin: 0 0 4px;
+  padding-left: 20px;
+  font-size: 13px;
+}
+
+.overview-controls-list li {
+  margin: 3px 0;
+}
+
+.overview-ladder-list {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.overview-ladder-list > li {
+  margin: 8px 0;
+}
+
+.overview-ladder-title {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.overview-ladder-body {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0;
+}
+
+.overview-ladder-notes {
+  margin: 4px 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+}
+
 .study-assay-actions {
   display: flex;
   gap: 8px;

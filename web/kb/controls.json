@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "panel-unstained-control",
+      "kind": "panel",
+      "title": "Unstained / autofluorescence control",
+      "why": "Fixed tissue and many cell types autofluoresce, especially in the green channel. Without an unstained sample imaged at the same settings, you cannot tell whether a dim signal is real stain or background autofluorescence.",
+      "when": { "all": [{ "exists": "naming.fields.markers" }, { "ne": ["naming.fields.markers", "NONE"] }] },
+      "priority": 10
+    },
+    {
+      "id": "panel-single-stain-controls",
+      "kind": "panel",
+      "title": "Single-stain controls (one channel at a time)",
+      "why": "When two or more fluorophores are imaged together, their emission spectra can overlap (spectral spillover/bleed-through). A sample stained with only ONE of the fluorophores, imaged on every channel, is what lets you tell real co-localization apart from spillover before you trust a multi-channel image.",
+      "when": { "all": [{ "exists": "naming.fields.markers" }, { "ne": ["naming.fields.markers", "NONE"] }] },
+      "priority": 20
+    },
+    {
+      "id": "panel-secondary-only-control",
+      "kind": "panel",
+      "title": "Secondary-antibody-only control",
+      "why": "For indirect immunofluorescence (primary antibody + fluorophore-conjugated secondary), the secondary can bind nonspecifically or the sample can autofluoresce at the secondary's wavelength. Omitting the primary but keeping the secondary isolates that background from real signal.",
+      "when": { "all": [{ "exists": "naming.fields.markers" }, { "ne": ["naming.fields.markers", "NONE"] }] },
+      "priority": 30
+    },
+    {
+      "id": "panel-isotype-control",
+      "kind": "panel",
+      "title": "Isotype control",
+      "why": "A primary antibody of the same host species and isotype but with no specificity for your target tests whether staining comes from genuine target binding or nonspecific antibody binding (e.g. Fc receptor binding).",
+      "when": { "all": [{ "exists": "naming.fields.markers" }, { "ne": ["naming.fields.markers", "NONE"] }] },
+      "priority": 40
+    },
+    {
+      "id": "viability-heat-killed-control",
+      "kind": "readout",
+      "title": "Heat-killed (dead) control",
+      "why": "SYTO9/PI viability staining reports percent-dead relative to a maximum-death reference. A heat-killed (or otherwise fully-killed) aliquot of the same culture, imaged the same way, calibrates the PI-positive gate -- without it, 'percent dead' has no anchor and drifts between imaging sessions.",
+      "when": { "eq": ["readout", "bacterial-viability"] },
+      "priority": 50
+    },
+    {
+      "id": "ros-positive-control",
+      "kind": "readout",
+      "title": "H2O2-treated positive control",
+      "why": "A hydrogen-peroxide-treated sample gives DCF a known, strong oxidative signal, confirming the probe is loading and responding before you trust a subtler biological ROS increase.",
+      "when": { "eq": ["readout", "ros"] },
+      "priority": 60
+    },
+    {
+      "id": "ros-negative-control",
+      "kind": "readout",
+      "title": "NAC-treated (antioxidant) negative control",
+      "why": "N-acetylcysteine scavenges reactive oxygen species and should suppress the DCF signal. If it doesn't, the assay's readout may not actually be tracking oxidative stress in this experiment.",
+      "when": { "eq": ["readout", "ros"] },
+      "priority": 61
+    },
+    {
+      "id": "cytoskeleton-untreated-reference",
+      "kind": "readout",
+      "title": "Untreated / vehicle reference",
+      "why": "Phalloidin staining shows the actin architecture at a moment in time, which only means something in comparison to an untreated or vehicle-only baseline imaged under identical settings -- otherwise there is nothing to say the treated cytoskeleton changed.",
+      "when": { "eq": ["readout", "macrophage-cytoskeleton"] },
+      "priority": 70
+    },
+    {
+      "id": "migration-baseline-reference",
+      "kind": "readout",
+      "title": "t=0 scratch reference image",
+      "why": "Migration/closure is measured as a change in the wound area over time, so every scratch needs its own t=0 image taken immediately after scratching, before any of that area can already have started closing.",
+      "when": { "eq": ["readout", "scratch-migration"] },
+      "priority": 80
+    },
+    {
+      "id": "migration-proliferation-control",
+      "kind": "readout",
+      "title": "Mitomycin C proliferation-blocked control",
+      "why": "A scratch can close by cells migrating in OR by cells proliferating into the gap. Without a mitomycin-C-treated (proliferation-blocked) control closing more slowly, migration and proliferation are confounded and the assay cannot tell you which one you measured.",
+      "when": { "eq": ["readout", "scratch-migration"] },
+      "priority": 81
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import {
 import { editTagFor } from '../../core/provenance.js';
 import { createAdvicePanel } from '../advice.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
+import { resolveReadoutCanonical } from '../../engine/controls.js';
 
 const INTERVIEW_LIMIT = 8;
 
@@ -115,6 +116,28 @@ function buildQuestionControl(question, initialValue) {
 /** Coerce a control's raw string back to the question's declared type. */
 function coerceAnswer(question, raw) {
   return question.type === 'number' ? Number(raw) : raw;
+}
+
+/**
+ * The `readout` question (web/kb/questions.json) is the one question that
+ * needs a SECOND write alongside its own field: `field: 'readoutText'`
+ * stores the user's verbatim pick (curated option or Other free text), and
+ * `readout` stores the canonical id engine/controls.js's rules key on --
+ * see docs/plans/planner-web-assay-tier.md Decision 5 ("readout is a
+ * controlled vocabulary, and 'unknown' is never silence"). This is a
+ * one-off special case, not a generic multi-field-question mechanism: no
+ * other question needs it, and inventing one for a single caller would be
+ * exactly the kind of premature abstraction this codebase avoids elsewhere.
+ * Canonicalization happens HERE, at answer time, not as a runtime derivation
+ * inside assayView -- core/assay.js is a pure leaf with no KB imports, and
+ * this is the one place both the readouts KB and a live write are in scope
+ * together.
+ */
+function writeReadoutCanonicalIfNeeded(store, question, readoutText, tag, assayId, kb) {
+  if (question.id !== 'readout') return;
+  const canonical = resolveReadoutCanonical(readoutText, kb.readouts) || '';
+  const { path, slotKey } = scopeWrite(store.get(), 'readout', assayId);
+  store.setPath(path, canonical, tag, { slotKey });
 }
 
 export function createDescribeStep(kb) {
@@ -328,6 +351,7 @@ export function createDescribeStep(kb) {
             const descriptor = recordAnswer(store.get(), question, coerceAnswer(question, raw));
             const { path, slotKey } = scopeWrite(store.get(), descriptor.path, assayId);
             store.setPath(path, descriptor.value, descriptor.tag, { slotKey });
+            writeReadoutCanonicalIfNeeded(store, question, descriptor.value, descriptor.tag, assayId, kb);
             renderInterview();
             renderAnswered();
           });
@@ -406,7 +430,10 @@ export function createDescribeStep(kb) {
             // Un-skip first: a skipped question being answered here must stop
             // being skipped, or it stays out of the ask list forever.
             unskipQuestion(store.get(), question.id);
-            store.setPath(path, coerceAnswer(question, raw), editTagFor(existingTag), { slotKey });
+            const coerced = coerceAnswer(question, raw);
+            const tag = editTagFor(existingTag);
+            store.setPath(path, coerced, tag, { slotKey });
+            writeReadoutCanonicalIfNeeded(store, question, coerced, tag, assayId, kb);
             renderInterview();
             renderAnswered();
           });

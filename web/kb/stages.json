@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "stages": [
+    {
+      "id": "idea",
+      "order": 10,
+      "title": "Idea & feasibility",
+      "body": "State the research question in one sentence, name the readout you are actually measuring (viability, cytoskeleton, ROS, migration -- whatever it is for this assay), and identify one modality you could reasonably run tomorrow, on equipment you already have access to. Everything below builds on committing to those three things first."
+    },
+    {
+      "id": "pilot",
+      "order": 20,
+      "title": "Pilot on the simplest sufficient scope",
+      "body": "Run a small pilot (n=1-2) on the cheapest, simplest microscope that can plausibly answer the question, before booking time on an advanced or shared instrument. A pilot's job is to catch a broken protocol or a wrong assumption while it is still cheap to fix."
+    },
+    {
+      "id": "validate-controls",
+      "order": 30,
+      "title": "Validate your controls",
+      "body": "Run every control this assay needs (see the Controls section above) on the pilot samples, and confirm each one behaves as expected -- a heat-killed control should read as dead, an isotype control should read as background -- before spending time imaging the full sample set. A control that fails to behave as expected invalidates every sample imaged before it is fixed."
+    },
+    {
+      "id": "acquisition-settings",
+      "order": 40,
+      "title": "Fix acquisition settings & power the design",
+      "body": "Lock exposure, gain, laser power, and pinhole size from the pilot data, then keep them fixed for every subsequent acquisition -- changing settings mid-study makes samples incomparable. Use the pilot's own variance to judge whether the planned number of biological replicates is enough to see the effect you are looking for, before committing to the full n."
+    },
+    {
+      "id": "advanced-modality",
+      "order": 50,
+      "title": "Move to advanced or specialized microscopy",
+      "body": "Once the pilot, the controls, and the acquisition settings are all locked, move to the advanced or specialized modality the study actually calls for (STED, light-sheet, EM) if one is needed -- not before, since advanced-instrument time is the most expensive place to discover a protocol problem."
+    }
+  ],
+  "rules": [
+    {
+      "id": "pilot-sted-on-confocal-first",
+      "stage": "pilot",
+      "when": { "eq": ["acquisition.modality", "STED"] },
+      "note": "STED sessions are slower, more bleach-prone, and typically shared-instrument time -- pilot your staining, dye choice, and mounting on a confocal first, then move to STED only once the biology and the sample prep are already validated.",
+      "priority": 10
+    },
+    {
+      "id": "pilot-light-sheet-mounting",
+      "stage": "pilot",
+      "when": { "eq": ["acquisition.modality", "light-sheet"] },
+      "note": "Light-sheet imaging usually requires specific sample mounting or clearing that a standard confocal prep does not need -- confirm your mounting protocol is compatible before the first real light-sheet session, ideally by checking it under a confocal first.",
+      "priority": 10
+    },
+    {
+      "id": "pilot-em-fixation-irreversible",
+      "stage": "pilot",
+      "when": { "in": ["acquisition.modality", ["SEM", "TEM"]] },
+      "note": "EM fixation and processing are destructive and irreversible -- a failed fixation protocol destroys the sample it was tested on. Pilot the fixation protocol on a spare or lower-value sample, and confirm the biology looks right under light microscopy first, before committing your real samples to EM processing.",
+      "priority": 10
+    },
+    {
+      "id": "validate-viability-heat-killed-first",
+      "stage": "validate-controls",
+      "when": { "eq": ["readout", "bacterial-viability"] },
+      "note": "Before imaging the full sample set, confirm the heat-killed control actually reads as fully PI-positive at your chosen settings -- if it doesn't, the viability gate is miscalibrated and every subsequent sample's percent-dead is unreliable.",
+      "priority": 20
+    },
+    {
+      "id": "validate-migration-mitomycin-first",
+      "stage": "validate-controls",
+      "when": { "eq": ["readout", "scratch-migration"] },
+      "note": "Confirm the mitomycin-C-treated control actually shows slower closure than the untreated scratch in your pilot -- if it doesn't block proliferation as expected at your chosen dose, migration and proliferation stay confounded in the full study too.",
+      "priority": 20
+    },
+    {
+      "id": "acquisition-ros-photobleaching-budget",
+      "stage": "acquisition-settings",
+      "when": { "eq": ["readout", "ros"] },
+      "note": "ROS-sensitive probes like DCF are photolabile, and the excitation light itself can generate additional ROS -- fix laser power and exposure to the lowest setting that gives usable signal in the pilot, and use identical settings for every sample so the readout reflects biology, not variable photo-induced signal.",
+      "priority": 20
+    }
+  ]
+}

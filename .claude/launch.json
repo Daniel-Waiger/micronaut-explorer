@@ -22,8 +22,8 @@
     {
       "name": "planner-web-dist",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8779", "--directory", "dist"],
-      "port": 8779
+      "runtimeArgs": ["tools/serve_dir.py", "dist"],
+      "autoPort": true
     }
   ]
 }

@@ -29,6 +29,9 @@ test('a raw.advisor pack reaches the returned advisor rules -- the exact wiring 
     markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
     questions: [],
     advisor: { version: 1, rules: [validAdvisorRule()] },
+    readouts: { version: 1, readouts: {} },
+    controls: { version: 1, rules: [] },
+    stages: { version: 1, stages: [], rules: [] },
   });
   assert.equal(issues.length, 0);
   assert.equal(advisor.length, 1);
@@ -41,16 +44,83 @@ test('raw.questions passes through UNTOUCHED (createDescribeStep still owns load
   assert.deepEqual(questions, rawQuestions);
 });
 
+test('raw.readouts and raw.controls reach the returned readouts/controlRules -- the same wiring gap advisor once had', () => {
+  const { readouts, controlRules, issues } = shapeAppKb({
+    markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
+    advisor: { version: 1, rules: [] },
+    stages: { version: 1, stages: [], rules: [] },
+    readouts: { version: 1, readouts: { ros: { label: 'Intracellular ROS', aliases: ['dcf'] } } },
+    controls: {
+      version: 1,
+      rules: [
+        {
+          id: 'ros-positive-control',
+          kind: 'readout',
+          title: 'H2O2-treated positive control',
+          why: 'A hydrogen-peroxide-treated sample gives DCF a known, strong oxidative signal before trusting a subtler one.',
+          when: { eq: ['readout', 'ros'] },
+          priority: 0,
+        },
+      ],
+    },
+  });
+  assert.equal(issues.length, 0);
+  assert.deepEqual(readouts.ros, { label: 'Intracellular ROS', aliases: ['dcf'] });
+  assert.equal(controlRules.length, 1);
+  assert.equal(controlRules[0].id, 'ros-positive-control');
+});
+
+test('missing raw.readouts/raw.controls degrade to empty shapes plus issues, never silence or a throw', () => {
+  const { readouts, controlRules, issues } = shapeAppKb({});
+  assert.deepEqual(readouts, {});
+  assert.deepEqual(controlRules, []);
+  assert.ok(issues.some((i) => /readouts pack is missing/.test(i.message)));
+  assert.ok(issues.some((i) => /controls pack is missing/.test(i.message) || /export_markers_kb\.py/.test(i.message)));
+});
+
+test('raw.stages reaches the returned stages/stageRules -- the same wiring gap advisor once had', () => {
+  const { stages, stageRules, issues } = shapeAppKb({
+    markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
+    advisor: { version: 1, rules: [] },
+    readouts: { version: 1, readouts: {} },
+    controls: { version: 1, rules: [] },
+    stages: {
+      version: 1,
+      stages: [{ id: 'idea', order: 10, title: 'Idea', body: 'x'.repeat(40) }],
+      rules: [{ id: 'note-1', stage: 'idea', when: { exists: 'researchQuestion' }, note: 'y'.repeat(40), priority: 0 }],
+    },
+  });
+  assert.equal(issues.length, 0);
+  assert.equal(stages.length, 1);
+  assert.equal(stages[0].id, 'idea');
+  assert.equal(stageRules.length, 1);
+  assert.equal(stageRules[0].id, 'note-1');
+});
+
+test('missing raw.stages degrades to empty shapes plus an issue, never silence or a throw', () => {
+  const { stages, stageRules, issues } = shapeAppKb({});
+  assert.deepEqual(stages, []);
+  assert.deepEqual(stageRules, []);
+  assert.ok(issues.some((i) => /stages pack is missing/.test(i.message)));
+});
+
 // --- Totality: every combination of absent/malformed input degrades cleanly
 
-test('a raw object with both real sub-packs present yields zero issues', () => {
-  const { index, questions, advisor, issues } = shapeAppKb({
+test('a raw object with every sub-pack present yields zero issues', () => {
+  const { index, questions, advisor, readouts, controlRules, stages, stageRules, issues } = shapeAppKb({
     markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
     questions: [],
     advisor: { version: 1, rules: [] },
+    readouts: { version: 1, readouts: {} },
+    controls: { version: 1, rules: [] },
+    stages: { version: 1, stages: [], rules: [] },
   });
   assert.deepEqual(questions, []);
   assert.deepEqual(advisor, []);
+  assert.deepEqual(readouts, {});
+  assert.deepEqual(controlRules, []);
+  assert.deepEqual(stages, []);
+  assert.deepEqual(stageRules, []);
   assert.deepEqual(issues, []);
   assert.ok(index); // indexKb's own shape, exercised by kb.test.js
 });
