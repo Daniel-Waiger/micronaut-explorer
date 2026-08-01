@@ -100,7 +100,7 @@ const FIELD_DEFS = [
   {
     key: 'group',
     label: 'Group',
-    placeholder: 'e.g. CT, NAM50MM -- set per-row by the Design step, or type one here',
+    placeholder: 'e.g. CTL, OPP -- set per-row by the Design step, or type one here',
     hint: 'Which experimental group this file belongs to, such as your control or a treatment arm. Usually filled in for you from the Design page.',
   },
   {

@@ -6,13 +6,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  ASSAY_SCALAR_FIELDS,
   ASSAY_SCOPED_ROOTS,
   assayById,
   assayIndexById,
   assayView,
   emptyAssay,
   firstAssayId,
+  isAssayScopedPath,
+  removeAssay,
   scopeWrite,
+  seedAssayFromVocabulary,
 } from '../src/core/assay.js';
 
 function studyWith(overrides = {}) {
@@ -208,5 +212,129 @@ test('scopeWrite never mutates the experiment it addresses', () => {
   const study = studyWith();
   const before = JSON.stringify(study);
   scopeWrite(study, 'acquisition.modality', 'a1');
+  assert.equal(JSON.stringify(study), before);
+});
+
+// --- ASSAY_SCALAR_FIELDS: bare assay-level fields, not under a root object -
+
+test('isAssayScopedPath recognizes label/readout/readoutText -- bare assay scalars, not container roots', () => {
+  for (const field of ASSAY_SCALAR_FIELDS) {
+    assert.equal(isAssayScopedPath(field), true, `expected '${field}' to be scoped`);
+  }
+});
+
+test('scopeWrite scopes a bare assay scalar field (label) to the real array index, like a container root', () => {
+  const study = studyWith(); // a1 at index 0, a2 at index 1
+  assert.deepEqual(scopeWrite(study, 'label', 'a2'), {
+    path: 'assays[1].label',
+    slotKey: 'assay:a2.label',
+  });
+});
+
+test('an unrelated bare study-level field (researchQuestion) is NOT swept up by the scalar-fields set', () => {
+  const study = studyWith();
+  assert.deepEqual(scopeWrite(study, 'researchQuestion', 'a1'), {
+    path: 'researchQuestion',
+    slotKey: 'researchQuestion',
+  });
+});
+
+// --- seedAssayFromVocabulary -----------------------------------------------
+
+test('seedAssayFromVocabulary copies the vocabulary levels into a fresh assay, tagged kb-default', () => {
+  const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(
+    { levels: ['CT', 'NAM25MM'] },
+    'newid'
+  );
+  assert.equal(assay.id, 'newid');
+  assert.deepEqual(assay.design.groups.levels, ['CT', 'NAM25MM']);
+  assert.equal(provenanceSlotKey, 'assay:newid.design.groups');
+  assert.deepEqual(provenanceEntry, { tag: 'kb-default', detail: null });
+});
+
+test('seedAssayFromVocabulary degrades to empty arms for a missing/malformed vocabulary, never throws', () => {
+  assert.deepEqual(seedAssayFromVocabulary(undefined, 'x').assay.design.groups.levels, []);
+  assert.deepEqual(seedAssayFromVocabulary({}, 'x').assay.design.groups.levels, []);
+  assert.deepEqual(seedAssayFromVocabulary({ levels: null }, 'x').assay.design.groups.levels, []);
+});
+
+test('seedAssayFromVocabulary copies the levels array -- mutating the seeded assay must not reach back into the vocabulary', () => {
+  const vocab = { levels: ['CT'] };
+  const { assay } = seedAssayFromVocabulary(vocab, 'x');
+  assay.design.groups.levels.push('NEW');
+  assert.deepEqual(vocab.levels, ['CT']);
+});
+
+test('seedAssayFromVocabulary otherwise mirrors emptyAssay -- specimen/panel/etc. untouched', () => {
+  const { assay } = seedAssayFromVocabulary({ levels: [] }, 'x');
+  const blank = emptyAssay('x');
+  assert.deepEqual(assay.specimen, blank.specimen);
+  assert.deepEqual(assay.panel, blank.panel);
+  assert.deepEqual(assay.naming, blank.naming);
+});
+
+// --- removeAssay ------------------------------------------------------------
+
+test('removeAssay refuses to remove the LAST assay, returning null', () => {
+  const study = studyWith({ assays: [emptyAssay('only')], activeAssayId: 'only' });
+  assert.equal(removeAssay(study, 'only'), null);
+});
+
+test('removeAssay refuses an unknown id, returning null', () => {
+  assert.equal(removeAssay(studyWith(), 'ghost'), null);
+});
+
+test('removeAssay drops the assay and leaves activeAssayId alone when a DIFFERENT assay was active', () => {
+  const study = studyWith(); // a1 (index 0), a2 (index 1); active a1
+  const result = removeAssay(study, 'a2');
+  assert.deepEqual(
+    result.assays.map((a) => a.id),
+    ['a1']
+  );
+  assert.equal(result.activeAssayId, 'a1');
+});
+
+test('removeAssay reassigns activeAssayId to the PRECEDING assay when the active one is removed', () => {
+  const study = studyWith({
+    assays: [emptyAssay('a1'), emptyAssay('a2'), emptyAssay('a3')],
+    activeAssayId: 'a2',
+  });
+  const result = removeAssay(study, 'a2');
+  assert.deepEqual(
+    result.assays.map((a) => a.id),
+    ['a1', 'a3']
+  );
+  assert.equal(result.activeAssayId, 'a1');
+});
+
+test('removeAssay reassigns activeAssayId to the new first assay when the active FIRST assay is removed', () => {
+  const study = studyWith(); // a1 (index 0) active, a2 (index 1)
+  const result = removeAssay(study, 'a1');
+  assert.deepEqual(
+    result.assays.map((a) => a.id),
+    ['a2']
+  );
+  assert.equal(result.activeAssayId, 'a2');
+});
+
+test('removeAssay prunes every provenance slot scoped to the removed assay, leaving other slots untouched', () => {
+  const study = studyWith();
+  study.provenance.slots = {
+    'assay:a1.acquisition.modality': { tag: 'user', detail: null },
+    'assay:a1.design.groups': { tag: 'kb-default', detail: null },
+    'assay:a2.acquisition.modality': { tag: 'user', detail: null },
+    'narrative.text': { tag: 'user', detail: null },
+  };
+  const result = removeAssay(study, 'a1');
+  assert.deepEqual(result.provenance.slots, {
+    'assay:a2.acquisition.modality': { tag: 'user', detail: null },
+    'narrative.text': { tag: 'user', detail: null },
+  });
+});
+
+test('removeAssay never mutates the experiment it reads', () => {
+  const study = studyWith();
+  const before = JSON.stringify(study);
+  removeAssay(study, 'a2');
   assert.equal(JSON.stringify(study), before);
 });

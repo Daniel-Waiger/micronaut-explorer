@@ -31,7 +31,7 @@ export const SCHEMA_VERSION = 3;
 // experiment with no technical replicates (common for SEM/TEM/Raman) omits the
 // token entirely rather than padding the name with a placeholder.
 //
-// {group} is the ARM axis (CT | NAM25MM | NAM50MM) and is a SINGLE token: arms
+// {group} is the ARM axis (CTL | OPP) and is a SINGLE token: arms
 // are mutually exclusive, so they must never be crossed with each other. It is
 // separate from {sample}, the specimen identifier.
 //

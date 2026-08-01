@@ -25,6 +25,18 @@
 // so it isn't a whole top-level root).
 export const ASSAY_SCOPED_ROOTS = new Set(['specimen', 'design', 'panel', 'acquisition', 'controls']);
 
+// Scalar fields that live DIRECTLY on the assay object rather than inside one
+// of the container roots above -- 'label' (commit 2's rename), 'readout'/
+// 'readoutText' (reserved on emptyAssay below for commit 3, not yet wired
+// into assayView). Without this set, scopeWrite('label', assayId) falls
+// through isAssayScopedPath as study-level and writes into a PHANTOM
+// experiment.label at the study root -- setPath auto-vivifies a missing root
+// on write with no error, exactly the hazard this module's header warns
+// about, just for a path shape commit 1 never had to write to. Solved for all
+// three scalar fields now so commit 3 does not have to revisit this
+// predicate a second time.
+export const ASSAY_SCALAR_FIELDS = new Set(['label', 'readout', 'readoutText']);
+
 // Matches the bare container ('naming.fields' itself, e.g. a future bulk
 // write) AND any leaf beneath it ('naming.fields.sample'). Missing the bare
 // case used to mean scopeWrite(exp, 'naming.fields', id) fell through as
@@ -46,7 +58,7 @@ function isNamingFieldPath(path) {
  */
 export function isAssayScopedPath(path) {
   const root = typeof path === 'string' ? path.split(/[.[]/)[0] : '';
-  return ASSAY_SCOPED_ROOTS.has(root) || isNamingFieldPath(path);
+  return ASSAY_SCOPED_ROOTS.has(root) || ASSAY_SCALAR_FIELDS.has(root) || isNamingFieldPath(path);
 }
 
 /** A brand-new assay, empty except for its stable id. Mirrors the v2 slice of emptyExperiment() exactly -- see schema.js. */
@@ -205,5 +217,82 @@ export function scopeWrite(experiment, path, assayId) {
   return {
     path: `assays[${index}].${path}`,
     slotKey: `assay:${assayId}.${path}`,
+  };
+}
+
+/**
+ * Build a fresh assay whose arm axis is seeded from the study's vocabulary,
+ * tagged 'kb-default' (WEAK) -- see the module header, Decision 1: a
+ * composed/shared axis was rejected because it can never be MISSING; a
+ * per-assay axis SEEDED from a vocabulary keeps "flag an assay with no
+ * groups" computable while still making the common case (every assay uses
+ * the same arms) a one-write copy. WEAK is what lets a later real user edit
+ * to this assay's arms always win over the seed, never the reverse.
+ *
+ * Pure: returns the assay plus the ONE provenance entry the caller must
+ * also record (this module never touches a store -- see the header). The
+ * caller is expected to compose both into one atomic write (e.g. a single
+ * store.patch), since a new assay half-written -- present in `assays` but
+ * missing its provenance slot -- would let a user edit right after creation
+ * be silently misjudged as overwriting nothing when it is actually
+ * overwriting an untagged seed.
+ */
+export function seedAssayFromVocabulary(armVocabulary, id) {
+  const assay = emptyAssay(id);
+  const levels =
+    armVocabulary && Array.isArray(armVocabulary.levels) ? [...armVocabulary.levels] : [];
+  assay.design = { ...assay.design, groups: { levels } };
+  return {
+    assay,
+    provenanceSlotKey: `assay:${id}.design.groups`,
+    provenanceEntry: { tag: 'kb-default', detail: null },
+  };
+}
+
+/**
+ * Compute the {assays, activeAssayId, provenance} a study would have AFTER
+ * removing `assayId`, or null if this is the last assay (refuse rather than
+ * produce a zero-assay study -- schema.js's emptyExperiment documents
+ * `assays.length >= 1` as an invariant every consumer may assume) or the id
+ * is not found.
+ *
+ * Reassigns activeAssayId ONLY when the removed assay was the active one --
+ * to the assay immediately before it in the array, or the new first assay if
+ * the removed one was both active and first. Prunes every provenance slot
+ * scoped to the removed assay (`assay:<assayId>.*`): left in place, they
+ * would sit in provenance.slots forever, orphaned, visible only to someone
+ * reading raw JSON -- the same "drop it explicitly, don't rely on
+ * unreachable-implies-safe" discipline projectProvenance already documents
+ * above for a different case.
+ *
+ * Pure: never mutates `experiment`; the caller writes the result via
+ * store.patch, same as seedAssayFromVocabulary above.
+ */
+export function removeAssay(experiment, assayId) {
+  const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];
+  if (assays.length <= 1) return null;
+  const index = assayIndexById(experiment, assayId);
+  if (index === -1) return null;
+
+  const nextAssays = assays.filter((a) => a.id !== assayId);
+  const nextActiveId =
+    experiment.activeAssayId === assayId
+      ? nextAssays[Math.max(0, index - 1)].id
+      : experiment.activeAssayId;
+
+  const prefix = `assay:${assayId}.`;
+  const slots =
+    experiment.provenance && typeof experiment.provenance.slots === 'object'
+      ? experiment.provenance.slots
+      : {};
+  const nextSlots = {};
+  for (const [key, slot] of Object.entries(slots)) {
+    if (!key.startsWith(prefix)) nextSlots[key] = slot;
+  }
+
+  return {
+    assays: nextAssays,
+    activeAssayId: nextActiveId,
+    provenance: { ...experiment.provenance, slots: nextSlots },
   };
 }

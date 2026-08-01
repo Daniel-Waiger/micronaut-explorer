@@ -664,6 +664,7 @@ button:focus-visible {
 
 @media print {
   .shell-header,
+  .assay-switcher-bar,
   .shell-nav,
   .shell-status {
     display: none;
@@ -682,4 +683,111 @@ button:focus-visible {
     background: #fff;
     color: #000;
   }
+}
+
+.assay-switcher-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  overflow-x: auto;
+}
+
+.assay-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.assay-pill.active {
+  background: var(--panel-2);
+  border-color: var(--accent);
+}
+
+.assay-pill-label {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 999px 0 0 999px;
+  padding: 6px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.assay-pill.active .assay-pill-label {
+  color: var(--ink);
+}
+
+.assay-pill-delete {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 6px 10px 6px 0;
+  cursor: pointer;
+}
+
+.assay-pill-delete:hover {
+  color: var(--ink);
+}
+
+.assay-pill-add {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.assay-pill-add:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.assay-pill-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.study-divergence {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 4px 0 12px;
+}
+
+.study-assay-row {
+  align-items: center;
+}
+
+.study-assay-row .field-input {
+  flex: 0 1 220px;
+}
+
+.study-assay-basename {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+/* Grouped and pinned to the row's end (margin-left: auto here, not on each
+   button) -- otherwise a button's horizontal position depends on how long
+   THIS row's base name happens to be, which reads as buttons "moving"
+   between rows as the base name's length varies. */
+.study-assay-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
 }

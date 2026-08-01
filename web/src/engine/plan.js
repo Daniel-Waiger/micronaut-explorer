@@ -18,6 +18,7 @@ import {
   formatReplicateToken,
 } from './conditions.js';
 import { finalizeFields, normalizeFields, renderName } from './naming.js';
+import { assayView } from '../core/assay.js';
 
 // The extension every planned name inherits. The planner names files that do
 // not exist yet (this app plans, it does not rename -- Micronaut Classic owns
@@ -101,4 +102,75 @@ export function planFilenames(experiment, config) {
       filename: renderName(finalized, config),
     };
   });
+}
+
+// A fat-fingered "Add assay" click cannot hang the browser building an
+// unbounded switcher/list -- mirrors conditions.js's MAX_CONDITION_ROWS
+// discipline. Not a realistic ceiling; a real study has single-digit to
+// low-tens of assays.
+export const MAX_STUDY_ROWS = 50;
+
+/**
+ * Detect filename collisions ACROSS assays: two assays whose base name
+ * (date/modality/exptype/markers/magnification) renders identically would
+ * silently overwrite each other's files on disk, even though conditionIssues
+ * (which only ever sees ONE assay, via assayView) structurally cannot catch
+ * this -- see docs/plans/planner-web-assay-tier.md, Decision 4.
+ *
+ * Takes the RAW experiment (not an assayView), since cross-assay comparison
+ * is the one thing that view deliberately cannot do -- and `baseTemplate`
+ * as a parameter for the same reason `config` already is (see this file's
+ * header): BASE_TEMPLATE lives in ui/steps/naming.js, and engine/ must never
+ * import from ui/.
+ *
+ * This also organically covers "exptype is required once assays.length > 1"
+ * (also Decision 4) without a separate rule: two assays that both leave
+ * exptype blank both render the SAME 'UNKNOWN' base name and collide exactly
+ * like two assays that typed the same value would.
+ *
+ * Never throws; a malformed experiment degrades to "as many issues as can be
+ * determined," matching conditions.js's conditionIssues discipline.
+ */
+export function studyNameIssues(experiment, config, baseTemplate) {
+  const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];
+  const issues = [];
+
+  if (assays.length > MAX_STUDY_ROWS) {
+    issues.push({
+      field: 'assays',
+      message: `Study has ${assays.length} assays, exceeding the cap of ${MAX_STUDY_ROWS}.`,
+      severity: 'error',
+    });
+  }
+
+  // A collision needs at least two assays to compare; with zero or one,
+  // there is nothing to collide WITH.
+  if (assays.length <= 1) return issues;
+
+  const baseConfig = { ...config, template: baseTemplate };
+  const byBaseName = new Map(); // base name -> [assay labels]
+  assays.forEach((assay, index) => {
+    const view = assayView(experiment, assay.id);
+    const finalized = finalizeFields(PLAN_SOURCE_NAME, effectiveNamingFields(view), config);
+    const base = renderName(finalized, baseConfig);
+    // Same fallback every other assay-list surface uses (ui/shell.js's
+    // switcher, ui/steps/study.js's list): a raw shortId would be
+    // technically correct but unreadable in an issue message meant for a
+    // person, not a debugger.
+    const label = (assay && assay.label) || `Assay ${index + 1}`;
+    if (!byBaseName.has(base)) byBaseName.set(base, []);
+    byBaseName.get(base).push(label);
+  });
+
+  for (const [base, labels] of byBaseName) {
+    if (labels.length > 1) {
+      issues.push({
+        field: 'exptype',
+        message: `Assays ${labels.join(', ')} all produce the identical base name '${base}' -- give them different experiment types, or every file in one will overwrite the other.`,
+        severity: 'error',
+      });
+    }
+  }
+
+  return issues;
 }

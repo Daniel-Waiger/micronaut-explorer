@@ -6,7 +6,11 @@ import { createAdvicePanel } from '../advice.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
-function parseLevels(text) {
+// Exported so ui/steps/study.js's arm-vocabulary input parses its
+// comma-separated levels list with the identical rule this step's own arm
+// input uses -- one implementation, not a second copy that could quietly
+// diverge on trimming/empty-filtering behavior.
+export function parseLevels(text) {
   return String(text)
     .split(',')
     .map((s) => s.trim())
@@ -113,7 +117,7 @@ export const designStep = {
     // caused 'CT' and 'NAM50MM' to be entered as two SEPARATE factors and
     // crossed against each other in the first place. Every level here is one
     // ARM; a sample belongs to exactly one.
-    groupsInput.placeholder = 'e.g. CT, NAM25MM, NAM50MM -- a sample is exactly ONE of these';
+    groupsInput.placeholder = 'e.g. CTL, OPP -- a sample is exactly ONE of these';
     // Native browser tooltip, on top of the placeholder example above.
     groupsInput.title =
       'Your experimental groups, such as control vs. treated. Every sample belongs to exactly one -- list them separated by commas.';
@@ -194,7 +198,7 @@ export const designStep = {
     // and the arm plus each factor gets its own segment automatically --
     // replicates are NOT part of this label; they render through their own
     // {biorep}/{techrep} slots regardless of this override.
-    idSchemeInput.placeholder = 'Blank = one segment per arm/factor (e.g. CT-NAM50MM). Tokens: {group} {biorep} {techrep} + factor names';
+    idSchemeInput.placeholder = 'Blank = one segment per arm/factor (e.g. CTL-OPP). Tokens: {group} {biorep} {techrep} + factor names';
     idSchemeInput.title = 'Advanced, optional: customize how your group name gets built into the filename. Most people can leave this blank.';
     idSchemeRow.appendChild(idSchemeInput);
     main.appendChild(idSchemeRow);

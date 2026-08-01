@@ -1,4 +1,4 @@
-import { emptyExperiment } from './core/schema.js';
+import { createDefaultStudy } from './core/defaultStudy.js';
 import { createStore } from './core/store.js';
 import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
@@ -7,6 +7,7 @@ import { shapeAppKb } from './engine/kbpack.js';
 import { namingStep } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
 import { designStep } from './ui/steps/design.js';
+import { studyStep } from './ui/steps/study.js';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -29,16 +30,18 @@ function loadAppKb() {
 
 /**
  * The thin wrapper around core/persist.js's loadMostRecentRecoverable that
- * supplies main.js's own console.error logging and the emptyExperiment()
- * fallback -- persist.js deliberately doesn't know what an empty
- * experiment looks like, so `experiment: null` means "start fresh" here.
+ * supplies main.js's own console.error logging and the createDefaultStudy()
+ * fallback -- persist.js deliberately doesn't know what a fresh study looks
+ * like, so `experiment: null` means "start fresh" here. Only fires when
+ * NO usable autosave exists at all (true first run, or every ring slot was
+ * corrupted) -- an existing in-progress study is never touched.
  */
 function loadInitialExperiment() {
   const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
     onUnreadable: (id, err) =>
       console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
   });
-  return { experiment: experiment || emptyExperiment(), skippedCount, totalSaved };
+  return { experiment: experiment || createDefaultStudy(), skippedCount, totalSaved };
 }
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
@@ -50,7 +53,11 @@ function init() {
 
   const kb = loadAppKb();
   const describeStep = createDescribeStep(kb);
-  const steps = [describeStep, designStep, namingStep];
+  // Study first: it is the study-level surface sitting above every assay,
+  // and the discoverability point for "this app can model more than one
+  // assay" -- the router lands on steps[0] by default, so this is also the
+  // new landing step. See docs/plans/planner-web-assay-tier.md, commit 2.
+  const steps = [studyStep, describeStep, designStep, namingStep];
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
@@ -85,11 +92,28 @@ function init() {
 
   function renderActiveStep(id) {
     const step = steps.find((s) => s.id === id) || steps[0];
-    step.render(main, store, { showToast, advisor: kb.advisor });
+    step.render(main, store, { showToast, advisor: kb.advisor, router });
   }
 
   router.onChange(renderActiveStep);
   renderActiveStep(router.current());
+
+  // Every step's render() caches activeAssayId ONCE and documents that this
+  // is only safe because the active assay never changes for the lifetime of
+  // one render (see e.g. design.js's identical comment). The assay switcher
+  // (shell.js) now makes that untrue, so switching assays must force a full
+  // re-render of whichever step is on screen -- same as a route change,
+  // because every closure inside render() (currentDesign(), prefill, etc.)
+  // was built from the OLD assayId. Guarded on an actual change so ordinary
+  // per-keystroke field edits (which also flow through this same
+  // store.subscribe channel via the autosave one below) never trigger it.
+  let lastActiveAssayId = store.get().activeAssayId;
+  store.subscribe((state) => {
+    if (state.activeAssayId !== lastActiveAssayId) {
+      lastActiveAssayId = state.activeAssayId;
+      renderActiveStep(router.current());
+    }
+  });
 
   // Debounced: saving on every keystroke would fill the 5-slot ring buffer
   // with near-duplicate snapshots of the last few characters typed, rather

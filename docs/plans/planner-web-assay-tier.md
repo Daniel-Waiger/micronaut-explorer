@@ -155,16 +155,60 @@ session.
 
 ## Remaining sequencing
 
-**Commit 2 — N assays.** Switcher in `shell.js`, **not** inside `design.js` (a switcher
-inside a step would re-enter `render()` from a handler whose own `main.textContent=''` just
-destroyed it — in the shell, an assay switch is exactly a nav, a proven contract). Study
-step, `armVocabulary` seeding, the `exptype` uniqueness rule, `studyNameIssues`,
-`MAX_STUDY_ROWS`, a divergence badge ("3 of 4 assays use CT, OPP"). `SCHEMA_VERSION` does
-not move — commit 1's v3 shape is already correct for N assays.
+**Commit 2 — N assays. DONE, not yet committed to git.** Switcher in `shell.js` (not
+inside `design.js`, per the re-render-safety reasoning above), a new Study step (first
+in `main.js`'s `steps`, so it is also the new landing page), `armVocabulary` seeding via
+`core/assay.js`'s new `seedAssayFromVocabulary`, an `exptype`-collision backstop
+(`engine/plan.js`'s `studyNameIssues`, which organically subsumes "exptype required when
+assays.length > 1" — two assays that both leave it blank collide on 'UNKNOWN' exactly
+like two that typed the same value), `MAX_STUDY_ROWS = 50`, and a divergence badge ("N of
+M assays use LEVEL, LEVEL") on the Study step. `SCHEMA_VERSION` does not move — commit
+1's v3 shape was already correct for N assays.
+
+A gap found while planning, not visible in the shipped commit-1 code: `scopeWrite`'s
+`isAssayScopedPath` only recognized whole container roots (`specimen`/`design`/etc.), so
+`scopeWrite('label', assayId)` — needed for rename — fell through as study-level and
+would have auto-vivified a phantom `experiment.label`. Fixed by adding
+`ASSAY_SCALAR_FIELDS = {'label', 'readout', 'readoutText'}`, solving it for commit 3's
+readout fields too so that predicate doesn't need a third pass.
+
+Also added, pure and unit-tested in `core/assay.js`: `removeAssay(experiment, assayId)`
+(refuses on the last assay, reassigns `activeAssayId`, prunes the removed assay's
+provenance slots). Full lifecycle shipped: add/rename/switch/delete/apply-vocabulary-to-
+existing-assays (a `kb-default`-tagged write, so `setPath`'s provenance gate naturally
+skips any assay whose arms are already user-customized — "fill in the ones that
+haven't diverged," never a blind overwrite).
+
+355 JS tests (up from 334), 347 Python (unaffected, JS-only change). Verified live
+against the built artifact over http: fresh load lands on Study; add/rename/switch/
+delete all round-trip through a reload; a manually-customized assay is correctly
+skipped by "Apply to all assays" while others converge; two assays with identical
+naming fields are flagged by `studyNameIssues`; switching the active assay while on the
+Design step fully re-renders it (no stale cached `assayId`), zero console errors
+throughout.
 
 > ⚠ **Ship commits 1+2 as one release.** If commit 1 reaches a real user before commit 2 and
 > commit 2 changes what v3 *means*, an autosave written in between is a structurally-wrong
 > v3 that `migrate()` silently no-ops past.
+
+**Same session, immediately after: the oregano study (Romo-Rico et al. — the paper that
+motivated this whole tier) became the app's real default, not just a placeholder
+example.** New `core/defaultStudy.js`'s `createDefaultStudy()`, built on
+`seedAssayFromVocabulary` + `core/paths.js`'s `setPath`, every populated field tagged
+`kb-default` at the same slot keys a live `scopeWrite` write would produce. Wired into
+`main.js`'s bootstrap fallback ONLY when no autosave exists at all — an in-progress
+session is never touched. Deliberately NOT seeded into `emptyExperiment()`/`emptyAssay()`
+themselves, which stay the neutral blank primitive the test suite (in particular
+`plan.test.js`'s `experimentWith()` fixture) relies on. The old "CT, NAM25MM, NAM50MM"
+placeholder text — confirmed via a full sweep to have never been a real default, only
+ever an unrelated illustrative example — is now `CTL, OPP` everywhere in production UI;
+`engine/conditions.js`'s historical-bug-narrative comments and existing test fixtures
+using the old NAM values were deliberately left alone, since they document a real past
+regression by its actual literal values. 367 JS tests (up from 355). Also fixed in
+passing: the Study step's per-assay "Go to Design"/"Delete" buttons weren't grouped or
+pinned, so their horizontal position depended on how long that row's base name happened
+to be — fixed by grouping them with `margin-left: auto` rather than relying on
+`justify-content: space-between`.
 
 **Commit 3 — readout vocabulary + controls tier.** `readouts.json`, `controls.json`, a
 generic evaluator reusing `predicate.js`, the three-state panel. Unblocks

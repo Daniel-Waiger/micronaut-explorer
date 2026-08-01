@@ -4,9 +4,18 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { effectiveNamingFields, planFilenames } from '../src/engine/plan.js';
+import {
+  MAX_STUDY_ROWS,
+  effectiveNamingFields,
+  planFilenames,
+  studyNameIssues,
+} from '../src/engine/plan.js';
 import { emptyExperiment } from '../src/core/schema.js';
-import { assayView } from '../src/core/assay.js';
+import { assayView, emptyAssay } from '../src/core/assay.js';
+
+// Mirrors ui/steps/naming.js's BASE_TEMPLATE, same reason planConfig() below
+// mirrors NAMING_CONFIG as a local literal rather than an import.
+const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
 
 // Mirrors ui/steps/naming.js's NAMING_CONFIG. Kept as a local literal rather
 // than imported: naming.js is a UI module that touches `document`, and the
@@ -193,4 +202,90 @@ test('planFilenames does not mutate the experiment it plans from', () => {
   const before = JSON.stringify(exp);
   planFilenames(exp, planConfig());
   assert.equal(JSON.stringify(exp), before);
+});
+
+// --- studyNameIssues: cross-assay collision detection ---------------------
+
+/** A study with N assays, each given the naming.fields needed to compute a
+ * base name. Distinct ids so scopeWrite-style provenance keys never clash;
+ * distinct labels so a collision message names each offender. */
+function studyWithAssays(fieldsPerAssay) {
+  const study = emptyExperiment();
+  study.assays = fieldsPerAssay.map((fields, i) => {
+    const assay = emptyAssay(`a${i}`);
+    assay.label = `Assay ${i + 1}`;
+    assay.naming.fields = fields;
+    return assay;
+  });
+  study.activeAssayId = study.assays[0].id;
+  return study;
+}
+
+const IDENTICAL_FIELDS = {
+  date: '2026-01-01',
+  modality: 'confocal',
+  exptype: 'CT',
+  markers: 'DAPI',
+  magnification: 'X40',
+};
+
+test('a single-assay study never collides (nothing to collide WITH)', () => {
+  const study = studyWithAssays([IDENTICAL_FIELDS]);
+  assert.deepEqual(studyNameIssues(study, planConfig(), BASE_TEMPLATE), []);
+});
+
+test('two assays with distinct exptype do not collide', () => {
+  const study = studyWithAssays([
+    IDENTICAL_FIELDS,
+    { ...IDENTICAL_FIELDS, exptype: 'NAM50MM' },
+  ]);
+  assert.deepEqual(studyNameIssues(study, planConfig(), BASE_TEMPLATE), []);
+});
+
+test('two assays sharing an identical base name collide, naming both by label', () => {
+  const study = studyWithAssays([IDENTICAL_FIELDS, { ...IDENTICAL_FIELDS }]);
+  const issues = studyNameIssues(study, planConfig(), BASE_TEMPLATE);
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].field, 'exptype');
+  assert.match(issues[0].message, /Assay 1/);
+  assert.match(issues[0].message, /Assay 2/);
+});
+
+test('two assays that BOTH leave exptype unset collide too -- required is subsumed by collision, not a separate rule', () => {
+  // OMITTED, not set to '': an omitted field falls through to
+  // config.defaults.exptype ('UNKNOWN'); an explicitly blank one renders as
+  // sanitizeToken's own 'UNSPECIFIED' fallback instead -- either way, two
+  // assays that both leave it unset produce the SAME base name and collide,
+  // which is the actual point of this test.
+  const { exptype, ...unset } = IDENTICAL_FIELDS;
+  const study = studyWithAssays([unset, { ...unset }]);
+  const issues = studyNameIssues(study, planConfig(), BASE_TEMPLATE);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /UNKNOWN/);
+});
+
+test('three assays colliding produce exactly ONE deduped issue, not one per pair', () => {
+  const study = studyWithAssays([IDENTICAL_FIELDS, { ...IDENTICAL_FIELDS }, { ...IDENTICAL_FIELDS }]);
+  const issues = studyNameIssues(study, planConfig(), BASE_TEMPLATE);
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /Assay 1/);
+  assert.match(issues[0].message, /Assay 2/);
+  assert.match(issues[0].message, /Assay 3/);
+});
+
+test('MAX_STUDY_ROWS cap fires as its own issue', () => {
+  const fields = Array.from({ length: MAX_STUDY_ROWS + 1 }, (_, i) => ({
+    ...IDENTICAL_FIELDS,
+    exptype: `T${i}`,
+  }));
+  const study = studyWithAssays(fields);
+  const issues = studyNameIssues(study, planConfig(), BASE_TEMPLATE);
+  assert.ok(issues.some((issue) => issue.field === 'assays' && /exceeding the cap/.test(issue.message)));
+});
+
+test('studyNameIssues does not mutate the experiment it inspects', () => {
+  const study = studyWithAssays([IDENTICAL_FIELDS, { ...IDENTICAL_FIELDS }]);
+  const before = JSON.stringify(study);
+  studyNameIssues(study, planConfig(), BASE_TEMPLATE);
+  assert.equal(JSON.stringify(study), before);
 });
