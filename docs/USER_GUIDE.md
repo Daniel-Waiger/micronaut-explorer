@@ -2,6 +2,10 @@
 
 *(The µ is the micron symbol; the project name is pronounced "Micronaut.")*
 
+> **This guide covers Micronaut Classic** (the Python file-renamer / Streamlit app),
+> which is **parked — not going forward in the near term** (see [ROADMAP.md](../ROADMAP.md)).
+> It remains accurate for Classic as it stands. The active web Planner is not covered here.
+
 ## Table of contents
 
 1. [Overview](#1-overview)

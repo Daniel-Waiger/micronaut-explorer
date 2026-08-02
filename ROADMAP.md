@@ -1,167 +1,90 @@
 # Roadmap
 
-Last updated: 2026-07-23
+Last updated: 2026-08-02
 
-The live, task-level execution plan is in [TASKS.md](TASKS.md). This file is the
-high-level phase summary; TASKS.md breaks each phase into session-sized units with
-acceptance criteria and dependencies.
+Near-term worklist: [TASKS.md](TASKS.md). This file is the high-level direction.
 
-## Status of the original roadmap
+## Current status
 
-The earlier roadmap's Phase 2 (apply manifest/log, rollback, conflict strategies) is
-**already implemented** in code (`manifest.py`, `service.recalculate_batch`,
-`--conflict-strategy`, and the UI Rollback Manager). Phase 1's test items are partly
-done: pure-logic tests exist and pass, but the reader-dependent tests hang, so the
-reliability baseline is not actually met. The revised plan below reflects that.
-
-## Phase 0 — Stop the hang and unbreak CI (highest priority)
-`extract_metadata` can block indefinitely on files bioio/Bio-Formats cannot parse,
-freezing the CLI, the Streamlit UI, and CI. Bound extraction with a process timeout
-and a heuristic fallback; make the default CI run fast and green; add UI feedback.
-
-## Phase 1 — Correctness & honesty
-Remove config fields that are advertised but unused; assemble/validate/name from a
-single field dict; make batch recursion explicit; add `--json` CLI output; stop
-rewriting config on every UI rerun; preserve `.ome.tif`; fix notes casing.
-
-## Phase 2 — Extraction quality (the core value)
-Structured OME-XML / per-format extraction with real sample fixtures; an externalized
-marker/fluorophore dictionary with word-boundary matching; per-field provenance so
-low-confidence guesses are surfaced for review instead of silently landing in names.
-
-## Phase 3 — Release & UX
-Robust data-editor round-trip; exportable preview report (CSV/JSON); first-run
-config/profile wizard; opt-in/flagged lab defaults; LICENSE, CHANGELOG, lint/format/
-type gates, and versioning discipline.
-
-## Future directions (not scheduled)
-
-Larger bets captured for later — not committed work.
-
-### Friendlier naming (near-term candidate)
-Format masks instead of regex (`E##`, `X#+`), an example under every field, and a
-"plan the name before you acquire" mode that previews the exact filename and exports
-a naming guide or a reusable profile.
-
-### Multi-image containers: LIF / ND2 / CZI (near-term correctness item)
-LIF (series), ND2 (multipoint), and CZI (scenes) pack multiple images with differing
-per-image metadata into one file. The extractor currently reads only the default scene
-once, so a multi-series file is silently named off whichever scene bioio returns first —
-confidently-wrong, not just incomplete. Fix, tied to P2-2 structured extraction (both
-touch how `_extract_bioio_fields` reads these formats):
-- Detect scene/series count (bioio exposes per-scene access); only special-case when > 1.
-- Rename the CONTAINER file (do not split — this is a namer, not a converter). Put only
-  fields shared across all internal images in the name; omit per-image-varying fields
-  (per-series markers, stage positions) rather than guessing.
-- Emit a sidecar (CSV/JSON) mapping each internal image (series index + internal name) to
-  its canonical name, so per-image detail is preserved with zero bytes rewritten.
-- Semantics differ: LIF series are often different setups (may want per-series identity);
-  CZI scenes / ND2 points are usually one experiment at different positions (share identity,
-  differ by a position index). Treat the varying axis as a suffix/sidecar, never a guess.
-- Optional, clearly-destructive future converter: opt-in "export each series to its own
-  canonically-named file" — separate from the default rename.
-
-### Safe renaming (hardening cluster)
-A rename is a destructive graph operation; the tool must not break links or destroy identity:
-- Rename companion/sidecar files together (and never break a multi-file OME-TIFF set, whose
-  planes reference each other by filename); warn when companions are detected.
-- Always preserve the original filename (sidecar and/or embedded) so identity is recoverable
-  even if the rollback manifest is lost or the files are moved.
-- Mark LLM-suggested fields as provisional through to the final name (not just in-app), so a
-  guess never reads as ground truth once applied.
-- Warn before renaming files that are cloud-synced (e.g. Google Drive), locked/open, or
-  externally referenced; make batch apply transactional (all-or-nothing) or clearly resumable,
-  since a half-completed batch looks done.
-- Treat raw acquisition data as potentially immutable (data-integrity / ALCOA posture): offer a
-  "plan/sidecar only, don't mutate raw" mode; distinguish raw from working copies.
-- Filesystem edges: Windows MAX_PATH, case-insensitive collisions, reserved names.
-- Validation is a format check, not a truth check — never present "valid" as "correct"; make it
-  explicit that an empty allow-list validates nothing for that field.
-- Collisions hide real distinctions: prefer a unique/time component over a bare `_NN` suffix so
-  two different acquisitions never become indistinguishable.
-- Date provenance: `date` may come from file mtime (often the copy date, not acquisition) —
-  surface which, don't silently trust mtime.
-
-### LLM as enhancer, not originator (guardrails)
-Naming is deterministic-first: parse metadata + keywords to build a solid base name; the LLM only
-refines/formats it, grounded in the extracted metadata and the user's own input, and must never
-invent biological identity (markers, experiment type, sample) from weak cues. First-line coded
-guardrails live in `llm.py`'s prompt (do not fabricate; omit over guess; don't overwrite known
-values; treat a user-provided description as authoritative context). Deeper enforcement — validate
-LLM output against the available evidence, and keep suggestions reproducible (pin model/seed) — is
-a follow-on.
-
-### Free-text experiment description → structured metadata (near-term candidate)
-For image data with no embedded metadata, add an "experiment description" field where
-the user describes what they did in plain language. The chosen LLM formulates that free
-text into structured naming fields and injects them into a new editable metadata table
-for the user to review, correct, and extend — turning "I know what I did" into a
-conforming filename with no file metadata required.
-
-### Open-weights model support (near-term candidate)
-Add support for local and open-weights models such as Qwen 3.5 and Gemma 30, allowing users to run the metadata enhancer and experiment describer without relying on closed-source APIs or sending data externally.
-
-### Web app re-platform — APPROVED and IN PROGRESS (2026-07-29)
-Superseded the file-picker/local-bioio idea below: a bigger pivot is underway,
-codenamed **planner-web**. Rather than extracting naming fields out of microscopy
-files after acquisition, the web app is a static, zero-install **experiment
-planner** that walks design intent → panel/controls/acquisition → naming as a
-downstream artifact of a finished design, deleting metadata extraction from the
-web product entirely (that pipeline stays fragile and was the only reason the app
-needed bioio/JVM/dask/Streamlit at all). Vanilla ES modules, flattened at build to
-one self-contained HTML file (`tools/build_single_file.py`) that runs from `file://`
-or GitHub Pages with identical bytes; zero npm dependencies (`node --test`);
-renaming itself stays out of the web app (Micronaut Classic, `src/`, keeps that job
-and is frozen going forward except bug fixes). See
-[docs/plans/planner-web.md](docs/plans/planner-web.md) for the full plan and
+The active project is the **web Planner** (`web/`) — a static, zero-install
+microscopy experiment planner. See [docs/plans/planner-web.md](docs/plans/planner-web.md)
+for the full plan and
 [docs/plans/planner-web-task-graph.json](docs/plans/planner-web-task-graph.json)
-for the authoritative per-task spec. P0 (schema, naming/validation ports, the
-inliner, store+provenance, app shell, persistence, and a working name-builder
-vertical slice) is done as of this writing. Next: P1 (interview engine +
-deterministic free-text parsing).
+for the authoritative per-task spec.
 
-<details>
-<summary>Original idea (superseded, kept for history)</summary>
+**Micronaut Classic** — the Python metadata-extraction + file-renaming tool
+(`src/`, `app_streamlit.py`) — is **parked: not going forward in the near term.**
+It is complete and usable, but the extraction/renaming approach is not being
+carried forward; the "Parked" section at the end records what shipped and the
+ideas that were on its backlog, all now deferred.
 
-Deliver naming as a static website: naming rules/masks, the planner, and OME-TIFF
-metadata read client-side in the browser (no upload, no install); vendor formats
-(CZI/LIF/ND2) read locally via bioio through a run-without-install command
-(`uvx mna …`), with the UI explaining why a local step is needed. Open decisions:
-web language (TypeScript-native vs Pyodide), and whether to allow any upload fallback.
-</details>
+## Planner — active direction
 
-### Microscopy experimental-design assistant (vision) — slice 1 shipped 2026-07-31
-Grow beyond naming into a broader experimental-design suite that advises on the
-"why", not just the "what":
-- **Modality-specific guidance (e.g. STED, confocal, widefield): probe/dye selection,
-  acquisition settings, and common pitfalls — DONE.** Rules live as data in
-  `web/kb/advisor.json`, evaluated by the predicate engine that already backed question
-  `askWhen` clauses; a small advice panel (`web/src/ui/advice.js`) surfaces them on the
-  Describe/Design/Naming steps. 16 rules across STED/confocal/widefield/light-sheet/
-  SEM-TEM/Raman.
-- Recommend the required experimental groups and controls for a given design, with
-  the rationale for each — not started (`web/kb/controls.json` + proposed condition
-  rows inside Design, per `docs/plans/planner-web-mvp-usecases.md` §6 step 4). Now
-  gated on the assay tier below (commit 3), since controls attach per-assay.
-- Help plan a fluorophore/color panel to minimize spectral spillover — not started;
-  its own page (the one part of this vision that earns one — see the plan doc), rules
-  qualitative-first, no spectral overlap integrals yet.
+### Delivered
+- **P0:** experiment schema, the naming/validation ports, the single-file inliner,
+  store + tiered provenance, app shell, persistence, and a working name-builder
+  vertical slice that runs from `file://`.
+- **P1:** KB loader, predicate DSL, interview engine, deterministic free-text
+  ingest, condition matrix → sample IDs.
+- **Modality advice:** 16 rules across STED / confocal / widefield / light-sheet /
+  SEM-TEM / Raman (`web/kb/advisor.json`), surfaced on the Describe / Design /
+  Naming steps.
+- **The assay tier (schema v3):** a study can hold several assays that share only a
+  research question and a test article, each with its own modality / panel /
+  specimen. Commits 1–3 shipped (N-assay UI, readout + controls vocabulary); the
+  real Romo-Rico et al. oregano study is the app's default. See
+  [docs/plans/planner-web-assay-tier.md](docs/plans/planner-web-assay-tier.md).
+- **Study overview step:** a shareable study diagram + a deterministic walkthrough,
+  plus a staged progression ladder (idea → advanced modality).
 
-**The assay tier (schema v3) — commit 1 of 4 shipped 2026-07-31.** A real published study
-(uploaded by Daniel) turned out to contain FOUR assays sharing only a research question and
-a test article, each with its own modality/panel/specimen -- something the schema could not
-represent at all (one design, one panel, one acquisition, full stop). Commit 1 adds the
-schema plus the read/write machinery (`web/src/core/assay.js`) with zero visible change and
-zero changes to the engine layer; commits 2-4 (the assay switcher, the readout/controls
-vocabulary, and an exportable design document) are designed but not started. Full reasoning,
-verified facts, and remaining sequencing: `docs/plans/planner-web-assay-tier.md`.
+Scope decisions and the use-case map behind the above:
+[docs/plans/planner-web-mvp-usecases.md](docs/plans/planner-web-mvp-usecases.md).
 
-**⚠ Parked: review the wording in `web/kb/advisor.json`.** Every rule's `concept`
-(the phenomenon, e.g. "spectral spillover") and `body` (the mechanism explanation) is
-Claude-drafted per the standing "Claude drafts, Daniel corrects" instruction for this
-content — not yet reviewed for terminology a FACSI user would actually recognize.
-Specific spots already flagged: "spillover" vs. "crosstalk" vs. "bleed-through" (the
-confocal rule's own body uses "bleed-through" while its concept says "spectral
-spillover" — worth reconciling either way), and whether "shadow striping" /
-"spherical aberration" are the right register. See `product-vision` memory for the
-full rule-by-concept list.
+### Next
+- **Assay tier commit 4 — the exportable design document.** The last commit of the
+  assay-tier arc: a pure renderer over the settled v3 model, no schema change.
+- **Fluorophore / color panel** to minimize spectral spillover — its own page,
+  rules qualitative-first (no spectral-overlap integrals yet). Not started.
+- **Exports** (bench card / CSV / Markdown / JSON), the **LLM seam** (manual-paste
+  provider first, then opt-in Ollama + diagnostics), a **conformance check**, and a
+  **GitHub Pages deploy** workflow (none exists yet — only `ci.yml`).
+
+### Content — owned by Daniel, not code
+Authored in the knowledge pack (`web/kb/`): fluorophore identities and spectra,
+FACSI instruments / objectives / lines / detectors, the question bank, control
+rules, golden-experiment regression fixtures, and modality profiles.
+
+**⚠ Parked review — `web/kb/advisor.json` wording.** Every rule's `concept` (the
+phenomenon, e.g. "spectral spillover") and `body` (the mechanism) is Claude-drafted
+per the standing "Claude drafts, Daniel corrects" instruction and not yet reviewed
+for terminology a FACSI user would recognize — e.g. "spillover" vs "crosstalk" vs
+"bleed-through" (the confocal rule's body says "bleed-through" while its concept
+says "spectral spillover"), and whether "shadow striping" / "spherical aberration"
+are the right register. The rules themselves in `web/kb/advisor.json` are the full list.
+
+## Parked: Micronaut Classic (not going forward in the near term)
+
+Classic reached a complete, usable state: bounded metadata extraction with a
+heuristic fallback, structured OME / per-format extraction, an externalized
+marker/fluorophore dictionary, per-field provenance, profile validation, batch
+apply with rollback, `--json` output, a free-text describer, and a Streamlit UI.
+Full detail is in [CHANGELOG.md](CHANGELOG.md).
+
+These were on Classic's backlog and are **now deferred** — kept for the record,
+not scheduled:
+
+- Multi-image container handling (LIF series / CZI scenes / ND2 points), which the
+  extractor currently reads only the first scene of.
+- The safe-renaming hardening cluster: rename companion/sidecar files together,
+  always preserve the original name, transactional (all-or-nothing) batch apply,
+  warn on cloud-synced/locked files, and filesystem edge cases (Windows MAX_PATH,
+  case-insensitive collisions, reserved names).
+- Deeper LLM guardrails: validate model output against the available evidence and
+  keep suggestions reproducible (pin model/seed).
+- Open-weights model support (e.g. Qwen 3.5, Gemma) for the enhancer/describer.
+- Format-mask-based "friendlier naming" (masks instead of regex, an example under
+  every field).
+
+The planning-side ideas here (notably "plan the name before you acquire") are
+subsumed by the web Planner, which is why the pivot made them redundant rather
+than merely postponed.

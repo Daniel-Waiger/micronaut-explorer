@@ -7,9 +7,9 @@ Last updated: 2026-08-02
 > `ROADMAP.md` holds the long-range "why"; this file is just the near-term worklist.
 >
 > The old contents of this file (the Classic "Review Remediation" execution plan) are
-> **done** — that work shipped and is frozen. Micronaut Classic (`src/`, `app_streamlit.py`)
-> is maintenance-only; new work is on the web Planner. The old plan is archived at
-> `_archive/docs/TASKS-classic-review-remediation.md` if needed.
+> **done** — that work shipped. Micronaut Classic (`src/`, `app_streamlit.py`) is now
+> **parked: not going forward in the near term**; all work is on the web Planner. The old
+> plan is archived at `_archive/docs/TASKS-classic-review-remediation.md` if needed.
 
 ## Near-term
 
@@ -31,4 +31,3 @@ Lives in the knowledge pack (`web/kb/`); see the K-1…K-7 list and the parked r
 - Exports: bench card / CSV / Markdown / JSON.
 - LLM seam: manual-paste provider, then opt-in Ollama + diagnostics.
 - GitHub Pages deploy workflow (none exists yet — only `ci.yml`).
-- Formally freeze/label Micronaut Classic as read-only.

@@ -1,25 +1,28 @@
 # μicronaut
 
-μicronaut — microscopy experiment planning and metadata-aware file naming.
+μicronaut — a static, zero-install **microscopy experiment planner**.
 (The µ is the micron symbol; the project name is pronounced "Micronaut.")
 
-This repository holds **two related tools** that share a common data model
-(profiles, the marker/fluorophore dictionary, and the naming convention):
+The active project is the web **Planner**. The repository also contains
+**Micronaut Classic**, an earlier metadata-aware file **renamer** — now
+**parked** (see status below). They share a common data model (profiles, the
+marker/fluorophore dictionary, and the naming convention).
 
 | Tool | What it is | Status |
 |------|------------|--------|
-| **Micronaut Planner** (`web/`) | A static, zero-install browser app that walks a researcher from design intent → assays, panel, controls, acquisition → a naming convention as a downstream artifact. No upload, no install, no server. | Active development |
-| **Micronaut Classic** (`src/`, `app_streamlit.py`) | A metadata-aware file **renamer**: reads microscopy files, builds standardized names, and applies batch renames with rollback. Python CLI (`mna`) + Streamlit UI. | Stable; frozen except bug fixes |
+| **Micronaut Planner** (`web/`) | A static, zero-install browser app that walks a researcher from design intent → assays, panel, controls, acquisition → a naming convention as a downstream artifact. No upload, no install, no server. | **Active** |
+| **Micronaut Classic** (`src/`, `app_streamlit.py`) | A metadata-aware file **renamer**: reads microscopy files, builds standardized names, and applies batch renames with rollback. Python CLI (`mna`) + Streamlit UI. | **Parked** — not under active development in the near term |
 
-**Why two tools?** Classic reverse-engineers naming fields *out of* files after
+**Why the pivot?** Classic reverse-engineers naming fields *out of* files after
 acquisition — which is fragile, because the information often isn't in the file
 in a consistent, vendor-neutral form, and because reading vendor formats drags in
 a heavy stack (bioio, a JVM via Bio-Formats, dask, Streamlit). The Planner takes
 the opposite approach: you already know the design at planning time, so it captures
 intent up front and emits the filename convention from a finished design — no
-extraction, no install. Renaming stays Classic's job; the Planner never touches a
-file. See [docs/plans/planner-web.md](docs/plans/planner-web.md) for the full
-rationale.
+extraction, no install. That approach won out, and metadata extraction / renaming
+(the whole Classic side) is **not being carried forward in the near term**. Classic
+stays in the tree, documented and runnable, but new work is on the Planner. See
+[docs/plans/planner-web.md](docs/plans/planner-web.md) for the full rationale.
 
 ---
 
@@ -94,6 +97,11 @@ bare `node --test web/tests/` fails with `MODULE_NOT_FOUND` on Node 22.
 ---
 
 # Micronaut Classic (`src/`, `app_streamlit.py`)
+
+> **Parked — not under active development in the near term.** Classic works and is
+> fully documented here, but the metadata-extraction / renaming approach is not being
+> carried forward right now; active work is on the Planner above. The sections below
+> describe the tool as it stands.
 
 A metadata-aware file renamer with optional local LLM suggestions.
 
