@@ -1,9 +1,9 @@
 ---
 name: cma-run
-description: microscopy-naming-assistant's CMA multi-agent scheme — extends the user-level cma-run skill with this repo's dashboard, lessons file, and task-graph conventions.
+description: micronaut-explorer's CMA multi-agent scheme — extends the user-level cma-run skill with this repo's dashboard, lessons file, and task-graph conventions.
 ---
 
-# /cma-run — microscopy-naming-assistant
+# /cma-run — micronaut-explorer
 
 **First: read `C:\Users\dwaig\.claude\skills\cma-run\SKILL.md` and follow its
 procedure.** That file owns the role/model assignment (Opus or Fable

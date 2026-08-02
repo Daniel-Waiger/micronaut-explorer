@@ -1,9 +1,9 @@
 ---
 name: handover
-description: End-of-session carry-forward for microscopy-naming-assistant. Extends the user-level handover with this project's CMA pipeline state, plan docs, and standing safety invariants.
+description: End-of-session carry-forward for micronaut-explorer. Extends the user-level handover with this project's CMA pipeline state, plan docs, and standing safety invariants.
 ---
 
-# /handover — microscopy-naming-assistant
+# /handover — micronaut-explorer
 
 **First: read `C:\Users\Owner\.claude\skills\handover\SKILL.md` and follow its procedure.**
 That file owns the survey → filter → persist → ask-before-commit → print flow. This file

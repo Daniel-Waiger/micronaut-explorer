@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "microscopy-naming-assistant"
+name = "micronaut-explorer"
 version = "0.1.0"
 description = "Micronaut - metadata-aware microscopy file naming assistant with optional local LLM suggestions"
 readme = "README.md"

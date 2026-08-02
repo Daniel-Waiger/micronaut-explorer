@@ -7,6 +7,8 @@ __pycache__/
 .DS_Store
 *.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Build artifacts
 build/
@@ -14,6 +16,9 @@ dist/
 *.spec
 *.zip
 *.exe
+
+# Local dumping ground for archived build output / logs, never tracked
+_archive/
 
 # CMA dashboard live run state (per-machine; status.seed.json is the tracked snapshot)
 tools/cma-dashboard/status.json
