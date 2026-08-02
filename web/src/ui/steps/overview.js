@@ -5,11 +5,14 @@
 // it shows is a READ over the other steps' data, never a place new facts
 // are entered.
 //
-// The in-app tree below is plain HTML/CSS -- no diagramming library, since
-// the app is one self-contained file with zero npm deps and a strict
-// no-external-asset rule, so mermaid cannot render inside it. The polished,
-// shareable diagram is the Markdown export's embedded ```mermaid block,
-// which GitHub/Notion/the Artifact viewer render natively.
+// The study map at the top is a self-drawn inline SVG (buildDiagramSvg
+// below, over engine/render/svgDiagram.js's pure layout) -- no diagramming
+// library, since the app is one self-contained file with zero npm deps and
+// a strict no-external-asset rule (bundling mermaid would also blow the
+// build's 2 MB size gate). The Markdown export additionally embeds a
+// ```mermaid block, the exact-branching form GitHub/Notion/the Artifact
+// viewer render natively; the in-app SVG is the at-a-glance visual. Both are
+// renderers over the one studydoc model, so they cannot disagree.
 //
 // No advice panel here, matching study.js's own reasoning: every advisor
 // rule keys on a per-assay fact already shown on Describe/Design/Naming;
@@ -17,8 +20,92 @@
 
 import { buildStudyDocument } from '../../engine/studydoc.js';
 import { renderMarkdown } from '../../engine/render/markdown.js';
+import { buildDiagramLayout } from '../../engine/render/svgDiagram.js';
 import { downloadTextFile } from '../../core/persist.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * Paint the diagram layout (engine/render/svgDiagram.js) into a real SVG
+ * element via createElementNS + textContent -- never innerHTML with the
+ * user's own study title / labels (shell.js's standing rule). The returned
+ * <svg> is self-contained (its own xmlns + viewBox), so serializing it for
+ * the download button below yields a valid standalone .svg file.
+ */
+function buildDiagramSvg(layout) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('xmlns', SVG_NS);
+  svg.setAttribute('viewBox', `0 0 ${layout.width} ${layout.height}`);
+  svg.setAttribute('width', String(layout.width));
+  svg.setAttribute('height', String(layout.height));
+  svg.setAttribute('class', 'study-map-svg');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', 'Study map: the study branching to each assay and its readout, modality, design, controls, and planned filenames.');
+
+  // One arrowhead marker, referenced by every edge.
+  const defs = document.createElementNS(SVG_NS, 'defs');
+  const marker = document.createElementNS(SVG_NS, 'marker');
+  marker.setAttribute('id', 'study-map-arrow');
+  marker.setAttribute('viewBox', '0 0 10 10');
+  marker.setAttribute('refX', '9');
+  marker.setAttribute('refY', '5');
+  marker.setAttribute('markerWidth', '6');
+  marker.setAttribute('markerHeight', '6');
+  marker.setAttribute('orient', 'auto-start-reverse');
+  const arrowPath = document.createElementNS(SVG_NS, 'path');
+  arrowPath.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+  arrowPath.setAttribute('class', 'study-map-arrowhead');
+  marker.appendChild(arrowPath);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  // Edges first, so nodes paint on top of the lines.
+  for (const edge of layout.edges) {
+    const line = document.createElementNS(SVG_NS, 'line');
+    line.setAttribute('x1', String(edge.x1));
+    line.setAttribute('y1', String(edge.y1));
+    line.setAttribute('x2', String(edge.x2));
+    line.setAttribute('y2', String(edge.y2));
+    line.setAttribute('class', 'study-map-edge');
+    line.setAttribute('marker-end', 'url(#study-map-arrow)');
+    svg.appendChild(line);
+  }
+
+  for (const node of layout.nodes) {
+    const g = document.createElementNS(SVG_NS, 'g');
+    g.setAttribute('class', `study-map-node study-map-node-${node.type}`);
+
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('x', String(node.x));
+    rect.setAttribute('y', String(node.y));
+    rect.setAttribute('width', String(node.w));
+    rect.setAttribute('height', String(node.h));
+    rect.setAttribute('rx', '8');
+    rect.setAttribute('class', 'study-map-box');
+    g.appendChild(rect);
+
+    const caption = document.createElementNS(SVG_NS, 'text');
+    caption.setAttribute('x', String(node.x + node.w / 2));
+    caption.setAttribute('y', String(node.y + 18));
+    caption.setAttribute('text-anchor', 'middle');
+    caption.setAttribute('class', 'study-map-caption');
+    caption.textContent = node.caption;
+    g.appendChild(caption);
+
+    const value = document.createElementNS(SVG_NS, 'text');
+    value.setAttribute('x', String(node.x + node.w / 2));
+    value.setAttribute('y', String(node.y + 36));
+    value.setAttribute('text-anchor', 'middle');
+    value.setAttribute('class', 'study-map-value');
+    value.textContent = node.value;
+    g.appendChild(value);
+
+    svg.appendChild(g);
+  }
+
+  return svg;
+}
 
 function readoutLine(readout) {
   if (readout.state === 'known') return `Readout: ${readout.label}`;
@@ -261,6 +348,20 @@ export function createOverviewStep(kb) {
       });
       actions.appendChild(downloadBtn);
 
+      const downloadSvgBtn = document.createElement('button');
+      downloadSvgBtn.type = 'button';
+      downloadSvgBtn.className = 'copy-button';
+      downloadSvgBtn.textContent = 'Download study map (.svg)';
+      downloadSvgBtn.addEventListener('click', () => {
+        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+        const svg = buildDiagramSvg(buildDiagramLayout(freshDoc));
+        const serialized = new XMLSerializer().serializeToString(svg);
+        const filename = `${(freshDoc.study.title || 'study-map').replace(/[^A-Za-z0-9_-]+/g, '-')}.svg`;
+        downloadTextFile(`<?xml version="1.0" encoding="UTF-8"?>\n${serialized}`, filename, 'image/svg+xml');
+        if (showToast) showToast('Downloaded the study map as SVG.');
+      });
+      actions.appendChild(downloadSvgBtn);
+
       const printBtn = document.createElement('button');
       printBtn.type = 'button';
       printBtn.className = 'copy-button';
@@ -271,6 +372,21 @@ export function createOverviewStep(kb) {
       main.appendChild(actions);
 
       const doc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+
+      // The study map: the headline visual of this step, placed first. A
+      // horizontal scroll container keeps a wide (many-assay) map from forcing
+      // the whole page to scroll sideways.
+      const mapSection = document.createElement('section');
+      mapSection.className = 'study-map';
+      const mapHeading = document.createElement('h2');
+      mapHeading.className = 'overview-node-title';
+      mapHeading.textContent = 'Study map';
+      mapSection.appendChild(mapHeading);
+      const mapScroll = document.createElement('div');
+      mapScroll.className = 'study-map-scroll';
+      mapScroll.appendChild(buildDiagramSvg(buildDiagramLayout(doc)));
+      mapSection.appendChild(mapScroll);
+      main.appendChild(mapSection);
 
       if (doc.study.researchQuestion) {
         appendLabeledNode(main, 'overview-node overview-research-question', doc.study.researchQuestion);

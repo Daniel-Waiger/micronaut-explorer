@@ -6,6 +6,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDefaultStudy } from '../src/core/defaultStudy.js';
 import { studyNameIssues } from '../src/engine/plan.js';
+import { readoutState } from '../src/engine/controls.js';
+
+// Mirrors web/kb/readouts.json's table shape ({ canonical: { label, aliases } }),
+// enough for readoutState to resolve the seeded readoutText values to 'known'.
+const READOUTS_TABLE = {
+  'bacterial-viability': { label: 'Bacterial viability', aliases: [] },
+  'macrophage-cytoskeleton': { label: 'Macrophage cytoskeleton', aliases: [] },
+  ros: { label: 'Intracellular ROS', aliases: [] },
+  'scratch-migration': { label: 'Scratch / migration', aliases: [] },
+};
 
 const NAMING_CONFIG = {
   template:
@@ -117,4 +127,23 @@ test('two calls to createDefaultStudy produce independent assay ids and object i
   assert.notEqual(a.assays[0].id, b.assays[0].id);
   assert.notEqual(a, b);
   assert.notEqual(a.assays, b.assays);
+});
+
+test('every assay is seeded with a recognized readout, so the example study is not "not answered yet"', () => {
+  const study = createDefaultStudy();
+  const expected = {
+    'Bacterial viability': 'bacterial-viability',
+    'Macrophage cytoskeleton': 'macrophage-cytoskeleton',
+    'Intracellular ROS': 'ros',
+    'Scratch / migration': 'scratch-migration',
+  };
+  for (const assay of study.assays) {
+    assert.equal(assay.readout, expected[assay.label], `${assay.label} canonical readout`);
+    assert.equal(
+      readoutState(assay.readoutText, READOUTS_TABLE),
+      'known',
+      `${assay.label} readoutText resolves to a known readout`
+    );
+    assert.equal(study.provenance.slots[`assay:${assay.id}.readout`].tag, 'kb-default');
+  }
 });
