@@ -1,0 +1,88 @@
+# Auto-deploy the Planner to its public Pages repo.
+#
+# On every push to main that touches the web app (or this workflow), this
+# builds the single-file artifact and pushes it to the SEPARATE public repo
+# Daniel-Waiger/micronaut-planner, whose GitHub Pages then rebuilds. The
+# source repo (this one) stays private; only the compiled index.html is
+# published. See the `planner-alpha-deploy` memory / README for the rationale.
+#
+# ONE-TIME SETUP (required before this can push):
+#   1. Create a token that can write to the deploy repo. Recommended: a
+#      fine-grained PAT scoped to ONLY `micronaut-planner`, with
+#      Repository permissions -> Contents: Read and write. Set an expiry.
+#      (GitHub -> Settings -> Developer settings -> Fine-grained tokens.)
+#   2. Add it to THIS repo as an Actions secret named PLANNER_DEPLOY_TOKEN:
+#        gh secret set PLANNER_DEPLOY_TOKEN --repo Daniel-Waiger/micronaut-explorer
+#      (paste the token when prompted), or via
+#      Settings -> Secrets and variables -> Actions -> New repository secret.
+#
+# Until the secret exists the job succeeds but SKIPS the push with a warning,
+# so it never blocks a merge. Once the secret is set, pushes deploy
+# automatically; you can also trigger a deploy by hand from the Actions tab
+# (workflow_dispatch).
+
+name: Deploy Planner
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'tools/build_single_file.py'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-planner
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Gate the deploy on the JS suite so a broken build never ships. No
+      # npm install -- web/ is a zero-dependency ES-module project; the glob
+      # is required (bare `node --test web/tests/` fails on node 22).
+      - name: Test (deploy gate)
+        run: node --test web/tests/*.test.js
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build single-file app
+        run: python tools/build_single_file.py --web-dir web --out dist
+
+      - name: Publish to the public Pages repo
+        env:
+          DEPLOY_TOKEN: ${{ secrets.PLANNER_DEPLOY_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEPLOY_TOKEN:-}" ]; then
+            echo "::warning::PLANNER_DEPLOY_TOKEN is not set -- skipping deploy. See this workflow's header for one-time setup."
+            exit 0
+          fi
+          work="$(mktemp -d)"
+          git clone --depth 1 "https://x-access-token:${DEPLOY_TOKEN}@github.com/Daniel-Waiger/micronaut-planner.git" "$work"
+          cp dist/index.html "$work/index.html"
+          cd "$work"
+          touch .nojekyll
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Built output is unchanged -- nothing to deploy."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Deploy build from micronaut-explorer@${GITHUB_SHA::7}"
+          git push origin HEAD:main
+          echo "Deployed. GitHub Pages will rebuild micronaut-planner in ~1-2 min."
