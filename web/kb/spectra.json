@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "overlapRules": {
+    "emissionProximityNm": 25,
+    "excitationProximityNm": 20,
+    "reviewStatus": "claude-drafted",
+    "note": "Thresholds are a domain judgment call pending review against FACSI's actual filter sets (K-3, instruments/objectives/lines/detectors, not yet authored). Emission proximity is the primary (error-severity) check: typical bandpass emission filters are 20-40 nm wide and most dye/FP emission curves have a 40-60 nm FWHM, so peaks this close will substantially co-register in each other's detection window regardless of exact filter choice. Excitation proximity is secondary (warning-severity): standard laser lines are spaced 40-100+ nm apart specifically so one line excites one dye class, and this flag makes the existing confocal-sequential-scanning advisor tip panel-specific and concrete."
+  },
+  "fluorophores": {
+    "ALEXA405": { "excitationPeakNm": 401, "emissionPeakNm": 421, "reviewStatus": "claude-drafted" },
+    "ALEXA430": { "excitationPeakNm": 434, "emissionPeakNm": 539, "reviewStatus": "claude-drafted" },
+    "ALEXA488": { "excitationPeakNm": 490, "emissionPeakNm": 525, "reviewStatus": "claude-drafted" },
+    "ALEXA514": { "excitationPeakNm": 517, "emissionPeakNm": 542, "reviewStatus": "claude-drafted" },
+    "ALEXA532": { "excitationPeakNm": 532, "emissionPeakNm": 553, "reviewStatus": "claude-drafted" },
+    "ALEXA546": { "excitationPeakNm": 556, "emissionPeakNm": 573, "reviewStatus": "claude-drafted" },
+    "ALEXA555": { "excitationPeakNm": 555, "emissionPeakNm": 565, "reviewStatus": "claude-drafted" },
+    "ALEXA568": { "excitationPeakNm": 578, "emissionPeakNm": 603, "reviewStatus": "claude-drafted" },
+    "ALEXA594": { "excitationPeakNm": 590, "emissionPeakNm": 617, "reviewStatus": "claude-drafted" },
+    "ALEXA647": { "excitationPeakNm": 650, "emissionPeakNm": 665, "reviewStatus": "claude-drafted" },
+    "ALEXA660": { "excitationPeakNm": 663, "emissionPeakNm": 690, "reviewStatus": "claude-drafted" },
+    "ALEXA680": { "excitationPeakNm": 679, "emissionPeakNm": 702, "reviewStatus": "claude-drafted" },
+    "ALEXA750": { "excitationPeakNm": 749, "emissionPeakNm": 775, "reviewStatus": "claude-drafted" },
+
+    "ATTO425": { "excitationPeakNm": 438, "emissionPeakNm": 484, "reviewStatus": "claude-drafted" },
+    "ATTO488": { "excitationPeakNm": 501, "emissionPeakNm": 523, "reviewStatus": "claude-drafted" },
+    "ATTO520": { "excitationPeakNm": 516, "emissionPeakNm": 538, "reviewStatus": "claude-drafted" },
+    "ATTO550": { "excitationPeakNm": 554, "emissionPeakNm": 576, "reviewStatus": "claude-drafted" },
+    "ATTO565": { "excitationPeakNm": 563, "emissionPeakNm": 592, "reviewStatus": "claude-drafted" },
+    "ATTO590": { "excitationPeakNm": 594, "emissionPeakNm": 624, "reviewStatus": "claude-drafted" },
+    "ATTO633": { "excitationPeakNm": 629, "emissionPeakNm": 657, "reviewStatus": "claude-drafted" },
+    "ATTO647": { "excitationPeakNm": 645, "emissionPeakNm": 669, "reviewStatus": "claude-drafted" },
+    "ATTO647N": { "excitationPeakNm": 644, "emissionPeakNm": 669, "reviewStatus": "claude-drafted" },
+    "ATTO700": { "excitationPeakNm": 700, "emissionPeakNm": 719, "reviewStatus": "claude-drafted" },
+
+    "DAPI": { "excitationPeakNm": 358, "emissionPeakNm": 461, "reviewStatus": "claude-drafted" },
+    "HOECHST": { "excitationPeakNm": 350, "emissionPeakNm": 461, "reviewStatus": "claude-drafted", "note": "Hoechst 33342, the variant overwhelmingly used for live-cell DNA stain." },
+    "FITC": { "excitationPeakNm": 495, "emissionPeakNm": 519, "reviewStatus": "claude-drafted" },
+    "TRITC": { "excitationPeakNm": 547, "emissionPeakNm": 572, "reviewStatus": "claude-drafted" },
+    "TEXASRED": { "excitationPeakNm": 596, "emissionPeakNm": 615, "reviewStatus": "claude-drafted" },
+    "CY2": { "excitationPeakNm": 489, "emissionPeakNm": 506, "reviewStatus": "claude-drafted" },
+    "CY3": { "excitationPeakNm": 550, "emissionPeakNm": 570, "reviewStatus": "claude-drafted" },
+    "CY5": { "excitationPeakNm": 649, "emissionPeakNm": 670, "reviewStatus": "claude-drafted" },
+    "CY7": { "excitationPeakNm": 750, "emissionPeakNm": 773, "reviewStatus": "claude-drafted" },
+    "DRAQ5": { "excitationPeakNm": 646, "emissionPeakNm": 681, "reviewStatus": "claude-drafted" },
+    "PROPIDIUMIODIDE": { "excitationPeakNm": 535, "emissionPeakNm": 617, "reviewStatus": "claude-drafted", "note": "Peaks shift on nucleic-acid binding; values given are for DNA-bound PI, the relevant state for imaging." },
+    "CALCEIN": { "excitationPeakNm": 495, "emissionPeakNm": 515, "reviewStatus": "claude-drafted" },
+    "DYLIGHT488": { "excitationPeakNm": 493, "emissionPeakNm": 518, "reviewStatus": "claude-drafted" },
+    "DYLIGHT550": { "excitationPeakNm": 562, "emissionPeakNm": 576, "reviewStatus": "claude-drafted" },
+    "DYLIGHT650": { "excitationPeakNm": 654, "emissionPeakNm": 673, "reviewStatus": "claude-drafted" },
+    "JF549": { "excitationPeakNm": 549, "emissionPeakNm": 571, "reviewStatus": "claude-drafted" },
+    "JF646": { "excitationPeakNm": 646, "emissionPeakNm": 664, "reviewStatus": "claude-drafted" },
+    "SIRACTIN": { "excitationPeakNm": 652, "emissionPeakNm": 674, "reviewStatus": "claude-drafted", "note": "SiR (silicon-rhodamine) actin probe; same parent dye as SiR-tubulin, so the two are NOT spectrally distinguishable from each other -- a real cross-check finding, not a drafting error." },
+    "SIRTUBULIN": { "excitationPeakNm": 652, "emissionPeakNm": 674, "reviewStatus": "claude-drafted", "note": "SiR (silicon-rhodamine) tubulin probe; same parent dye as SiR-actin." },
+
+    "GFP": { "excitationPeakNm": 488, "emissionPeakNm": 507, "reviewStatus": "claude-drafted" },
+    "YFP": { "excitationPeakNm": 514, "emissionPeakNm": 527, "reviewStatus": "claude-drafted" },
+    "CFP": { "excitationPeakNm": 434, "emissionPeakNm": 477, "reviewStatus": "claude-drafted" },
+    "BFP": { "excitationPeakNm": 383, "emissionPeakNm": 445, "reviewStatus": "claude-drafted" },
+    "MCHERRY": { "excitationPeakNm": 587, "emissionPeakNm": 610, "reviewStatus": "claude-drafted" },
+    "TDTOMATO": { "excitationPeakNm": 554, "emissionPeakNm": 581, "reviewStatus": "claude-drafted" },
+    "MNEONGREEN": { "excitationPeakNm": 506, "emissionPeakNm": 517, "reviewStatus": "claude-drafted" },
+    "MSCARLET": { "excitationPeakNm": 569, "emissionPeakNm": 594, "reviewStatus": "claude-drafted" },
+    "MTURQUOISE": { "excitationPeakNm": 434, "emissionPeakNm": 474, "reviewStatus": "claude-drafted" },
+    "CERULEAN": { "excitationPeakNm": 433, "emissionPeakNm": 475, "reviewStatus": "claude-drafted" },
+    "VENUS": { "excitationPeakNm": 515, "emissionPeakNm": 528, "reviewStatus": "claude-drafted" },
+    "CITRINE": { "excitationPeakNm": 516, "emissionPeakNm": 529, "reviewStatus": "claude-drafted" },
+    "IRFP": { "excitationPeakNm": 690, "emissionPeakNm": 713, "reviewStatus": "claude-drafted", "note": "iRFP713, the most common near-infrared iRFP variant; other iRFP variants differ." },
+    "MIRFP": { "excitationPeakNm": 683, "emissionPeakNm": 703, "reviewStatus": "claude-drafted", "note": "Approximate; several named miRFP variants (miRFP670/703/720) differ by tens of nm -- treat this single entry as indicative only until a specific variant is confirmed." },
+    "MEMERALD": { "excitationPeakNm": 487, "emissionPeakNm": 509, "reviewStatus": "claude-drafted" },
+    "MRUBY": { "excitationPeakNm": 558, "emissionPeakNm": 605, "reviewStatus": "claude-drafted" },
+    "GCAMP": {
+      "excitationPeakNm": 488,
+      "emissionPeakNm": 509,
+      "reviewStatus": "claude-drafted",
+      "note": "Spectrally ~one dye (cpEGFP) across every GCaMP variant despite markers.json's isFamily:true -- variants (6f/6s/7/...) differ in Ca2+ affinity and kinetics, not color, so this entry deliberately has no per-variant sub-entries."
+    },
+    "FLUO4": { "excitationPeakNm": 494, "emissionPeakNm": 516, "reviewStatus": "claude-drafted" },
+
+    "MITOTRACKER": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "variants": {
+        "mitotracker green": { "excitationPeakNm": 490, "emissionPeakNm": 516 },
+        "mitotracker orange": { "excitationPeakNm": 551, "emissionPeakNm": 576 },
+        "mitotracker red": { "excitationPeakNm": 579, "emissionPeakNm": 599 },
+        "mitotracker deep red": { "excitationPeakNm": 644, "emissionPeakNm": 665 }
+      }
+    },
+    "LYSOTRACKER": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "variants": {
+        "lysotracker green": { "excitationPeakNm": 504, "emissionPeakNm": 511 },
+        "lysotracker red": { "excitationPeakNm": 577, "emissionPeakNm": 590 }
+      }
+    },
+    "SYTOX": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "variants": {
+        "sytox blue": { "excitationPeakNm": 444, "emissionPeakNm": 480 },
+        "sytox green": { "excitationPeakNm": 504, "emissionPeakNm": 523 },
+        "sytox orange": { "excitationPeakNm": 547, "emissionPeakNm": 570 },
+        "sytox red": { "excitationPeakNm": 640, "emissionPeakNm": 658 }
+      }
+    }
+  }
+}

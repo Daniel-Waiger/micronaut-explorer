@@ -31,23 +31,36 @@ ideas that were on its backlog, all now deferred.
   Naming steps.
 - **The assay tier (schema v3):** a study can hold several assays that share only a
   research question and a test article, each with its own modality / panel /
-  specimen. Commits 1–3 shipped (N-assay UI, readout + controls vocabulary); the
-  real Romo-Rico et al. oregano study is the app's default. See
-  [docs/plans/planner-web-assay-tier.md](docs/plans/planner-web-assay-tier.md).
-- **Study overview step:** a shareable study diagram + a deterministic walkthrough,
-  plus a staged progression ladder (idea → advanced modality).
+  specimen. All four commits shipped (N-assay UI, readout + controls vocabulary,
+  the exportable design document); the real Romo-Rico et al. oregano study is the
+  app's default. See [docs/plans/planner-web-assay-tier.md](docs/plans/planner-web-assay-tier.md).
+- **Study overview step:** a shareable study diagram (HTML + an in-app SVG map) + a
+  deterministic walkthrough, plus a staged progression ladder (idea → advanced modality),
+  exportable as Markdown/mermaid.
+- **In-app Guide step** and a **GitHub Pages auto-deploy workflow**
+  (`.github/workflows/deploy.yml`).
+- **Fluorophore / color panel:** a qualitative spectral-spillover advisor over the active
+  assay's markers field — excitation/emission peak-proximity flags, no overlap-integral
+  math. See [docs/plans/planner-web-color-panel.md](docs/plans/planner-web-color-panel.md).
 
 Scope decisions and the use-case map behind the above:
 [docs/plans/planner-web-mvp-usecases.md](docs/plans/planner-web-mvp-usecases.md).
 
 ### Next
-- **Assay tier commit 4 — the exportable design document.** The last commit of the
-  assay-tier arc: a pure renderer over the settled v3 model, no schema change.
-- **Fluorophore / color panel** to minimize spectral spillover — its own page,
-  rules qualitative-first (no spectral-overlap integrals yet). Not started.
-- **Exports** (bench card / CSV / Markdown / JSON), the **LLM seam** (manual-paste
-  provider first, then opt-in Ollama + diagnostics), a **conformance check**, and a
-  **GitHub Pages deploy** workflow (none exists yet — only `ci.yml`).
+- **Exports** (bench card / CSV / Markdown / JSON — Markdown/mermaid already shipped for
+  the study overview; bench card / CSV / JSON still open), the **LLM seam** (manual-paste
+  provider first, then opt-in Ollama + diagnostics), and a **conformance check**.
+- Fuller **panel assembly** (`panel.targets`/`panel.channels`, direct/indirect conjugation
+  structure) — deliberately out of scope for the color panel above, which reads the
+  existing free-text markers field instead. Still reserved, zero consumers.
+
+**⚠ Parked review — `web/kb/spectra.json` content.** Every fluorophore's excitation/
+emission peak values are Claude-drafted from common published references (same "Claude
+drafts, Daniel corrects" arrangement as `advisor.json`), not yet verified against FACSI's
+actual reference sources or filter sets. The two overlap thresholds
+(`emissionProximityNm`/`excitationProximityNm`) are likewise a judgment call pending
+review once `K-3` (instruments/objectives/lines/detectors) exists. Flagged in-app too (a
+persistent banner on the Color panel step).
 
 ### Content — owned by Daniel, not code
 Authored in the knowledge pack (`web/kb/`): fluorophore identities and spectra,

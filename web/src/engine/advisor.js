@@ -20,7 +20,7 @@ import { evaluatePredicate } from './predicate.js';
 // naming an unknown surface is dropped with an issue, not silently inert.
 // Adding a surface later is one entry here plus one UI wire-up, in the same
 // commit.
-export const ADVICE_SURFACES = ['describe', 'design', 'naming'];
+export const ADVICE_SURFACES = ['describe', 'design', 'naming', 'panel'];
 
 export const ADVICE_KINDS = ['pitfall', 'tip'];
 

@@ -1,0 +1,96 @@
+{
+  "run": "planner-web-color-panel-v1",
+  "generated": "2026-08-02",
+  "plan_doc": "docs/plans/planner-web-color-panel.md",
+  "objective": "Ship the fluorophore/color-panel spillover advisor: qualitative peak-proximity flags over a Claude-drafted, Daniel-reviewable spectral KB, as its own step.",
+  "decisions": {
+    "data_source": "naming.fields.markers (existing free-text field), parsed via engine/validation.js's splitMarkers -- NOT panel.targets/panel.channels (reserved, zero consumers, left untouched)",
+    "content_owner": "Claude drafts spectral values, flagged in-app and in docs as needing Daniel's review -- same arrangement as advisor.json's 16 rules",
+    "overlap_rule": "qualitative peak-proximity only (emissionProximityNm=25 error, excitationProximityNm=20 warning), both stored as KB data not engine constants -- no spectral-overlap-integral math",
+    "content_scope": "~35-40 well-documented markers.json entries; ambiguous/heterogeneous ones (BODIPY, RFP, FURA2, ARL, SOX, SOX2, CELLMASK, ERTRACKER) explicitly excluded as honest gaps, resolve to spectrum-unavailable"
+  },
+  "invariants": [
+    "engine/spectra.js is pure and total -- no DOM, no store, never throws on malformed/missing input",
+    "rules-as-data: overlapRules thresholds live in web/kb/spectra.json, not hardcoded in engine/spectra.js",
+    "five-state resolution per marker token; an empty/excluded/ambiguous case must always render a specific sentence, never a blank row or silent omission",
+    "web/ never imports from src/; zero npm deps; node --test and pytest -m 'not integration' both stay green",
+    "verify against the BUILT artifact (tools/build_single_file.py output), not just file:// or the dev server (lessons 47/48)"
+  ],
+  "out_of_scope": [
+    "spectral-overlap integrals / real curve math",
+    "panel.targets/panel.channels structured panel-assembly UI",
+    "instruments/objectives/lines/detectors KB (K-3)",
+    "Overview/studydoc.js integration (deferred, PAN-7 dropped from this run)"
+  ],
+  "batches": [
+    ["PAN-1", "PAN-2", "PAN-4"],
+    ["PAN-3"],
+    ["PAN-5"],
+    ["PAN-6", "PAN-8"]
+  ],
+  "tasks": [
+    {
+      "id": "PAN-1",
+      "title": "Draft web/kb/spectra.json content",
+      "phase": "Batch 1",
+      "depends_on": [],
+      "files": ["web/kb/spectra.json"],
+      "scope": "Author the fluorophores map + overlapRules per the schema in the plan doc: ~35-40 well-known markers.json entries (Alexa Fluor 405/430/488/514/532/546/555/568/594/647/660/680/750, ATTO dyes, DAPI, Hoechst, FITC, TRITC, Texas Red, Cy2/3/5/7, DRAQ5, Propidium Iodide, Calcein, DyLight 488/550/650, JF549/646, SiR-actin/SiR-tubulin, common FPs: GFP/YFP/CFP/BFP/mCherry/tdTomato/mNeonGreen/mScarlet/mTurquoise/Cerulean/Venus/Citrine/iRFP/mEmerald/mRuby, GCaMP as ONE spectrum despite markers.json isFamily, MitoTracker as 4 per-variant sub-entries). Every entry and overlapRules tagged reviewStatus:'claude-drafted'. Explicitly SKIP BODIPY/RFP/FURA2/ARL/SOX/SOX2/CELLMASK/ERTRACKER as content gaps.",
+      "verification": "Valid JSON. Every top-level fluorophores key exists in web/kb/markers.json. Every family entry's variant keys are a subset of that canonical's markers.json 'variants' list."
+    },
+    {
+      "id": "PAN-2",
+      "title": "engine/spectra.js: loader + resolver + evaluator",
+      "phase": "Batch 1",
+      "depends_on": [],
+      "files": ["web/src/engine/spectra.js", "web/tests/spectra.test.js"],
+      "scope": "loadSpectraKb (whitelist discipline mirroring loadControlRules/loadReadouts, unknown-key reporting, reviewStatus defaults to 'claude-drafted'), resolveMarkerToken/resolvePanel (five-state resolution reusing engine/validation.js's splitMarkers, deduping by canonical), flagPanelOverlaps (pairwise emission/excitation proximity, validationIssue-shaped {field,message,severity} output, deterministic ordering). Built and unit-tested against SYNTHETIC fixtures -- does not require PAN-1's real content.",
+      "verification": "node --test web/tests/spectra.test.js passes. Totality: malformed/missing raw pack never throws; a family token not in variants resolves 'ambiguous-family'; a tag/moiety resolves 'no-intrinsic-spectrum'; an unknown token resolves 'unrecognized'. Pairwise check: two synthetic entries 10nm apart in emission flag severity 'error'; 15nm apart in excitation only flags 'warning'; entries outside both thresholds produce zero flags. Ordering stable across repeated calls."
+    },
+    {
+      "id": "PAN-4",
+      "title": "Extend advisor surface to 'panel'",
+      "phase": "Batch 1",
+      "depends_on": [],
+      "files": ["web/src/engine/advisor.js", "web/kb/advisor.json", "web/tests/advisor.test.js"],
+      "scope": "Add 'panel' to ADVICE_SURFACES. Add \"panel\" to confocal-sequential-scanning's surfaces array in web/kb/advisor.json.",
+      "verification": "node --test web/tests/advisor.test.js passes, including any existing assertion on the committed rule set/surfaces list, updated to expect the new surface."
+    },
+    {
+      "id": "PAN-3",
+      "title": "Thread spectra + markersKb through kbpack.js",
+      "phase": "Batch 2",
+      "depends_on": ["PAN-1", "PAN-2"],
+      "files": ["web/src/engine/kbpack.js", "web/tests/kbpack.test.js", "web/tests/spectra.test.js"],
+      "scope": "shapeAppKb: add loadSpectraKb(source.spectra), merge its issues, and expose the already-computed markersKb object (currently discarded after indexKb) in the return shape so kbMarker(kb.markersKb, canonical) is callable by panel.js. Append real web/kb/spectra.json content guards to spectra.test.js: 'the real pack loads with zero issues' + a never-silently-orphaned-content guard.",
+      "verification": "node --test web/tests/kbpack.test.js and spectra.test.js pass. A direct test asserts shapeAppKb({spectra:{...}}).spectra/overlapRules/markersKb are all populated and non-empty."
+    },
+    {
+      "id": "PAN-5",
+      "title": "ui/steps/panel.js: the Color panel step",
+      "phase": "Batch 3",
+      "depends_on": ["PAN-3", "PAN-4"],
+      "files": ["web/src/ui/steps/panel.js", "web/src/main.js", "web/src/ui/steps/guide.js", "web/styles/app.css"],
+      "scope": "createPanelStep(kb): review banner, panel table with five-state rows and unreviewed badges, flags rendered via the existing .issues-list/.issue-{severity} idiom, never-silent empty/unanswered states, createAdvicePanel(advisor,'panel') at the bottom. Wire into main.js's steps array between namingStep and overviewStep. Add the Guide step bullet. Add the small CSS block.",
+      "verification": "Serve web/ and confirm: with no markers entered, the page states that plainly; typing 'ALEXA488-GFP' into the Naming step's markers field and returning to Panel shows both rows resolved 'known' plus one 'error'-severity flag citing the actual nm gap; a nonsense token shows 'unrecognized'; bare 'MITOTRACKER' shows 'ambiguous-family'; the review banner and per-row badges are visible and match the count of claude-drafted entries shown."
+    },
+    {
+      "id": "PAN-6",
+      "title": "Docs: ROADMAP.md / TASKS.md updates",
+      "phase": "Batch 4",
+      "depends_on": ["PAN-1"],
+      "files": ["ROADMAP.md", "TASKS.md"],
+      "scope": "Move the color-panel item from ROADMAP's 'Next' list to 'Delivered', and add a new '⚠ Parked review' bullet for web/kb/spectra.json mirroring the existing advisor.json one.",
+      "verification": "Manual read -- no code to test."
+    },
+    {
+      "id": "PAN-8",
+      "title": "Ship gate: full regression + built-artifact smoke",
+      "phase": "Batch 4",
+      "depends_on": ["PAN-5"],
+      "files": [],
+      "scope": "Full-suite regression and the standing 'verify the artifact you actually ship' discipline (cma-lessons 47/48).",
+      "verification": "node --test web/tests/*.test.js all green (no prior test broken). python tools/build_single_file.py --out dist/ succeeds, stays under the 2MB gate. Open dist/index.html via file:// (or serve it) and confirm zero console errors, the Color panel step is reachable from the nav, and the same manual scenario from PAN-5 works against the built artifact."
+    }
+  ]
+}

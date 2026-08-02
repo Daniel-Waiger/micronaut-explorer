@@ -9,6 +9,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { shapeAppKb } from '../src/engine/kbpack.js';
 
+// A minimal, valid spectra pack -- reused by every test below that asserts
+// `issues.length === 0` for an otherwise-complete raw object, so adding
+// spectra wiring (PAN-3) doesn't force each of those tests to know its full
+// shape just to stay issue-free.
+const VALID_SPECTRA = {
+  version: 1,
+  fluorophores: {},
+  overlapRules: { emissionProximityNm: 25, excitationProximityNm: 20, reviewStatus: 'claude-drafted' },
+};
+
 function validAdvisorRule() {
   return {
     id: 'sted-photobleaching',
@@ -32,6 +42,7 @@ test('a raw.advisor pack reaches the returned advisor rules -- the exact wiring 
     readouts: { version: 1, readouts: {} },
     controls: { version: 1, rules: [] },
     stages: { version: 1, stages: [], rules: [] },
+    spectra: VALID_SPECTRA,
   });
   assert.equal(issues.length, 0);
   assert.equal(advisor.length, 1);
@@ -63,6 +74,7 @@ test('raw.readouts and raw.controls reach the returned readouts/controlRules -- 
         },
       ],
     },
+    spectra: VALID_SPECTRA,
   });
   assert.equal(issues.length, 0);
   assert.deepEqual(readouts.ros, { label: 'Intracellular ROS', aliases: ['dcf'] });
@@ -89,6 +101,7 @@ test('raw.stages reaches the returned stages/stageRules -- the same wiring gap a
       stages: [{ id: 'idea', order: 10, title: 'Idea', body: 'x'.repeat(40) }],
       rules: [{ id: 'note-1', stage: 'idea', when: { exists: 'researchQuestion' }, note: 'y'.repeat(40), priority: 0 }],
     },
+    spectra: VALID_SPECTRA,
   });
   assert.equal(issues.length, 0);
   assert.equal(stages.length, 1);
@@ -107,13 +120,14 @@ test('missing raw.stages degrades to empty shapes plus an issue, never silence o
 // --- Totality: every combination of absent/malformed input degrades cleanly
 
 test('a raw object with every sub-pack present yields zero issues', () => {
-  const { index, questions, advisor, readouts, controlRules, stages, stageRules, issues } = shapeAppKb({
+  const { index, questions, advisor, readouts, controlRules, stages, stageRules, spectra, overlapRules, issues } = shapeAppKb({
     markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
     questions: [],
     advisor: { version: 1, rules: [] },
     readouts: { version: 1, readouts: {} },
     controls: { version: 1, rules: [] },
     stages: { version: 1, stages: [], rules: [] },
+    spectra: VALID_SPECTRA,
   });
   assert.deepEqual(questions, []);
   assert.deepEqual(advisor, []);
@@ -121,8 +135,46 @@ test('a raw object with every sub-pack present yields zero issues', () => {
   assert.deepEqual(controlRules, []);
   assert.deepEqual(stages, []);
   assert.deepEqual(stageRules, []);
+  assert.deepEqual(spectra, {});
+  assert.equal(overlapRules.emissionProximityNm, 25);
   assert.deepEqual(issues, []);
   assert.ok(index); // indexKb's own shape, exercised by kb.test.js
+});
+
+// --- raw.spectra + markersKb wiring (PAN-3): the same wiring gap advisor once had
+
+test('raw.spectra reaches the returned spectra/overlapRules -- the same wiring gap advisor once had', () => {
+  const { spectra, overlapRules, issues } = shapeAppKb({
+    markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
+    advisor: { version: 1, rules: [] },
+    readouts: { version: 1, readouts: {} },
+    controls: { version: 1, rules: [] },
+    stages: { version: 1, stages: [], rules: [] },
+    spectra: {
+      version: 1,
+      overlapRules: { emissionProximityNm: 25, excitationProximityNm: 20, reviewStatus: 'claude-drafted' },
+      fluorophores: { DYEA: { excitationPeakNm: 490, emissionPeakNm: 525, reviewStatus: 'claude-drafted' } },
+    },
+  });
+  assert.equal(issues.length, 0);
+  assert.ok(spectra.DYEA);
+  assert.equal(overlapRules.emissionProximityNm, 25);
+});
+
+test('missing raw.spectra degrades to an empty shape plus an issue, never silence or a throw', () => {
+  const { spectra, overlapRules, issues } = shapeAppKb({});
+  assert.deepEqual(spectra, {});
+  assert.ok(overlapRules.emissionProximityNm > 0); // safe default, not a throw
+  assert.ok(issues.some((i) => /spectra pack is missing/.test(i.message)));
+});
+
+test("markersKb (loadKb's own {version, markers, ambiguousInFreeText} shape) is exposed, not discarded after building the index", () => {
+  const { markersKb } = shapeAppKb({
+    markers: { version: 1, markers: { DYEA: { aliases: ['dyea'], class: 'dye', isFamily: false, variants: [] } }, ambiguousInFreeText: [] },
+  });
+  assert.ok(markersKb);
+  assert.ok(markersKb.markers.DYEA);
+  assert.equal(markersKb.markers.DYEA.class, 'dye');
 });
 
 test('a genuinely empty raw object ({}) reports BOTH sub-packs missing, not silence', () => {

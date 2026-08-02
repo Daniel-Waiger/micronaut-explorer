@@ -191,10 +191,10 @@ test('missing, non-array, or empty surfaces is dropped and reported', () => {
 
 test('a rule naming an unknown surface is dropped WHOLESALE, not narrowed to the known surfaces', () => {
   const { rules, issues } = loadAdvisorRules({
-    rules: [validRule({ surfaces: ['design', 'panel'] })],
+    rules: [validRule({ surfaces: ['design', 'summary'] })],
   });
   assert.equal(rules.length, 0);
-  assert.match(issues[0].message, /unknown surface 'panel'/);
+  assert.match(issues[0].message, /unknown surface 'summary'/);
 });
 
 for (const surface of ADVICE_SURFACES) {

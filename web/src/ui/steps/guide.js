@@ -105,6 +105,13 @@ export const guideStep = {
           'convention is assembled from the design — you rarely type a filename by hand.',
       ],
       [
+        'Color panel',
+        'A qualitative check for spectral spillover across the markers you entered on Naming — ' +
+          'flags fluorophore pairs whose excitation or emission peaks sit too close together. ' +
+          'Not a spectral-overlap integral, and the spectral values are Claude-drafted, not yet ' +
+          'reviewed.',
+      ],
+      [
         'Overview',
         'A read-only summary of the whole study: a visual study map, the recommended ' +
           'controls, a step-by-step “how to run this project” walkthrough, and every planned ' +

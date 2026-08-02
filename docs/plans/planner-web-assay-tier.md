@@ -1,10 +1,19 @@
 # planner-web — the assay tier (schema v3)
 
-Status: **commits 1–3 shipped and pushed** (commit 1 `49c4e2a`, review-fixed `bd24d1a`;
-commit 2 `87b26ae`; commit 3 `9361d8c`, merged `b7c5a96`). **Commit 4 — the exportable
-design document — is the only one remaining.** Written 2026-07-31 after Daniel uploaded a
-real published paper (Romo-Rico et al. 2026, oregano plasma coatings for wound healing) as
-a target for what the planner should be able to produce.
+Status: **all four commits shipped and pushed** (commit 1 `49c4e2a`, review-fixed
+`bd24d1a`; commit 2 `87b26ae`; commit 3 `9361d8c`; commit 4 — the exportable design
+document — merged as part of `feat/study-overview-walkthrough`, `b7c5a96`, 2026-08-02).
+Written 2026-07-31 after Daniel uploaded a real published paper (Romo-Rico et al. 2026,
+oregano plasma coatings for wound healing) as a target for what the planner should be
+able to produce.
+
+**Note (2026-08-02):** the study-overview-walkthrough plan
+(`docs/plans/planner-web-assay-tier.md`'s sibling decision doc) explicitly chose "no SVG"
+for the exportable design document — HTML in-app + Markdown/mermaid export only. A later
+same-day commit (`651d5fe`, "in-app SVG study map") added an SVG renderer
+(`engine/render/svgDiagram.js`) anyway, as a fourth renderer over the same `studydoc`
+model. Not wrong, but it reverses that recorded decision without an explanation on file —
+flagging here since this doc is the one a future reader would check.
 
 ## Context
 

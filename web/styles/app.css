@@ -423,6 +423,67 @@ button:focus-visible {
   border-color: var(--danger);
 }
 
+/* The Color panel step. .panel-review-banner is deliberately persistent, not
+   a dismissible toast -- the content it flags (Claude-drafted spectral
+   values) stays true for the lifetime of the page, so a one-time notice
+   would stop being accurate the moment it's dismissed. */
+.panel-review-banner {
+  font-size: 13px;
+  color: var(--warn);
+  background: var(--panel-2);
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.panel-empty {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.panel-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.panel-state {
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.panel-row-text {
+  flex: 1 1 260px;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.panel-badge {
+  font-size: 11px;
+  color: var(--warn);
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-left: auto;
+  cursor: default;
+}
+
 .describe-textarea {
   width: 100%;
   min-height: 120px;

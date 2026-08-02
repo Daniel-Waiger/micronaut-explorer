@@ -144,195 +144,112 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "planner-web P1 — interview engine + deterministic parsing",
-  "orchestrator": "Claude Opus",
-  "active_model": "Claude Opus",
-  "active_status": "done",
-  "phase": "Schema v3: the assay tier (commit 1 of 4)",
-  "state_note": "First slice of the experimental-design assistant vision (controls/panel/modality guidance) implemented and verified. Architecture: rules are DATA in web/kb/advisor.json, evaluated by the ALREADY-BUILT predicate engine (engine/predicate.js) -- zero engine changes needed, proving the rules-as-data pattern the rest of the vision depends on. New engine/advisor.js (loader mirrors interview.js's loadQuestions discipline: explicit whitelist, drop-and-report, never spread the raw entry) plus engine/kbpack.js (extracts shapeAppKb from main.js's previously-untestable inline loadAppKb -- this is what a future KB key needs to avoid repeating the allowOther silent-drop bug). New ui/advice.js: a shared, non-focusable advice panel wired into all three steps (describe/design/naming) at verified real re-render seams, not the ones that looked obvious -- design.js's renderAll() is called exactly once at mount; the real funnel is renderConditions(). 16 modality rules drafted (STED, confocal, widefield, light-sheet, SEM/TEM, Raman), each with a title (the pitfall) and a body of at least 40 characters (the why), gated on acquisition.modality via exact-canonical-value predicates. 277 JS tests (up from 229), 341 Python. Verified live against the built artifact over http: STED notes route correctly to Design and Naming, swapping to SEM live-updates all three surfaces with zero reload and zero residue, per-keystroke re-render on Naming preserves focus and cursor position, empty experiment shows zero notes anywhere, console clean throughout.",
-  "current_task": null,
+  "run": "planner-web-color-panel-v1",
+  "orchestrator": "Claude Sonnet (warm-context; plan by Opus)",
+  "active_model": "Claude Sonnet (resumed session)",
+  "active_status": "idle",
+  "phase": "",
+  "state_note": "",
+  "current_task": {
+    "id": "PAN-8",
+    "title": "Ship gate: full regression + built-artifact smoke"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "334 passed",
+      "v": "495 passed",
       "tone": "ok"
     },
     {
-      "k": "Tasks",
-      "v": "6 / 6"
-    },
-    {
-      "k": "Py tests",
-      "v": "342 passed, 10 deselected",
-      "tone": "ok"
-    },
-    {
-      "k": "Advisor rules",
-      "v": "16",
+      "k": "Build",
+      "v": "382479 bytes, under 2MB gate",
       "tone": "ok"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "C1-1",
+      "id": "PAN-1",
       "phase": "Batch 1",
-      "title": "Knowledge pack: generated marker KB + pure loader/validate/index",
+      "title": "Draft web/kb/spectra.json content",
       "status": "done",
-      "by": "Opus re-verified PASS, all 76 markers spot-checked"
+      "by": "Sonnet"
     },
     {
-      "id": "C1-2",
+      "id": "PAN-2",
       "phase": "Batch 1",
-      "title": "Predicate DSL: total, eval-free rule evaluation against the Experiment",
+      "title": "engine/spectra.js: loader + resolver + evaluator",
       "status": "done",
-      "by": "Opus re-verified, no new defects"
+      "by": "Sonnet"
     },
     {
-      "id": "C1-5",
+      "id": "PAN-4",
       "phase": "Batch 1",
-      "title": "Condition matrix: factors x levels x replicates -> condition rows -> sample IDs",
+      "title": "Extend advisor surface to 'panel'",
       "status": "done",
-      "by": "Sonnet · D3 (reserved-name collision), D4 (prototype-chain token injection), D5 (invalid-level) fixed+tested"
+      "by": "Sonnet"
     },
     {
-      "id": "C1-4",
+      "id": "PAN-3",
       "phase": "Batch 2",
-      "title": "Deterministic free-text ingest: paragraph -> provisional field proposals",
+      "title": "Thread spectra + markersKb through kbpack.js",
       "status": "done",
-      "by": "Sonnet · D1 (magnification/dimension-pair false positive) fixed+tested, needed 2 iterations"
+      "by": "Sonnet"
     },
     {
-      "id": "C1-3",
-      "phase": "Batch 2",
-      "title": "Interview engine: question bank, next-question selection, answer recording",
-      "status": "done",
-      "by": "Opus re-verified, no new defects"
-    },
-    {
-      "id": "C1-6",
+      "id": "PAN-5",
       "phase": "Batch 3",
-      "title": "P1 vertical slice: paste a paragraph, answer questions, get sample IDs and filenames",
-      "status": "verifying",
-      "by": "Sonnet · D2 (remove-factor stale closure), D6 (retag on edit), D7 (refused-write toast) fixed+unit-tested; D2 LIVE re-verify anomaly unresolved"
+      "title": "ui/steps/panel.js: the Color panel step",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "PAN-6",
+      "phase": "Batch 4",
+      "title": "Docs: ROADMAP.md / TASKS.md updates",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "PAN-8",
+      "phase": "Batch 4",
+      "title": "Ship gate: full regression + built-artifact smoke",
+      "status": "done",
+      "by": "Sonnet"
     }
   ],
   "log": [
     {
-      "time": "10:44:33",
-      "msg": "P1 started. P0 shipped and pushed. Planning pass underway: authoring docs/plans/planner-web-p1.md + task graph with real scope/verification per task."
+      "time": "23:08:23",
+      "msg": "Batch 1 started: PAN-1 (KB content), PAN-2 (engine), PAN-4 (advisor surface) -- file-disjoint"
     },
     {
-      "time": "10:48:03",
-      "msg": "Task graph authored: 6 tasks in 3 batches. C1-6 (UI wiring) deliberately alone in the last batch per lesson 4. K-1 content prerequisite discharged structurally by C1-1's generated KB."
+      "time": "23:12:06",
+      "msg": "PAN-1 (spectra.json content, 63 fluorophores + 3 families) and PAN-4 (panel advice surface) done. Caught and fixed a real regression while at it: advisor.test.js's 'unknown surface' test used 'panel' as its unknown-surface example -- now real, swapped to 'summary'. 55/55 advisor tests green."
     },
     {
-      "time": "10:48:25",
-      "msg": "Dispatched batch 1 in parallel: C1-1 (KB export+loader), C1-2 (predicate DSL), C1-5 (condition matrix). File-disjoint."
+      "time": "23:15:02",
+      "msg": "PAN-2 done: engine/spectra.js (loader, five-state resolver, pairwise evaluator), 27 synthetic tests. Caught+fixed a real determinism bug: flagPanelOverlaps' pair-label text depended on caller iteration order, not a stable key -- fixed to order pairs by canonical id."
     },
     {
-      "time": "10:58:14",
-      "msg": "C1-5 executed: conditions.js + 15 tests. Reconciled design shape against schema.js's existing design slot (good - lesson 33). FLAG for verification: buildSampleId THROWS on an unknown scheme token rather than returning an issue; conditionIssues catches it first, but a direct call from C1-6 could white-screen. Verify the composition order is actually safe."
+      "time": "23:17:22",
+      "msg": "PAN-3 done: kbpack.js threads spectra+markersKb through shapeAppKb. Caught+fixed 3 pre-existing kbpack.test.js tests that broke because they asserted zero issues without a spectra fixture -- added a shared VALID_SPECTRA fixture. Real-content guards added to spectra.test.js: real spectra.json loads clean, every fluorophore key is a real markers.json canonical, every family variant is a real markers.json variant, every one of the 76 markers.json canonicals is accounted for (spectrum, tag/moiety, or named gap). 495/495 JS tests green."
     },
     {
-      "time": "10:58:59",
-      "msg": "C1-2 executed: predicate.js + 23 tests. Notable: the executor rejected the spec's literal 'return false at the depth cap' because an enclosing chain of not-wrappers re-negates that false -- an even parity would flip a runaway predicate back to TRUE. Used a throw-and-unwind instead so the cap always forces the whole evaluation false. Verified with 33- and 34-deep chains. Correct reasoning; the literal spec text would have shipped a live bug."
+      "time": "23:19:27",
+      "msg": "PAN-5 done: ui/steps/panel.js (Color panel step), wired into main.js between Naming and Overview, guide.js bullet added, CSS added. 495/495 JS tests still green."
     },
     {
-      "time": "11:09:23",
-      "msg": "Batch 1 complete: C1-1 (76-marker generated KB + loader, 26 tests, falsification step confirmed the staleness gate fails when markers.py is edited without re-export), C1-2 (predicate DSL, 23 tests), C1-5 (condition matrix, 15 tests). 136/136 JS, 328 Python, zero regressions. Dispatching batch 2: C1-4 (free-text ingest) + C1-3 (interview engine), both depend on C1-1/C1-2 which are now satisfied."
+      "time": "23:31:03",
+      "msg": "PAN-6 finished: ROADMAP.md already reflected Delivered/parked-review; reconciled TASKS.md wording (ship-gate note, kept not-yet-committed caveat pending explicit commit confirmation)."
     },
     {
-      "time": "11:09:46",
-      "msg": "Dispatched batch 2 in parallel: C1-4 (free-text ingest) + C1-3 (interview engine). File-disjoint."
-    },
-    {
-      "time": "11:12:03",
-      "msg": "C1-3's first dispatch failed: it reported 'completed' but produced NONE of its deliverable files (interview.js/questions.json/interview.test.js). Its final result was a raw nested Agent() tool-call artifact, not a real report -- it appears to have tried spawning its own sub-agent for reconnaissance reading instead of reading the files directly, and that went wrong. Confirmed via direct filesystem check, not trusting the notification. Redispatching with an explicit no-nested-agents instruction."
-    },
-    {
-      "time": "11:12:49",
-      "msg": "C1-3 redispatched (2nd attempt) with an explicit instruction not to spawn nested sub-agents and to read all spec/API files directly."
-    },
-    {
-      "time": "15:36:01",
-      "msg": "SPEND LIMIT HIT: both C1-3 (2nd attempt) and C1-4 subagent dispatches failed with 'monthly spend limit'. This also likely explains C1-3's first garbled failure (probably cut off mid-task, not a real reasoning error). Switching to direct warm-context implementation for both remaining batch-2 tasks per lesson 42 -- retrying dispatch would just fail again on a monthly (non-transient) limit."
-    },
-    {
-      "time": "15:39:44",
-      "msg": "C1-3 done directly (lesson-42 substitution, not subagent-dispatched): interview.js + 12-question bank + 15 tests. Composition proven: a freetext-tagged slot is still asked and carries suggestedDefault; a STRONG-tagged slot is not re-asked; recordAnswer performs zero mutation (proven by JSON snapshot compare); real questions.json loads with zero issues; empty-experiment nextQuestions(limit=8) covers all 5 naming-critical fields."
-    },
-    {
-      "time": "15:45:43",
-      "msg": "Batch 2 complete: C1-3 (interview engine + 12-question bank, 15 tests) and C1-4 (free-text ingest, 15 JS + 2 Python conformance tests) both done DIRECTLY after subagent dispatch hit the monthly spend limit twice -- substituted per lesson 42, declared explicitly. 166/166 JS, 330 Python, ruff+black clean, build succeeds at 98KB. Remaining: C1-6 (UI vertical slice) deferred to next session -- deliberately not starting the highest-risk task this late in the budget."
-    },
-    {
-      "time": "15:48:05",
-      "msg": "Session ending: committed, dashboard synced, memory updated. Handover follows."
-    },
-    {
-      "time": "15:51:32",
-      "msg": "User confirmed enough budget remains -- proceeding with C1-6 directly (established pattern this session, subagent dispatch still unreliable on the monthly spend limit)."
-    },
-    {
-      "time": "16:14:46",
-      "msg": "C1-6 done: describe.js (paste-a-paragraph, reviewable Accept/Dismiss proposals, interview panel with why+skip) + design.js (factors/levels/replicates, live condition table) wired into main.js's router alongside naming.js. Live file:// verification caught and fixed a real UI bug (stale closure clobbering a factor's other field on edit). All P1 (C1-1 through C1-6) now committed. 166 JS / 330 Python tests, zero regressions."
-    },
-    {
-      "time": "16:20:52",
-      "msg": "Dispatching Opus verification over P1 (dbe8718, 8bf53b7 + lesson commits)."
-    },
-    {
-      "time": "16:55:11",
-      "msg": "Second Opus adversarial pass over full P1 diff (C1-1..C1-6): 8 defects (D1-D8) + 2 minor UX gaps found. All fixed, unit-tested green. D2's live re-verification hit an anomaly (extra blank factor row after Remove) -- paused for /handover mid-diagnosis, not yet committed."
-    },
-    {
-      "time": "21:49:29",
-      "msg": "Two-stage naming shipped: base name rendered once, group segments separated by '-' so arms never merge. Inliner now folds wrapped imports AND hard-fails on any surviving static import (falsification-tested). Answers are now reviewable/editable/re-askable, plus a confirmed 'Start over'. 190 JS + 332 Py green; verified live against the BUILT artifact."
-    },
-    {
-      "time": "21:49:29",
-      "msg": "Lessons 47 + 48 distilled: line-anchored source regexes break on formatter line-wrapping and output gates must assert absence, not that a step ran; and a dev server's module registry can serve fresh bytes while executing stale exports -- verify the shipped artifact."
-    },
-    {
-      "time": "23:30:26",
-      "msg": "Planned via docs/plans/planner-web-mvp-usecases.md, then C:/Users/dwaig/.claude/plans/wobbly-splashing-cookie.md (plan mode). Implemented warm-context (well-scoped, no subagent dispatch needed). Verified live against the BUILT artifact over http: 9-row CT/NAM25MM/NAM50MM x 3-biorep design renders exactly per spec, allowOther round-trips through the answered-list re-edit path, and a hand-seeded v1 autosave correctly migrates to v2 and re-persists cleanly."
-    },
-    {
-      "time": "23:30:26",
-      "msg": "docs/plans/planner-web-mvp-usecases.md written to map MVP use cases (UC-1..UC-7) and resolve the if/then-rules-vs-hardcoding question: rules belong in the knowledge pack as data (predicate.js already exists for this), code stays a generic evaluator. K-5 (control rules) still needed before controls can be generated."
-    },
-    {
-      "time": "23:36:25",
-      "msg": "Adversarial verification pass (required by the master decision rule even for warm-context runs) found+fixed D13. See docs/cma-lessons.md lesson 49. All 6 planned work items (schema v2, conditions engine rework, naming+design UI, allowOther, build+verify) done and green."
-    },
-    {
-      "time": "12:55:31",
-      "msg": "Planned via C:/Users/dwaig/.claude/plans/curried-chasing-flamingo.md (plan mode, Explore+Plan subagents dispatched to verify the predicate engine/KB pipeline/UI seams before committing to a design). Executed warm-context (well-scoped after planning). Two Plan-agent-caught corrections proved out during implementation: design.js's real re-render funnel is renderConditions() not renderAll(), and store.patch() rebinds the experiment root so no experiment reference may ever be cached."
-    },
-    {
-      "time": "12:55:31",
-      "msg": "Content: 16 rules drafted by Claude per the user's explicit 'I draft, you correct' instruction -- domain content awaits Daniel's review before being treated as authoritative."
-    },
-    {
-      "time": "12:57:23",
-      "msg": "D14 and D15 fixed and verified (write_kb_dev_js now names the offending file on malformed JSON; ci.yml now runs node --test web/tests/*.test.js)."
-    },
-    {
-      "time": "16:02:57",
-      "msg": "Board hygiene: cleared D1-D7, D9, D10. All nine were fixed in earlier rounds (D1-D7 committed in 8997446, D9/D10 in 1c8fa6e) but never defect-cleared, so the board was showing nine resolved defects as open. Spot-verified each against current source before clearing."
-    },
-    {
-      "time": "16:02:57",
-      "msg": "Advice notes now carry a required 'concept' (the phenomenon: spectral spillover, photobleaching) rendered as the note's reason, distinct from the mechanically-derived 'Applies when ...' trigger clause. User correction: a trigger condition is not a reason."
-    },
-    {
-      "time": "07:50:47",
-      "msg": "Schema v3 (assay tier, commit 1 of 4) shipped and pushed as 49c4e2a: one study can now hold multiple assays (bacterial viability, cytoskeleton, ROS, scratch from a real uploaded paper each need their own modality/panel/specimen). Falsifiable gate held throughout: zero changes to web/src/engine/. Adversarial self-review found and fixed 4 real issues in bd24d1a (local only): duplicated scoping predicate between schema.js and assay.js, a scopeWrite gap on the bare naming.fields container, a stale header comment claiming false imports, 4 curly apostrophes breaking the plain-ASCII convention."
+      "time": "23:31:11",
+      "msg": "PAN-8 done: node --test web/tests/*.test.js 495/495 green; tools/build_single_file.py --out dist/ succeeded (382479 bytes); verified live against built dist/index.html via file:// -- empty markers states plainly, ALEXA488+GFP both resolve known with excitation(2nm,warning)+emission(18nm,error) flags citing real gaps, BOGUSMARKER->unrecognized, bare MITOTRACKER->ambiguous-family, review banner + unreviewed badges visible, zero console errors/pageerrors on reload with state persisted. Pre-existing content gap noted (out of scope): SYTO9/PI abbreviation aren't in markers.json aliases at all, so the default Bacterial viability assay's markers correctly render as unrecognized -- not a regression, markers.json content is Daniel's domain."
     }
   ],
-  "snapshot_at": "2026-08-01 07:50"
+  "snapshot_at": "2026-08-02 23:31"
 };
 /* CMA:EMBEDDED:END */
 

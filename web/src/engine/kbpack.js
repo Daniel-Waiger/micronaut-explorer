@@ -19,15 +19,23 @@ import { indexKb, loadKb } from '../core/kb.js';
 import { loadAdvisorRules } from './advisor.js';
 import { loadControlRules, loadReadouts } from './controls.js';
 import { loadStages } from './stages.js';
+import { loadSpectraKb } from './spectra.js';
 
 /**
- * Shape the raw KB object into { index, questions, advisor, readouts,
- * controlRules, stages, stageRules, issues }.
+ * Shape the raw KB object into { index, markersKb, questions, advisor,
+ * readouts, controlRules, stages, stageRules, spectra, overlapRules, issues }.
  *
  * `raw` is globalThis.__MICRONAUT_KB__ (or an already-defaulted `{}`):
  * an object keyed by filename stem -- `raw.markers`, `raw.questions`,
- * `raw.advisor`, `raw.readouts`, `raw.controls`, `raw.stages` --
- * aggregated at build/dev time from web/kb/*.json.
+ * `raw.advisor`, `raw.readouts`, `raw.controls`, `raw.stages`, `raw.spectra`
+ * -- aggregated at build/dev time from web/kb/*.json.
+ *
+ * `markersKb` is `loadKb`'s own `{version, markers, ambiguousInFreeText}`
+ * shape -- previously computed here and immediately discarded once `index`
+ * was built from it. engine/spectra.js's resolveMarkerToken needs it (via
+ * core/kb.js's kbMarker) to read a marker's `class`/`isFamily`, so it is now
+ * part of the returned shape rather than a second, redundant loadKb() call
+ * a future caller might otherwise be tempted to make.
  *
  * TOTAL, like every loader it composes: a missing or malformed `raw`, or any
  * missing key on it, degrades to a usable empty shape plus issues, never a
@@ -45,15 +53,19 @@ export function shapeAppKb(raw) {
   const { readouts, issues: readoutIssues } = loadReadouts(source.readouts);
   const { rules: controlRules, issues: controlIssues } = loadControlRules(source.controls);
   const { stages, rules: stageRules, issues: stageIssues } = loadStages(source.stages);
+  const { fluorophores: spectra, overlapRules, issues: spectraIssues } = loadSpectraKb(source.spectra);
 
   return {
     index,
+    markersKb,
     questions,
     advisor,
     readouts,
     controlRules,
     stages,
     stageRules,
-    issues: [...markerIssues, ...advisorIssues, ...readoutIssues, ...controlIssues, ...stageIssues],
+    spectra,
+    overlapRules,
+    issues: [...markerIssues, ...advisorIssues, ...readoutIssues, ...controlIssues, ...stageIssues, ...spectraIssues],
   };
 }

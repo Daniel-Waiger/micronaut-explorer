@@ -13,13 +13,29 @@ Last updated: 2026-08-02
 
 ## Near-term
 
-- **Assay tier — commit 4: the exportable design document.** The last commit of the
-  assay-tier arc (commits 1–3 shipped). A pure read/renderer over the settled v3 model,
-  no schema change. Plan: [docs/plans/planner-web-assay-tier.md](docs/plans/planner-web-assay-tier.md).
-- **Fix stale status header in the assay-tier plan.** Its top line still says "commits 2–4
-  not started," but 2 and 3 shipped (`87b26ae`, `9361d8c`, `b7c5a96`). One-line correction.
-- **Fluorophore / color panel (spillover).** Its own page; rules qualitative-first, no
-  spectral-overlap integrals yet. Not started. See ROADMAP "experimental-design assistant."
+- Nothing queued right now — the two items on this list (assay-tier commit 4, the color
+  panel) both shipped this session; see "Recently shipped" below. Next up is whatever
+  Daniel prioritizes from ROADMAP's "Next" list (exports, the LLM seam, a conformance
+  check, or the fuller panel-assembly model).
+
+## Recently shipped (2026-08-02, not yet reflected elsewhere until this pass)
+
+- **Assay tier — commit 4: the exportable design document.** Shipped via the
+  `feat/study-overview-walkthrough` merge (`b7c5a96`): `engine/studydoc.js` (model),
+  `engine/render/{markdown,mermaid}.js`, `ui/steps/overview.js`. Plan:
+  [docs/plans/planner-web-assay-tier.md](docs/plans/planner-web-assay-tier.md).
+- **In-app SVG study map** (`engine/render/svgDiagram.js`) — a further renderer over the
+  same studydoc model, added after commit 4 as an alpha-prep addition. Note: this reverses
+  the explicit "No SVG" decision recorded in the study-overview-walkthrough plan; worth a
+  one-line note in that plan explaining why, if anyone goes looking.
+- **In-app Guide step**, and a **GitHub Pages auto-deploy workflow**
+  (`.github/workflows/deploy.yml`) — the "GitHub Pages deploy (none exists yet)" item in
+  ROADMAP's Next list is now done, not pending.
+- **Fluorophore / color panel (spillover).** A new "Color panel" step: qualitative
+  excitation/emission peak-proximity flags over the active assay's markers field.
+  Content (`web/kb/spectra.json`, 63 fluorophores) is Claude-drafted and flagged for
+  review, same arrangement as `advisor.json`. Plan:
+  [docs/plans/planner-web-color-panel.md](docs/plans/planner-web-color-panel.md).
 
 ## Content authoring (owned by Daniel, not code)
 

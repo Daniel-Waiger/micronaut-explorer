@@ -53,7 +53,7 @@
     },
     {
       "id": "confocal-sequential-scanning",
-      "surfaces": ["design"],
+      "surfaces": ["design", "panel"],
       "kind": "pitfall",
       "concept": "spectral spillover",
       "title": "Overlapping emission spectra need sequential scanning, not simultaneous",
