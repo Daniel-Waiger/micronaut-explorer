@@ -131,11 +131,23 @@ test('cross-assay filename collisions are flagged (or not) via studyNameIssues, 
   assert.deepEqual(doc.crossAssayIssues, []);
 });
 
-test('the default study readout is unanswered for every assay (readout is a live interview question, not seeded)', () => {
+test('the default study seeds a recognized readout for every assay, so the example is a fully-worked demo', () => {
+  // Reversal of an earlier "readout is a live interview question, not seeded"
+  // decision: for the alpha the example study ships FULLY answered, so a
+  // first-time user sees the guidance engine actually working (readout-
+  // specific controls + stage notes) rather than "not answered yet" on every
+  // assay. See core/defaultStudy.js's ASSAY_SEEDS readout/readoutText.
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   for (const assay of doc.assays) {
-    assert.equal(assay.readout.state, 'unanswered');
+    assert.equal(assay.readout.state, 'known', `${assay.label} readout should be seeded and recognized`);
   }
+  // The worked example must actually exercise the engine, not just fill a
+  // label: a seeded readout fires its readout-specific controls.
+  const viability = doc.assays.find((a) => a.label === 'Bacterial viability');
+  assert.ok(
+    viability.controls.readout.some((c) => c.id === 'viability-heat-killed-control'),
+    'expected the seeded bacterial-viability readout to fire the heat-killed control'
+  );
 });
 
 test('once a readout is answered, the matching panel AND readout controls fire, three-state resolves to "known"', () => {
@@ -155,7 +167,13 @@ test('once a readout is answered, the matching panel AND readout controls fire, 
 
 test('an unrecognized readout answer resolves to "unrecognized", not silence', () => {
   const study = createDefaultStudy();
+  // Mirror how the Describe step writes an unrecognized answer: both the free
+  // text AND the canonical id change together (describe.js resolves the
+  // canonical to '' when nothing matches). Clearing only readoutText would
+  // leave the seeded canonical 'bacterial-viability' behind and fire its
+  // controls -- not a real state the UI can produce.
   study.assays[0].readoutText = 'some assay this app has never heard of';
+  study.assays[0].readout = '';
   const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.equal(doc.assays[0].readout.state, 'unrecognized');
   assert.deepEqual(doc.assays[0].controls.readout, []);
@@ -176,22 +194,32 @@ test('the study gets the full 5-stage ladder ONCE, not per assay', () => {
   for (const assay of doc.assays) assert.equal(assay.ladder, undefined);
 });
 
-test('every default-study assay has zero stageNotes (none use STED/light-sheet/SEM/TEM)', () => {
+test('the seeded example surfaces readout-specific stage notes for the assays whose readout has them', () => {
+  // With readouts now seeded (see above), the worked example legitimately
+  // shows study-specific stage notes -- another way the demo exercises the
+  // engine. Cytoskeleton's readout has no authored stage note, so it stays
+  // empty; that difference is the point, not a gap.
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
-  for (const assay of doc.assays) {
-    assert.deepEqual(assay.stageNotes, [], `assay '${assay.label}' unexpectedly has study-specific notes for modality '${assay.modality}'`);
-  }
+  const byLabel = Object.fromEntries(doc.assays.map((a) => [a.label, a]));
+  assert.ok(byLabel['Bacterial viability'].stageNotes.length >= 1);
+  assert.ok(byLabel['Intracellular ROS'].stageNotes.length >= 1);
+  assert.ok(byLabel['Scratch / migration'].stageNotes.length >= 1);
+  assert.deepEqual(byLabel['Macrophage cytoskeleton'].stageNotes, []);
 });
 
-test('a STED assay gets a pilot stageNote, scoped to that assay only', () => {
+test('a STED assay gets a pilot stageNote, and that pilot note is scoped to that assay only', () => {
   const study = createDefaultStudy();
   study.assays[0].acquisition = { ...study.assays[0].acquisition, modality: 'STED' };
   const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const [viability, ...rest] = doc.assays;
-  assert.equal(viability.stageNotes.length, 1);
-  assert.equal(viability.stageNotes[0].stageId, 'pilot');
-  assert.ok(viability.stageNotes[0].notes[0].includes('confocal'));
-  for (const assay of rest) assert.deepEqual(assay.stageNotes, []);
+  const pilotNotes = viability.stageNotes.filter((s) => s.stageId === 'pilot');
+  assert.equal(pilotNotes.length, 1);
+  assert.ok(pilotNotes[0].notes[0].includes('confocal'));
+  // Other assays may carry their own readout-derived notes now, but the
+  // STED-triggered PILOT note must not leak onto any of them.
+  for (const assay of rest) {
+    assert.deepEqual(assay.stageNotes.filter((s) => s.stageId === 'pilot'), []);
+  }
 });
 
 // --- The exact bug an adversarial pass found: renderer parity on the

@@ -675,6 +675,44 @@ button:focus-visible {
     break-inside: avoid;
   }
 
+  /* The map's fills/strokes are theme vars (dark by default); force a plain
+     black-on-white rendering for paper so it never prints dark boxes. */
+  .study-map,
+  .study-map-svg {
+    break-inside: avoid;
+  }
+
+  .study-map-scroll {
+    border-color: #000;
+    background: #fff;
+    overflow: visible;
+  }
+
+  .study-map-box {
+    fill: #fff;
+    stroke: #000;
+  }
+
+  .study-map-node-study .study-map-box {
+    fill: #eee;
+    stroke: #000;
+  }
+
+  .study-map-caption,
+  .study-map-value,
+  .study-map-node-study .study-map-caption,
+  .study-map-node-study .study-map-value {
+    fill: #000;
+  }
+
+  .study-map-edge {
+    stroke: #000;
+  }
+
+  .study-map-arrowhead {
+    fill: #000;
+  }
+
   .shell-body {
     display: block;
   }
@@ -800,6 +838,72 @@ button:focus-visible {
   font-style: italic;
   color: var(--muted);
   margin: 4px 0 16px;
+}
+
+/* The study map (ui/steps/overview.js buildDiagramSvg over the pure layout
+   in engine/render/svgDiagram.js). Themed entirely through the CSS vars so
+   it tracks the light/dark toggle; print overrides live in @media print. */
+.study-map {
+  margin: 4px 0 20px;
+}
+
+.study-map-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 12px;
+}
+
+.study-map-svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  font-family: var(--sans);
+}
+
+.study-map-box {
+  fill: var(--panel-2);
+  stroke: var(--line);
+  stroke-width: 1.5;
+}
+
+.study-map-node-study .study-map-box {
+  fill: var(--accent);
+  stroke: var(--accent);
+}
+
+.study-map-node-assay .study-map-box {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.study-map-caption {
+  fill: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.study-map-value {
+  fill: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.study-map-node-study .study-map-caption,
+.study-map-node-study .study-map-value {
+  fill: var(--accent-ink);
+}
+
+.study-map-edge {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.study-map-arrowhead {
+  fill: var(--muted);
 }
 
 .overview-tree {

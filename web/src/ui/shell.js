@@ -34,7 +34,7 @@ function osPrefersLight() {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches;
 }
 
-export function renderShell(root, store, router, { onReset } = {}) {
+export function renderShell(root, store, router, { onReset, onNewBlank } = {}) {
   root.textContent = '';
 
   const header = document.createElement('header');
@@ -73,21 +73,40 @@ export function renderShell(root, store, router, { onReset } = {}) {
   // Everything is autosaved to localStorage, so a page refresh deliberately
   // RESTORES the previous session rather than clearing it. That is the right
   // default (nobody wants to lose a design to a stray F5) but it leaves no
-  // way to start a genuinely new experiment -- hence an explicit control.
-  // Confirmed, because it is destructive and unrecoverable.
+  // way to start a genuinely new experiment -- hence explicit controls.
+  // TWO distinct actions, because a first-time user lands on the seeded
+  // oregano EXAMPLE study and needs an unambiguous way to plan their own:
+  //   "New study"        -> a genuinely blank experiment they fill in
+  //   "Reset to example" -> reload the oregano example (undo their edits)
+  // Both are confirmed: they are destructive and unrecoverable.
+  if (onNewBlank) {
+    const newBtn = document.createElement('button');
+    newBtn.type = 'button';
+    newBtn.className = 'theme-toggle reset-button';
+    newBtn.textContent = 'New study';
+    newBtn.title = 'Start a blank study of your own (clears the current one)';
+    newBtn.addEventListener('click', () => {
+      const ok = window.confirm(
+        'Start a new, blank study of your own?\n\nThis clears the current experiment (including the example study) and starts from an empty slate. It cannot be undone.'
+      );
+      if (ok) onNewBlank();
+    });
+    headerActions.appendChild(newBtn);
+  }
+
   if (onReset) {
     const resetBtn = document.createElement('button');
     resetBtn.type = 'button';
     resetBtn.className = 'theme-toggle reset-button';
-    resetBtn.textContent = 'Start over';
-    // "the default study," not "an empty one" -- core/defaultStudy.js seeds
+    resetBtn.textContent = 'Reset to example';
+    // "the example study," not "an empty one" -- core/defaultStudy.js seeds
     // a fresh session with the oregano study's real research question and
-    // 4 assays (weakly tagged, freely overwritable), so a reset no longer
-    // lands on a genuinely blank slate.
-    resetBtn.title = 'Discard this experiment and start over with the default study';
+    // 4 assays (weakly tagged, freely overwritable). "New study" above is
+    // the blank-slate path; this one restores the example.
+    resetBtn.title = 'Discard this experiment and reload the example (oregano) study';
     resetBtn.addEventListener('click', () => {
       const ok = window.confirm(
-        'Discard the current experiment and start over with the default study?\n\nThis clears every answer, factor, and naming field. It cannot be undone.'
+        'Discard the current experiment and reload the example (oregano) study?\n\nThis clears every answer, factor, and naming field. It cannot be undone.'
       );
       if (ok) onReset();
     });

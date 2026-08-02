@@ -1,4 +1,5 @@
 import { createDefaultStudy } from './core/defaultStudy.js';
+import { emptyExperiment } from './core/schema.js';
 import { createStore } from './core/store.js';
 import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
@@ -73,6 +74,16 @@ function init() {
     // place for listSaved() to resurrect on the next load.
     onReset: () => {
       clearAll();
+      window.location.reload();
+    },
+    // "New study": start from a genuinely blank experiment, not the oregano
+    // example. Clear the autosave ring, persist the blank as the newest entry
+    // so the reload restores IT (loadInitialExperiment would otherwise fall
+    // straight back to createDefaultStudy when it finds no save), then reload
+    // through the same clean path onReset uses.
+    onNewBlank: () => {
+      clearAll();
+      saveExperiment(emptyExperiment());
       window.location.reload();
     },
   });
