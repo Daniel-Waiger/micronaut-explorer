@@ -144,112 +144,113 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "planner-web-color-panel-v1",
-  "orchestrator": "Claude Sonnet (warm-context; plan by Opus)",
-  "active_model": "Claude Sonnet (resumed session)",
+  "run": "planner-web-exports-v1",
+  "orchestrator": "warm-context (self-selected)",
+  "active_model": "Claude Sonnet",
   "active_status": "idle",
-  "phase": "",
+  "phase": "implementation",
   "state_note": "",
-  "current_task": {
-    "id": "PAN-8",
-    "title": "Ship gate: full regression + built-artifact smoke"
-  },
+  "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "495 passed",
+      "v": "507 passed",
       "tone": "ok"
     },
     {
       "k": "Build",
-      "v": "382479 bytes, under 2MB gate",
+      "v": "387628 bytes, under 2MB gate",
       "tone": "ok"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "PAN-1",
-      "phase": "Batch 1",
-      "title": "Draft web/kb/spectra.json content",
+      "id": "EXP-1",
+      "phase": "implementation",
+      "title": "Extend studydoc.js filenames with row detail",
       "status": "done",
       "by": "Sonnet"
     },
     {
-      "id": "PAN-2",
-      "phase": "Batch 1",
-      "title": "engine/spectra.js: loader + resolver + evaluator",
+      "id": "EXP-2",
+      "phase": "implementation",
+      "title": "Add render/csv.js (renderCsv)",
       "status": "done",
       "by": "Sonnet"
     },
     {
-      "id": "PAN-4",
-      "phase": "Batch 1",
-      "title": "Extend advisor surface to 'panel'",
+      "id": "EXP-3",
+      "phase": "implementation",
+      "title": "Add render/json.js (renderJson)",
       "status": "done",
       "by": "Sonnet"
     },
     {
-      "id": "PAN-3",
-      "phase": "Batch 2",
-      "title": "Thread spectra + markersKb through kbpack.js",
+      "id": "EXP-4",
+      "phase": "implementation",
+      "title": "Wire CSV/JSON download buttons into overview.js",
       "status": "done",
       "by": "Sonnet"
     },
     {
-      "id": "PAN-5",
-      "phase": "Batch 3",
-      "title": "ui/steps/panel.js: the Color panel step",
+      "id": "EXP-5",
+      "phase": "implementation",
+      "title": "Tests: csv.test.js, json.test.js, studydoc.test.js row assertion",
       "status": "done",
       "by": "Sonnet"
     },
     {
-      "id": "PAN-6",
-      "phase": "Batch 4",
-      "title": "Docs: ROADMAP.md / TASKS.md updates",
+      "id": "EXP-6",
+      "phase": "ship-gate",
+      "title": "Build + live browser verification",
       "status": "done",
       "by": "Sonnet"
     },
     {
-      "id": "PAN-8",
-      "phase": "Batch 4",
-      "title": "Ship gate: full regression + built-artifact smoke",
+      "id": "EXP-7",
+      "phase": "docs",
+      "title": "ROADMAP/TASKS/plan doc updated",
       "status": "done",
       "by": "Sonnet"
     }
   ],
   "log": [
     {
-      "time": "23:08:23",
-      "msg": "Batch 1 started: PAN-1 (KB content), PAN-2 (engine), PAN-4 (advisor surface) -- file-disjoint"
+      "time": "00:07:37",
+      "msg": "EXP-1: studydoc.js filenames entries now carry row (group/factorLevels/bioRep/techRep)"
     },
     {
-      "time": "23:12:06",
-      "msg": "PAN-1 (spectra.json content, 63 fluorophores + 3 families) and PAN-4 (panel advice surface) done. Caught and fixed a real regression while at it: advisor.test.js's 'unknown surface' test used 'panel' as its unknown-surface example -- now real, swapped to 'summary'. 55/55 advisor tests green."
+      "time": "00:07:37",
+      "msg": "EXP-2: CSV renderer added, RFC 4180 quoting, flattened factors column"
     },
     {
-      "time": "23:15:02",
-      "msg": "PAN-2 done: engine/spectra.js (loader, five-state resolver, pairwise evaluator), 27 synthetic tests. Caught+fixed a real determinism bug: flagPanelOverlaps' pair-label text depended on caller iteration order, not a stable key -- fixed to order pairs by canonical id."
+      "time": "00:07:37",
+      "msg": "EXP-3: JSON renderer added"
     },
     {
-      "time": "23:17:22",
-      "msg": "PAN-3 done: kbpack.js threads spectra+markersKb through shapeAppKb. Caught+fixed 3 pre-existing kbpack.test.js tests that broke because they asserted zero issues without a spectra fixture -- added a shared VALID_SPECTRA fixture. Real-content guards added to spectra.test.js: real spectra.json loads clean, every fluorophore key is a real markers.json canonical, every family variant is a real markers.json variant, every one of the 76 markers.json canonicals is accounted for (spectrum, tag/moiety, or named gap). 495/495 JS tests green."
+      "time": "00:07:38",
+      "msg": "EXP-4: two new buttons wired into overview actions div"
     },
     {
-      "time": "23:19:27",
-      "msg": "PAN-5 done: ui/steps/panel.js (Color panel step), wired into main.js between Naming and Overview, guide.js bullet added, CSS added. 495/495 JS tests still green."
+      "time": "00:07:38",
+      "msg": "EXP-5: 507/507 JS tests passing (was 495)"
     },
     {
-      "time": "23:31:03",
-      "msg": "PAN-6 finished: ROADMAP.md already reflected Delivered/parked-review; reconciled TASKS.md wording (ship-gate note, kept not-yet-committed caveat pending explicit commit confirmation)."
+      "time": "00:07:38",
+      "msg": "EXP-6: dist build verified, both buttons present/functional, zero console errors on click"
     },
     {
-      "time": "23:31:11",
-      "msg": "PAN-8 done: node --test web/tests/*.test.js 495/495 green; tools/build_single_file.py --out dist/ succeeded (382479 bytes); verified live against built dist/index.html via file:// -- empty markers states plainly, ALEXA488+GFP both resolve known with excitation(2nm,warning)+emission(18nm,error) flags citing real gaps, BOGUSMARKER->unrecognized, bare MITOTRACKER->ambiguous-family, review banner + unreviewed badges visible, zero console errors/pageerrors on reload with state persisted. Pre-existing content gap noted (out of scope): SYTO9/PI abbreviation aren't in markers.json aliases at all, so the default Bacterial viability assay's markers correctly render as unrecognized -- not a regression, markers.json content is Daniel's domain."
+      "time": "00:07:38",
+      "msg": "EXP-7: ROADMAP.md Delivered+Next updated, TASKS.md updated, docs/plans/planner-web-exports.md written"
+    },
+    {
+      "time": "00:07:39",
+      "msg": "Exports (CSV/JSON) run complete; awaiting user review before commit/push"
     }
   ],
-  "snapshot_at": "2026-08-02 23:31"
+  "snapshot_at": "2026-08-03 00:07"
 };
 /* CMA:EMBEDDED:END */
 

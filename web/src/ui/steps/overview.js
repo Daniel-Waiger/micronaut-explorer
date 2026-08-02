@@ -20,6 +20,8 @@
 
 import { buildStudyDocument } from '../../engine/studydoc.js';
 import { renderMarkdown } from '../../engine/render/markdown.js';
+import { renderCsv } from '../../engine/render/csv.js';
+import { renderJson } from '../../engine/render/json.js';
 import { buildDiagramLayout } from '../../engine/render/svgDiagram.js';
 import { downloadTextFile } from '../../core/persist.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
@@ -361,6 +363,30 @@ export function createOverviewStep(kb) {
         if (showToast) showToast('Downloaded the study map as SVG.');
       });
       actions.appendChild(downloadSvgBtn);
+
+      const downloadCsvBtn = document.createElement('button');
+      downloadCsvBtn.type = 'button';
+      downloadCsvBtn.className = 'copy-button';
+      downloadCsvBtn.textContent = 'Download file manifest (.csv)';
+      downloadCsvBtn.addEventListener('click', () => {
+        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+        const filename = `${(freshDoc.study.title || 'study-manifest').replace(/[^A-Za-z0-9_-]+/g, '-')}.csv`;
+        downloadTextFile(renderCsv(freshDoc), filename, 'text/csv');
+        if (showToast) showToast('Downloaded the file manifest as CSV.');
+      });
+      actions.appendChild(downloadCsvBtn);
+
+      const downloadJsonBtn = document.createElement('button');
+      downloadJsonBtn.type = 'button';
+      downloadJsonBtn.className = 'copy-button';
+      downloadJsonBtn.textContent = 'Download raw data (.json)';
+      downloadJsonBtn.addEventListener('click', () => {
+        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+        const filename = `${(freshDoc.study.title || 'study-overview').replace(/[^A-Za-z0-9_-]+/g, '-')}.json`;
+        downloadTextFile(renderJson(freshDoc), filename, 'application/json');
+        if (showToast) showToast('Downloaded the study overview as JSON.');
+      });
+      actions.appendChild(downloadJsonBtn);
 
       const printBtn = document.createElement('button');
       printBtn.type = 'button';

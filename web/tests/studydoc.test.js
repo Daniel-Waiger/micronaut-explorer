@@ -123,6 +123,16 @@ test('every default-study assay has planned filenames with no errors', () => {
   }
 });
 
+test('every planned-filename entry carries its condition row (group/factorLevels/bioRep/techRep) -- a CSV renderer needs this without re-deriving the condition matrix', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  for (const assay of doc.assays) {
+    for (const entry of assay.filenames) {
+      assert.ok(entry.row && typeof entry.row === 'object', `assay '${assay.label}' has a filename entry with no row`);
+      assert.ok('group' in entry.row && 'factorLevels' in entry.row && 'bioRep' in entry.row && 'techRep' in entry.row);
+    }
+  }
+});
+
 test('cross-assay filename collisions are flagged (or not) via studyNameIssues, not duplicated logic', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   // The default study gives every assay a distinct exptype, so this pins

@@ -42,14 +42,20 @@ ideas that were on its backlog, all now deferred.
 - **Fluorophore / color panel:** a qualitative spectral-spillover advisor over the active
   assay's markers field — excitation/emission peak-proximity flags, no overlap-integral
   math. See [docs/plans/planner-web-color-panel.md](docs/plans/planner-web-color-panel.md).
+- **Exports — file manifest (CSV) and raw data (JSON):** two more study-overview export
+  buttons alongside the existing Markdown/mermaid/SVG/print ones — a per-planned-filename
+  CSV manifest (assay, group, factors, replicates, filename) and a full-fidelity JSON dump
+  of the same study document. See
+  [docs/plans/planner-web-exports.md](docs/plans/planner-web-exports.md).
 
 Scope decisions and the use-case map behind the above:
 [docs/plans/planner-web-mvp-usecases.md](docs/plans/planner-web-mvp-usecases.md).
 
 ### Next
-- **Exports** (bench card / CSV / Markdown / JSON — Markdown/mermaid already shipped for
-  the study overview; bench card / CSV / JSON still open), the **LLM seam** (manual-paste
-  provider first, then opt-in Ollama + diagnostics), and a **conformance check**.
+- **Bench card** export (a compact, print-oriented single-assay summary — deliberately
+  deferred from the CSV/JSON exports above; needs real UX/content design, not yet
+  specified), the **LLM seam** (manual-paste provider first, then opt-in Ollama +
+  diagnostics), and a **conformance check**.
 - Fuller **panel assembly** (`panel.targets`/`panel.channels`, direct/indirect conjugation
   structure) — deliberately out of scope for the color panel above, which reads the
   existing free-text markers field instead. Still reserved, zero consumers.

@@ -13,13 +13,17 @@ Last updated: 2026-08-02
 
 ## Near-term
 
-- Nothing queued right now — the two items on this list (assay-tier commit 4, the color
-  panel) both shipped this session; see "Recently shipped" below. Next up is whatever
-  Daniel prioritizes from ROADMAP's "Next" list (exports, the LLM seam, a conformance
-  check, or the fuller panel-assembly model).
+- Nothing queued right now — Exports (CSV/JSON) shipped this session; see "Recently
+  shipped" below. Next up is whatever Daniel prioritizes from ROADMAP's "Next" list (bench
+  card, the LLM seam, a conformance check, or the fuller panel-assembly model).
 
 ## Recently shipped (2026-08-02, not yet reflected elsewhere until this pass)
 
+- **Exports — file manifest (CSV) and raw data (JSON).** Two more study-overview export
+  buttons: `engine/render/csv.js` (one row per planned filename, factors flattened into
+  one cell) and `engine/render/json.js` (full `studydoc` dump). Self-selected from
+  ROADMAP's "Next" list. Bench card deliberately deferred (needs UX/content design not
+  yet specified). Plan: [docs/plans/planner-web-exports.md](docs/plans/planner-web-exports.md).
 - **Assay tier — commit 4: the exportable design document.** Shipped via the
   `feat/study-overview-walkthrough` merge (`b7c5a96`): `engine/studydoc.js` (model),
   `engine/render/{markdown,mermaid}.js`, `ui/steps/overview.js`. Plan:

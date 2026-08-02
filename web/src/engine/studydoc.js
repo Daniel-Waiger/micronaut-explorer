@@ -146,7 +146,17 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
       controls,
       stageNotes,
       namingFields: effectiveNamingFields(view),
+      // `row` (group/factorLevels/bioRep/techRep) rides along so a CSV
+      // renderer can emit one column per design axis without re-deriving
+      // the condition matrix itself -- the same "one model, three renderers"
+      // reasoning as this module's header, one field deeper.
       filenames: filenamePlan.map((entry) => ({
+        row: {
+          group: entry.row.group,
+          factorLevels: { ...entry.row.factorLevels },
+          bioRep: entry.row.bioRep,
+          techRep: entry.row.techRep,
+        },
         groupLabel: entry.groupLabel,
         filename: entry.filename,
         error: entry.error || null,
