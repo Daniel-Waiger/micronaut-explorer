@@ -840,6 +840,51 @@ button:focus-visible {
   margin: 4px 0 16px;
 }
 
+/* The Guide step (ui/steps/guide.js): a readable, max-width prose column. */
+.guide-heading {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 26px 0 8px;
+  color: var(--ink);
+}
+
+.guide-para {
+  max-width: 70ch;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 8px 0;
+}
+
+.guide-list {
+  max-width: 70ch;
+  line-height: 1.6;
+  color: var(--ink);
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.guide-list li {
+  margin: 6px 0;
+}
+
+.guide-deflist {
+  max-width: 70ch;
+  margin: 8px 0;
+}
+
+.guide-deflist dt {
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 12px;
+}
+
+.guide-deflist dd {
+  margin: 2px 0 0;
+  padding-left: 0;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
 /* The study map (ui/steps/overview.js buildDiagramSvg over the pure layout
    in engine/render/svgDiagram.js). Themed entirely through the CSS vars so
    it tracks the light/dark toggle; print overrides live in @media print. */

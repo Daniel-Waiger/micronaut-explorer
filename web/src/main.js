@@ -10,6 +10,7 @@ import { createDescribeStep } from './ui/steps/describe.js';
 import { designStep } from './ui/steps/design.js';
 import { studyStep } from './ui/steps/study.js';
 import { createOverviewStep } from './ui/steps/overview.js';
+import { guideStep } from './ui/steps/guide.js';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -63,7 +64,10 @@ function init() {
   // Overview last: it is a pure READ over every other step's data (the
   // shareable diagram + deterministic walkthrough), never a place new facts
   // are entered -- see ui/steps/overview.js's module header.
-  const steps = [studyStep, describeStep, designStep, namingStep, overviewStep];
+  // Guide LAST: it must not displace the deliberate Study landing page
+  // (router lands on steps[0]), but stays permanently in the nav so a
+  // first-time tester can find it. See ui/steps/guide.js's header.
+  const steps = [studyStep, describeStep, designStep, namingStep, overviewStep, guideStep];
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
