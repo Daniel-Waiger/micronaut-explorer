@@ -113,11 +113,70 @@ PROTEIN_MARKERS: frozenset[str] = frozenset(
         "MIRFP",
         "MEMERALD",
         "MRUBY",
+        "TAGBFP2",
+        "MTURQUOISE2",
+        "MCERULEAN3",
+        "SUPERFOLDERGFP",
+        "MCLOVER3",
+        "MGREENLANTERN",
+        "MORANGE2",
+        "MAPPLE",
+        "MRUBY3",
+        "MSCARLETI",
+        "MSCARLET3",
+        "MKATE2",
+        "FUSIONRED",
+        "IRFP670",
+        "IRFP713",
+        "MIRFP680",
+        "MIRFP720",
     }
 )
 
-# Calcium indicators.
-INDICATOR_MARKERS: frozenset[str] = frozenset({"FLUO4", "FURA2", "GCAMP"})
+# Functional calcium, ROS, mitochondrial, and pH indicators.
+INDICATOR_MARKERS: frozenset[str] = frozenset(
+    {
+        "FLUO4",
+        "FURA2",
+        "GCAMP",
+        "FLUO3",
+        "CALCIUMGREEN1",
+        "CALCIUMORANGE",
+        "RHOD2",
+        "XRHOD1",
+        "CELLROXGREEN",
+        "CELLROXORANGE",
+        "CELLROXDEEPRED",
+        "DHE",
+        "MITOSOXGREEN",
+        "PHRODOGREEN",
+        "PHRODORED",
+    }
+)
+
+# Intrinsically fluorescent stains and tracers used for live-cell/organelle
+# or nucleic-acid labeling. These remain distinct from general conjugatable
+# dyes because downstream panel guidance can reason about their assay role.
+STAIN_MARKERS: frozenset[str] = frozenset(
+    {
+        "RHODAMINE123",
+        "FM143",
+        "FM464",
+        "LIPIDTOXGREEN",
+        "LIPIDTOXRED",
+        "LIPIDTOXDEEPRED",
+        "7AAD",
+        "ETHIDIUMHOMODIMER1",
+        "TOPRO1",
+        "TOPRO3",
+        "TOPRO5",
+        "YOPRO1",
+        "YOPRO3",
+        "LYSOTRACKER",
+        "LIVEDEAD",
+        "SYTO",
+    }
+)
 
 # FAMILIES spanning several spectra: a channel naming one of these alone is
 # under-specified (P2's panel engine uses isFamily to refuse a spectrum-less
@@ -138,7 +197,13 @@ FAMILY_VARIANTS: dict[str, list[str]] = {
         "mitotracker orange",
         "mitotracker red",
     ],
-    "LYSOTRACKER": ["lysotracker green", "lysotracker red"],
+    "LYSOTRACKER": [
+        "lysotracker blue",
+        "lysotracker deep red",
+        "lysotracker green",
+        "lysotracker red",
+        "lysotracker yellow",
+    ],
     "SYTOX": ["sytox blue", "sytox green", "sytox orange", "sytox red"],
     "GCAMP": [
         "gcamp3",
@@ -159,8 +224,28 @@ FAMILY_VARIANTS: dict[str, list[str]] = {
     "BODIPY": ["bodipy fl", "bodipy tmr", "bodipy tr", "bodipy 630"],
     "ERTRACKER": ["er-tracker green", "er-tracker red", "er-tracker blue-white dpx"],
     "CELLMASK": ["cellmask green", "cellmask orange", "cellmask deep red"],
-    "SYTO": ["syto9", "syto13", "syto60", "syto82", "syto85"],
-    "LIVEDEAD": ["livedead blue", "livedead green", "livedead violet", "livedead red", "livedead far red"],
+    "SYTO": [
+        "syto 40",
+        "syto 41",
+        "syto 42",
+        "syto 45",
+        "syto rnaselect",
+        "syto9",
+        "syto13",
+        "syto60",
+        "syto82",
+        "syto85",
+    ],
+    "LIVEDEAD": [
+        "livedead aqua",
+        "livedead blue",
+        "livedead far red",
+        "livedead green",
+        "livedead near ir",
+        "livedead red",
+        "livedead violet",
+        "livedead yellow",
+    ],
 }
 
 
@@ -178,6 +263,8 @@ def _classify(canonical: str) -> str:
         return "protein"
     if canonical in INDICATOR_MARKERS:
         return "indicator"
+    if canonical in STAIN_MARKERS:
+        return "stain"
     return "dye"
 
 

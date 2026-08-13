@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { shapeAppKb } from '../src/engine/kbpack.js';
+import { readKbJson, realKb } from './fixtures.js';
 
 // A minimal, valid spectra pack -- reused by every test below that asserts
 // `issues.length === 0` for an otherwise-complete raw object, so adding
@@ -159,6 +160,78 @@ test('raw.spectra reaches the returned spectra/overlapRules -- the same wiring g
   assert.equal(issues.length, 0);
   assert.ok(spectra.DYEA);
   assert.equal(overlapRules.emissionProximityNm, 25);
+});
+
+test('the real generated marker and spectra packs expose the representative fluorophore expansion', () => {
+  assert.doesNotThrow(() => realKb());
+
+  // These are the committed generated packs, loaded through the same
+  // shapeAppKb boundary as the application. Expected peaks and variants
+  // come from those files rather than a fallback copy in this test.
+  const rawMarkers = readKbJson('markers');
+  const rawSpectra = readKbJson('spectra');
+  const kb = realKb();
+  assert.deepEqual(kb.issues, []);
+
+  const directCanonicals = [
+    'ALEXA790',
+    'ATTO740',
+    'CF790',
+    'DYLIGHT800',
+    'MSCARLET3',
+    'MIRFP720',
+    'LIPIDTOXDEEPRED',
+    'TOPRO5',
+    'CELLROXDEEPRED',
+    'PHRODORED',
+    'IRDYE800CW',
+  ];
+  for (const canonical of directCanonicals) {
+    assert.ok(rawMarkers.markers[canonical], `${canonical} must be generated in markers.json`);
+    assert.ok(rawSpectra.fluorophores[canonical], `${canonical} must be present in spectra.json`);
+    assert.deepEqual(kb.markersKb.markers[canonical], rawMarkers.markers[canonical]);
+    assert.equal(
+      kb.spectra[canonical].excitationPeakNm,
+      rawSpectra.fluorophores[canonical].excitationPeakNm,
+      `${canonical} excitation`
+    );
+    assert.equal(
+      kb.spectra[canonical].emissionPeakNm,
+      rawSpectra.fluorophores[canonical].emissionPeakNm,
+      `${canonical} emission`
+    );
+  }
+
+  const newFamilyVariants = {
+    LYSOTRACKER: ['lysotracker blue', 'lysotracker yellow', 'lysotracker deep red'],
+    LIVEDEAD: ['livedead aqua', 'livedead yellow', 'livedead near ir'],
+    SYTO: ['syto 40', 'syto 41', 'syto 42', 'syto 45', 'syto rnaselect'],
+  };
+  for (const [canonical, variants] of Object.entries(newFamilyVariants)) {
+    for (const variant of variants) {
+      assert.ok(kb.markersKb.markers[canonical].variants.includes(variant), `${canonical}: ${variant}`);
+      assert.deepEqual(
+        kb.spectra[canonical].variants[variant],
+        rawSpectra.fluorophores[canonical].variants[variant],
+        `${canonical} spectrum: ${variant}`
+      );
+    }
+  }
+
+  const representativeAliases = {
+    'Alexa Fluor 790': 'ALEXA790',
+    'ATTO 740': 'ATTO740',
+    'CF 790': 'CF790',
+    'DyLight 800': 'DYLIGHT800',
+    'mScarlet-I': 'MSCARLETI',
+    'IRDye 800CW': 'IRDYE800CW',
+    'LysoTracker Deep Red': 'LYSOTRACKER',
+    'LIVE-DEAD Near IR': 'LIVEDEAD',
+    'SYTO RNASelect': 'SYTO',
+  };
+  for (const [alias, canonical] of Object.entries(representativeAliases)) {
+    assert.equal(kb.index.aliasToCanonical.get(alias.toLowerCase()), canonical, alias);
+  }
 });
 
 test('missing raw.spectra degrades to an empty shape plus an issue, never silence or a throw', () => {

@@ -12,7 +12,7 @@ import { renderMarkdown } from '../src/engine/render/markdown.js';
 import { renderMermaid } from '../src/engine/render/mermaid.js';
 import { emptyExperiment } from '../src/core/schema.js';
 import { createDefaultStudy } from '../src/core/defaultStudy.js';
-import { NAMING_CONFIG, BASE_TEMPLATE, realKb } from './fixtures.js';
+import { NAMING_CONFIG, BASE_TEMPLATE, readKbJson, realKb } from './fixtures.js';
 
 // --- Determinism ---------------------------------------------------------
 
@@ -116,6 +116,74 @@ test('panelRows reads from structured channels (target + resolved spectral field
   assert.deepEqual(viability.panelRows, [
     { target: 'Nucleic acid', fluorophore: 'DAPI', conjugation: 'direct-probe', state: 'known', excitationPeakNm: 358, emissionPeakNm: 461 },
   ]);
+});
+
+test('a mixed expanded panel reaches panelRows with identities and peaks from the real spectra pack', () => {
+  const study = createDefaultStudy();
+  const assay = study.assays[0];
+  const fluorophores = ['mScarlet-I', 'IRDye 800CW', 'CellROX Deep Red', 'LysoTracker Deep Red'];
+  assay.panel = {
+    targets: [],
+    channels: fluorophores.map((fluorophore, index) => ({
+      id: `expanded-${index + 1}`,
+      target: `Target ${index + 1}`,
+      fluorophore,
+      conjugation: 'direct-probe',
+      conjugateDye: '',
+    })),
+  };
+
+  const kb = realKb();
+  const rawSpectra = readKbJson('spectra').fluorophores;
+  const expectedByName = {
+    'mScarlet-I': rawSpectra.MSCARLETI,
+    'IRDye 800CW': rawSpectra.IRDYE800CW,
+    'CellROX Deep Red': rawSpectra.CELLROXDEEPRED,
+    'LysoTracker Deep Red': rawSpectra.LYSOTRACKER.variants['lysotracker deep red'],
+  };
+  const rows = buildStudyDocument(study, kb, NAMING_CONFIG, BASE_TEMPLATE).assays[0].panelRows;
+
+  assert.equal(rows.length, fluorophores.length);
+  for (const row of rows) {
+    const expected = expectedByName[row.fluorophore];
+    assert.ok(expected, `unexpected panel row '${row.fluorophore}'`);
+    assert.equal(row.state, 'known', row.fluorophore);
+    assert.equal(row.excitationPeakNm, expected.excitationPeakNm, `${row.fluorophore} excitation`);
+    assert.equal(row.emissionPeakNm, expected.emissionPeakNm, `${row.fluorophore} emission`);
+  }
+
+  // Perturb the shaped runtime pack in memory and require the document to
+  // follow it. This fails if buildStudyDocument ever copies these familiar
+  // values into consumer code instead of resolving the supplied KB.
+  kb.spectra.MSCARLETI.excitationPeakNm = rawSpectra.MSCARLETI.excitationPeakNm + 1;
+  kb.spectra.MSCARLETI.emissionPeakNm = rawSpectra.MSCARLETI.emissionPeakNm + 1;
+  const changedRow = buildStudyDocument(study, kb, NAMING_CONFIG, BASE_TEMPLATE).assays[0].panelRows[0];
+  assert.equal(changedRow.excitationPeakNm, rawSpectra.MSCARLETI.excitationPeakNm + 1);
+  assert.equal(changedRow.emissionPeakNm, rawSpectra.MSCARLETI.emissionPeakNm + 1);
+});
+
+test('panelRows preserve honest ambiguous-family and spectrum-unavailable states', () => {
+  const study = createDefaultStudy();
+  study.assays[0].panel = {
+    targets: [],
+    channels: [
+      { id: 'generic-family', target: '', fluorophore: 'LysoTracker', conjugation: 'direct-probe', conjugateDye: '' },
+      { id: 'unsupported-spectrum', target: '', fluorophore: 'FURA2', conjugation: 'direct-probe', conjugateDye: '' },
+    ],
+  };
+  const rows = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE).assays[0].panelRows;
+  assert.deepEqual(
+    rows.map(({ fluorophore, state, excitationPeakNm, emissionPeakNm }) => ({
+      fluorophore,
+      state,
+      excitationPeakNm,
+      emissionPeakNm,
+    })),
+    [
+      { fluorophore: 'LysoTracker', state: 'ambiguous-family', excitationPeakNm: null, emissionPeakNm: null },
+      { fluorophore: 'FURA2', state: 'spectrum-unavailable', excitationPeakNm: null, emissionPeakNm: null },
+    ]
+  );
 });
 
 test('a filled-in structured panel.channels takes precedence over the free-text markers field for control gating', () => {

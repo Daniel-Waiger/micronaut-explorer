@@ -1,0 +1,66 @@
+{
+  "collaborationTag": "Codex:planner-web-fluorophore-expansion",
+  "executorModel": "gpt-5.6-sol medium",
+  "purpose": "Parallel-edit ownership signal for Claude Code; do not overwrite files while their task is in_progress.",
+  "tasks": {
+    "T1": {
+      "status": "completed",
+      "owner": "Codex/gpt-5.6-sol-medium",
+      "files": [
+        "docs/references/planner-fluorophore-sources.json"
+      ]
+    },
+    "T2": {
+      "status": "completed",
+      "owner": "Codex/gpt-5.6-sol-medium",
+      "files": [
+        "src/microscopy_naming_assistant/markers.py"
+      ]
+    },
+    "T3": {
+      "status": "completed",
+      "owner": "Codex/gpt-5.6-sol-medium",
+      "files": [
+        "tools/export_markers_kb.py"
+      ]
+    },
+    "T4": {
+      "status": "completed",
+      "owner": "Codex/gpt-5.6-sol-medium",
+      "files": [
+        "web/kb/markers.json",
+        "web/kb.dev.js"
+      ]
+    },
+    "T5-T7": {
+      "status": "completed",
+      "owner": "Codex/gpt-5.6-sol-medium",
+      "files": [
+        "web/kb/spectra.json"
+      ]
+    },
+    "T8-T11": {
+      "status": "completed",
+      "owner": "Codex/gpt-5.6-sol-medium",
+      "files": [
+        "web/tests/kb.test.js",
+        "web/tests/spectra.test.js",
+        "web/tests/kbpack.test.js",
+        "web/tests/studydoc.test.js",
+        "web/tests/benchcard.test.js"
+      ]
+    },
+    "T12": {
+      "status": "completed",
+      "owner": "Codex/gpt-5.6-sol-medium",
+      "files": [
+        "web/kb/markers.json",
+        "web/kb.dev.js",
+        "web/src/engine/spectra.js",
+        "dist/index.html",
+        "app_streamlit.py",
+        "tests/test_app_smoke.py"
+      ]
+    }
+  }
+}

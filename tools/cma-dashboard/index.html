@@ -144,102 +144,299 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "local-llm-guidance",
-  "orchestrator": "Claude Opus 4.8",
-  "active_model": "Claude Opus 4.8",
-  "active_status": "idle",
-  "phase": "Waves A+B complete",
-  "state_note": "",
+  "run": "Planner fluorophore expansion",
+  "orchestrator": "CMA orchestrator",
+  "active_model": "gpt-5.6-sol-medium",
+  "active_status": "done",
+  "phase": "",
+  "state_note": "All authorized worktree-scope issues resolved; BioIO/metadata readers parked by user",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "Test suite",
-      "v": "598 passed",
+      "k": "Source ledger",
+      "v": "83 records",
       "tone": "ok"
     },
     {
-      "k": "Wave A",
-      "v": "5/5 complete",
+      "k": "Source URLs",
+      "v": "46 live",
       "tone": "ok"
     },
     {
-      "k": "Wave B",
-      "v": "1/1 complete",
+      "k": "Marker canonicals",
+      "v": "168 total",
+      "tone": "ok"
+    },
+    {
+      "k": "Alias collisions",
+      "v": "0",
+      "tone": "ok"
+    },
+    {
+      "k": "New classes",
+      "v": "17 protein / 12 indicator / 13 stain / 30 dye",
+      "tone": "ok"
+    },
+    {
+      "k": "New family variants",
+      "v": "11",
+      "tone": "ok"
+    },
+    {
+      "k": "Python marker/export tests",
+      "v": "40 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Marker KB JS tests",
+      "v": "19 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Marker export",
+      "v": "byte-identical twice",
+      "tone": "ok"
+    },
+    {
+      "k": "Spectra ledger parity",
+      "v": "72 direct + 11 variants",
+      "tone": "ok"
+    },
+    {
+      "k": "Spectra tests",
+      "v": "50 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "KB pack tests",
+      "v": "16 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Streamlit smoke",
+      "v": "12 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Python non-reader",
+      "v": "343 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Web suite",
+      "v": "608 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Single-file build",
+      "v": "24 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Smoke floor/current",
+      "v": "15 + 15 passed",
       "tone": "ok"
     }
   ],
-  "defects": [],
+  "defects": [
+    {
+      "id": "E1",
+      "severity": "external",
+      "title": "Legacy Streamlit suite rejects nested expanders",
+      "detail": "10 failures at unchanged app_streamlit.py:623; 333 non-integration tests pass"
+    }
+  ],
   "tasks": [
     {
-      "id": "1",
-      "phase": "Wave A",
-      "title": "llmschema.js (pure schema builder)",
+      "id": "T1",
+      "phase": "Batch 1",
+      "title": "Curate an authoritative spectral source ledger",
       "status": "done",
-      "by": "Opus"
+      "by": "gpt-5.6-sol-medium verified"
     },
     {
-      "id": "2",
-      "phase": "Wave A",
-      "title": "provider seam (manualPaste + ollama adapters)",
+      "id": "T2",
+      "phase": "Batch 2",
+      "title": "Add canonical marker names and collision-free aliases",
       "status": "done",
-      "by": "Opus"
+      "by": "27 tests + alias audit"
     },
     {
-      "id": "3",
-      "phase": "Wave A",
-      "title": "guidance system prompt in llmprompt.js",
+      "id": "T3",
+      "phase": "Batch 3",
+      "title": "Classify new canonicals and family variants in the exporter",
       "status": "done",
-      "by": "Opus"
+      "by": "classification audit passed"
     },
     {
-      "id": "4",
-      "phase": "Wave A",
-      "title": "guidance panel UI",
-      "status": "done",
-      "by": "Opus"
+      "id": "T4",
+      "phase": "Batch 4",
+      "title": "Regenerate marker KB mirrors from their producers",
+      "status": "resolved",
+      "by": "DIR exact-alias invariant fixed; full T4 verification passed"
     },
     {
-      "id": "5",
-      "phase": "Wave A",
-      "title": "README/header accuracy update",
+      "id": "T5",
+      "phase": "Batch 5",
+      "title": "Add source-backed organic-label and near-IR spectra",
       "status": "done",
-      "by": "Opus"
+      "by": "30/30 ledger parity + suite green"
     },
     {
-      "id": "6",
-      "phase": "Wave B",
-      "title": "llmproposals.js + draft + wiring",
+      "id": "T6",
+      "phase": "Batch 6",
+      "title": "Add exact named fluorescent-protein spectra",
       "status": "done",
-      "by": "Opus"
+      "by": "17/17 FP parity + exact aliases"
     },
     {
-      "id": "7",
-      "phase": "Verification",
-      "title": "tests + browser preview",
+      "id": "T7",
+      "phase": "Batch 7",
+      "title": "Add live-cell, nucleic-acid, ion, ROS, pH, and family spectra",
       "status": "done",
-      "by": "Opus"
+      "by": "25 direct + 11 variants; 47 spectra tests"
+    },
+    {
+      "id": "T8",
+      "phase": "Batch 5",
+      "title": "Lock new marker classes, aliases, and variants with producer tests",
+      "status": "done",
+      "by": "19 producer acceptance tests"
+    },
+    {
+      "id": "T9",
+      "phase": "Batch 8",
+      "title": "Add source-parity and resolver regression tests for spectra",
+      "status": "done",
+      "by": "50 source-parity/resolver tests"
+    },
+    {
+      "id": "T10",
+      "phase": "Batch 8",
+      "title": "Verify generated-pack wiring exposes the expanded KB",
+      "status": "done",
+      "by": "16 real-pack wiring tests"
+    },
+    {
+      "id": "T11",
+      "phase": "Batch 9",
+      "title": "Exercise study-document and bench-card consumers",
+      "status": "done",
+      "by": "36 downstream consumer tests"
+    },
+    {
+      "id": "T12",
+      "phase": "Batch 10",
+      "title": "Run the full suite and verify the served shipped artifact",
+      "status": "done",
+      "by": "independent-CMA-approved"
+    },
+    {
+      "id": "R1",
+      "phase": "Repair",
+      "title": "Remove_nested_Streamlit_expanders",
+      "status": "resolved",
+      "by": "gpt-5.6-sol-medium"
+    },
+    {
+      "id": "R2",
+      "phase": "Repair",
+      "title": "Validate_metadata_reader_environment",
+      "status": "done",
+      "by": "user-parked-readers"
+    },
+    {
+      "id": "R3",
+      "phase": "Repair",
+      "title": "Rerun_all_gates_and_rebuild",
+      "status": "done",
+      "by": "independent-CMA-approved"
     }
   ],
   "log": [
     {
-      "time": "18:06:44",
-      "msg": "Reclaimed :8777 after Codex overwrite; Codex run preserved on :8778 (tools/cma-dashboard-codex)"
+      "time": "18:02:19",
+      "msg": "T1 dispatched: authoritative vendor, FPbase, and primary-source verification"
     },
     {
-      "time": "18:06:44",
-      "msg": "Wave B: llmproposals.js + core/draft.js + new-tab handoff built, 20 new tests green"
+      "time": "18:03:03",
+      "msg": "Live dashboard started at http://localhost:8778 (separate from Claude Code)"
     },
     {
-      "time": "18:07:13",
-      "msg": "Collaboration ownership published in docs/plans/planner-web-fluorophore-expansion-ownership.json; code edits will carry Codex task tags"
+      "time": "18:04:33",
+      "msg": "T1 executor switched to gpt-5.6-sol medium per user request"
     },
     {
-      "time": "18:09:30",
-      "msg": "Wave B verified: draft loads in new tab, badges render, confirm promotes llm_freetext -> user_edited (lesson E8)"
+      "time": "18:06:34",
+      "msg": "Board moved to :8778 (Opus took :8777 for local-llm-guidance); run state preserved intact"
+    },
+    {
+      "time": "21:46:02",
+      "msg": "T1 source ledger verified; corrected stale/formulation-specific source mismatches and started T2"
+    },
+    {
+      "time": "21:51:48",
+      "msg": "T2 complete: 72 new canonicals, representative aliases verified, generic FP parents preserved"
+    },
+    {
+      "time": "21:53:18",
+      "msg": "T3 complete; X-03 coupling notice posted before marker pack generation"
+    },
+    {
+      "time": "21:53:49",
+      "msg": "T4 verification caught DIR exact-lookup invariant failure"
+    },
+    {
+      "time": "21:54:37",
+      "msg": "D1 resolved; T4 complete and beginning source-backed spectra batches"
+    },
+    {
+      "time": "21:56:32",
+      "msg": "T5 content parity passed; spectra completeness test correctly awaits remaining staged entries"
+    },
+    {
+      "time": "21:58:55",
+      "msg": "T5-T7 complete; all source-backed spectra and family resolution verified"
+    },
+    {
+      "time": "22:04:36",
+      "msg": "T8-T10 complete; producer, source-parity/resolver, and real-kbpack wiring tests green; T11 started"
+    },
+    {
+      "time": "23:22:47",
+      "msg": "T11 complete with 36 consumer tests; T12 deterministic regeneration and full gates started"
+    },
+    {
+      "time": "23:35:00",
+      "msg": "Independent review findings fixed and re-review approved; T12 held on unrelated legacy failures and browser URL policy"
+    },
+    {
+      "time": "23:38:19",
+      "msg": "User authorized resolving all actionable issues in this worktree; validating failures under .venv before edits"
+    },
+    {
+      "time": "23:40:06",
+      "msg": "Confirmed the worktree lacks the documented .venv; nested expander is a genuine compatibility defect, metadata failure requires a proper dependency environment"
+    },
+    {
+      "time": "23:42:11",
+      "msg": "Stopped dependency installation before BioIO was installed; metadata-reader gate parked by user"
+    },
+    {
+      "time": "23:49:26",
+      "msg": "Current Streamlit 1.61.1 smoke suite passes 12/12 without BioIO installed"
+    },
+    {
+      "time": "23:53:33",
+      "msg": "All active code gates green; entering mandatory independent verification"
+    },
+    {
+      "time": "00:03:28",
+      "msg": "Final independent verification approved with no blocking findings; all active worktree gates green"
     }
   ],
-  "snapshot_at": "2026-08-13 18:09"
+  "snapshot_at": "2026-08-14 00:03"
 };
 /* CMA:EMBEDDED:END */
 
