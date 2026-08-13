@@ -78,6 +78,7 @@ function init() {
 
   const root = document.getElementById('app');
   const { main, showToast } = renderShell(root, store, router, {
+    kbIssueCount: kb.issues.length,
     // Clear persisted state BEFORE reloading. Resetting the in-memory store
     // instead would immediately trip the autosave subscription below and write
     // the empty experiment back as a NEW ring entry, leaving the old slots in
