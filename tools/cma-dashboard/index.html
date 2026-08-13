@@ -144,113 +144,211 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "planner-web-exports-v1",
-  "orchestrator": "warm-context (self-selected)",
-  "active_model": "Claude Sonnet",
-  "active_status": "idle",
-  "phase": "implementation",
-  "state_note": "",
-  "current_task": null,
+  "run": "Alpha pilot readiness (Planner)",
+  "orchestrator": "Claude Opus 5",
+  "active_model": "Claude Opus 5",
+  "active_status": "running",
+  "phase": "Post-plan bug fix",
+  "state_note": "User caught: deleting an assay via the switcher's x sometimes silently didn't update the on-screen list",
+  "current_task": {
+    "id": "DELFIX",
+    "title": "main.js reactivity fix for assay deletion"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "JS tests",
-      "v": "507 passed",
+      "k": "Test suite",
+      "v": "561 js + 327 py",
       "tone": "ok"
     },
     {
-      "k": "Build",
-      "v": "387628 bytes, under 2MB gate",
-      "tone": "ok"
+      "k": "Review findings",
+      "v": "15 found",
+      "tone": "bad"
+    },
+    {
+      "k": "Branch",
+      "v": "feat/alpha-pilot-readiness",
+      "tone": "sm"
+    },
+    {
+      "k": "Files changed",
+      "v": "43",
+      "tone": "sm"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "EXP-1",
-      "phase": "implementation",
-      "title": "Extend studydoc.js filenames with row detail",
+      "id": "0A",
+      "phase": "Wave 0",
+      "title": "Fix spectra.js engine bugs (dedupe, hyphen tokenizer, NONE sentinel, sort, peak sanity)",
       "status": "done",
-      "by": "Sonnet"
+      "by": "Opus 5 (41 tests)"
     },
     {
-      "id": "EXP-2",
-      "phase": "implementation",
-      "title": "Add render/csv.js (renderCsv)",
+      "id": "0B",
+      "phase": "Wave 0",
+      "title": "Fix Color panel UI (per-state CSS, wording, dedupe filter)",
       "status": "done",
-      "by": "Sonnet"
+      "by": "Opus 5"
     },
     {
-      "id": "EXP-3",
-      "phase": "implementation",
-      "title": "Add render/json.js (renderJson)",
+      "id": "0C",
+      "phase": "Wave 0",
+      "title": "KB content: fix gaps + common-dye sweep + spectra",
       "status": "done",
-      "by": "Sonnet"
+      "by": "Opus 5 (326 py + 516 js green)"
     },
     {
-      "id": "EXP-4",
-      "phase": "implementation",
-      "title": "Wire CSV/JSON download buttons into overview.js",
+      "id": "0D",
+      "phase": "Wave 0",
+      "title": "Ship integrity: deploy gate + kb.dev.js staleness guard",
       "status": "done",
-      "by": "Sonnet"
+      "by": "Opus 5"
     },
     {
-      "id": "EXP-5",
-      "phase": "implementation",
-      "title": "Tests: csv.test.js, json.test.js, studydoc.test.js row assertion",
+      "id": "0E",
+      "phase": "Wave 0",
+      "title": "Cleanups: CSV injection guard, dedupe download buttons, test fixtures",
       "status": "done",
-      "by": "Sonnet"
+      "by": "Opus 5"
     },
     {
-      "id": "EXP-6",
-      "phase": "ship-gate",
-      "title": "Build + live browser verification",
+      "id": "0F",
+      "phase": "Wave 0",
+      "title": "Docs: README steps list, guide.js exports, ROADMAP/TASKS refresh",
       "status": "done",
-      "by": "Sonnet"
+      "by": "Opus 5"
     },
     {
-      "id": "EXP-7",
-      "phase": "docs",
-      "title": "ROADMAP/TASKS/plan doc updated",
+      "id": "0G",
+      "phase": "Wave 0",
+      "title": "Fix experimental controls decision rules (antibody gating, FMO, NONE normalize)",
       "status": "done",
-      "by": "Sonnet"
+      "by": "Opus 5 (39 controls tests, verified fix on default study)"
+    },
+    {
+      "id": "W1",
+      "phase": "Wave 1",
+      "title": "Feedback path: Copy feedback report button + form/alias links",
+      "status": "done",
+      "by": "Opus 5, verified in browser"
+    },
+    {
+      "id": "W2A",
+      "phase": "Wave 2",
+      "title": "Structured panel assembly (panel.targets/panel.channels editor)",
+      "status": "done",
+      "by": "Opus 5, verified live (antibody-gating flows Panel->Overview)"
+    },
+    {
+      "id": "W2B",
+      "phase": "Wave 2",
+      "title": "Bench card export",
+      "status": "done",
+      "by": "Opus 5, verified live"
+    },
+    {
+      "id": "W2C",
+      "phase": "Wave 2",
+      "title": "Conformance check",
+      "status": "done",
+      "by": "Opus 5, verified live"
+    },
+    {
+      "id": "W2D",
+      "phase": "Wave 2",
+      "title": "Export for your own LLM (prompt + JSON builder)",
+      "status": "done",
+      "by": "Opus 5, verified on built artifact"
+    },
+    {
+      "id": "VERIFY",
+      "phase": "Wave 3",
+      "title": "Final verification pass (tests, dev server, built dist, print preview)",
+      "status": "done",
+      "by": "Opus 5"
+    },
+    {
+      "id": "DELFIX",
+      "phase": "Post-plan",
+      "title": "Fix stale assay list after switcher delete",
+      "status": "done",
+      "by": "Opus 5"
     }
   ],
   "log": [
     {
-      "time": "00:07:37",
-      "msg": "EXP-1: studydoc.js filenames entries now carry row (group/factorLevels/bioRep/techRep)"
+      "time": "17:18:19",
+      "msg": "Plan approved: finish Planner roadmap (minus in-app LLM), fix xhigh-review findings, widen alpha pilot"
     },
     {
-      "time": "00:07:37",
-      "msg": "EXP-2: CSV renderer added, RFC 4180 quoting, flattened factors column"
+      "time": "17:18:19",
+      "msg": "Started 0A: spectra.js engine fixes"
     },
     {
-      "time": "00:07:37",
-      "msg": "EXP-3: JSON renderer added"
+      "time": "17:20:24",
+      "msg": "0A done: dedupe/hyphen/sentinel/sort/peak-sanity fixed, +9 tests (516 total green)"
     },
     {
-      "time": "00:07:38",
-      "msg": "EXP-4: two new buttons wired into overview actions div"
+      "time": "17:21:32",
+      "msg": "0B done: per-state CSS, wording fix, no-markers-declared rendering, 516 tests green"
     },
     {
-      "time": "00:07:38",
-      "msg": "EXP-5: 507/507 JS tests passing (was 495)"
+      "time": "17:30:35",
+      "msg": "0C done: SYTO/DCFDA/BODIPY/CELLMASK/ERTRACKER families filled, SOX/SOX2/ANNEXINV reclassified moiety, 20+ common-dye sweep, default study markers fixed"
     },
     {
-      "time": "00:07:38",
-      "msg": "EXP-6: dist build verified, both buttons present/functional, zero console errors on click"
+      "time": "17:31:48",
+      "msg": "0D done: deploy.yml gains build-pipeline pytest gate + artifact smoke check; serve_dir.py auto-regenerates stale kb.dev.js"
     },
     {
-      "time": "00:07:38",
-      "msg": "EXP-7: ROADMAP.md Delivered+Next updated, TASKS.md updated, docs/plans/planner-web-exports.md written"
+      "time": "17:34:30",
+      "msg": "0E done: CSV formula-injection guard, 4 download buttons collapsed to 1 helper, tests/fixtures.js extracted (518 green)"
     },
     {
-      "time": "00:07:39",
-      "msg": "Exports (CSV/JSON) run complete; awaiting user review before commit/push"
+      "time": "17:43:03",
+      "msg": "0G done: panel.derived facts (fluorophoreCount/hasAntibody/hasTag/hasMarkersDeclared), new 'target' KB class split from 'moiety', antibody-gated isotype/secondary/specificity, FMO rule at 3+, NONE-guard normalized. Verified: default study no longer wrongly requests isotype/secondary controls."
+    },
+    {
+      "time": "17:44:47",
+      "msg": "WAVE 0 COMPLETE: all 7 review-fix tasks done, 529 js + 327 py tests green. README/ROADMAP/TASKS refreshed."
+    },
+    {
+      "time": "17:52:17",
+      "msg": "WAVE 1 COMPLETE: Copy feedback report button (build+toast+clipboard verified live), GitHub issues link. FEEDBACK_FORM_URL/FEEDBACK_EMAIL left blank for Daniel to fill in shell.js."
+    },
+    {
+      "time": "17:59:14",
+      "msg": "WAVE 2A COMPLETE: panel.channels structured editor (target/fluorophore/conjugation), seed-from-markers, studydoc prefers structured over free-text. Verified live: switching a channel to antibody-indirect adds 3 controls on Overview."
+    },
+    {
+      "time": "18:03:41",
+      "msg": "WAVE 2B COMPLETE: engine/render/benchcard.js (single-assay print card), studydoc.js panelRows, per-assay download button on Overview. Verified live, no console errors."
+    },
+    {
+      "time": "18:16:04",
+      "msg": "WAVE 2C COMPLETE: engine/conformance.js pass/fail gate, splits 'unanswered placeholder' (warning) from 'answered but invalid' (error). Deploy gate from 0D caught a real duplicate-symbol build break -- fixed by exporting assayLabel once + renaming benchcard helpers."
+    },
+    {
+      "time": "18:16:04",
+      "msg": "serve_dir.py now sends no-store headers: browser HTTP caching had twice produced phantom 'export not found' errors during verification."
+    },
+    {
+      "time": "09:48:22",
+      "msg": "WAVE 2D COMPLETE: engine/render/llmprompt.js -- preamble + study JSON + suggested questions, copy button on Overview. Verified on the BUILT artifact: clipboard write succeeds, all wave 0/1/2 features present."
+    },
+    {
+      "time": "09:52:20",
+      "msg": "FULL PLAN COMPLETE. Not committed per standing instruction (only commit when asked). Two loose ends for Daniel: FEEDBACK_FORM_URL/FEEDBACK_EMAIL in shell.js, and the spectra.json content review."
+    },
+    {
+      "time": "12:13:13",
+      "msg": "Real bug found and fixed: main.js only re-rendered the active step on activeAssayId change, so deleting a NON-active assay via the switcher updated the pill bar but left Study's own assay list stale until an unrelated action fired. Fixed with an assays-reference check (safe: store.setPath mutates in place, only patch() replaces the array). Verified on the built artifact after 3 rounds of ES-module-cache false negatives on the dev server."
     }
   ],
-  "snapshot_at": "2026-08-03 00:07"
+  "snapshot_at": "2026-08-13 12:13"
 };
 /* CMA:EMBEDDED:END */
 
