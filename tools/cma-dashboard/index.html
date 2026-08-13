@@ -149,7 +149,7 @@ const EMBEDDED = {
   "active_model": "gpt-5.6-sol-medium",
   "active_status": "done",
   "phase": "",
-  "state_note": "All authorized worktree-scope issues resolved; BioIO/metadata readers parked by user",
+  "state_note": "Fluorophore expansion and Streamlit repair complete, independently approved, committed, and pushed; BioIO/metadata readers parked by user",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
@@ -215,7 +215,7 @@ const EMBEDDED = {
     },
     {
       "k": "Streamlit smoke",
-      "v": "12 passed",
+      "v": "15 floor + 15 current",
       "tone": "ok"
     },
     {
@@ -239,14 +239,7 @@ const EMBEDDED = {
       "tone": "ok"
     }
   ],
-  "defects": [
-    {
-      "id": "E1",
-      "severity": "external",
-      "title": "Legacy Streamlit suite rejects nested expanders",
-      "detail": "10 failures at unchanged app_streamlit.py:623; 333 non-integration tests pass"
-    }
-  ],
+  "defects": [],
   "tasks": [
     {
       "id": "T1",
@@ -434,9 +427,13 @@ const EMBEDDED = {
     {
       "time": "00:03:28",
       "msg": "Final independent verification approved with no blocking findings; all active worktree gates green"
+    },
+    {
+      "time": "00:10:08",
+      "msg": "Handover prepared: stale E1 cleared; branch pushed and ready for integration"
     }
   ],
-  "snapshot_at": "2026-08-14 00:03"
+  "snapshot_at": "2026-08-14 00:10"
 };
 /* CMA:EMBEDDED:END */
 
