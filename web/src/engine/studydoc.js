@@ -28,6 +28,7 @@ import { effectiveNamingFields, planFilenames, studyNameIssues } from './plan.js
 import { readoutState, selectControls } from './controls.js';
 import { buildLadder } from './stages.js';
 import { derivePanelFacts } from './spectra.js';
+import { ANTIBODY_CONJUGATION_MODES, normalizeChannels } from './panelAssembly.js';
 
 function assayLabel(assay, index) {
   return (assay && typeof assay.label === 'string' && assay.label.trim()) || `Assay ${index + 1}`;
@@ -107,8 +108,37 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
     // single-stain, and the no-markers-declared guard every panel rule
     // shares) can gate on the real panel content instead of firing as a
     // block. See derivePanelFacts's own header for the defect this fixes.
+    //
+    // The structured panel (engine/panelAssembly.js, Wave 2A) is preferred
+    // over the free-text derivation whenever at least one channel exists --
+    // a filled-in channel's `conjugation` states unambiguously whether an
+    // antibody is involved, where the free-text path can only approximate
+    // it from markers.json's `class`. Falls back to the free-text field
+    // when panel.channels is empty, which is every assay before Wave 2A and
+    // every assay that never adopts the structured editor -- the free-text
+    // path is not being retired.
+    const channels = normalizeChannels(view.panel && view.panel.channels);
     const markersText = (view.naming && view.naming.fields && view.naming.fields.markers) || '';
-    const panelDerived = derivePanelFacts(markersText, markerIndex, markersKb, spectra);
+    let panelDerived;
+    if (channels.length > 0) {
+      // hasAntibody/hasMarkersDeclared read from the CHANNEL's existence and
+      // its stated conjugation -- a channel the user has started (a target,
+      // an antibody conjugation mode) is a real declared fact even before
+      // they have typed the fluorophore's name. fluorophoreCount is
+      // narrower on purpose: it gates single-stain/FMO controls, which are
+      // specifically about SPILLOVER between named dyes, so only channels
+      // with an actual spectral identity filled in count toward it.
+      const withFluorophore = channels.filter((c) => (c.conjugation === 'tag-ligand' ? c.conjugateDye : c.fluorophore).trim());
+      panelDerived = {
+        fluorophoreCount: withFluorophore.length,
+        hasAntibody: channels.some((c) => ANTIBODY_CONJUGATION_MODES.has(c.conjugation)),
+        hasTag: channels.some((c) => c.conjugation === 'tag-ligand'),
+        classes: [],
+        hasMarkersDeclared: true,
+      };
+    } else {
+      panelDerived = derivePanelFacts(markersText, markerIndex, markersKb, spectra);
+    }
     const viewWithDerivedPanel = { ...view, panel: { ...view.panel, derived: panelDerived } };
 
     const firedControls = selectControls(controlRules, viewWithDerivedPanel);

@@ -1,9 +1,16 @@
 // The Color panel step: a qualitative spectral-spillover advisor over the
-// active assay's markers field. Pure read over naming.fields.markers (the
-// ONE source of truth for "which fluorophores are in this assay" -- see
-// docs/plans/planner-web-color-panel.md, Decision 1; the long-reserved,
-// never-built panel.targets/panel.channels stays untouched), reusing
-// engine/validation.js's splitMarkers rather than a second tokenizer.
+// active assay's markers field, PLUS (Wave 2A, alpha-pilot-readiness) the
+// structured panel assembly editor over the long-reserved panel.channels.
+//
+// TWO panels, deliberately not merged into one: the free-text markers field
+// (naming.fields.markers) stays the quick path and the seed -- one line is
+// enough to get a filename and a first spillover read, reusing
+// engine/validation.js's splitMarkers rather than a second tokenizer. The
+// structured channel editor below it is the altitude fix for what free text
+// cannot express: WHICH conjugation mode a channel uses, specifically
+// whether an antibody is involved -- see engine/panelAssembly.js's header
+// and engine/studydoc.js, which prefers a filled-in panel.channels over the
+// free-text derivation once at least one channel exists.
 //
 // The spectral content in web/kb/spectra.json is Claude-drafted, exactly
 // like web/kb/advisor.json's 16 rules -- NOT a placeholder, but not yet
@@ -20,8 +27,19 @@
 // treatment: the app's own "NONE"/"N/A" sentinel is a declaration, not a
 // typo, and must not render through the same path as an unrecognized token.
 
-import { assayView } from '../../core/assay.js';
+import { assayView, scopeWrite } from '../../core/assay.js';
+import { kbMarker } from '../../core/kb.js';
+import { shortId } from '../../core/ids.js';
 import { flagPanelOverlaps, resolvePanel } from '../../engine/spectra.js';
+import {
+  ANTIBODY_CONJUGATION_MODES,
+  CONJUGATION_LABELS,
+  CONJUGATION_MODES,
+  channelSpectralField,
+  emptyChannel,
+  normalizeChannels,
+  seedChannelsFromMarkers,
+} from '../../engine/panelAssembly.js';
 import { createAdvicePanel } from '../advice.js';
 
 const STATE_LABELS = {
@@ -70,6 +88,18 @@ function appendRow(list, entry) {
   }
 
   list.appendChild(row);
+}
+
+function summaryText(channels) {
+  if (channels.length === 0) return 'No channels yet.';
+  const antibodyCount = channels.filter((c) => ANTIBODY_CONJUGATION_MODES.has(c.conjugation)).length;
+  const filled = channels.filter((c) => channelSpectralField(c).trim()).length;
+  return (
+    `${channels.length} channel(s), ${filled} with a fluorophore named -- ` +
+    (antibodyCount > 0
+      ? `${antibodyCount} use an antibody (isotype/secondary-antibody controls will be recommended on Overview).`
+      : 'none use an antibody.')
+  );
 }
 
 export function createPanelStep(kb) {
@@ -156,6 +186,149 @@ export function createPanelStep(kb) {
           main.appendChild(noFlags);
         }
       }
+
+      // --- Structured panel assembly (Wave 2A) --------------------------
+      const assemblyHeading = document.createElement('div');
+      assemblyHeading.className = 'proposals-heading';
+      assemblyHeading.textContent = 'Panel assembly (structured)';
+      main.appendChild(assemblyHeading);
+
+      const assemblyExplainer = document.createElement('p');
+      assemblyExplainer.className = 'panel-empty';
+      assemblyExplainer.textContent =
+        'Optional: name each channel’s biological target and how its fluorophore is attached. More precise than the ' +
+        'markers field above -- in particular, it is what tells the Overview step’s controls whether an antibody is ' +
+        'actually involved, so it can recommend an isotype control only when one is warranted.';
+      main.appendChild(assemblyExplainer);
+
+      const channelsList = document.createElement('div');
+      channelsList.className = 'panel-list';
+      const summary = document.createElement('p');
+      summary.className = 'panel-empty';
+      const controlsRow = document.createElement('div');
+      controlsRow.className = 'overview-actions';
+
+      function currentChannels() {
+        const currentPanel = assayView(store.get(), assayId).panel;
+        return normalizeChannels(currentPanel && currentPanel.channels);
+      }
+
+      function writeChannels(channels) {
+        const { path, slotKey } = scopeWrite(store.get(), 'panel.channels', assayId);
+        store.setPath(path, channels, 'user', { slotKey });
+      }
+
+      function writeChannelsData(channels) {
+        writeChannels(channels);
+        summary.textContent = summaryText(channels);
+      }
+
+      function writeChannelsStructure(channels) {
+        writeChannels(channels);
+        renderChannelsList();
+      }
+
+      function channelField(input, className) {
+        input.className = className;
+        return input;
+      }
+
+      function appendChannelRow(channel, index) {
+        const row = document.createElement('div');
+        row.className = 'panel-row';
+
+        const targetInput = channelField(document.createElement('input'), 'panel-row-text');
+        targetInput.type = 'text';
+        targetInput.placeholder = 'Target (e.g. F-actin, Sox2)';
+        targetInput.value = channel.target;
+        targetInput.addEventListener('input', () => {
+          const next = currentChannels();
+          next[index] = { ...next[index], target: targetInput.value };
+          writeChannelsData(next);
+        });
+        row.appendChild(targetInput);
+
+        const conjugationSelect = document.createElement('select');
+        conjugationSelect.className = 'panel-row-text';
+        for (const mode of CONJUGATION_MODES) {
+          const option = document.createElement('option');
+          option.value = mode;
+          option.textContent = CONJUGATION_LABELS[mode] || mode;
+          if (mode === channel.conjugation) option.selected = true;
+          conjugationSelect.appendChild(option);
+        }
+        conjugationSelect.addEventListener('change', () => {
+          const next = currentChannels();
+          next[index] = { ...next[index], conjugation: conjugationSelect.value };
+          writeChannelsStructure(next); // structural: the dye/conjugate-dye input below depends on the mode
+        });
+        row.appendChild(conjugationSelect);
+
+        const dyeInput = channelField(document.createElement('input'), 'panel-row-text');
+        dyeInput.type = 'text';
+        const isTagLigand = channel.conjugation === 'tag-ligand';
+        dyeInput.placeholder = isTagLigand ? 'Ligand dye (e.g. JF549)' : 'Fluorophore (e.g. Alexa Fluor 488)';
+        dyeInput.value = isTagLigand ? channel.conjugateDye : channel.fluorophore;
+        dyeInput.addEventListener('input', () => {
+          const next = currentChannels();
+          next[index] = isTagLigand
+            ? { ...next[index], conjugateDye: dyeInput.value }
+            : { ...next[index], fluorophore: dyeInput.value };
+          writeChannelsData(next);
+        });
+        row.appendChild(dyeInput);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'assay-pill-delete';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove this channel';
+        removeBtn.addEventListener('click', () => {
+          const next = currentChannels().filter((c) => c.id !== channel.id);
+          writeChannelsStructure(next);
+        });
+        row.appendChild(removeBtn);
+
+        channelsList.appendChild(row);
+      }
+
+      function renderChannelsList() {
+        channelsList.textContent = '';
+        const channels = currentChannels();
+        channels.forEach((channel, index) => appendChannelRow(channel, index));
+        summary.textContent = summaryText(channels);
+
+        controlsRow.textContent = '';
+        const addBtn = document.createElement('button');
+        addBtn.type = 'button';
+        addBtn.className = 'copy-button';
+        addBtn.textContent = '+ Add channel';
+        addBtn.addEventListener('click', () => {
+          writeChannelsStructure([...currentChannels(), emptyChannel(shortId())]);
+        });
+        controlsRow.appendChild(addBtn);
+
+        // Seeding is a ONE-TIME bootstrap (engine/panelAssembly.js's own
+        // header): only offered while channels is still empty, so it can
+        // never silently overwrite in-progress structured edits.
+        if (channels.length === 0 && panelState === 'has-entries') {
+          const seedBtn = document.createElement('button');
+          seedBtn.type = 'button';
+          seedBtn.className = 'copy-button';
+          seedBtn.textContent = 'Seed from markers field';
+          seedBtn.title = 'Create one channel per marker in the free-text field above, with a best-guess conjugation to correct.';
+          seedBtn.addEventListener('click', () => {
+            const seeded = seedChannelsFromMarkers({ entries }, kb.markersKb, kbMarker, shortId);
+            writeChannelsStructure(seeded);
+          });
+          controlsRow.appendChild(seedBtn);
+        }
+      }
+
+      main.appendChild(channelsList);
+      main.appendChild(summary);
+      main.appendChild(controlsRow);
+      renderChannelsList();
 
       const advicePanel = createAdvicePanel(advisor || [], 'panel');
       main.appendChild(advicePanel.element);
