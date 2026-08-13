@@ -179,7 +179,13 @@ export const guideStep = {
       'A bench card per assay (Overview) — a compact, print-oriented single-assay summary: ' +
         'channels, controls with their reasons, and two worked filename examples.',
       'A copy-paste prompt for your own LLM (Overview) — the study as JSON plus ground rules ' +
-        'that keep the model from inventing a domain fact. This app never calls a model itself.',
+        'that keep the model from inventing a domain fact.',
+      'An optional "Ask about this step" panel (Describe) — off by default. Left off, or if ' +
+        'no local model is configured, it works exactly like the copy-paste prompt above: you ' +
+        'get text to paste into whatever LLM you already use. If you opt in and point it at a ' +
+        'local Ollama server, the app calls that server directly over your own network — no ' +
+        'API key, nothing sent anywhere else. Either way it can only explain the current step; ' +
+        'it never writes an answer into your study for you.',
     ]);
 
     section(main, 'Saving your work');

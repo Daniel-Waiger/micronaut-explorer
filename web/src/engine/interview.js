@@ -9,6 +9,7 @@
 
 import { evaluatePredicate } from './predicate.js';
 import { getPath } from '../core/paths.js';
+import { isProvisional } from '../core/provenance.js';
 
 const KNOWN_QUESTION_TYPES = new Set(['text', 'choice', 'number', 'multi']);
 const DEFAULT_ANSWER_TAG = 'user';
@@ -125,6 +126,14 @@ export function skipQuestion(experiment, questionId) {
  * the entire reason the free-text tier (C1-4) and this interview compose:
  * the parser fills WEAK slots, the interview then asks about exactly those,
  * pre-filled.
+ *
+ * A PROVISIONAL slot ('llm'/'llm_freetext', core/provenance.js) gets the
+ * SAME treatment, for the same reason: a model-drafted study (core/draft.js)
+ * would otherwise be invisible here -- every drafted field would re-ask as
+ * an empty question, discarding the draft in the one view meant to review
+ * it. Only these two tiers pre-fill; 'kb-default' and 'derived' are app-
+ * supplied scaffolding the user never proposed, and surfacing them as
+ * "confirm this" would ask the user to ratify the app's own defaults.
  */
 export function nextQuestions(questions, experiment, limit) {
   const cap = typeof limit === 'number' && limit >= 0 ? limit : Infinity;
@@ -139,10 +148,10 @@ export function nextQuestions(questions, experiment, limit) {
     const tag = slotTag(experiment, question.field);
     if (STRONG_TAGS.has(tag)) continue;
 
-    if (tag === 'freetext') {
+    if (tag === 'freetext' || (tag && isProvisional(tag))) {
       const currentValue = getPath(experiment, question.field);
       if (currentValue !== undefined) {
-        askable.push({ ...question, suggestedDefault: currentValue });
+        askable.push({ ...question, suggestedDefault: currentValue, suggestedTag: tag });
         continue;
       }
     }

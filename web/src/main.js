@@ -3,7 +3,7 @@ import { emptyExperiment } from './core/schema.js';
 import { createStore } from './core/store.js';
 import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
-import { clearAll, loadMostRecentRecoverable, saveExperiment } from './core/persist.js';
+import { clearAll, loadMostRecentRecoverable, saveExperiment, takeStashedDraft } from './core/persist.js';
 import { shapeAppKb } from './engine/kbpack.js';
 import { namingStep } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
@@ -41,18 +41,27 @@ function loadAppKb() {
  * corrupted) -- an existing in-progress study is never touched.
  */
 function loadInitialExperiment() {
+  // A model-drafted study opened in a new tab (core/draft.js) wins over the
+  // autosave, and is consumed one-shot so a later reload of THIS tab falls
+  // back to the normal autosave path rather than re-opening the draft
+  // forever. Deliberately ahead of loadMostRecentRecoverable: the draft was
+  // stashed by the other tab moments ago and is the reason this tab exists.
+  const draft = takeStashedDraft();
+  if (draft) {
+    return { experiment: draft, skippedCount: 0, totalSaved: 0, isDraft: true };
+  }
   const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
     onUnreadable: (id, err) =>
       console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
   });
-  return { experiment: experiment || createDefaultStudy(), skippedCount, totalSaved };
+  return { experiment: experiment || createDefaultStudy(), skippedCount, totalSaved, isDraft: false };
 }
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
 // top-level await since the released artifact is one classic (non-module,
 // non-async) IIFE.
 function init() {
-  const { experiment: initialExperiment, skippedCount, totalSaved } = loadInitialExperiment();
+  const { experiment: initialExperiment, skippedCount, totalSaved, isDraft } = loadInitialExperiment();
   const store = createStore(initialExperiment);
 
   const kb = loadAppKb();
@@ -115,6 +124,12 @@ function init() {
         ? `Recovered your work -- skipped ${skippedCount} unreadable autosave(s) and used an older one instead.`
         : `Couldn't read any of your ${totalSaved} saved experiment(s) -- starting fresh. Nothing was deleted.`
     );
+  }
+
+  // Last, so it wins the single visible toast slot: a user who just landed
+  // in a drafted study most needs to know that nothing here is confirmed.
+  if (isDraft) {
+    showToast('This is a model-drafted study -- every value is a suggestion awaiting your review.');
   }
 
   function renderActiveStep(id) {

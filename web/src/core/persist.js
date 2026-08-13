@@ -164,6 +164,29 @@ export function clearAll({ storage = defaultBackend(), onQuotaExceeded } = {}) {
   }
 }
 
+// A model-drafted study waiting to be opened in a NEW tab (core/draft.js,
+// Wave B). Deliberately NOT a ring slot: the ring is the autosave history of
+// the study the user is actually working on, and pushing a draft into it
+// would make the draft the newest entry -- i.e. what the CURRENT tab
+// restores on its next reload. The whole point of the draft flow is that the
+// open study is not disturbed at all, so the handoff needs its own key that
+// nothing else reads.
+//
+// One-shot by construction: takeStashedDraft deletes the key as it reads it,
+// so a stale draft can never resurrect itself on a later unrelated reload.
+const DRAFT_HANDOFF_KEY = STORAGE_PREFIX + 'draftHandoff';
+
+export function stashDraft(experiment, { storage = defaultBackend(), onQuotaExceeded } = {}) {
+  return writeJSON(storage, DRAFT_HANDOFF_KEY, experiment, onQuotaExceeded);
+}
+
+/** Read and CLEAR the stashed draft. Returns null when there isn't one. */
+export function takeStashedDraft({ storage = defaultBackend(), onQuotaExceeded } = {}) {
+  const draft = readJSON(storage, DRAFT_HANDOFF_KEY, null);
+  if (draft !== null) removeKey(storage, DRAFT_HANDOFF_KEY, onQuotaExceeded);
+  return draft;
+}
+
 export function markChanged({ storage = defaultBackend(), onQuotaExceeded } = {}) {
   const current = readJSON(storage, CHANGES_KEY, 0);
   writeJSON(storage, CHANGES_KEY, current + 1, onQuotaExceeded);

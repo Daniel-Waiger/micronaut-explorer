@@ -7,10 +7,19 @@ import {
   skipQuestion,
   unskipQuestion,
 } from '../../engine/interview.js';
-import { editTagFor } from '../../core/provenance.js';
+import { editTagFor, isProvisional } from '../../core/provenance.js';
 import { createAdvicePanel } from '../advice.js';
+import { createGuidancePanel } from '../guidance.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
 import { resolveReadoutCanonical } from '../../engine/controls.js';
+import { buildStudyDocument } from '../../engine/studydoc.js';
+import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
+import { buildProposalSchema } from '../../engine/llmschema.js';
+import { parseLlmProposals } from '../../engine/llmproposals.js';
+import { buildDraftExperiment } from '../../core/draft.js';
+import { createOllamaProvider } from '../../llm/ollama.js';
+import { loadLlmConfig } from '../../llm/config.js';
+import { stashDraft } from '../../core/persist.js';
 
 const INTERVIEW_LIMIT = 8;
 
@@ -140,6 +149,25 @@ function writeReadoutCanonicalIfNeeded(store, question, readoutText, tag, assayI
   store.setPath(path, canonical, tag, { slotKey });
 }
 
+// The system prompt for study-drafting (Wave B). Separate from
+// engine/render/llmprompt.js's GUIDANCE_PREAMBLE because the roles differ:
+// guidance NARRATES and must never answer for the user, this one answers
+// exactly the supplied questions and nothing else. The schema
+// (engine/llmschema.js) is what actually enforces the vocabulary; this text
+// only explains the job, and every returned value is re-checked against the
+// options anyway (engine/llmproposals.js).
+const DRAFT_SYSTEM_PROMPT = [
+  'You are filling in a microscopy experiment plan from the researcher’s own description.',
+  '',
+  'Rules:',
+  '- Answer ONLY the questions supplied, using ONLY the options offered for each.',
+  '- Omit any question the description does not actually answer. An omission is',
+  '  correct and expected; a guess is not. Do not infer a value to be helpful.',
+  '- Never invent a marker, filter, control, instrument setting, or option that is',
+  '  not in the list you were given.',
+  '- Return JSON matching the supplied schema and nothing else.',
+].join('\n');
+
 export function createDescribeStep(kb) {
   const { questions: questionBank, issues: questionIssues } = loadQuestions(kb.questions);
   if (questionIssues.length > 0) {
@@ -180,6 +208,20 @@ export function createDescribeStep(kb) {
       readButton.textContent = 'Read it';
       main.appendChild(readButton);
 
+      // Only offered when a local model is actually configured -- the draft
+      // flow needs schema-constrained decoding, which the manual-paste
+      // provider cannot do (a human pasting a reply back by hand has no
+      // `format` field). Showing a button that can only fail would be worse
+      // than not showing one.
+      const draftButton = document.createElement('button');
+      draftButton.type = 'button';
+      draftButton.className = 'draft-button';
+      draftButton.textContent = 'Draft a study from this (new tab)';
+      draftButton.title =
+        'Sends this description to your local model and opens the drafted study in a NEW tab. This study is not touched.';
+      draftButton.hidden = !loadLlmConfig().enabled;
+      main.appendChild(draftButton);
+
       // advisor may be undefined (a caller that hasn't wired it, or a KB
       // that failed to load) -- createAdvicePanel([], ...) is completely
       // inert, not a missing-argument crash. Guidance sits above the
@@ -190,6 +232,17 @@ export function createDescribeStep(kb) {
       function updateAdvice() {
         advicePanel.update(assayView(store.get(), assayId));
       }
+
+      // Guidance (local-llm-guidance): read-only, opt-in "ask about this
+      // step" panel. `currentAskable` is refreshed by renderInterview below
+      // on every call, so getContext() always reflects whatever the user is
+      // actually looking at, not a snapshot from when the panel mounted.
+      let currentAskable = [];
+      const guidancePanel = createGuidancePanel(() => ({
+        doc: buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE),
+        questions: currentAskable,
+      }));
+      main.appendChild(guidancePanel.element);
 
       const proposalsHeading = document.createElement('div');
       proposalsHeading.className = 'proposals-heading';
@@ -313,6 +366,7 @@ export function createDescribeStep(kb) {
         // nextQuestions' isSkipped check is unaffected by the assay scoping
         // below -- only the per-question field paths need it.
         const askable = nextQuestions(questionBank, assayView(store.get(), assayId), INTERVIEW_LIMIT);
+        currentAskable = askable;
         if (askable.length === 0) {
           const done = document.createElement('p');
           done.className = 'interview-empty';
@@ -335,6 +389,18 @@ export function createDescribeStep(kb) {
           why.textContent = question.why;
           row.appendChild(why);
 
+          // A pre-filled answer must never look like one the user gave. The
+          // control below is populated either way (that is the point of
+          // suggestedDefault), so the ONLY thing distinguishing a model's
+          // guess from a confirmed answer is this badge -- without it, the
+          // provisional tier would be invisible exactly where it matters.
+          if (question.suggestedTag && isProvisional(question.suggestedTag)) {
+            const badge = document.createElement('div');
+            badge.className = 'question-provisional';
+            badge.textContent = 'Suggested by the model — confirm or change it';
+            row.appendChild(badge);
+          }
+
           const control = buildQuestionControl(question, question.suggestedDefault);
           row.appendChild(control.element);
 
@@ -350,8 +416,18 @@ export function createDescribeStep(kb) {
             if (!raw) return;
             const descriptor = recordAnswer(store.get(), question, coerceAnswer(question, raw));
             const { path, slotKey } = scopeWrite(store.get(), descriptor.path, assayId);
-            store.setPath(path, descriptor.value, descriptor.tag, { slotKey });
-            writeReadoutCanonicalIfNeeded(store, question, descriptor.value, descriptor.tag, assayId, kb);
+            // Confirming a PRE-FILLED question (a freetext parse or an LLM
+            // draft) is the user CORRECTING a machine-sourced guess, which
+            // provenance.js's editTagFor documents as 'user_edited' -- and
+            // repo lesson E8 requires be distinguishable from a value typed
+            // fresh. recordAnswer's own tag is always the question bank's
+            // plain 'user', which is right only for a first-ever entry, so
+            // the two cases have to be told apart here, exactly as the
+            // answered-list's Update button below already does.
+            const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
+            const tag = existingTag ? editTagFor(existingTag) : descriptor.tag;
+            store.setPath(path, descriptor.value, tag, { slotKey });
+            writeReadoutCanonicalIfNeeded(store, question, descriptor.value, tag, assayId, kb);
             renderInterview();
             renderAnswered();
           });
@@ -470,6 +546,74 @@ export function createDescribeStep(kb) {
         // this call, a rule keyed on the narrative would never update while
         // the user is actually typing it.
         updateAdvice();
+      });
+
+      // Wave B: prose -> schema-constrained proposals -> a fresh study in a
+      // new tab. Every value is re-validated against the question's own
+      // options (engine/llmproposals.js) even though the schema should have
+      // made an out-of-vocabulary answer impossible, and lands PROVISIONAL +
+      // needsReview (core/draft.js) so nothing in the draft can pass as a
+      // value the user chose.
+      draftButton.addEventListener('click', async () => {
+        const cfg = loadLlmConfig();
+        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model });
+        if (!provider.isAvailable()) {
+          if (showToast) showToast('Set a local model endpoint and name first (in "Ask about this step").');
+          return;
+        }
+        const text = textarea.value.trim();
+        if (!text) {
+          if (showToast) showToast('Describe the experiment above first.');
+          return;
+        }
+
+        draftButton.disabled = true;
+        draftButton.textContent = 'Drafting...';
+        try {
+          const schema = buildProposalSchema(questionBank);
+          const result = await provider.complete({
+            system: DRAFT_SYSTEM_PROMPT,
+            user: `--- QUESTIONS ---\n${questionBank
+              .map((q) => {
+                const options = Array.isArray(q.options) ? ` [options: ${q.options.join(', ')}]` : '';
+                return `- ${q.field}: ${q.prompt}${options}`;
+              })
+              .join('\n')}\n\n--- DESCRIPTION ---\n${text}`,
+            schema,
+          });
+
+          const { proposals, issues } = parseLlmProposals(result.json, questionBank);
+          if (issues.length > 0) {
+            // Not a failure: a dropped proposal is this tier working. Logged
+            // rather than toasted so a partial draft still opens, with the
+            // detail available to whoever is debugging the model's output.
+            console.warn('Dropped LLM proposals:', issues);
+          }
+          if (proposals.length === 0) {
+            if (showToast) showToast('The model did not fill in anything usable from that description.');
+            return;
+          }
+
+          const { experiment: draft } = buildDraftExperiment(proposals);
+          draft.narrative = { ...draft.narrative, text };
+          if (!stashDraft(draft)) {
+            if (showToast) showToast("Couldn't stash the draft (storage full?). Nothing was changed.");
+            return;
+          }
+          const opened = window.open(window.location.href, '_blank');
+          if (showToast) {
+            showToast(
+              opened
+                ? `Drafted ${proposals.length} answer(s) -- opened in a new tab. This study is unchanged.`
+                : 'Draft ready, but the browser blocked the new tab. Allow pop-ups and try again.'
+            );
+          }
+        } catch (err) {
+          if (showToast) showToast(`Couldn't reach the local model (${err.message}). Nothing was changed.`);
+        } finally {
+          draftButton.disabled = false;
+          draftButton.textContent = 'Draft a study from this (new tab)';
+        }
       });
 
       readButton.addEventListener('click', () => {

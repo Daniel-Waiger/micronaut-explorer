@@ -23,6 +23,11 @@ _archive/
 # CMA dashboard live run state (per-machine; status.seed.json is the tracked snapshot)
 tools/cma-dashboard/status.json
 
+# A parallel agent's own board, served on :8778 (see .claude/launch.json).
+# Whole-directory: it is a working copy of the dashboard holding another
+# run's live state, which is per-machine for the same reason status.json is.
+tools/cma-dashboard-codex/
+
 # Generated dev-mode knowledge-pack aggregate (tools/export_markers_kb.py);
 # the built dist/index.html embeds the KB directly, so this is only needed
 # for opening web/index.html unbuilt.
