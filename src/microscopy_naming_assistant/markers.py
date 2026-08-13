@@ -120,11 +120,43 @@ MARKER_ALIASES: dict[str, list[str]] = {
         "mitotracker orange",
     ],
     "LYSOTRACKER": ["lysotracker", "lyso tracker", "lysotracker red", "lysotracker green"],
-    "ERTRACKER": ["er-tracker", "ertracker", "er tracker"],
-    "CELLMASK": ["cellmask", "cell mask"],
-    "BODIPY": ["bodipy"],
+    # ER-Tracker (BODIPY-glibenclamide conjugates) ships in three colors, the
+    # same "bare name is under-specified" shape as MitoTracker/LysoTracker --
+    # promoted to a family below (export_markers_kb.py's FAMILY_VARIANTS) now
+    # that the Color panel (PAN-1..8) needs a per-color spectrum, not just a
+    # canonical name.
+    "ERTRACKER": [
+        "er-tracker",
+        "ertracker",
+        "er tracker",
+        "er-tracker green",
+        "er-tracker red",
+        "er-tracker blue-white dpx",
+    ],
+    # Plasma-membrane stain, likewise three colors under one bare name --
+    # promoted to a family below for the same reason as ER-Tracker.
+    "CELLMASK": [
+        "cellmask",
+        "cell mask",
+        "cellmask green",
+        "cellmask orange",
+        "cellmask deep red",
+    ],
+    # BODIPY is a whole dye CLASS (20+ published variants with wildly
+    # different colors -- FL is green, TMR is orange, 630/650 is far-red),
+    # not one spectrum; the bare canonical stays 'ambiguous-family' by
+    # design (docs/plans/planner-web-color-panel.md's "near-zero info in the
+    # bare family name"). These four are the variants common enough to be
+    # worth naming explicitly; many real BODIPY dyes are still, correctly,
+    # not covered.
+    "BODIPY": ["bodipy", "bodipy fl", "bodipy tmr", "bodipy tr", "bodipy 630"],
     # Calcium indicators.
     "FLUO4": ["fluo-4", "fluo4", "fluo 4"],
+    # Fura-2 is RATIOMETRIC (two excitation peaks depending on Ca2+-bound
+    # state, ~340/380 nm) -- it does not fit this app's single
+    # excitation/emission-peak spillover model at all, so it is deliberately
+    # left with no spectra.json entry (an honest content gap, not an
+    # oversight) -- see docs/plans/planner-web-color-panel.md.
     "FURA2": ["fura-2", "fura2", "fura 2"],
     "GCAMP": [
         "gcamp",
@@ -139,6 +171,67 @@ MARKER_ALIASES: dict[str, list[str]] = {
         "gcamp7s",
     ],
     "CALCEIN": ["calcein", "calcein am", "calcein-am"],
+    # --- SYTO (nucleic-acid stains; distinct from SYTOX above, which is
+    # dead-cell-impermeant only) -- a family for the same "bare name is
+    # under-specified" reason. Seeded because "SYTO9" (paired with
+    # PROPIDIUMIODIDE, above) is the standard BacLight bacterial live/dead
+    # stain and was previously entirely absent from this table -- the app's
+    # own default study used it and the Color panel could not recognize it.
+    # No alternate-spacing variant spellings ("syto 9") on purpose: the
+    # variant lookup in engine/spectra.js keys strictly on the alias string
+    # that resolved the token, so a second spelling of the same color that
+    # ISN'T the one FAMILY_VARIANTS/spectra.json key by would silently
+    # resolve 'ambiguous-family' instead of 'known' -- see MITOTRACKER above,
+    # which has the same one-spelling-per-variant discipline.
+    "SYTO": ["syto", "syto9", "syto13", "syto60", "syto82", "syto85"],
+    # A ROS (reactive-oxygen-species) indicator dye: DCFH-DA/H2DCFDA is
+    # non-fluorescent until intracellular esterases and oxidation convert it
+    # to fluorescent DCF, which is what's actually imaged and what the
+    # published excitation/emission values below describe. Bare "DCF" is a
+    # short alias, consistent with this table's existing precedent (ARL,
+    # SOX, CFP, YFP, RFP, BFP) -- unlike "PI" below, no comparably common
+    # non-microscopy meaning collides with it in this domain.
+    "DCFDA": ["dcf", "dcfda", "dcf-da", "h2dcfda", "cm-h2dcfda"],
+    # --- Common-dye sweep (PAN-1..8 alpha-readiness pass): well-documented
+    # additions with real, stable published spectra, filling the most
+    # obvious gaps in a FACSI-relevant panel.
+    "CELLTRACKERGREEN": ["celltracker green", "cmfda", "celltracker-green"],
+    "CELLTRACKERRED": ["celltracker red", "cmtpx", "celltracker-red"],
+    "CELLTRACKERBLUE": ["celltracker blue", "cmac", "celltracker-blue"],
+    "CELLTRACEVIOLET": ["celltrace violet", "celltrace-violet"],
+    "CFSE": ["cfse"],
+    "DIO": ["dio"],
+    "DII": ["dii"],
+    "DID": ["did"],
+    "TMRM": ["tmrm"],
+    "TMRE": ["tmre"],
+    "NILERED": ["nile red", "nilered"],
+    "SIRDNA": ["sir-dna", "sirdna", "sir dna"],
+    # Sold and used as a fluorophore CONJUGATE ("Annexin V-FITC", "Annexin
+    # V-APC", ...); Annexin V itself has no intrinsic spectrum, the same
+    # semantics as PHALLOIDIN/WGA above -- see MOIETY_MARKERS in
+    # export_markers_kb.py.
+    "ANNEXINV": ["annexin v", "annexinv", "annexin-v"],
+    # LIVE/DEAD Fixable viability stains: a numbered color series under one
+    # product line, the same "bare name is under-specified" family shape.
+    # Real spellings use a '/' ("LIVE/DEAD"), which splitMarkers treats as a
+    # delimiter -- these aliases use a hyphen or plain space instead so the
+    # spelling actually round-trips through this app's tokenizer; the
+    # slashed spelling is still recognizable to a human reading the alias.
+    "LIVEDEAD": [
+        "livedead",
+        "live dead",
+        "live-dead",
+        "livedead blue",
+        "livedead green",
+        "livedead violet",
+        "livedead red",
+        "livedead far red",
+    ],
+    "ALEXA350": ["alexa fluor 350", "alexa 350", "af350", "alexa350"],
+    "CF488A": ["cf488a", "cf 488a", "cf488"],
+    "CF568": ["cf568", "cf 568"],
+    "CF647": ["cf647", "cf 647"],
 }
 
 # Deliberately-omitted aliases (checked against word-boundary substring

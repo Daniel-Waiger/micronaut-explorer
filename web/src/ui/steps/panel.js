@@ -15,7 +15,10 @@
 // Five-state, never-silent rendering throughout (Decision 5): an empty
 // markers field, a fully-resolved panel with zero flagged pairs, and a
 // token this app cannot resolve all get their OWN explicit sentence, never
-// a blank section that could be misread as "no risk here."
+// a blank section that could be misread as "no risk here." A sixth,
+// panel-level state ('no-markers-declared', see spectra.js) gets the same
+// treatment: the app's own "NONE"/"N/A" sentinel is a declaration, not a
+// typo, and must not render through the same path as an unrecognized token.
 
 import { assayView } from '../../core/assay.js';
 import { flagPanelOverlaps, resolvePanel } from '../../engine/spectra.js';
@@ -61,7 +64,7 @@ function appendRow(list, entry) {
   if (entry.state === 'known') {
     const badge = document.createElement('span');
     badge.className = 'panel-badge';
-    badge.title = 'Spectral value drafted by Claude from common published references -- not yet reviewed by Daniel.';
+    badge.title = 'Spectral value drafted by Claude from common published references -- not yet reviewed by a microscopy specialist.';
     badge.textContent = entry.reviewStatus === 'claude-drafted' ? 'unreviewed' : entry.reviewStatus;
     row.appendChild(badge);
   }
@@ -90,7 +93,7 @@ export function createPanelStep(kb) {
       const banner = document.createElement('div');
       banner.className = 'panel-review-banner';
       banner.textContent =
-        'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by Daniel -- treat exact peak numbers as approximate until reviewed.';
+        'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by a microscopy specialist -- treat exact peak numbers as approximate until reviewed.';
       main.appendChild(banner);
 
       // Commit 1 of the assay tier: caching activeAssayId once here is only
@@ -108,6 +111,15 @@ export function createPanelStep(kb) {
         empty.className = 'panel-empty';
         empty.textContent = 'No markers entered yet -- fill in the markers field on the Naming step to see a color panel here.';
         main.appendChild(empty);
+      } else if (panelState === 'no-markers-declared') {
+        // A DECLARATION ("NONE", "N/A", "unstained", ...), not a typo -- see
+        // spectra.js's NO_MARKERS_SENTINELS. Its own sentence, distinct from
+        // 'unanswered' (nothing typed yet): the field was answered, and the
+        // answer was "there are no fluorophores in this assay."
+        const declared = document.createElement('p');
+        declared.className = 'panel-empty';
+        declared.textContent = 'This assay declares no markers/fluorophores -- nothing for a color panel to check here.';
+        main.appendChild(declared);
       } else {
         const list = document.createElement('div');
         list.className = 'panel-list';
@@ -116,7 +128,6 @@ export function createPanelStep(kb) {
         }
         main.appendChild(list);
 
-        const known = entries.filter((e) => e.state === 'known');
         const flags = flagPanelOverlaps(entries, kb.overlapRules);
 
         const flagsHeading = document.createElement('div');
@@ -135,11 +146,12 @@ export function createPanelStep(kb) {
           }
           main.appendChild(issuesList);
         } else {
+          const knownCount = entries.filter((e) => e.state === 'known').length;
           const noFlags = document.createElement('p');
           noFlags.className = 'panel-empty';
           noFlags.textContent =
-            known.length > 0
-              ? `No spectral-proximity conflicts among ${known.length} recognized fluorophore(s).`
+            knownCount > 0
+              ? `No spectral-proximity conflicts among ${knownCount} recognized fluorophore(s).`
               : 'No recognized fluorophores with spectral data yet -- see the states above.';
           main.appendChild(noFlags);
         }

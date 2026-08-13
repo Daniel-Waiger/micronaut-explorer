@@ -269,18 +269,70 @@ test('selectControls(rules, emptyExperiment()) is EMPTY -- no advice before the 
   assert.deepEqual(notes, []);
 });
 
-test('every committed panel rule fires once markers are set, and readout rules stay silent', () => {
-  const { rules } = loadControlRules(controlsRaw);
-  const { readouts } = loadReadouts(readoutsRaw);
+// `panel.derived.*` (fluorophoreCount/hasAntibody/hasMarkersDeclared) is
+// computed by engine/spectra.js's derivePanelFacts and wired in by
+// engine/studydoc.js BEFORE selectControls ever runs (see studydoc.js's
+// header on why: the predicate DSL cannot resolve a marker alias itself).
+// These tests attach it by hand, the same shape studydoc.js produces, so
+// they exercise the REAL committed controls.json predicates without
+// pulling in the whole studydoc/kbpack machinery just to get one object.
+function expWithPanelDerived(derived) {
   const exp = emptyExperiment();
-  exp.naming = { ...exp.naming, fields: { markers: 'SYTO9-PI' } };
-  const fired = selectControls(rules, exp).map((r) => r.id);
-  const panelRules = rules.filter((r) => r.kind === 'panel');
-  for (const rule of panelRules) {
-    assert.ok(fired.includes(rule.id), `panel rule '${rule.id}' did not fire once markers were set`);
-  }
-  // Sanity: the readouts vocabulary is non-empty, i.e. readout rules have
-  // something real to key on in the next test.
+  exp.naming = { ...exp.naming, fields: { markers: 'placeholder' } };
+  exp.panel = { ...exp.panel, derived };
+  return exp;
+}
+
+test('no markers declared (hasMarkersDeclared false) -- no panel rule fires, regardless of the other derived facts', () => {
+  const { rules } = loadControlRules(controlsRaw);
+  const exp = expWithPanelDerived({ fluorophoreCount: 5, hasAntibody: true, hasTag: false, classes: ['target'], hasMarkersDeclared: false });
+  const fired = selectControls(rules, exp)
+    .filter((r) => r.kind === 'panel')
+    .map((r) => r.id);
+  assert.deepEqual(fired, []);
+});
+
+test('one non-antibody fluorophore: only the unstained control fires -- NOT single-stain, FMO, isotype, secondary, or specificity', () => {
+  const { rules } = loadControlRules(controlsRaw);
+  const exp = expWithPanelDerived({ fluorophoreCount: 1, hasAntibody: false, hasTag: false, classes: ['dye'], hasMarkersDeclared: true });
+  const fired = selectControls(rules, exp)
+    .filter((r) => r.kind === 'panel')
+    .map((r) => r.id);
+  assert.deepEqual(fired, ['panel-unstained-control']);
+});
+
+test('two non-antibody fluorophores: single-stain joins unstained, FMO and antibody controls still silent', () => {
+  const { rules } = loadControlRules(controlsRaw);
+  const exp = expWithPanelDerived({ fluorophoreCount: 2, hasAntibody: false, hasTag: false, classes: ['dye'], hasMarkersDeclared: true });
+  const fired = selectControls(rules, exp)
+    .filter((r) => r.kind === 'panel')
+    .map((r) => r.id);
+  assert.deepEqual(fired, ['panel-unstained-control', 'panel-single-stain-controls']);
+});
+
+test('three non-antibody fluorophores: FMO joins too -- unstained, single-stain, FMO, still no antibody controls', () => {
+  const { rules } = loadControlRules(controlsRaw);
+  const exp = expWithPanelDerived({ fluorophoreCount: 3, hasAntibody: false, hasTag: false, classes: ['dye'], hasMarkersDeclared: true });
+  const fired = selectControls(rules, exp)
+    .filter((r) => r.kind === 'panel')
+    .map((r) => r.id);
+  assert.deepEqual(fired, ['panel-unstained-control', 'panel-single-stain-controls', 'panel-fmo-control']);
+});
+
+test('hasAntibody true: isotype/secondary-only/biological-specificity join, even for a single fluorophore', () => {
+  const { rules } = loadControlRules(controlsRaw);
+  const exp = expWithPanelDerived({ fluorophoreCount: 1, hasAntibody: true, hasTag: false, classes: ['target'], hasMarkersDeclared: true });
+  const fired = selectControls(rules, exp)
+    .filter((r) => r.kind === 'panel')
+    .map((r) => r.id);
+  assert.deepEqual(
+    fired.sort(),
+    ['panel-antibody-specificity-control', 'panel-isotype-control', 'panel-secondary-only-control', 'panel-unstained-control'].sort()
+  );
+});
+
+test('the readouts vocabulary is non-empty, i.e. readout rules have something real to key on', () => {
+  const { readouts } = loadReadouts(readoutsRaw);
   assert.ok(Object.keys(readouts).length > 0);
 });
 

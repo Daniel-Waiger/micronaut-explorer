@@ -10,6 +10,23 @@
     "venus"
   ],
   "markers": {
+    "ALEXA350": {
+      "aliases": [
+        "af350",
+        "alexa 350",
+        "alexa fluor 350",
+        "alexa350"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af350",
+        "alexa 350",
+        "alexa fluor 350",
+        "alexa350"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "ALEXA405": {
       "aliases": [
         "af405",
@@ -231,6 +248,21 @@
       "isFamily": false,
       "variants": []
     },
+    "ANNEXINV": {
+      "aliases": [
+        "annexin v",
+        "annexin-v",
+        "annexinv"
+      ],
+      "class": "moiety",
+      "freeTextAliases": [
+        "annexin v",
+        "annexin-v",
+        "annexinv"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "ARL": {
       "aliases": [
         "arl"
@@ -389,14 +421,27 @@
     },
     "BODIPY": {
       "aliases": [
-        "bodipy"
+        "bodipy",
+        "bodipy 630",
+        "bodipy fl",
+        "bodipy tmr",
+        "bodipy tr"
       ],
       "class": "dye",
       "freeTextAliases": [
-        "bodipy"
+        "bodipy",
+        "bodipy 630",
+        "bodipy fl",
+        "bodipy tmr",
+        "bodipy tr"
       ],
       "isFamily": true,
-      "variants": []
+      "variants": [
+        "bodipy 630",
+        "bodipy fl",
+        "bodipy tmr",
+        "bodipy tr"
+      ]
     },
     "CALCEIN": {
       "aliases": [
@@ -416,12 +461,80 @@
     "CELLMASK": {
       "aliases": [
         "cell mask",
-        "cellmask"
+        "cellmask",
+        "cellmask deep red",
+        "cellmask green",
+        "cellmask orange"
       ],
       "class": "dye",
       "freeTextAliases": [
         "cell mask",
-        "cellmask"
+        "cellmask",
+        "cellmask deep red",
+        "cellmask green",
+        "cellmask orange"
+      ],
+      "isFamily": true,
+      "variants": [
+        "cellmask deep red",
+        "cellmask green",
+        "cellmask orange"
+      ]
+    },
+    "CELLTRACEVIOLET": {
+      "aliases": [
+        "celltrace violet",
+        "celltrace-violet"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "celltrace violet",
+        "celltrace-violet"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLTRACKERBLUE": {
+      "aliases": [
+        "celltracker blue",
+        "celltracker-blue",
+        "cmac"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "celltracker blue",
+        "celltracker-blue",
+        "cmac"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLTRACKERGREEN": {
+      "aliases": [
+        "celltracker green",
+        "celltracker-green",
+        "cmfda"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "celltracker green",
+        "celltracker-green",
+        "cmfda"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLTRACKERRED": {
+      "aliases": [
+        "celltracker red",
+        "celltracker-red",
+        "cmtpx"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "celltracker red",
+        "celltracker-red",
+        "cmtpx"
       ],
       "isFamily": false,
       "variants": []
@@ -435,6 +548,47 @@
       "isFamily": false,
       "variants": []
     },
+    "CF488A": {
+      "aliases": [
+        "cf 488a",
+        "cf488",
+        "cf488a"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 488a",
+        "cf488",
+        "cf488a"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF568": {
+      "aliases": [
+        "cf 568",
+        "cf568"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 568",
+        "cf568"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF647": {
+      "aliases": [
+        "cf 647",
+        "cf647"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 647",
+        "cf647"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "CFP": {
       "aliases": [
         "cfp"
@@ -442,6 +596,17 @@
       "class": "protein",
       "freeTextAliases": [
         "cfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CFSE": {
+      "aliases": [
+        "cfse"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cfse"
       ],
       "isFamily": false,
       "variants": []
@@ -534,6 +699,58 @@
       "isFamily": false,
       "variants": []
     },
+    "DCFDA": {
+      "aliases": [
+        "cm-h2dcfda",
+        "dcf",
+        "dcf-da",
+        "dcfda",
+        "h2dcfda"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cm-h2dcfda",
+        "dcf",
+        "dcf-da",
+        "dcfda",
+        "h2dcfda"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DID": {
+      "aliases": [
+        "did"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "did"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DII": {
+      "aliases": [
+        "dii"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dii"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DIO": {
+      "aliases": [
+        "dio"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dio"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "DRAQ5": {
       "aliases": [
         "draq 5",
@@ -590,16 +807,26 @@
       "aliases": [
         "er tracker",
         "er-tracker",
+        "er-tracker blue-white dpx",
+        "er-tracker green",
+        "er-tracker red",
         "ertracker"
       ],
       "class": "dye",
       "freeTextAliases": [
         "er tracker",
         "er-tracker",
+        "er-tracker blue-white dpx",
+        "er-tracker green",
+        "er-tracker red",
         "ertracker"
       ],
-      "isFamily": false,
-      "variants": []
+      "isFamily": true,
+      "variants": [
+        "er-tracker blue-white dpx",
+        "er-tracker green",
+        "er-tracker red"
+      ]
     },
     "FITC": {
       "aliases": [
@@ -772,6 +999,37 @@
       "isFamily": false,
       "variants": []
     },
+    "LIVEDEAD": {
+      "aliases": [
+        "live dead",
+        "live-dead",
+        "livedead",
+        "livedead blue",
+        "livedead far red",
+        "livedead green",
+        "livedead red",
+        "livedead violet"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "live dead",
+        "live-dead",
+        "livedead",
+        "livedead blue",
+        "livedead far red",
+        "livedead green",
+        "livedead red",
+        "livedead violet"
+      ],
+      "isFamily": true,
+      "variants": [
+        "livedead blue",
+        "livedead far red",
+        "livedead green",
+        "livedead red",
+        "livedead violet"
+      ]
+    },
     "LYSOTRACKER": {
       "aliases": [
         "lyso tracker",
@@ -898,6 +1156,19 @@
       "isFamily": false,
       "variants": []
     },
+    "NILERED": {
+      "aliases": [
+        "nile red",
+        "nilered"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "nile red",
+        "nilered"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "PHALLOIDIN": {
       "aliases": [
         "phalloidin"
@@ -948,6 +1219,21 @@
       "isFamily": false,
       "variants": []
     },
+    "SIRDNA": {
+      "aliases": [
+        "sir dna",
+        "sir-dna",
+        "sirdna"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "sir dna",
+        "sir-dna",
+        "sirdna"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "SIRTUBULIN": {
       "aliases": [
         "sir tubulin",
@@ -983,7 +1269,7 @@
       "aliases": [
         "sox"
       ],
-      "class": "dye",
+      "class": "target",
       "freeTextAliases": [
         "sox"
       ],
@@ -994,12 +1280,39 @@
       "aliases": [
         "sox2"
       ],
-      "class": "dye",
+      "class": "target",
       "freeTextAliases": [
         "sox2"
       ],
       "isFamily": false,
       "variants": []
+    },
+    "SYTO": {
+      "aliases": [
+        "syto",
+        "syto13",
+        "syto60",
+        "syto82",
+        "syto85",
+        "syto9"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "syto",
+        "syto13",
+        "syto60",
+        "syto82",
+        "syto85",
+        "syto9"
+      ],
+      "isFamily": true,
+      "variants": [
+        "syto13",
+        "syto60",
+        "syto82",
+        "syto85",
+        "syto9"
+      ]
     },
     "SYTOX": {
       "aliases": [
@@ -1050,6 +1363,28 @@
         "texas red",
         "texas-red",
         "texasred"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TMRE": {
+      "aliases": [
+        "tmre"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "tmre"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TMRM": {
+      "aliases": [
+        "tmrm"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "tmrm"
       ],
       "isFamily": false,
       "variants": []

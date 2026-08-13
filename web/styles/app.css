@@ -456,6 +456,7 @@ button:focus-visible {
   flex-wrap: wrap;
   background: var(--panel);
   border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
   border-radius: 8px;
   padding: 10px 14px;
 }
@@ -466,6 +467,48 @@ button:focus-visible {
   text-transform: uppercase;
   color: var(--muted);
   flex: 0 0 auto;
+}
+
+/* Per-state accents (Decision 5's five states, never-silent): the state
+   label and the row's left border both carry the color, so a panel with a
+   mix of states is scannable at a glance without reading every sentence --
+   'known' reads as resolved, 'unrecognized' and 'ambiguous-family' read as
+   needing the user's attention, 'spectrum-unavailable' reads as a content
+   gap (not the user's fault), 'no-intrinsic-spectrum' reads as neutral
+   information rather than a problem. */
+.panel-row-known {
+  border-left-color: var(--ok);
+}
+.panel-row-known .panel-state {
+  color: var(--ok);
+}
+
+.panel-row-unrecognized {
+  border-left-color: var(--danger);
+}
+.panel-row-unrecognized .panel-state {
+  color: var(--danger);
+}
+
+.panel-row-ambiguous-family {
+  border-left-color: var(--warn);
+}
+.panel-row-ambiguous-family .panel-state {
+  color: var(--warn);
+}
+
+.panel-row-spectrum-unavailable {
+  border-left-color: var(--warn);
+}
+.panel-row-spectrum-unavailable .panel-state {
+  color: var(--warn);
+}
+
+.panel-row-no-intrinsic-spectrum {
+  border-left-color: var(--accent);
+}
+.panel-row-no-intrinsic-spectrum .panel-state {
+  color: var(--accent);
 }
 
 .panel-row-text {

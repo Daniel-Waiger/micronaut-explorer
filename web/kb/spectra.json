@@ -51,6 +51,23 @@
     "JF646": { "excitationPeakNm": 646, "emissionPeakNm": 664, "reviewStatus": "claude-drafted" },
     "SIRACTIN": { "excitationPeakNm": 652, "emissionPeakNm": 674, "reviewStatus": "claude-drafted", "note": "SiR (silicon-rhodamine) actin probe; same parent dye as SiR-tubulin, so the two are NOT spectrally distinguishable from each other -- a real cross-check finding, not a drafting error." },
     "SIRTUBULIN": { "excitationPeakNm": 652, "emissionPeakNm": 674, "reviewStatus": "claude-drafted", "note": "SiR (silicon-rhodamine) tubulin probe; same parent dye as SiR-actin." },
+    "SIRDNA": { "excitationPeakNm": 652, "emissionPeakNm": 674, "reviewStatus": "claude-drafted", "note": "SiR (silicon-rhodamine) DNA probe; same parent dye as SiR-actin/SiR-tubulin, so none of the three SiR probes are spectrally distinguishable from each other." },
+    "DCFDA": { "excitationPeakNm": 495, "emissionPeakNm": 529, "reviewStatus": "claude-drafted", "note": "Peaks are for the oxidized, fluorescent DCF product -- the non-fluorescent DCFH-DA/H2DCFDA loading form has no meaningful excitation/emission peak until intracellular oxidation converts it." },
+    "ALEXA350": { "excitationPeakNm": 346, "emissionPeakNm": 442, "reviewStatus": "claude-drafted" },
+    "CF488A": { "excitationPeakNm": 490, "emissionPeakNm": 515, "reviewStatus": "claude-drafted" },
+    "CF568": { "excitationPeakNm": 562, "emissionPeakNm": 583, "reviewStatus": "claude-drafted" },
+    "CF647": { "excitationPeakNm": 650, "emissionPeakNm": 665, "reviewStatus": "claude-drafted" },
+    "CELLTRACKERGREEN": { "excitationPeakNm": 492, "emissionPeakNm": 517, "reviewStatus": "claude-drafted", "note": "CMFDA, the active fluorescent form after intracellular esterase cleavage." },
+    "CELLTRACKERRED": { "excitationPeakNm": 577, "emissionPeakNm": 602, "reviewStatus": "claude-drafted", "note": "CMTPX." },
+    "CELLTRACKERBLUE": { "excitationPeakNm": 353, "emissionPeakNm": 466, "reviewStatus": "claude-drafted", "note": "CMAC." },
+    "CELLTRACEVIOLET": { "excitationPeakNm": 405, "emissionPeakNm": 450, "reviewStatus": "claude-drafted" },
+    "CFSE": { "excitationPeakNm": 494, "emissionPeakNm": 521, "reviewStatus": "claude-drafted" },
+    "DIO": { "excitationPeakNm": 484, "emissionPeakNm": 501, "reviewStatus": "claude-drafted", "note": "DiOC18(3), a lipophilic membrane dye." },
+    "DII": { "excitationPeakNm": 549, "emissionPeakNm": 565, "reviewStatus": "claude-drafted", "note": "DiIC18(3), a lipophilic membrane dye." },
+    "DID": { "excitationPeakNm": 644, "emissionPeakNm": 665, "reviewStatus": "claude-drafted", "note": "DiIC18(5), a lipophilic membrane dye." },
+    "TMRM": { "excitationPeakNm": 548, "emissionPeakNm": 573, "reviewStatus": "claude-drafted", "note": "A mitochondrial-membrane-potential dye; peaks are for the free (unquenched) dye." },
+    "TMRE": { "excitationPeakNm": 549, "emissionPeakNm": 575, "reviewStatus": "claude-drafted", "note": "A mitochondrial-membrane-potential dye; peaks are for the free (unquenched) dye." },
+    "NILERED": { "excitationPeakNm": 552, "emissionPeakNm": 636, "reviewStatus": "claude-drafted", "note": "A lipid-droplet stain; both peaks shift substantially with the polarity of the lipid environment -- treat as indicative only." },
 
     "GFP": { "excitationPeakNm": 488, "emissionPeakNm": 507, "reviewStatus": "claude-drafted" },
     "YFP": { "excitationPeakNm": 514, "emissionPeakNm": 527, "reviewStatus": "claude-drafted" },
@@ -102,6 +119,59 @@
         "sytox green": { "excitationPeakNm": 504, "emissionPeakNm": 523 },
         "sytox orange": { "excitationPeakNm": 547, "emissionPeakNm": 570 },
         "sytox red": { "excitationPeakNm": 640, "emissionPeakNm": 658 }
+      }
+    },
+    "BODIPY": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "note": "The bare 'BODIPY' name is a whole dye class, not one spectrum -- these four named variants are the ones common enough to draft with confidence; many real BODIPY dyes are still, correctly, not covered here.",
+      "variants": {
+        "bodipy fl": { "excitationPeakNm": 505, "emissionPeakNm": 513 },
+        "bodipy tmr": { "excitationPeakNm": 542, "emissionPeakNm": 574 },
+        "bodipy tr": { "excitationPeakNm": 588, "emissionPeakNm": 616 },
+        "bodipy 630": { "excitationPeakNm": 625, "emissionPeakNm": 640 }
+      }
+    },
+    "CELLMASK": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "variants": {
+        "cellmask green": { "excitationPeakNm": 522, "emissionPeakNm": 535 },
+        "cellmask orange": { "excitationPeakNm": 554, "emissionPeakNm": 567 },
+        "cellmask deep red": { "excitationPeakNm": 649, "emissionPeakNm": 666 }
+      }
+    },
+    "ERTRACKER": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "variants": {
+        "er-tracker green": { "excitationPeakNm": 504, "emissionPeakNm": 511 },
+        "er-tracker red": { "excitationPeakNm": 587, "emissionPeakNm": 615 },
+        "er-tracker blue-white dpx": { "excitationPeakNm": 374, "emissionPeakNm": 430 }
+      }
+    },
+    "SYTO": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "note": "Distinct from SYTOX above: SYTO stains are cell-permeant (label live and dead cells alike); SYTOX stains are impermeant to live cells (dead-cell/nucleic-acid-exposed indicators only).",
+      "variants": {
+        "syto9": { "excitationPeakNm": 480, "emissionPeakNm": 500 },
+        "syto13": { "excitationPeakNm": 488, "emissionPeakNm": 509 },
+        "syto60": { "excitationPeakNm": 652, "emissionPeakNm": 678 },
+        "syto82": { "excitationPeakNm": 541, "emissionPeakNm": 560 },
+        "syto85": { "excitationPeakNm": 567, "emissionPeakNm": 585 }
+      }
+    },
+    "LIVEDEAD": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "note": "The real product-line spelling uses 'LIVE/DEAD Fixable ...'; aliases here use a hyphen/space instead because splitMarkers treats '/' as a field delimiter.",
+      "variants": {
+        "livedead blue": { "excitationPeakNm": 350, "emissionPeakNm": 450 },
+        "livedead green": { "excitationPeakNm": 495, "emissionPeakNm": 520 },
+        "livedead violet": { "excitationPeakNm": 416, "emissionPeakNm": 451 },
+        "livedead red": { "excitationPeakNm": 595, "emissionPeakNm": 615 },
+        "livedead far red": { "excitationPeakNm": 650, "emissionPeakNm": 665 }
       }
     }
   }

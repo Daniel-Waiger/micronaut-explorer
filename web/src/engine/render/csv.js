@@ -26,14 +26,26 @@ const HEADER = [
   'error',
 ];
 
+// A leading =, +, -, or @ makes Excel/Sheets/LibreOffice interpret the cell
+// as a FORMULA on open, not text -- "formula injection", the CSV-equivalent
+// of an XSS payload. This manifest is built to be handed to collaborators
+// (assay labels and factor levels are free text the user typed), so a value
+// like "=HYPERLINK(...)" must not execute in whoever opens it. Prefixing a
+// leading apostrophe is the standard neutralizer: every mainstream
+// spreadsheet app renders it as plain text and drops the apostrophe itself,
+// so the visible cell content is unchanged for the overwhelming common case
+// (nothing starts with these characters) and merely inert for the rare one.
+const FORMULA_PREFIX = /^[=+\-@]/;
+
 // RFC 4180 minimal quoting: only quote a field that needs it, so the common
 // case (a plain filename) stays readable unquoted.
 function csvField(value) {
   const text = value === null || value === undefined ? '' : String(value);
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replace(/"/g, '""')}"`;
+  const safe = FORMULA_PREFIX.test(text) ? `'${text}` : text;
+  if (/[",\n\r]/.test(safe)) {
+    return `"${safe.replace(/"/g, '""')}"`;
   }
-  return text;
+  return safe;
 }
 
 function factorsCell(factorLevels) {

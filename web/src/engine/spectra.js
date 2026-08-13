@@ -32,6 +32,15 @@
 //   'known'                -- full peaks available; participates in the
 //                             pairwise check.
 //
+// A SIXTH, panel-level state lives outside this list: resolvePanel's
+// `panelState` can be 'no-markers-declared' (the field holds one of the
+// app's own "nothing here" sentinels -- 'NONE', 'N/A', 'unstained', ...,
+// see defaultStudy.js's scratch-migration assay) rather than 'has-entries'.
+// That is a deliberate DECLARATION, not a typo, and rendering it through
+// 'unrecognized' (as commit 1 of this feature did) told the user their own
+// app's sentinel was a misspelling -- exactly the silence/false-alarm
+// asymmetry this module otherwise refuses to allow.
+//
 // Pure module: no DOM, no store. Imports splitMarkers (the ONE existing
 // tokenizer for this field, not a second regex) and kbMarker (the one
 // existing marker-class/isFamily lookup, already reserved but previously
@@ -48,9 +57,56 @@ export const SPECTRAL_STATES = [
   'known',
 ];
 
+// The app's own "there is nothing to check here" sentinels (see
+// defaultStudy.js's scratch-migration assay, which seeds literal 'NONE').
+// Matched against the WHOLE field, case-insensitively, with internal
+// whitespace collapsed -- so 'NONE', ' none ', 'N/A', and 'label-free' all
+// resolve the same declarative way instead of through per-token
+// 'unrecognized'. Deliberately does NOT match ambiguous prose containing
+// other words (e.g. "none yet, TBD") -- that is likely user note-taking,
+// not a sentinel, and still deserves per-token resolution.
+const NO_MARKERS_SENTINELS = new Set([
+  'none',
+  'no markers',
+  'no marker',
+  'no stain',
+  'no staining',
+  'unstained',
+  'label-free',
+  'label free',
+  'n/a',
+  'na',
+  'unknown',
+  'tbd',
+]);
+
 const DEFAULT_REVIEW_STATUS = 'claude-drafted';
 const DEFAULT_EMISSION_PROXIMITY_NM = 25;
 const DEFAULT_EXCITATION_PROXIMITY_NM = 20;
+
+// Peak plausibility (Decision: content is hand-drafted and hand-edited, so a
+// type check alone lets a transposed digit through clean). The visible
+// spectrum plus a safety margin into near-UV/near-IR, where FACSI-relevant
+// dyes/FPs/indicators actually live; anything outside it is far more likely
+// a typo than a real fluorophore this app should be advising on.
+const MIN_PLAUSIBLE_PEAK_NM = 300;
+const MAX_PLAUSIBLE_PEAK_NM = 900;
+
+/**
+ * A Stokes shift is always positive (emission is always redder / lower-
+ * energy than excitation) -- `emissionPeakNm <= excitationPeakNm` is
+ * physically impossible for real fluorescence and is a strong signal of a
+ * transposed excitation/emission pair.
+ */
+function peaksArePlausible(excitationPeakNm, emissionPeakNm) {
+  return (
+    excitationPeakNm >= MIN_PLAUSIBLE_PEAK_NM &&
+    excitationPeakNm <= MAX_PLAUSIBLE_PEAK_NM &&
+    emissionPeakNm >= MIN_PLAUSIBLE_PEAK_NM &&
+    emissionPeakNm <= MAX_PLAUSIBLE_PEAK_NM &&
+    emissionPeakNm > excitationPeakNm
+  );
+}
 
 const KNOWN_FLUOROPHORE_KEYS = new Set([
   'excitationPeakNm',
@@ -80,6 +136,15 @@ function normalizeVariantEntry(canonical, variantKey, entry, issues) {
   const emissionPeakNm = entry.emissionPeakNm;
   if (typeof excitationPeakNm !== 'number' || typeof emissionPeakNm !== 'number') {
     issues.push(spectraIssue(canonical, `variant '${variantKey}' is missing numeric excitationPeakNm/emissionPeakNm`));
+    return null;
+  }
+  if (!peaksArePlausible(excitationPeakNm, emissionPeakNm)) {
+    issues.push(
+      spectraIssue(
+        canonical,
+        `variant '${variantKey}' has an implausible excitationPeakNm/emissionPeakNm (${excitationPeakNm}/${emissionPeakNm} nm -- expected ${MIN_PLAUSIBLE_PEAK_NM}-${MAX_PLAUSIBLE_PEAK_NM} nm with emission > excitation) -- likely a data-entry error`
+      )
+    );
     return null;
   }
   return { excitationPeakNm, emissionPeakNm };
@@ -130,6 +195,15 @@ function normalizeFluorophoreEntry(canonical, entry, issues) {
   if (typeof excitationPeakNm !== 'number' || typeof emissionPeakNm !== 'number') {
     issues.push(
       spectraIssue(canonical, "fluorophore entry is missing numeric excitationPeakNm/emissionPeakNm (or isFamily:true with 'variants')")
+    );
+    return null;
+  }
+  if (!peaksArePlausible(excitationPeakNm, emissionPeakNm)) {
+    issues.push(
+      spectraIssue(
+        canonical,
+        `fluorophore entry has an implausible excitationPeakNm/emissionPeakNm (${excitationPeakNm}/${emissionPeakNm} nm -- expected ${MIN_PLAUSIBLE_PEAK_NM}-${MAX_PLAUSIBLE_PEAK_NM} nm with emission > excitation) -- likely a data-entry error`
+      )
     );
     return null;
   }
@@ -215,7 +289,16 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
 
   const markerEntry = kbMarker(markersKb, canonical);
   const markerClass = markerEntry ? markerEntry.class : undefined;
-  if (markerClass === 'tag' || markerClass === 'moiety') {
+  // 'tag' (HaloTag/SNAP/CLIP), 'moiety' (phalloidin/WGA/Annexin V -- a
+  // direct-conjugate probe, no antibody), and 'target' (Sox2 and friends --
+  // an ANTIBODY target, no antibody-free conjugate) all render identically
+  // here: none has a spectrum of its own. They stay three DISTINCT KB
+  // classes, not folded into one, because engine/controls.js's isotype/
+  // secondary-antibody-control rules need to tell 'target' apart from
+  // 'moiety' precisely (an isotype control makes no sense for a
+  // phalloidin/WGA/Annexin V panel -- no antibody is involved) -- see
+  // derivePanelFacts below and export_markers_kb.py's TARGET_MARKERS.
+  if (markerClass === 'tag' || markerClass === 'moiety' || markerClass === 'target') {
     return { token, canonical, state: 'no-intrinsic-spectrum' };
   }
 
@@ -232,6 +315,13 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
     return {
       token,
       canonical,
+      // `variantKey` (the specific matched variant, e.g. 'mitotracker deep
+      // red') rides along ONLY for a resolved family member -- resolvePanel
+      // needs it to dedupe two different colors of the same family as two
+      // entries, not one (see its own header). Absent for every other
+      // state/non-family entry, so a caller can branch on its presence
+      // instead of re-deriving isFamily.
+      variantKey: needle,
       state: 'known',
       excitationPeakNm: variant.excitationPeakNm,
       emissionPeakNm: variant.emissionPeakNm,
@@ -249,26 +339,89 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
   };
 }
 
+// splitMarkers (engine/validation.js) tokenizes on `/[-,;|/]+/` -- correct
+// for Classic's filename semantics, where '-' is a field separator, not a
+// character inside a marker name. But markers.json deliberately lists
+// hyphenated ALIASES for this same field ('calcein-am', 'fura-2',
+// 'texas-red', 'halo-tag', ...), so splitMarkers shreds them into
+// unreachable fragments ("CALCEIN"/"AM", "FURA"/"2") before this module
+// ever sees them.
+//
+// Rather than forking a second tokenizer (the module header's whole point),
+// this is a REJOIN pass over splitMarkers' own output: try gluing 2-3
+// consecutive tokens back together with '-' and see if that exact string is
+// a known alias. Longest span first, so a genuine 3-token alias is not
+// pre-empted by an accidental 2-token match inside it. A false-positive
+// rejoin requires an EXACT alias-table hit, so two unrelated tokens
+// (e.g. "GFP" then "AM" from "GFP,AM") only collide if some future KB entry
+// happens to alias exactly "gfp-am" -- vanishingly unlikely, and a content
+// question for spectra.json review, not a code defect.
+const MAX_REJOIN_SPAN = 3;
+
+function rejoinHyphenatedAliases(tokens, markerIndex) {
+  const aliasToCanonical = markerIndex && markerIndex.aliasToCanonical;
+  if (!aliasToCanonical || tokens.length < 2) return tokens;
+
+  const result = [];
+  let i = 0;
+  while (i < tokens.length) {
+    let joined = null;
+    for (let span = Math.min(MAX_REJOIN_SPAN, tokens.length - i); span >= 2; span--) {
+      const candidate = tokens.slice(i, i + span).join('-');
+      if (aliasToCanonical.has(candidate.toLowerCase())) {
+        joined = { candidate, span };
+        break;
+      }
+    }
+    if (joined) {
+      result.push(joined.candidate);
+      i += joined.span;
+    } else {
+      result.push(tokens[i]);
+      i += 1;
+    }
+  }
+  return result;
+}
+
 /**
  * Resolve the WHOLE markers free-text field (naming.fields.markers, the
  * one source of truth per docs/plans/planner-web-color-panel.md Decision 1)
  * into `{panelState, entries}`. `panelState` is `'unanswered'` (field is
  * empty -- the panel has nothing to check yet, never silently equivalent to
- * "0 conflicts") or `'has-entries'`. Deduplicates by resolved canonical (an
- * unrecognized token dedupes by its own text instead, since it has none),
- * keeping the FIRST-seen token spelling for display -- so typing the same
- * marker twice under different casing/spacing doesn't double-count a pair.
+ * "0 conflicts"), `'no-markers-declared'` (the field is one of the app's own
+ * "nothing here" sentinels -- 'NONE', 'N/A', 'unstained', ... -- a
+ * DECLARATION, not a typo; see NO_MARKERS_SENTINELS above), or
+ * `'has-entries'`.
+ *
+ * Deduplicates by resolved canonical, PLUS `variantKey` when the entry
+ * resolved to a specific family member -- so "MitoTracker Green,
+ * MitoTracker Deep Red" keeps both colors as distinct entries instead of
+ * collapsing to whichever was seen first (a real defect this project
+ * shipped once: two colors of the same family sharing ONE canonical, and a
+ * dedupe keyed on canonical alone silently dropped the second). An
+ * unrecognized token dedupes by its own text instead, since it has no
+ * canonical. Keeps the FIRST-seen token spelling for display -- so typing
+ * the same marker twice under different casing/spacing doesn't double-count
+ * a pair.
  */
 export function resolvePanel(markersFieldText, markerIndex, markersKb, fluorophores) {
   const text = typeof markersFieldText === 'string' ? markersFieldText.trim() : '';
   if (!text) return { panelState: 'unanswered', entries: [] };
 
-  const tokens = splitMarkers(text);
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (NO_MARKERS_SENTINELS.has(normalized)) {
+    return { panelState: 'no-markers-declared', entries: [] };
+  }
+
+  const tokens = rejoinHyphenatedAliases(splitMarkers(text), markerIndex);
   const seen = new Set();
   const entries = [];
   for (const token of tokens) {
     const resolved = resolveMarkerToken(token, markerIndex, markersKb, fluorophores);
-    const dedupeKey = resolved.canonical || `token:${resolved.token}`;
+    const dedupeKey = resolved.canonical
+      ? resolved.canonical + (resolved.variantKey ? `::${resolved.variantKey}` : '')
+      : `token:${resolved.token}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
     entries.push(resolved);
@@ -284,10 +437,17 @@ export function resolvePanel(markersFieldText, markerIndex, markersKb, fluoropho
  * engine/validation.js's validationIssue, so callers reuse the existing
  * `.issues-list`/`.issue-{severity}` rendering unchanged.
  *
- * Deterministic order: ascending gap size, ties broken by the pair's sorted
- * canonical ids then by severity -- so re-rendering the same panel never
- * reorders the flags.
+ * Deterministic order: SEVERITY FIRST (every 'error' -- an emission-peak
+ * conflict, the one that actually invalidates the panel -- ahead of every
+ * 'warning'), then ascending gap size within a severity, ties broken by the
+ * pair's sorted canonical ids -- so re-rendering the same panel never
+ * reorders the flags, and a reader scanning top-to-bottom sees the flags
+ * that matter most first regardless of how close together their nm gaps
+ * happen to be. An earlier version sorted by gap alone, which routinely put
+ * a 2 nm excitation warning above a 12 nm emission error.
  */
+const SEVERITY_RANK = { error: 0, warning: 1 };
+
 export function flagPanelOverlaps(entries, overlapRules) {
   const known = entries.filter((e) => e.state === 'known');
   const rules = overlapRules || { emissionProximityNm: DEFAULT_EMISSION_PROXIMITY_NM, excitationProximityNm: DEFAULT_EXCITATION_PROXIMITY_NM };
@@ -329,6 +489,59 @@ export function flagPanelOverlaps(entries, overlapRules) {
     }
   }
 
-  flags.sort((x, y) => x.gap - y.gap || x.pairKey.localeCompare(y.pairKey) || x.severity.localeCompare(y.severity));
+  flags.sort(
+    (x, y) => SEVERITY_RANK[x.severity] - SEVERITY_RANK[y.severity] || x.gap - y.gap || x.pairKey.localeCompare(y.pairKey)
+  );
   return flags.map(({ field, message, severity }) => ({ field, message, severity }));
+}
+
+/**
+ * Derive the panel-level FACTS engine/controls.js's predicate DSL needs but
+ * cannot compute itself -- the DSL only reads plain paths off the flat
+ * assay view (evaluatePredicate never resolves an alias, never asks "is
+ * this marker an antibody"), so anything that requires resolving markers
+ * against the KB has to be pre-computed here and handed in as ordinary
+ * data at `panel.derived.*`.
+ *
+ * This exists because of a real, verified defect: every 'panel'-kind
+ * control rule used to share ONE predicate (`exists(markers) AND markers
+ * != 'NONE'`), so on the app's own default study three of four assays
+ * (SYTO9/PI, phalloidin/DAPI, DCF/DAPI -- none of them antibody-based) were
+ * told to run an isotype control and a secondary-antibody-only control.
+ * `hasAntibody` lets those two rules gate on the right fact instead of
+ * firing as a block; `fluorophoreCount` lets single-stain/FMO controls gate
+ * on actual panel complexity instead of "any markers at all";
+ * `hasMarkersDeclared` replaces the old exact-string `!= 'NONE'` guard
+ * (case-sensitive, untrimmed -- verified to let 'none', 'N/A', 'unstained',
+ * 'label-free' all slip through) with the same sentinel-aware resolution
+ * resolvePanel already does for the Color panel step, so the two surfaces
+ * can never disagree about what counts as "no markers here."
+ *
+ * Returns `{fluorophoreCount, hasAntibody, hasTag, classes, hasMarkersDeclared}`.
+ * `fluorophoreCount` counts every resolved, non-typo entry (known,
+ * ambiguous-family, no-intrinsic-spectrum, spectrum-unavailable) -- a
+ * phalloidin or a not-yet-drafted dye is still a real channel in the panel,
+ * it just isn't 'known' to the spillover checker; only 'unrecognized'
+ * tokens (likely typos) are excluded. TOTAL: never throws.
+ */
+export function derivePanelFacts(markersFieldText, markerIndex, markersKb, fluorophores) {
+  const { panelState, entries } = resolvePanel(markersFieldText, markerIndex, markersKb, fluorophores);
+  if (panelState !== 'has-entries') {
+    return { fluorophoreCount: 0, hasAntibody: false, hasTag: false, classes: [], hasMarkersDeclared: false };
+  }
+
+  const recognized = entries.filter((e) => e.state !== 'unrecognized');
+  const classes = new Set();
+  for (const entry of recognized) {
+    const markerEntry = entry.canonical ? kbMarker(markersKb, entry.canonical) : undefined;
+    if (markerEntry && typeof markerEntry.class === 'string') classes.add(markerEntry.class);
+  }
+
+  return {
+    fluorophoreCount: recognized.length,
+    hasAntibody: classes.has('target'),
+    hasTag: classes.has('tag'),
+    classes: [...classes].sort(),
+    hasMarkersDeclared: true,
+  };
 }

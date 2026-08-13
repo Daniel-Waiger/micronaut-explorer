@@ -28,7 +28,7 @@ KNOWN_KINDS = {"pitfall", "tip"}
 # literal, not imported (this is Python; that module is JS) -- if the two
 # ever diverge, web/tests/advisor.test.js's surface-acceptance tests are the
 # ones that will actually catch it.
-KNOWN_SURFACES = {"describe", "design", "naming"}
+KNOWN_SURFACES = {"describe", "design", "naming", "panel"}
 
 
 def test_every_kb_json_file_parses() -> None:
