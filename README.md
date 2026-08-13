@@ -48,8 +48,24 @@ outside-in, no forced order):
   Raman) surfaced from a rules knowledge base (`web/kb/advisor.json`).
 - **Naming** — builds the filename convention from the finished design, reusing
   Classic's naming/validation logic ported to JS.
-- **Overview** — a shareable study diagram plus a deterministic walkthrough, and a
-  staged progression ladder (idea → advanced modality).
+- **Color panel** — a qualitative spectral-spillover advisor over the active assay's
+  fluorophores: excitation/emission peak-proximity flags, not a spectral-overlap
+  integral. Content is Claude-drafted and flagged unreviewed (`web/kb/spectra.json`).
+  An optional structured panel editor below it lets you name each channel's target
+  and conjugation mode (direct antibody / indirect / genetically encoded / a
+  direct-binding probe / self-labeling tag) — the fact-precise alternative to the
+  free-text markers field, and what lets the controls engine tell whether an
+  antibody is actually involved.
+- **Overview** — a shareable study diagram, a conformance check (one pass/fail
+  verdict composed from every validator the app already runs), a deterministic
+  walkthrough, a staged progression ladder (idea → advanced modality), and
+  downloads: Markdown, an SVG study map, a CSV file manifest, a raw-data JSON
+  dump, a per-assay print-oriented bench card, and a copy-paste prompt (+ the
+  study as JSON) for pasting into whatever LLM you already use.
+- **Guide** — an in-app user guide, always in the step nav.
+
+A "Copy feedback report" button in the header copies the current step, browser,
+and full study as text — for reporting problems during the alpha.
 
 Everything works with the optional LLM **disabled** — the deterministic tier is
 always the floor. The LLM never originates a domain fact; it may only emit IDs
@@ -321,9 +337,9 @@ Example LLM section:
 web/                         Micronaut Planner (static browser app)
   index.html                 dev entry (BUILD:* markers for the inliner)
   src/core/                  schema, store, tiered provenance, router, persistence
-  src/engine/                naming, validation, interview, advisor, controls, render
-  src/ui/steps/              study, describe, design, naming, overview
-  kb/                        knowledge pack (markers, stages, controls, advisor, …)
+  src/engine/                naming, validation, interview, advisor, controls, spectra, render
+  src/ui/steps/              study, describe, design, naming, panel, overview, guide
+  kb/                        knowledge pack (markers, stages, controls, advisor, spectra, …)
   tests/                     node --test suite (zero npm deps)
 
 src/microscopy_naming_assistant/   Micronaut Classic (Python package)
