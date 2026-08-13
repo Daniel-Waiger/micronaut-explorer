@@ -22,6 +22,7 @@ import { buildStudyDocument } from '../../engine/studydoc.js';
 import { renderMarkdown } from '../../engine/render/markdown.js';
 import { renderCsv } from '../../engine/render/csv.js';
 import { renderJson } from '../../engine/render/json.js';
+import { renderBenchCard } from '../../engine/render/benchcard.js';
 import { buildDiagramLayout } from '../../engine/render/svgDiagram.js';
 import { downloadTextFile } from '../../core/persist.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
@@ -263,14 +264,31 @@ function renderStageNotesNode(parent, stageNotes) {
   parent.appendChild(box);
 }
 
-function renderAssayNode(parent, assay) {
+function renderAssayNode(parent, assay, onDownloadBenchCard) {
   const box = document.createElement('div');
   box.className = 'overview-assay';
+
+  const headerRow = document.createElement('div');
+  headerRow.className = 'overview-assay-header';
 
   const heading = document.createElement('div');
   heading.className = 'overview-assay-title';
   heading.textContent = `Assay ${assay.index}: ${assay.label}`;
-  box.appendChild(heading);
+  headerRow.appendChild(heading);
+
+  // Per-assay, not a single study-wide button -- a bench card is a
+  // SINGLE-ASSAY document by design (render/benchcard.js's own header), and
+  // a multi-assay study has no one obvious "current" assay to default to
+  // here the way the Color panel step can (this is a pure read over every
+  // assay, not scoped to whichever one is active in the switcher).
+  const benchCardBtn = document.createElement('button');
+  benchCardBtn.type = 'button';
+  benchCardBtn.className = 'copy-button overview-assay-benchcard-btn';
+  benchCardBtn.textContent = 'Download bench card (.md)';
+  benchCardBtn.addEventListener('click', () => onDownloadBenchCard(assay));
+  headerRow.appendChild(benchCardBtn);
+
+  box.appendChild(headerRow);
 
   appendLabeledNode(box, 'overview-node', readoutLine(assay.readout));
   appendLabeledNode(box, 'overview-node', `Modality: ${assay.modality || 'not answered yet'}`);
@@ -452,7 +470,11 @@ export function createOverviewStep(kb) {
       const tree = document.createElement('div');
       tree.className = 'overview-tree';
       for (const assay of doc.assays) {
-        renderAssayNode(tree, assay);
+        renderAssayNode(tree, assay, (assayForCard) => {
+          const filename = `${(assayForCard.label || 'bench-card').replace(/[^A-Za-z0-9_-]+/g, '-')}-bench-card.md`;
+          downloadTextFile(renderBenchCard(assayForCard), filename, 'text/markdown');
+          if (showToast) showToast(`Downloaded the bench card for "${assayForCard.label}".`);
+        });
       }
       main.appendChild(tree);
     },

@@ -771,7 +771,8 @@ button:focus-visible {
   .assay-switcher-bar,
   .shell-nav,
   .shell-status,
-  .overview-actions {
+  .overview-actions,
+  .overview-assay-benchcard-btn {
     display: none;
   }
 
@@ -1068,10 +1069,24 @@ button:focus-visible {
   background: var(--panel);
 }
 
+.overview-assay-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
 .overview-assay-title {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 8px;
+}
+
+.overview-assay-benchcard-btn {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 .overview-node {

@@ -27,11 +27,47 @@ import { conditionIssues, expandConditions } from './conditions.js';
 import { effectiveNamingFields, planFilenames, studyNameIssues } from './plan.js';
 import { readoutState, selectControls } from './controls.js';
 import { buildLadder } from './stages.js';
-import { derivePanelFacts } from './spectra.js';
-import { ANTIBODY_CONJUGATION_MODES, normalizeChannels } from './panelAssembly.js';
+import { derivePanelFacts, resolveMarkerToken, resolvePanel } from './spectra.js';
+import { ANTIBODY_CONJUGATION_MODES, channelSpectralField, normalizeChannels } from './panelAssembly.js';
 
 function assayLabel(assay, index) {
   return (assay && typeof assay.label === 'string' && assay.label.trim()) || `Assay ${index + 1}`;
+}
+
+/**
+ * One row per channel/marker for a per-assay panel table (the bench card's
+ * Channels section, render/benchcard.js). Same precedence as panelDerived
+ * just above: the structured `channels` (with a real `target` and
+ * `conjugation`) when at least one exists, else the free-text markers field
+ * resolved the same way the Color panel step reads it -- so the bench card
+ * and the Color panel can never show a different channel list for the same
+ * assay. TOTAL: a channel/token whose spectral field is empty or
+ * unresolved still gets a row (state carries why), never silently omitted.
+ */
+function buildPanelRows(channels, markersText, markerIndex, markersKb, spectra) {
+  if (channels.length > 0) {
+    return channels.map((c) => {
+      const spectralField = channelSpectralField(c).trim();
+      const resolved = spectralField ? resolveMarkerToken(spectralField, markerIndex, markersKb, spectra) : null;
+      return {
+        target: c.target || '',
+        fluorophore: spectralField,
+        conjugation: c.conjugation,
+        state: resolved ? resolved.state : 'unrecognized',
+        excitationPeakNm: resolved && resolved.state === 'known' ? resolved.excitationPeakNm : null,
+        emissionPeakNm: resolved && resolved.state === 'known' ? resolved.emissionPeakNm : null,
+      };
+    });
+  }
+  const { entries } = resolvePanel(markersText, markerIndex, markersKb, spectra);
+  return entries.map((e) => ({
+    target: '',
+    fluorophore: e.token,
+    conjugation: null,
+    state: e.state,
+    excitationPeakNm: e.state === 'known' ? e.excitationPeakNm : null,
+    emissionPeakNm: e.state === 'known' ? e.emissionPeakNm : null,
+  }));
 }
 
 /**
@@ -140,6 +176,7 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
       panelDerived = derivePanelFacts(markersText, markerIndex, markersKb, spectra);
     }
     const viewWithDerivedPanel = { ...view, panel: { ...view.panel, derived: panelDerived } };
+    const panelRows = buildPanelRows(channels, markersText, markerIndex, markersKb, spectra);
 
     const firedControls = selectControls(controlRules, viewWithDerivedPanel);
     const readoutControls = firedControls
@@ -174,6 +211,7 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
       label: assayLabel(assay, index),
       readout: { text: view.readoutText || '', state: rState, canonical, label: readoutLabel },
       modality: (view.acquisition && view.acquisition.modality) || '',
+      panelRows,
       specimen: {
         organism: (view.specimen && view.specimen.organism) || '',
         sampleType: (view.specimen && view.specimen.sampleType) || '',
