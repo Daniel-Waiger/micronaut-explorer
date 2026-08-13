@@ -338,55 +338,70 @@ export function createOverviewStep(kb) {
       const actions = document.createElement('div');
       actions.className = 'overview-actions';
 
-      const downloadBtn = document.createElement('button');
-      downloadBtn.type = 'button';
-      downloadBtn.className = 'copy-button';
-      downloadBtn.textContent = 'Download Markdown (.md)';
-      downloadBtn.addEventListener('click', () => {
-        const doc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
-        const filename = `${(doc.study.title || 'study-overview').replace(/[^A-Za-z0-9_-]+/g, '-')}.md`;
-        downloadTextFile(renderMarkdown(doc), filename, 'text/markdown');
-        if (showToast) showToast('Downloaded the study overview as Markdown.');
-      });
-      actions.appendChild(downloadBtn);
+      // One button-wiring path for every export: build a fresh doc (never
+      // the one this render() closed over, since a download can fire long
+      // after typing continued to change the store), derive the filename
+      // from the study title, hand the text to downloadTextFile, toast.
+      // Four near-identical copies of this used to live inline here --
+      // each new export format (CSV, then JSON) meant copy-pasting an
+      // eleven-line block, so the title-sanitizing regex alone was
+      // duplicated four times over with three chances to fix it in only
+      // one place. `render` takes the fresh doc and returns the file text;
+      // everything format-specific (renderMarkdown, the SVG serialization,
+      // renderCsv, renderJson) stays a one-line argument.
+      function addDownloadButton({ label, fallbackName, ext, mime, render, toastMessage }) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'copy-button';
+        btn.textContent = label;
+        btn.addEventListener('click', () => {
+          const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+          const filename = `${(freshDoc.study.title || fallbackName).replace(/[^A-Za-z0-9_-]+/g, '-')}.${ext}`;
+          downloadTextFile(render(freshDoc), filename, mime);
+          if (showToast) showToast(toastMessage);
+        });
+        actions.appendChild(btn);
+      }
 
-      const downloadSvgBtn = document.createElement('button');
-      downloadSvgBtn.type = 'button';
-      downloadSvgBtn.className = 'copy-button';
-      downloadSvgBtn.textContent = 'Download study map (.svg)';
-      downloadSvgBtn.addEventListener('click', () => {
-        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
-        const svg = buildDiagramSvg(buildDiagramLayout(freshDoc));
-        const serialized = new XMLSerializer().serializeToString(svg);
-        const filename = `${(freshDoc.study.title || 'study-map').replace(/[^A-Za-z0-9_-]+/g, '-')}.svg`;
-        downloadTextFile(`<?xml version="1.0" encoding="UTF-8"?>\n${serialized}`, filename, 'image/svg+xml');
-        if (showToast) showToast('Downloaded the study map as SVG.');
+      addDownloadButton({
+        label: 'Download Markdown (.md)',
+        fallbackName: 'study-overview',
+        ext: 'md',
+        mime: 'text/markdown',
+        render: renderMarkdown,
+        toastMessage: 'Downloaded the study overview as Markdown.',
       });
-      actions.appendChild(downloadSvgBtn);
 
-      const downloadCsvBtn = document.createElement('button');
-      downloadCsvBtn.type = 'button';
-      downloadCsvBtn.className = 'copy-button';
-      downloadCsvBtn.textContent = 'Download file manifest (.csv)';
-      downloadCsvBtn.addEventListener('click', () => {
-        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
-        const filename = `${(freshDoc.study.title || 'study-manifest').replace(/[^A-Za-z0-9_-]+/g, '-')}.csv`;
-        downloadTextFile(renderCsv(freshDoc), filename, 'text/csv');
-        if (showToast) showToast('Downloaded the file manifest as CSV.');
+      addDownloadButton({
+        label: 'Download study map (.svg)',
+        fallbackName: 'study-map',
+        ext: 'svg',
+        mime: 'image/svg+xml',
+        render: (freshDoc) => {
+          const svg = buildDiagramSvg(buildDiagramLayout(freshDoc));
+          const serialized = new XMLSerializer().serializeToString(svg);
+          return `<?xml version="1.0" encoding="UTF-8"?>\n${serialized}`;
+        },
+        toastMessage: 'Downloaded the study map as SVG.',
       });
-      actions.appendChild(downloadCsvBtn);
 
-      const downloadJsonBtn = document.createElement('button');
-      downloadJsonBtn.type = 'button';
-      downloadJsonBtn.className = 'copy-button';
-      downloadJsonBtn.textContent = 'Download raw data (.json)';
-      downloadJsonBtn.addEventListener('click', () => {
-        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
-        const filename = `${(freshDoc.study.title || 'study-overview').replace(/[^A-Za-z0-9_-]+/g, '-')}.json`;
-        downloadTextFile(renderJson(freshDoc), filename, 'application/json');
-        if (showToast) showToast('Downloaded the study overview as JSON.');
+      addDownloadButton({
+        label: 'Download file manifest (.csv)',
+        fallbackName: 'study-manifest',
+        ext: 'csv',
+        mime: 'text/csv',
+        render: renderCsv,
+        toastMessage: 'Downloaded the file manifest as CSV.',
       });
-      actions.appendChild(downloadJsonBtn);
+
+      addDownloadButton({
+        label: 'Download raw data (.json)',
+        fallbackName: 'study-overview',
+        ext: 'json',
+        mime: 'application/json',
+        render: renderJson,
+        toastMessage: 'Downloaded the study overview as JSON.',
+      });
 
       const printBtn = document.createElement('button');
       printBtn.type = 'button';
