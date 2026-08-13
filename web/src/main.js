@@ -134,10 +134,28 @@ function init() {
   // was built from the OLD assayId. Guarded on an actual change so ordinary
   // per-keystroke field edits (which also flow through this same
   // store.subscribe channel via the autosave one below) never trigger it.
+  //
+  // ALSO re-render when `assays` itself is a new array reference -- not just
+  // when activeAssayId changes. Deleting a NON-active assay via the
+  // switcher's "x" (shell.js's renderSwitcher) calls store.patch(result),
+  // which replaces `assays` but leaves activeAssayId untouched, so the
+  // activeAssayId check alone never fires; a step that lists every assay by
+  // reading store.get().assays directly (study.js) then keeps showing the
+  // deleted assay until some UNRELATED action happens to change
+  // activeAssayId too. This is a real bug that shipped: verified live --
+  // the switcher pill disappeared correctly (it has its own subscription)
+  // while the Study step's own assay list kept a stale row for the assay
+  // just removed. Safe as a reference check, not a deep one: core/store.js's
+  // setPath MUTATES nested state in place (core/paths.js), so `assays` keeps
+  // the SAME reference across ordinary per-keystroke field edits and only
+  // gets a new one when store.patch() explicitly replaces it (add/remove
+  // assay) -- this can never fire on a keystroke.
   let lastActiveAssayId = store.get().activeAssayId;
+  let lastAssays = store.get().assays;
   store.subscribe((state) => {
-    if (state.activeAssayId !== lastActiveAssayId) {
+    if (state.activeAssayId !== lastActiveAssayId || state.assays !== lastAssays) {
       lastActiveAssayId = state.activeAssayId;
+      lastAssays = state.assays;
       renderActiveStep(router.current());
     }
   });
