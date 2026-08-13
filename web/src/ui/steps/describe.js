@@ -222,6 +222,19 @@ export function createDescribeStep(kb) {
       draftButton.hidden = !loadLlmConfig().enabled;
       main.appendChild(draftButton);
 
+      // Wave C: the same model, aimed at THIS study instead of a new one.
+      // The two are different moments, not redundant buttons -- drafting is
+      // for starting from nothing, this is for finishing something already
+      // underway, and only this one can collide with existing answers.
+      const suggestButton = document.createElement('button');
+      suggestButton.type = 'button';
+      suggestButton.className = 'draft-button';
+      suggestButton.textContent = 'Suggest answers for what is left';
+      suggestButton.title =
+        "Asks your local model to answer only the questions you haven't decided yet, as proposals you review one by one.";
+      suggestButton.hidden = !loadLlmConfig().enabled;
+      main.appendChild(suggestButton);
+
       // advisor may be undefined (a caller that hasn't wired it, or a KB
       // that failed to load) -- createAdvicePanel([], ...) is completely
       // inert, not a missing-argument crash. Guidance sits above the
@@ -284,7 +297,9 @@ export function createDescribeStep(kb) {
           const empty = document.createElement('p');
           empty.className = 'proposals-empty';
           empty.textContent = textarea.value
-            ? 'Click "Read it" to scan the paragraph above.'
+            ? loadLlmConfig().enabled
+              ? 'Click "Read it" to scan the paragraph above, or "Suggest answers for what is left".'
+              : 'Click "Read it" to scan the paragraph above.'
             : 'Nothing to scan yet.';
           proposalsList.appendChild(empty);
           return;
@@ -311,6 +326,30 @@ export function createDescribeStep(kb) {
           text.appendChild(evidenceSpan);
           row.appendChild(text);
 
+          // WHICH TIER PROPOSED THIS. The two are not equally trustworthy and
+          // must not look alike: the deterministic scan matched literal text
+          // the user wrote, while the model INFERRED a value from the same
+          // prose. Derived from the provenance tag rather than a separate
+          // display field, so the badge can never disagree with what an
+          // Accept would actually write.
+          const source = document.createElement('span');
+          source.className = isProvisional(proposal.tag) ? 'proposal-source proposal-source-llm' : 'proposal-source';
+          source.textContent = isProvisional(proposal.tag) ? 'model' : 'text scan';
+          text.appendChild(source);
+
+          // Accept is now a STRONG write, so it CAN replace an existing
+          // value. That makes showing what is about to be lost a
+          // requirement, not a nicety -- a silent replacement is exactly the
+          // failure the provenance gate used to prevent for us.
+          const { path: currentPath } = scopeWrite(store.get(), proposal.path, assayId);
+          const currentValue = store.getPath(currentPath);
+          if (currentValue !== undefined && currentValue !== null && currentValue !== '') {
+            const replaces = document.createElement('div');
+            replaces.className = 'proposal-replaces';
+            replaces.textContent = `Replaces the current value: ${displayValue(currentValue)}`;
+            row.appendChild(replaces);
+          }
+
           const actions = document.createElement('div');
           actions.className = 'proposal-actions';
 
@@ -323,14 +362,29 @@ export function createDescribeStep(kb) {
             // (e.g. 'naming.fields.markers') -- assay-scoped like every
             // question field, so it needs scopeWrite too.
             const { path, slotKey } = scopeWrite(store.get(), proposal.path, assayId);
-            const applied = store.setPath(path, proposal.value, proposal.tag, { slotKey });
+            // Accept is the USER endorsing this value, so it is written with a
+            // STRONG tag -- NOT the proposal's own WEAK 'freetext' /
+            // PROVISIONAL 'llm_freetext'. Writing the source tag (what this
+            // did before) left an accepted value still flagged needsReview,
+            // which reads as "unreviewed" about the one value the user
+            // explicitly just reviewed, and left it clobberable by the next
+            // re-parse. editTagFor is the same rule the interview's own
+            // Answer/Update buttons use: 'user_edited' when endorsing a
+            // machine-sourced guess (its docstring names an LLM suggestion
+            // outright), plain 'user' for a slot that held nothing.
+            const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
+            const tag = editTagFor(existingTag);
+            const applied = store.setPath(path, proposal.value, tag, { slotKey });
+            writeReadoutCanonicalIfNeeded(store, { id: proposal.questionId }, proposal.value, tag, assayId, kb);
             pendingProposals = pendingProposals.filter((p) => p !== proposal);
             renderProposals();
             renderInterview();
             renderAnswered();
             // setPath's return value is the ONLY signal that a write was
-            // refused (a stronger value already occupies that slot) -- a
-            // refused Accept must not look identical to a successful one.
+            // refused -- a refused Accept must not look identical to a
+            // successful one. With a STRONG tag this should no longer be
+            // reachable, so it is kept as a genuine invariant check rather
+            // than an expected path.
             if (!applied && showToast) {
               showToast(
                 `Couldn't apply "${displayValue(proposal.value)}" -- a stronger value is already set there.`
@@ -613,6 +667,83 @@ export function createDescribeStep(kb) {
         } finally {
           draftButton.disabled = false;
           draftButton.textContent = 'Draft a study from this (new tab)';
+        }
+      });
+
+      // Wave C: model proposals into the CURRENT study, reviewed one slot at
+      // a time through the same list the deterministic scan already feeds.
+      //
+      // Deliberately scoped to `currentAskable` (nextQuestions' output: slots
+      // NOT already carrying a STRONG tag) rather than the whole question
+      // bank. Three reasons, in order of importance: the model is never
+      // invited to second-guess a value the user actually chose; the schema
+      // and prompt stay small, which matters because every call re-sends this
+      // context; and a proposal therefore almost never has anything to
+      // replace, keeping Accept boring.
+      suggestButton.addEventListener('click', async () => {
+        const cfg = loadLlmConfig();
+        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model });
+        if (!provider.isAvailable()) {
+          if (showToast) showToast('Set a local model endpoint and name first (in "Ask about this step").');
+          return;
+        }
+        const text = textarea.value.trim();
+        if (!text) {
+          if (showToast) showToast('Describe the experiment above first.');
+          return;
+        }
+        if (currentAskable.length === 0) {
+          if (showToast) showToast('Nothing left to suggest -- every question is answered or skipped.');
+          return;
+        }
+
+        suggestButton.disabled = true;
+        suggestButton.textContent = 'Asking...';
+        try {
+          const schema = buildProposalSchema(currentAskable);
+          const result = await provider.complete({
+            system: DRAFT_SYSTEM_PROMPT,
+            user: `--- QUESTIONS STILL OPEN ---\n${currentAskable
+              .map((q) => {
+                const options = Array.isArray(q.options) ? ` [options: ${q.options.join(', ')}]` : '';
+                return `- ${q.field}: ${q.prompt}${options}`;
+              })
+              .join('\n')}\n\n--- DESCRIPTION ---\n${text}`,
+            schema,
+          });
+
+          const { proposals, issues } = parseLlmProposals(result.json, currentAskable);
+          if (issues.length > 0) {
+            // A dropped proposal is this tier working as designed, not a
+            // failure -- logged, so the surviving ones still render.
+            console.warn('Dropped LLM proposals:', issues);
+          }
+          if (proposals.length === 0) {
+            if (showToast) showToast('The model did not suggest anything usable for the open questions.');
+            return;
+          }
+
+          // Merge rather than replace: a deterministic scan may already be
+          // sitting in this list, and silently discarding it because the
+          // model was asked second would lose work the user has not judged
+          // yet. A model proposal never displaces a scan for the same path.
+          const takenPaths = new Set(pendingProposals.map((p) => p.path));
+          const added = proposals.filter((p) => !takenPaths.has(p.path));
+          pendingProposals = pendingProposals.concat(added);
+          renderProposals();
+          updateAdvice();
+          if (showToast) {
+            const skipped = proposals.length - added.length;
+            showToast(
+              `${added.length} suggestion(s) to review.` +
+                (skipped > 0 ? ` ${skipped} skipped -- already proposed by the text scan.` : '')
+            );
+          }
+        } catch (err) {
+          if (showToast) showToast(`Couldn't reach the local model (${err.message}). Nothing was changed.`);
+        } finally {
+          suggestButton.disabled = false;
+          suggestButton.textContent = 'Suggest answers for what is left';
         }
       });
 

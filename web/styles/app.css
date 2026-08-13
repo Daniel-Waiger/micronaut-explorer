@@ -512,6 +512,34 @@ button:focus-visible {
   cursor: default;
 }
 
+/* Which tier proposed a row. The deterministic scan matched literal text the
+   user wrote; the model inferred from it. Same list, different warrant, so
+   they must not read alike. */
+.proposal-source {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.proposal-source-llm {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Accept is a STRONG write and can replace an existing value, so what would
+   be lost is stated before the click, not discovered after it. */
+.proposal-replaces {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--warn);
+}
+
 /* The one thing separating a model's guess from an answer the user gave --
    the control itself is pre-filled in both cases. */
 .question-provisional {

@@ -144,11 +144,11 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "local-llm-guidance",
+  "run": "local-llm-guidance Wave C",
   "orchestrator": "Claude Opus 4.8",
   "active_model": "Claude Opus 4.8",
   "active_status": "idle",
-  "phase": "Waves A+B complete",
+  "phase": "Wave C complete",
   "state_note": "",
   "current_task": null,
   "crit_title": "Open defects",
@@ -159,87 +159,53 @@ const EMBEDDED = {
       "tone": "ok"
     },
     {
-      "k": "Wave A",
-      "v": "5/5 complete",
-      "tone": "ok"
-    },
-    {
-      "k": "Wave B",
-      "v": "1/1 complete",
+      "k": "Wave C",
+      "v": "4/4 complete",
       "tone": "ok"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "1",
-      "phase": "Wave A",
-      "title": "llmschema.js (pure schema builder)",
+      "id": "8",
+      "phase": "Wave C",
+      "title": "suggest-answers button (LLM into current study)",
       "status": "done",
       "by": "Opus"
     },
     {
-      "id": "2",
-      "phase": "Wave A",
-      "title": "provider seam (manualPaste + ollama adapters)",
+      "id": "9",
+      "phase": "Wave C",
+      "title": "Accept writes a STRONG tag",
       "status": "done",
       "by": "Opus"
     },
     {
-      "id": "3",
-      "phase": "Wave A",
-      "title": "guidance system prompt in llmprompt.js",
+      "id": "10",
+      "phase": "Wave C",
+      "title": "proposal rows show source + conflict",
       "status": "done",
       "by": "Opus"
     },
     {
-      "id": "4",
-      "phase": "Wave A",
-      "title": "guidance panel UI",
-      "status": "done",
-      "by": "Opus"
-    },
-    {
-      "id": "5",
-      "phase": "Wave A",
-      "title": "README/header accuracy update",
-      "status": "done",
-      "by": "Opus"
-    },
-    {
-      "id": "6",
-      "phase": "Wave B",
-      "title": "llmproposals.js + draft + wiring",
-      "status": "done",
-      "by": "Opus"
-    },
-    {
-      "id": "7",
+      "id": "11",
       "phase": "Verification",
-      "title": "tests + browser preview",
+      "title": "browser + full suite",
       "status": "done",
       "by": "Opus"
     }
   ],
   "log": [
     {
-      "time": "18:06:44",
-      "msg": "Reclaimed :8777 after Codex overwrite; Codex run preserved on :8778 (tools/cma-dashboard-codex)"
+      "time": "22:16:31",
+      "msg": "Wave C started: merge LLM proposals into an in-progress study via the existing review list"
     },
     {
-      "time": "18:06:44",
-      "msg": "Wave B: llmproposals.js + core/draft.js + new-tab handoff built, 20 new tests green"
-    },
-    {
-      "time": "18:07:13",
-      "msg": "Collaboration ownership published in docs/plans/planner-web-fluorophore-expansion-ownership.json; code edits will carry Codex task tags"
-    },
-    {
-      "time": "18:09:30",
-      "msg": "Wave B verified: draft loads in new tab, badges render, confirm promotes llm_freetext -> user_edited (lesson E8)"
+      "time": "22:22:14",
+      "msg": "Wave C verified end-to-end against a stub Ollama server: format schema sent, out-of-vocab value rejected, Accept promotes to user_edited"
     }
   ],
-  "snapshot_at": "2026-08-13 18:09"
+  "snapshot_at": "2026-08-13 22:22"
 };
 /* CMA:EMBEDDED:END */
 
