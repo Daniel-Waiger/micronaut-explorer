@@ -7,6 +7,26 @@
 // tool exists to prevent.
 export const MAX_PATH_LENGTH = 260;
 
+// The Planner's own baseline validateFields profile: empty allow-lists mean
+// "unrestricted" (see validateFields below), so this only enforces the
+// FORMAT patterns (sample/magnification/notes), not a specific lab's
+// marker/exptype vocabulary. Deliberately NOT Classic's profiles/
+// facsi_default.json -- that file lives in the Python package and is
+// authored per-lab for Classic's own renaming workflow; porting it into the
+// Planner would be inventing a content-authoring surface nobody asked the
+// Planner to have. Exported (not a ui/steps/naming.js local, where it
+// previously lived only) so engine/conformance.js's whole-study check uses
+// the IDENTICAL profile naming.js's own per-keystroke validation does --
+// one definition, not two that could quietly diverge.
+export const DEFAULT_PROFILE = {
+  allowedExperimentTypes: [],
+  allowedMarkers: [],
+  samplePattern: '^E\\d{2}$',
+  magnificationPattern: '^X\\d{2,3}$',
+  notesPattern: '^[A-Za-z0-9_-]+$',
+  unknownMarkerPolicy: 'warn',
+};
+
 /** Build a {field, message, severity} validation issue. */
 export function validationIssue(field, message, severity = 'error') {
   return { field, message, severity };

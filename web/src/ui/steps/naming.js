@@ -1,5 +1,5 @@
 import { finalizeFields } from '../../engine/naming.js';
-import { validateFields, validateTargetPath } from '../../engine/validation.js';
+import { DEFAULT_PROFILE, validateFields, validateTargetPath } from '../../engine/validation.js';
 import { editTagFor } from '../../core/provenance.js';
 import { formatReplicateToken } from '../../engine/conditions.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
@@ -45,14 +45,9 @@ export const NAMING_CONFIG = {
 // (fields.ext won't match the tail), which is what we want for a stem.
 export const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
 
-const DEFAULT_PROFILE = {
-  allowedExperimentTypes: [],
-  allowedMarkers: [],
-  samplePattern: '^E\\d{2}$',
-  magnificationPattern: '^X\\d{2,3}$',
-  notesPattern: '^[A-Za-z0-9_-]+$',
-  unknownMarkerPolicy: 'warn',
-};
+// DEFAULT_PROFILE itself now lives in engine/validation.js -- see its own
+// comment there for why (one profile shared with engine/conformance.js,
+// not a second local copy that could quietly diverge).
 
 // Prefixes formatReplicateToken uses for the two number-typed replicate
 // fields -- kept alongside FIELD_DEFS so currentRawFields() can look one up

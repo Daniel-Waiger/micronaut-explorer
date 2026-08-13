@@ -30,7 +30,17 @@ import { buildLadder } from './stages.js';
 import { derivePanelFacts, resolveMarkerToken, resolvePanel } from './spectra.js';
 import { ANTIBODY_CONJUGATION_MODES, channelSpectralField, normalizeChannels } from './panelAssembly.js';
 
-function assayLabel(assay, index) {
+/**
+ * An assay's display label, falling back to a 1-based positional name.
+ * Exported so engine/conformance.js labels its per-assay report rows the
+ * SAME way this document model does -- two copies of this fallback would
+ * let a renamed/blank assay show as "Assay 3" in one place and "Assay 2" in
+ * another, the same two-renderings-of-one-fact defect this module's header
+ * already names as the reason it exists. (The single-file build also
+ * forbids two top-level symbols of the same name across web/src, which is
+ * what surfaced the duplicate.)
+ */
+export function assayLabel(assay, index) {
   return (assay && typeof assay.label === 'string' && assay.label.trim()) || `Assay ${index + 1}`;
 }
 

@@ -23,6 +23,7 @@ import { renderMarkdown } from '../../engine/render/markdown.js';
 import { renderCsv } from '../../engine/render/csv.js';
 import { renderJson } from '../../engine/render/json.js';
 import { renderBenchCard } from '../../engine/render/benchcard.js';
+import { checkConformance } from '../../engine/conformance.js';
 import { buildDiagramLayout } from '../../engine/render/svgDiagram.js';
 import { downloadTextFile } from '../../core/persist.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
@@ -450,6 +451,46 @@ export function createOverviewStep(kb) {
       if (doc.study.researchQuestion) {
         appendLabeledNode(main, 'overview-node overview-research-question', doc.study.researchQuestion);
       }
+
+      // The conformance gate: ONE "is this study ready?" verdict, composed
+      // from checks the individual steps already run (engine/conformance.js).
+      // Placed above the per-assay tree so the answer is the first thing
+      // read, not something to reconstruct by scrolling every assay.
+      const conformance = checkConformance(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+      const conformanceSection = document.createElement('section');
+      conformanceSection.className = 'conformance';
+
+      const conformanceHeading = document.createElement('h2');
+      conformanceHeading.className = 'overview-node-title';
+      conformanceHeading.textContent = 'Conformance check';
+      conformanceSection.appendChild(conformanceHeading);
+
+      const verdict = document.createElement('div');
+      verdict.className = `conformance-verdict conformance-${conformance.pass ? 'pass' : 'fail'}`;
+      verdict.textContent = conformance.pass
+        ? `Passes: nothing blocking across ${conformance.assays.length} assay(s).`
+        : 'Does not pass yet: at least one blocking problem below.';
+      conformanceSection.appendChild(verdict);
+
+      const conformanceIssues = conformance.assays.flatMap((a) => a.issues.map((i) => ({ ...i, label: a.label })));
+      const allConformanceIssues = [...conformanceIssues, ...conformance.crossAssayIssues.map((i) => ({ ...i, label: 'Across assays' }))];
+      if (allConformanceIssues.length === 0) {
+        const clean = document.createElement('p');
+        clean.className = 'panel-empty';
+        clean.textContent = 'No issues found at all -- every check this app runs came back clean.';
+        conformanceSection.appendChild(clean);
+      } else {
+        const list = document.createElement('ul');
+        list.className = 'issues-list';
+        for (const issue of allConformanceIssues) {
+          const li = document.createElement('li');
+          li.className = 'issue issue-' + issue.severity;
+          li.textContent = `[${issue.section}] ${issue.label}: ${issue.message}`;
+          list.appendChild(li);
+        }
+        conformanceSection.appendChild(list);
+      }
+      main.appendChild(conformanceSection);
 
       if (doc.crossAssayIssues.length > 0) {
         const issuesList = document.createElement('ul');
