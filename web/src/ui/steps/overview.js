@@ -24,6 +24,8 @@ import { renderCsv } from '../../engine/render/csv.js';
 import { renderJson } from '../../engine/render/json.js';
 import { renderBenchCard } from '../../engine/render/benchcard.js';
 import { checkConformance } from '../../engine/conformance.js';
+import { renderLlmPrompt } from '../../engine/render/llmprompt.js';
+import { copyToClipboard } from '../clipboard.js';
 import { buildDiagramLayout } from '../../engine/render/svgDiagram.js';
 import { downloadTextFile } from '../../core/persist.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
@@ -421,6 +423,29 @@ export function createOverviewStep(kb) {
         render: renderJson,
         toastMessage: 'Downloaded the study overview as JSON.',
       });
+
+      // "Export for your own LLM": a COPY button, not a download -- the
+      // whole point is pasting it straight into whatever model the user
+      // already has open (engine/render/llmprompt.js's header). A download
+      // button is offered alongside for anyone who wants the file.
+      const copyLlmBtn = document.createElement('button');
+      copyLlmBtn.type = 'button';
+      copyLlmBtn.className = 'copy-button';
+      copyLlmBtn.textContent = 'Copy prompt for your own LLM';
+      copyLlmBtn.title =
+        'Copies an instruction preamble + this study as JSON + suggested questions. Paste it into ChatGPT/Claude/whatever you use -- nothing is sent from this app.';
+      copyLlmBtn.addEventListener('click', async () => {
+        const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+        const ok = await copyToClipboard(renderLlmPrompt(freshDoc));
+        if (showToast) {
+          showToast(
+            ok
+              ? 'Copied the prompt -- paste it into your own LLM. Nothing was sent from this app.'
+              : 'Could not copy automatically -- use "Download raw data (.json)" instead.'
+          );
+        }
+      });
+      actions.appendChild(copyLlmBtn);
 
       const printBtn = document.createElement('button');
       printBtn.type = 'button';
