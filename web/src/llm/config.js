@@ -10,6 +10,14 @@
 const ENABLED_KEY = 'micronaut.llm.enabled';
 const ENDPOINT_KEY = 'micronaut.llm.endpoint';
 const MODEL_KEY = 'micronaut.llm.model';
+// Separate from ENABLED_KEY on purpose: ENABLED_KEY governs the Ollama path,
+// where nothing leaves the user's own network by construction (LAN-only,
+// see llm/ollama.js's header). A chat-LLM link-out is different in kind --
+// it puts the study's narrative into a third-party URL -- so it gets its
+// own explicit opt-in rather than riding along with a flag that means
+// something narrower. Copying the prompt to the clipboard needs neither
+// flag: that sends nothing anywhere.
+const LINK_OUTS_KEY = 'micronaut.llm.linkouts';
 
 export const DEFAULT_ENDPOINT = 'http://localhost:11434';
 export const DEFAULT_MODEL = 'llama3.1:8b';
@@ -37,11 +45,13 @@ export function loadLlmConfig() {
     enabled: readLS(ENABLED_KEY, '0') === '1',
     endpoint: readLS(ENDPOINT_KEY, DEFAULT_ENDPOINT),
     model: readLS(MODEL_KEY, DEFAULT_MODEL),
+    linkOuts: readLS(LINK_OUTS_KEY, '0') === '1',
   };
 }
 
-export function saveLlmConfig({ enabled, endpoint, model }) {
+export function saveLlmConfig({ enabled, endpoint, model, linkOuts }) {
   if (typeof enabled === 'boolean') writeLS(ENABLED_KEY, enabled ? '1' : '0');
   if (typeof endpoint === 'string') writeLS(ENDPOINT_KEY, endpoint);
   if (typeof model === 'string') writeLS(MODEL_KEY, model);
+  if (typeof linkOuts === 'boolean') writeLS(LINK_OUTS_KEY, linkOuts ? '1' : '0');
 }

@@ -43,7 +43,10 @@ test('an ANSWERED-but-invalid field is an error that fails the gate', () => {
   const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.equal(report.pass, false);
   const namingErrors = report.assays.flatMap((a) => a.issues).filter((i) => i.section === 'naming');
-  assert.ok(namingErrors.some((i) => i.severity === 'error' && /sample_pattern/.test(i.message)));
+  // Plain-language message (engine/validation.js), not the internal profile
+  // key name -- check the field it's about and that it names a valid
+  // example, not the old 'sample_pattern' jargon a user wouldn't parse.
+  assert.ok(namingErrors.some((i) => i.severity === 'error' && i.field === 'sample' && /E01/.test(i.message)));
 });
 
 test('an UNANSWERED field is reported as incomplete (a warning), not as an invalid value -- and does not fail the gate', () => {

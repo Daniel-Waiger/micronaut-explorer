@@ -93,6 +93,15 @@
     "tag": "user"
   },
   {
+    "id": "smallestFeature",
+    "prompt": "What's the smallest feature you need to resolve, in nanometers?",
+    "why": "This is the number that actually sets how finely to sample the image (Nyquist sampling) -- leave it blank if you haven't decided, but it's worth deciding before you're at the microscope, not after.",
+    "field": "acquisition.smallestFeatureNm",
+    "type": "number",
+    "priority": 101,
+    "tag": "user"
+  },
+  {
     "id": "readout",
     "prompt": "What is this assay's readout?",
     "why": "The readout drives the control guidance on the study overview -- a viability assay, a ROS assay, and a migration assay each need a different reference control, and the app can only suggest the right ones once it knows which you're running.",

@@ -14,12 +14,6 @@
       "port": 8777
     },
     {
-      "name": "cma-dashboard-codex",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8778", "--directory", "tools/cma-dashboard-codex"],
-      "port": 8778
-    },
-    {
       "name": "planner-web-dev",
       "runtimeExecutable": "python",
       "runtimeArgs": ["tools/serve_dir.py", "web"],

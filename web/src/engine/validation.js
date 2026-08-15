@@ -67,8 +67,9 @@ export function validateTargetPath(pathString) {
   return [
     validationIssue(
       'target_path',
-      `Target path is ${pathStr.length} characters, exceeding the Windows ` +
-        `MAX_PATH limit of ${MAX_PATH_LENGTH}: '${pathStr}'`,
+      `This filename would be ${pathStr.length} characters long, which is longer than Windows ` +
+        `allows (${MAX_PATH_LENGTH}). Shorten one of the naming fields, or move the files to a ` +
+        `folder closer to your drive's root. Full path: '${pathStr}'`,
       'warning'
     ),
   ];
@@ -85,16 +86,29 @@ export function validateFields(fields, profile) {
     !profile.allowedExperimentTypes.some((x) => String(x).toUpperCase() === exptype)
   ) {
     issues.push(
-      validationIssue('exptype', `Value '${exptype}' is not in allowed_experiment_types.`, 'error')
+      validationIssue(
+        'exptype',
+        `'${exptype}' isn't one of the experiment types set up for this study. Pick one of the ` +
+          `allowed types, or add it to the list if it's meant to be a new one.`,
+        'error'
+      )
     );
   }
 
+  // Each of these three messages leads with what the value should look like
+  // in plain terms (safe to state directly: DEFAULT_PROFILE below is the
+  // ONLY profile this app ever constructs, so "sample" always means this
+  // exact E## shape in practice) and keeps the regex afterward only as a
+  // technical reference, not as the primary explanation -- a researcher
+  // hitting this error needs "use E01, not UNKNOWN", not a pattern to
+  // decode themselves.
   const sample = String(fields.sample ?? '');
   if (sample && !compileFullMatch(profile.samplePattern).test(sample)) {
     issues.push(
       validationIssue(
         'sample',
-        `Value '${sample}' does not match sample_pattern '${profile.samplePattern}'.`,
+        `'${sample}' isn't a valid sample ID -- it should be the letter E followed by two digits, ` +
+          `like E01 or E12. (Expected pattern: ${profile.samplePattern})`,
         'error'
       )
     );
@@ -105,8 +119,8 @@ export function validateFields(fields, profile) {
     issues.push(
       validationIssue(
         'magnification',
-        `Value '${magnification}' does not match magnification_pattern ` +
-          `'${profile.magnificationPattern}'.`,
+        `'${magnification}' isn't a valid magnification -- it should be the letter X followed by ` +
+          `2-3 digits, like X40 or X100. (Expected pattern: ${profile.magnificationPattern})`,
         'error'
       )
     );
@@ -117,7 +131,8 @@ export function validateFields(fields, profile) {
     issues.push(
       validationIssue(
         'notes',
-        `Value '${notes}' does not match notes_pattern '${profile.notesPattern}'.`,
+        `'${notes}' has characters this tool can't safely put in a filename -- stick to letters, ` +
+          `numbers, underscores (_) and hyphens (-), with no spaces. (Expected pattern: ${profile.notesPattern})`,
         'error'
       )
     );
@@ -132,7 +147,9 @@ export function validateFields(fields, profile) {
       issues.push(
         validationIssue(
           'markers',
-          'Unknown markers not in allowed_markers: ' + unknownMarkers.slice().sort().join(', '),
+          "These markers aren't on the approved list for this study -- check for a typo, or add " +
+            'them if they\'re meant to be new: ' +
+            unknownMarkers.slice().sort().join(', '),
           severity
         )
       );

@@ -160,6 +160,16 @@
       "body": "A stronger signal-to-noise ratio comes at the cost of local heating, which can damage biological or otherwise photosensitive material well before it's visibly obvious. Start at low power, check for damage, and only raise it once you've confirmed the sample tolerates it.",
       "when": { "in": ["acquisition.modality", ["Raman"]] },
       "priority": 20
+    },
+    {
+      "id": "smallest-feature-pixel-size",
+      "surfaces": ["describe", "design"],
+      "kind": "tip",
+      "concept": "undersampling",
+      "title": "Set your pixel size from the smallest feature you need to resolve, not the other way around",
+      "body": "As a rule of thumb (not a strict requirement), sample at roughly 2 to 3 times finer than the smallest feature that matters -- Nyquist sampling. A common practical figure is about 2.3x the feature size, since the true optical resolution of a system is rarely known exactly at acquisition time. Undersampling throws away detail the optics can actually deliver; oversampling mostly costs storage and time.",
+      "when": { "exists": "acquisition.smallestFeatureNm" },
+      "priority": 15
     }
   ]
 }

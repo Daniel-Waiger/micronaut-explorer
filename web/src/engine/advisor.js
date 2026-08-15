@@ -228,7 +228,10 @@ export function selectAdvice(rules, experiment, surface) {
 // actually reference today. An unmapped path makes summarizeTrigger return
 // null (see below) rather than leaking a raw dotted path like
 // 'acquisition.modality' into user-facing text.
-const TRIGGER_FIELD_LABELS = { 'acquisition.modality': 'modality' };
+const TRIGGER_FIELD_LABELS = {
+  'acquisition.modality': 'modality',
+  'acquisition.smallestFeatureNm': 'the smallest feature to resolve',
+};
 
 /**
  * A short, plain-English rendering of a rule's APPLICABILITY condition --
@@ -251,12 +254,12 @@ const TRIGGER_FIELD_LABELS = { 'acquisition.modality': 'modality' };
  * with the actual condition the engine evaluates, by construction. The
  * `concept`, by contrast, is NOT derivable and so is authored per rule.
  *
- * TOTAL: only the two simplest predicate shapes this pack currently uses
- * (`eq`, `in`, both on a single string path) are summarized. Anything else
- * -- composite `all`/`any`/`not`, `matches`, `gt`/`lt`, `exists`/`empty`, or
- * a path not in TRIGGER_FIELD_LABELS -- returns null. The caller omits the
- * clause entirely in that case rather than showing something misleading or
- * falling back to raw predicate syntax.
+ * TOTAL: only the three simplest predicate shapes this pack currently uses
+ * (`eq`, `in` on a single string path; `exists` on a single path) are
+ * summarized. Anything else -- composite `all`/`any`/`not`, `matches`,
+ * `gt`/`lt`, `empty`, or a path not in TRIGGER_FIELD_LABELS -- returns null.
+ * The caller omits the clause entirely in that case rather than showing
+ * something misleading or falling back to raw predicate syntax.
  */
 export function summarizeTrigger(predicate) {
   if (predicate === null || typeof predicate !== 'object' || Array.isArray(predicate)) return null;
@@ -264,6 +267,13 @@ export function summarizeTrigger(predicate) {
   if (keys.length !== 1) return null;
   const [op] = keys;
   const arg = predicate[op];
+
+  if (op === 'exists') {
+    if (typeof arg !== 'string') return null;
+    const label = TRIGGER_FIELD_LABELS[arg];
+    return label ? `${label} is set` : null;
+  }
+
   if ((op !== 'eq' && op !== 'in') || !Array.isArray(arg) || arg.length !== 2) return null;
 
   const [path, value] = arg;

@@ -22,6 +22,7 @@ import { createOllamaProvider } from '../llm/ollama.js';
 import { buildGuidanceMessages } from '../engine/render/llmprompt.js';
 import { loadLlmConfig, saveLlmConfig } from '../llm/config.js';
 import { copyToClipboard } from './clipboard.js';
+import { COLD_START_HINT, startElapsedLabel } from './llmStatus.js';
 
 function buildProvider(config) {
   if (config.enabled && config.endpoint && config.model) {
@@ -43,8 +44,17 @@ function buildProvider(config) {
  * per-render state besides the persisted settings, which are re-read on
  * every Ask) -- kept only so a step can mount this panel with the same
  * `{element, update}` shape as ui/advice.js's createAdvicePanel.
+ *
+ * `onConfigChange`, if given, is called after every settings edit (the
+ * enabled checkbox, the endpoint, the model). describe.js uses this to fix a
+ * real bug: its Draft/Suggest buttons used to read loadLlmConfig().enabled
+ * once at render() time, so ticking this panel's checkbox did not reveal
+ * them until the step re-rendered. This is NOT a full re-render hook --
+ * describe.js's callback only updates button visibility, deliberately,
+ * because a full re-render would lose the narrative textarea's caret
+ * mid-typing.
  */
-export function createGuidancePanel(getContext) {
+export function createGuidancePanel(getContext, { onConfigChange } = {}) {
   const section = document.createElement('div');
   section.className = 'guidance-section';
 
@@ -84,9 +94,20 @@ export function createGuidancePanel(getContext) {
 
   section.appendChild(settingsRow);
 
+  // Set once, shown/hidden with the rest of the local-model settings: this
+  // is the one place the endpoint/model config lives, so it's also the one
+  // place a user checking the box will see the cold-start expectation
+  // before clicking Ask (or, from describe.js, Draft/Suggest -- those reuse
+  // this same persisted config rather than owning their own settings UI).
+  const coldStartHint = document.createElement('p');
+  coldStartHint.className = 'guidance-hint guidance-cold-start-hint';
+  coldStartHint.textContent = COLD_START_HINT;
+  section.appendChild(coldStartHint);
+
   function syncSettingsVisibility() {
     endpointInput.hidden = !enabledCheckbox.checked;
     modelInput.hidden = !enabledCheckbox.checked;
+    coldStartHint.hidden = !enabledCheckbox.checked;
   }
 
   const config = loadLlmConfig();
@@ -98,6 +119,7 @@ export function createGuidancePanel(getContext) {
   function persistSettings() {
     saveLlmConfig({ enabled: enabledCheckbox.checked, endpoint: endpointInput.value, model: modelInput.value });
     syncSettingsVisibility();
+    if (typeof onConfigChange === 'function') onConfigChange();
   }
   enabledCheckbox.addEventListener('change', persistSettings);
   endpointInput.addEventListener('change', persistSettings);
@@ -167,7 +189,11 @@ export function createGuidancePanel(getContext) {
     const user = question ? `${contextBlock}\n\n--- USER'S QUESTION ---\n${question}` : contextBlock;
 
     askButton.disabled = true;
-    askButton.textContent = 'Asking...';
+    // Only Ollama has a real wait worth explaining -- manual-paste composes
+    // text locally and resolves instantly, so ticking a label for it would
+    // just flash "Asking… 0s" for a moment.
+    const stopTicking = provider.id === 'ollama' ? startElapsedLabel(askButton, 'Asking') : null;
+    if (!stopTicking) askButton.textContent = 'Asking...';
     try {
       const result = await provider.complete({ system, user });
       if (provider.id === 'manual-paste') {
@@ -185,6 +211,7 @@ export function createGuidancePanel(getContext) {
       const fb = await fallback.complete({ system, user });
       showPaste(fb.text);
     } finally {
+      if (stopTicking) stopTicking();
       askButton.disabled = false;
       askButton.textContent = 'Ask';
     }
