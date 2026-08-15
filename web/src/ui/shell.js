@@ -12,12 +12,13 @@ import { copyToClipboard } from './clipboard.js';
 const THEME_KEY = 'micronaut.theme';
 const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
 
-// One glyph per step, matching this codebase's existing convention of a
-// plain Unicode character standing in for an icon (the drag handle's '↕',
-// the reorder buttons' '↑'/'↓', the delete pill's '×') rather than pulling
-// in an icon font/library -- web/ is a deliberately zero-dependency project.
-// Purely decorative: every nav button also carries an explicit aria-label
-// (below), so a screen reader never has to guess a name from an emoji.
+// One emoji per step -- real color glyphs (no custom SVG, no icon library:
+// web/ is deliberately zero-dependency), desaturated to black/white via the
+// CSS filter on .nav-step-icon in app.css rather than a monochrome Unicode
+// symbol set, since an emoji's own multicolor rendering can't be overridden
+// with `color`/currentColor the way a plain text glyph can. Purely
+// decorative: every nav button also carries an explicit aria-label (below),
+// so a screen reader never has to guess a name from the emoji.
 const NAV_STEP_ICONS = {
   study: '📋',
   describe: '📝',
@@ -329,6 +330,16 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
   nav.className = 'shell-nav';
   nav.setAttribute('aria-label', 'Steps');
 
+  // .shell-nav itself stays a plain, full-height grid item (its background/
+  // border span the whole page, top to bottom, matching every other column
+  // on the page) -- only THIS inner wrapper sticks to the viewport top as
+  // the page scrolls, so the buttons stay reachable without the nav
+  // shrinking down to just their height (which read as "very small" against
+  // the rest of the left column going blank below it).
+  const navSticky = document.createElement('div');
+  navSticky.className = 'nav-sticky';
+  nav.appendChild(navSticky);
+
   // A toggle button, not the whole nav's textContent rebuilt on every
   // collapse -- renderNav (below) only ever touches navSteps, so the toggle
   // survives every step-navigation re-render untouched.
@@ -349,11 +360,11 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
     updateNavToggle();
   });
   updateNavToggle();
-  nav.appendChild(navToggle);
+  navSticky.appendChild(navToggle);
 
   const navSteps = document.createElement('div');
   navSteps.className = 'nav-steps';
-  nav.appendChild(navSteps);
+  navSticky.appendChild(navSteps);
 
   const main = document.createElement('main');
   main.className = 'shell-main';

@@ -18,6 +18,10 @@
   --danger: #f87171;
   --warn: #fbbf24;
   --ok: #34d399;
+  /* Desaturates the nav step emoji toward black/white (see .nav-step-icon) --
+     brighter in dark mode, since a flat grayscale emoji reads too dark
+     against this app's dark panel background otherwise. */
+  --nav-icon-filter: grayscale(1) brightness(1.35) contrast(0.9);
   --mono: ui-monospace, "Cascadia Code", Consolas, "SF Mono", monospace;
   --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
@@ -36,6 +40,7 @@
     --danger: #dc2626;
     --warn: #b45309;
     --ok: #059669;
+    --nav-icon-filter: grayscale(1) brightness(0.85) contrast(1.15);
   }
 }
 
@@ -52,6 +57,7 @@
   --danger: #f87171;
   --warn: #fbbf24;
   --ok: #34d399;
+  --nav-icon-filter: grayscale(1) brightness(1.35) contrast(0.9);
 }
 
 :root[data-theme="light"] {
@@ -67,6 +73,7 @@
   --danger: #dc2626;
   --warn: #b45309;
   --ok: #059669;
+  --nav-icon-filter: grayscale(1) brightness(0.85) contrast(1.15);
 }
 
 * {
@@ -140,19 +147,23 @@ button:focus-visible {
 .shell-nav {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 16px 10px;
   border-right: 1px solid var(--line);
   background: var(--panel);
-  /* Stays on screen while .shell-main's own content scrolls the page past
-     it -- #app has no height cap, so it's the WHOLE page that scrolls, not
-     an inner .shell-main viewport; align-self: start keeps this box at its
-     own content height instead of stretching to match .shell-main's (often
-     much taller) height, which is what gives sticky positioning room to
-     actually move as the page scrolls. */
+  /* A plain, full-height grid item (default align-items: stretch) -- its
+     background/border span the whole page, top to bottom, matching every
+     other column. Only .nav-sticky below (its one child) actually sticks;
+     letting THIS box itself stick+shrink-to-content (an earlier draft did)
+     left the background covering just the buttons' own height, with the
+     rest of the left column going blank beneath it as the page scrolled. */
+}
+
+.nav-sticky {
   position: sticky;
   top: 0;
-  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 10px;
   max-height: 100vh;
   overflow-y: auto;
 }
@@ -198,10 +209,20 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+/* Icon-only when collapsed, text-only when expanded (never both at once) --
+   hidden here is the expanded default. Real emoji carry their own fixed
+   multicolor rendering that `color` cannot touch -- grayscale is the one
+   filter that reliably desaturates them toward black/white across
+   platforms; --nav-icon-filter (defined alongside every other theme token
+   at the top of this file) swaps its brightness/contrast per theme, since a
+   flat grayscale emoji reads too dark against this app's dark panel
+   background and too light against its white one otherwise. */
 .nav-step-icon {
+  display: none;
   flex: 0 0 auto;
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1;
+  filter: var(--nav-icon-filter);
 }
 
 .nav-step-label {
@@ -225,6 +246,10 @@ button:focus-visible {
 .shell-body.shell-nav-collapsed .nav-step {
   justify-content: center;
   padding: 10px 4px;
+}
+
+.shell-body.shell-nav-collapsed .nav-step-icon {
+  display: block;
 }
 
 .shell-body.shell-nav-collapsed .nav-step-label {
