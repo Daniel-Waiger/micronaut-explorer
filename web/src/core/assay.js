@@ -82,7 +82,14 @@ export function emptyAssay(id) {
       conditions: [],
     },
     panel: { targets: [], channels: [] },
-    acquisition: { instrument: '', objective: '', magnification: '', modality: '', settings: {} },
+    acquisition: {
+      instrument: '',
+      objective: '',
+      magnification: '',
+      modality: '',
+      smallestFeatureNm: null,
+      settings: {},
+    },
     controls: { positive: [], negative: [], notes: '' },
     naming: { fields: {} },
   };

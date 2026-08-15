@@ -167,3 +167,75 @@ export function parseLlmProposals(reply, questions) {
 
   return { proposals, issues };
 }
+
+// Advisory items never write to the store, so they need none of the
+// vocabulary/provenance machinery above -- there is no field to clobber and
+// no tag to launder. What they DO need is a size cap: this is the one place
+// in the app that renders raw model-sourced text (via textContent, never
+// innerHTML -- see ui/steps/describe.js), and a hostile or malfunctioning
+// reply padding this array is a rendering-cost problem, not a write-safety
+// one. The caps exist for that reason alone.
+const MAX_ASKS = 12;
+const MAX_ASK_TEXT_CHARS = 300;
+
+function clampAskText(value, maxChars) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  return trimmed.length > maxChars ? `${trimmed.slice(0, maxChars)}…` : trimmed;
+}
+
+/**
+ * Parse the advisory half of a model reply: things the researcher still
+ * needs to decide or measure that engine/render/llmdraftprompt.js's prompt
+ * asked the model to name (the study question, Nyquist sampling, controls
+ * fit, spectral overlap) plus anything else it flags. `reply` is the SAME
+ * parsed object parseLlmProposals(reply, ...) receives -- call both over one
+ * reply, independently; a malformed `asks` array does not affect proposals
+ * or vice versa.
+ *
+ * TOTAL: never throws. Returns `{asks, issues}`, same issue shape as
+ * parseLlmProposals, so a caller can render both lists' problems through one
+ * code path.
+ */
+export function parseLlmAsks(reply) {
+  const issues = [];
+  const rawList = reply && typeof reply === 'object' && Array.isArray(reply.asks) ? reply.asks : null;
+  if (!rawList) {
+    // No `asks` key, or the wrong shape, is a normal and common reply --
+    // engine/render/llmdraftprompt.js's contract states "asks: [] is valid
+    // if nothing applies" -- so this is reported only when the key was
+    // present but malformed, never for a simple absence.
+    if (reply && typeof reply === 'object' && 'asks' in reply) {
+      issues.push(proposalIssue('asks', "'asks' was present but was not an array"));
+    }
+    return { asks: [], issues };
+  }
+
+  const asks = [];
+  rawList.forEach((entry, index) => {
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+      issues.push(proposalIssue(`asks[${index}]`, 'ask entry is not an object'));
+      return;
+    }
+    const topic = clampAskText(entry.topic, MAX_ASK_TEXT_CHARS);
+    if (!topic) {
+      issues.push(proposalIssue(`asks[${index}]`, 'ask is missing a non-empty topic'));
+      return;
+    }
+    if (asks.length >= MAX_ASKS) {
+      // Reported once, not once per excess entry: a reply padding this
+      // array with dozens of entries should not also pad `issues` in
+      // lockstep -- one clear "the rest were dropped" beats a wall of them.
+      if (!issues.some((issue) => issue.field === 'asks')) {
+        issues.push(proposalIssue('asks', `more than ${MAX_ASKS} asks -- the rest were dropped`));
+      }
+      return;
+    }
+    asks.push({
+      topic,
+      why: clampAskText(entry.why, MAX_ASK_TEXT_CHARS),
+    });
+  });
+
+  return { asks, issues };
+}

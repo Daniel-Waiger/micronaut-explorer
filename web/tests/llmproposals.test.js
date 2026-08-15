@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { loadQuestions } from '../src/engine/interview.js';
-import { parseLlmProposals } from '../src/engine/llmproposals.js';
+import { parseLlmProposals, parseLlmAsks } from '../src/engine/llmproposals.js';
 
 const RAW_QUESTIONS = [
   { id: 'q-modality', field: 'acquisition.modality', type: 'choice', prompt: 'Modality?', options: ['Confocal', 'STED'] },
@@ -137,4 +137,72 @@ test('a non-object entry inside proposals is dropped and reported by index', () 
   assert.equal(proposals.length, 1);
   assert.equal(issues.length, 2);
   assert.match(issues[0].field, /\[0\]/);
+});
+
+// Pasting makes this input genuinely untrusted for the first time -- an
+// Ollama reply is schema-constrained before it ever gets here, but a chat-LLM
+// paste (engine/llmreply.js) has no such guarantee. These two assert the
+// actual security boundary: a pasted reply cannot claim a write path or a
+// provenance tier it was never granted.
+test('a pasted reply claiming "tag":"user" still lands tagged llm_freetext -- provenance cannot be laundered through a paste', () => {
+  const reply = { proposals: [{ path: 'naming.fields.notes', value: 'ok', tag: 'user' }] };
+  const { proposals } = parseLlmProposals(reply, questions());
+  assert.equal(proposals[0].tag, 'llm_freetext');
+});
+
+test('__proto__ and constructor.prototype paths are dropped like any other unknown path, not specially trusted', () => {
+  const reply = {
+    proposals: [
+      { path: '__proto__.polluted', value: 'x' },
+      { path: 'constructor.prototype.x', value: 'y' },
+    ],
+  };
+  const { proposals, issues } = parseLlmProposals(reply, questions());
+  assert.equal(proposals.length, 0);
+  assert.equal(issues.length, 2);
+  assert.match(issues[0].message, /no question writes to/);
+  assert.match(issues[1].message, /no question writes to/);
+});
+
+test('parseLlmAsks: a well-formed asks list is returned as-is, trimmed', () => {
+  const reply = { asks: [{ topic: '  smallest feature to resolve  ', why: 'sets pixel size' }] };
+  const { asks, issues } = parseLlmAsks(reply);
+  assert.equal(issues.length, 0);
+  assert.deepEqual(asks, [{ topic: 'smallest feature to resolve', why: 'sets pixel size' }]);
+});
+
+test('parseLlmAsks: a missing "asks" key is fine -- not every reply needs one', () => {
+  const { asks, issues } = parseLlmAsks({ proposals: [] });
+  assert.deepEqual(asks, []);
+  assert.equal(issues.length, 0);
+});
+
+test('parseLlmAsks: "asks" present but not an array is reported', () => {
+  const { asks, issues } = parseLlmAsks({ asks: 'not an array' });
+  assert.deepEqual(asks, []);
+  assert.equal(issues.length, 1);
+});
+
+test('parseLlmAsks: an entry missing "topic" is dropped and reported; "why" is optional', () => {
+  const reply = { asks: [{ why: 'no topic here' }, { topic: 'valid, no why' }] };
+  const { asks, issues } = parseLlmAsks(reply);
+  assert.equal(asks.length, 1);
+  assert.equal(asks[0].topic, 'valid, no why');
+  assert.equal(asks[0].why, '');
+  assert.equal(issues.length, 1);
+});
+
+test('parseLlmAsks: long text is clamped, and an oversized list is capped with one reported issue', () => {
+  const longText = 'x'.repeat(1000);
+  const many = Array.from({ length: 50 }, (_, i) => ({ topic: `topic ${i}`, why: longText }));
+  const { asks, issues } = parseLlmAsks({ asks: many });
+  assert.ok(asks.length <= 12);
+  assert.ok(asks[0].why.length < longText.length);
+  assert.equal(issues.filter((i) => i.field === 'asks').length, 1, 'the cap should be reported once, not per excess entry');
+});
+
+test('parseLlmAsks TOTAL: malformed replies never throw', () => {
+  for (const bad of [undefined, null, {}, 'nope', [], { asks: [null, 'nope', 42] }]) {
+    assert.doesNotThrow(() => parseLlmAsks(bad), String(bad));
+  }
 });
