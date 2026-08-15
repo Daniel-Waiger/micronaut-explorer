@@ -546,8 +546,8 @@ export function createPanelStep(kb) {
         const filterHint = document.createElement('span');
         filterHint.className = 'panel-filter-hint';
         filterHint.textContent = computedFilterDefault
-          ? 'Suggested from this fluorophore’s emission peak -- edit to match the microscope’s actual detection filter.'
-          : 'Optional; both values are required. Use the microscope’s actual detection filter.';
+          ? 'Suggested from this fluorophore’s emission peak -- edit to match the microscope’s actual detection filter values.'
+          : 'Optional; both values are required. Use the microscope’s actual detection filter values.';
         filterRow.appendChild(filterHint);
 
         function writeFilterPair() {
