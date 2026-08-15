@@ -144,68 +144,143 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "local-llm-guidance Wave C",
-  "orchestrator": "Claude Opus 4.8",
-  "active_model": "Claude Opus 4.8",
+  "run": "chat-LLM round trip + planning-gap advisories",
+  "orchestrator": "Claude Sonnet 5",
+  "active_model": "Claude Sonnet 5",
   "active_status": "idle",
-  "phase": "Wave C complete",
-  "state_note": "",
+  "phase": "Phase 1 complete -- ready for review/commit",
+  "state_note": "GPU/context/unload fixes + cold-start UI already shipped (uncommitted); now building llmreply.js/llmdraftprompt.js/chatTargets.js",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "Test suite",
-      "v": "598 passed",
+      "v": "646 passed",
       "tone": "ok"
     },
     {
-      "k": "Wave C",
-      "v": "4/4 complete",
+      "k": "Uncommitted",
+      "v": "ollama.js, guidance.js, describe.js, llmStatus.js, llmreply.js",
+      "tone": "warn"
+    },
+    {
+      "k": "Phase 1",
+      "v": "7/7 complete",
       "tone": "ok"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "8",
-      "phase": "Wave C",
-      "title": "suggest-answers button (LLM into current study)",
+      "id": "P1-0",
+      "phase": "Prep",
+      "title": "Real Ollama MVP test + GPU CUDA-install fix (unrelated infra bug found+fixed)",
       "status": "done",
-      "by": "Opus"
+      "by": "Sonnet"
     },
     {
-      "id": "9",
-      "phase": "Wave C",
-      "title": "Accept writes a STRONG tag",
+      "id": "P1-0b",
+      "phase": "Prep",
+      "title": "num_ctx cap + unload-on-tab-close (llm/ollama.js)",
       "status": "done",
-      "by": "Opus"
+      "by": "Sonnet"
     },
     {
-      "id": "10",
-      "phase": "Wave C",
-      "title": "proposal rows show source + conflict",
+      "id": "P1-0c",
+      "phase": "Prep",
+      "title": "Cold-start transparency UI (ui/llmStatus.js, guidance.js, describe.js)",
       "status": "done",
-      "by": "Opus"
+      "by": "Sonnet"
     },
     {
-      "id": "11",
+      "id": "P1-1",
+      "phase": "Phase 1",
+      "title": "engine/llmreply.js -- tolerant JSON extraction from a pasted reply",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "P1-2",
+      "phase": "Phase 1",
+      "title": "engine/render/llmdraftprompt.js -- copy-out prompt with output contract",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "P1-3",
+      "phase": "Phase 1",
+      "title": "llm/chatTargets.js -- prefilled link-outs (ChatGPT/Claude)",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "P1-4",
+      "phase": "Phase 1",
+      "title": "engine/llmproposals.js -- add parseLlmAsks (advisory, never writes)",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "P1-5",
+      "phase": "Phase 1",
+      "title": "describe.js/guidance.js wiring -- paste-back UI, stale-config fix",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "P1-6",
+      "phase": "Phase 1",
+      "title": "Nyquist question + advisor rule (questions.json/advisor.json, HEADS-UP posted C-05)",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "P1-7",
       "phase": "Verification",
-      "title": "browser + full suite",
+      "title": "New unit tests + full suite + browser + built-artifact pass",
       "status": "done",
-      "by": "Opus"
+      "by": "Sonnet"
     }
   ],
   "log": [
     {
-      "time": "22:16:31",
-      "msg": "Wave C started: merge LLM proposals into an in-progress study via the existing review list"
+      "time": "11:39:56",
+      "msg": "Session continued from local-llm-guidance Wave C: real-Ollama MVP test, GPU/context/unload fixes, cold-start UI -- all verified, none committed"
     },
     {
-      "time": "22:22:14",
-      "msg": "Wave C verified end-to-end against a stub Ollama server: format schema sent, out-of-vocab value rejected, Accept promotes to user_edited"
+      "time": "11:39:56",
+      "msg": "Approved plan: chat-LLM round trip (copy prompt -> paste JSON back) for zero-setup users, plus asks[] advisories (study question / Nyquist / controls / spillover) and a real Nyquist question. Magnification-per-acquisition deliberately deferred to Phase 2, post-pilot (5 load-bearing call sites incl. SCHEMA_VERSION migration)."
+    },
+    {
+      "time": "11:39:56",
+      "msg": "llmreply.js written: string/escape-aware balanced-brace scan, fenced-block extraction, last-resort curly-quote/trailing-comma repairs (each reported, never silent), no relaxed parser"
+    },
+    {
+      "time": "11:43:30",
+      "msg": "llmdraftprompt.js + llmreply.js done, tested (19+12 new tests, all green, 629/629 total). describe.js refactored to share renderQuestionLines; DRAFT_SYSTEM_PROMPT replaced by imported PROPOSAL_SYSTEM_PROMPT; mergeProposals() helper extracted for reuse by the upcoming paste-back handler."
+    },
+    {
+      "time": "11:44:39",
+      "msg": "chatTargets.js done, tested (7/7). linkOuts privacy flag added to llm/config.js, default off. 636/636 total."
+    },
+    {
+      "time": "11:46:14",
+      "msg": "parseLlmAsks added to llmproposals.js (advisory, never writes, capped at 12 entries/300 chars). 644/644. Starting the UI wiring -- the largest untested surface in this plan."
+    },
+    {
+      "time": "11:54:50",
+      "msg": "P1-5 done + verified live in browser: stale-config fix (checkbox toggle reveals/hides Draft/Suggest instantly), full paste-back round trip (fenced JSON with prose -> 3 proposals + 1 ask rendered), link-out opt-in reveals ChatGPT/Claude buttons, and a deliberately-malformed paste correctly showed all 3 lanes (repair/issue/proposal) with proper CSS (reused .issue/.issue-error, not a new warning vocabulary -- app.css:308's reservation rule respected). Zero console errors throughout. 644/644 unit tests still green."
+    },
+    {
+      "time": "12:00:56",
+      "msg": "P1-6 done: Nyquist question added to questions.json (acquisition.smallestFeatureNm, number), advisor.json rule 'smallest-feature-pixel-size' (kind:tip, exists-gated, ~2.3x rule of thumb). Extended summarizeTrigger to handle exists on labeled paths (was eq/in only) -- needed 2 test fixes (advisor.test.js never-fires guard + summarizeTrigger unsummarizable list), both principled per the tests' own documented extension points, not workarounds. Python KB validity (8/8) + build pipeline (24/24) + single-file build all pass; built artifact confirmed embeds the new question/rule. 646/646 JS unit tests."
+    },
+    {
+      "time": "12:09:31",
+      "msg": "P1-7 done. Found and fixed a real staleness bug during verification: the dev server boots from web/kb.dev.js (a generated snapshot), not web/kb/*.json directly -- edited the source JSON without regenerating the snapshot, so the new question invisibly didn't appear in the live app despite loadQuestions() proving correct in isolation. Fixed via 'python tools/export_markers_kb.py' (also regenerates markers.json, confirmed byte-identical/deterministic via git diff). Full round trip re-verified after the fix: Nyquist question appears, paste-back proposal accepted, advisor tip fires with correct 'Applies when...' trigger clause. Python gates: KB validity 8/8, build-pipeline 24/24, built artifact confirmed embeds new content. Nothing committed yet -- all work is in the working tree for review."
     }
   ],
-  "snapshot_at": "2026-08-13 22:22"
+  "snapshot_at": "2026-08-15 12:09"
 };
 /* CMA:EMBEDDED:END */
 
