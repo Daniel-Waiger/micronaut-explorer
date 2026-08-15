@@ -3,7 +3,7 @@ import { emptyExperiment } from './core/schema.js';
 import { createStore } from './core/store.js';
 import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
-import { clearAll, loadMostRecentRecoverable, saveExperiment } from './core/persist.js';
+import { clearAll, loadMostRecentRecoverable, saveExperiment, takeStashedDraft } from './core/persist.js';
 import { shapeAppKb } from './engine/kbpack.js';
 import { namingStep } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
@@ -41,18 +41,27 @@ function loadAppKb() {
  * corrupted) -- an existing in-progress study is never touched.
  */
 function loadInitialExperiment() {
+  // A model-drafted study opened in a new tab (core/draft.js) wins over the
+  // autosave, and is consumed one-shot so a later reload of THIS tab falls
+  // back to the normal autosave path rather than re-opening the draft
+  // forever. Deliberately ahead of loadMostRecentRecoverable: the draft was
+  // stashed by the other tab moments ago and is the reason this tab exists.
+  const draft = takeStashedDraft();
+  if (draft) {
+    return { experiment: draft, skippedCount: 0, totalSaved: 0, isDraft: true };
+  }
   const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
     onUnreadable: (id, err) =>
       console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
   });
-  return { experiment: experiment || createDefaultStudy(), skippedCount, totalSaved };
+  return { experiment: experiment || createDefaultStudy(), skippedCount, totalSaved, isDraft: false };
 }
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
 // top-level await since the released artifact is one classic (non-module,
 // non-async) IIFE.
 function init() {
-  const { experiment: initialExperiment, skippedCount, totalSaved } = loadInitialExperiment();
+  const { experiment: initialExperiment, skippedCount, totalSaved, isDraft } = loadInitialExperiment();
   const store = createStore(initialExperiment);
 
   const kb = loadAppKb();
@@ -78,6 +87,7 @@ function init() {
 
   const root = document.getElementById('app');
   const { main, showToast } = renderShell(root, store, router, {
+    kbIssueCount: kb.issues.length,
     // Clear persisted state BEFORE reloading. Resetting the in-memory store
     // instead would immediately trip the autosave subscription below and write
     // the empty experiment back as a NEW ring entry, leaving the old slots in
@@ -116,6 +126,12 @@ function init() {
     );
   }
 
+  // Last, so it wins the single visible toast slot: a user who just landed
+  // in a drafted study most needs to know that nothing here is confirmed.
+  if (isDraft) {
+    showToast('This is a model-drafted study -- every value is a suggestion awaiting your review.');
+  }
+
   function renderActiveStep(id) {
     const step = steps.find((s) => s.id === id) || steps[0];
     step.render(main, store, { showToast, advisor: kb.advisor, router });
@@ -133,10 +149,28 @@ function init() {
   // was built from the OLD assayId. Guarded on an actual change so ordinary
   // per-keystroke field edits (which also flow through this same
   // store.subscribe channel via the autosave one below) never trigger it.
+  //
+  // ALSO re-render when `assays` itself is a new array reference -- not just
+  // when activeAssayId changes. Deleting a NON-active assay via the
+  // switcher's "x" (shell.js's renderSwitcher) calls store.patch(result),
+  // which replaces `assays` but leaves activeAssayId untouched, so the
+  // activeAssayId check alone never fires; a step that lists every assay by
+  // reading store.get().assays directly (study.js) then keeps showing the
+  // deleted assay until some UNRELATED action happens to change
+  // activeAssayId too. This is a real bug that shipped: verified live --
+  // the switcher pill disappeared correctly (it has its own subscription)
+  // while the Study step's own assay list kept a stale row for the assay
+  // just removed. Safe as a reference check, not a deep one: core/store.js's
+  // setPath MUTATES nested state in place (core/paths.js), so `assays` keeps
+  // the SAME reference across ordinary per-keystroke field edits and only
+  // gets a new one when store.patch() explicitly replaces it (add/remove
+  // assay) -- this can never fire on a keystroke.
   let lastActiveAssayId = store.get().activeAssayId;
+  let lastAssays = store.get().assays;
   store.subscribe((state) => {
-    if (state.activeAssayId !== lastActiveAssayId) {
+    if (state.activeAssayId !== lastActiveAssayId || state.assays !== lastAssays) {
       lastActiveAssayId = state.activeAssayId;
+      lastAssays = state.assays;
       renderActiveStep(router.current());
     }
   });

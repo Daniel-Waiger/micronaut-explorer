@@ -10,7 +10,7 @@ marker/fluorophore dictionary, and the naming convention).
 
 | Tool | What it is | Status |
 |------|------------|--------|
-| **Micronaut Planner** (`web/`) | A static, zero-install browser app that walks a researcher from design intent → assays, panel, controls, acquisition → a naming convention as a downstream artifact. No upload, no install, no server. | **Active** |
+| **Micronaut Planner** (`web/`) | A static, zero-install browser app that walks a researcher from design intent → assays, panel, controls, acquisition → a naming convention as a downstream artifact. No upload, no install, no server required — an optional, off-by-default panel can call a local LLM (e.g. Ollama) on your own network if you configure one. | **Active** |
 | **Micronaut Classic** (`src/`, `app_streamlit.py`) | A metadata-aware file **renamer**: reads microscopy files, builds standardized names, and applies batch renames with rollback. Python CLI (`mna`) + Streamlit UI. | **Parked** — not under active development in the near term |
 
 **Why the pivot?** Classic reverse-engineers naming fields *out of* files after
@@ -48,12 +48,40 @@ outside-in, no forced order):
   Raman) surfaced from a rules knowledge base (`web/kb/advisor.json`).
 - **Naming** — builds the filename convention from the finished design, reusing
   Classic's naming/validation logic ported to JS.
-- **Overview** — a shareable study diagram plus a deterministic walkthrough, and a
-  staged progression ladder (idea → advanced modality).
+- **Color panel** — a qualitative spectral-spillover advisor over the active assay's
+  fluorophores: excitation/emission peak-proximity flags, not a spectral-overlap
+  integral. Content is Claude-drafted and flagged unreviewed (`web/kb/spectra.json`).
+  An optional structured panel editor below it lets you name each channel's target
+  and conjugation mode (direct antibody / indirect / genetically encoded / a
+  direct-binding probe / self-labeling tag) — the fact-precise alternative to the
+  free-text markers field, and what lets the controls engine tell whether an
+  antibody is actually involved.
+- **Overview** — a shareable study diagram, a conformance check (one pass/fail
+  verdict composed from every validator the app already runs), a deterministic
+  walkthrough, a staged progression ladder (idea → advanced modality), and
+  downloads: Markdown, an SVG study map, a CSV file manifest, a raw-data JSON
+  dump, a per-assay print-oriented bench card, and a copy-paste prompt (+ the
+  study as JSON) for pasting into whatever LLM you already use.
+- **Guide** — an in-app user guide, always in the step nav.
+
+A "Copy feedback report" button in the header copies the current step, browser,
+and full study as text — for reporting problems during the alpha.
 
 Everything works with the optional LLM **disabled** — the deterministic tier is
 always the floor. The LLM never originates a domain fact; it may only emit IDs
 from a vocabulary the app supplies.
+
+There are two ways an LLM enters the picture, both opt-in: the copy-paste
+export above (Overview), and an "Ask about this step" guidance panel
+(Describe) that can call a local Ollama server directly if you configure one
+in its settings. The panel is off by default and falls back to the same
+copy-paste behavior when it's off, unconfigured, or the server is
+unreachable. When it is on, the app talks only to the endpoint you gave it —
+no API key is stored, and nothing is sent anywhere beyond that server. Either
+path is read-only with respect to your study: the model can explain the
+current step, but never writes into it. A separate, schema-constrained
+proposal/write path (`llm_freetext` provenance, `engine/llmschema.js`) exists
+in the codebase but is not yet wired into any step.
 
 ## Run it locally
 
@@ -321,9 +349,9 @@ Example LLM section:
 web/                         Micronaut Planner (static browser app)
   index.html                 dev entry (BUILD:* markers for the inliner)
   src/core/                  schema, store, tiered provenance, router, persistence
-  src/engine/                naming, validation, interview, advisor, controls, render
-  src/ui/steps/              study, describe, design, naming, overview
-  kb/                        knowledge pack (markers, stages, controls, advisor, …)
+  src/engine/                naming, validation, interview, advisor, controls, spectra, render
+  src/ui/steps/              study, describe, design, naming, panel, overview, guide
+  kb/                        knowledge pack (markers, stages, controls, advisor, spectra, …)
   tests/                     node --test suite (zero npm deps)
 
 src/microscopy_naming_assistant/   Micronaut Classic (Python package)

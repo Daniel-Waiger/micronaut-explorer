@@ -6,8 +6,25 @@
 import { removeAssay, seedAssayFromVocabulary } from '../core/assay.js';
 import { shortId } from '../core/ids.js';
 import { MAX_STUDY_ROWS } from '../engine/plan.js';
+import { buildFeedbackReport } from '../core/feedbackReport.js';
+import { copyToClipboard } from './clipboard.js';
 
 const THEME_KEY = 'micronaut.theme';
+
+// Alpha-pilot feedback destinations (Wave 1 of alpha-pilot-readiness).
+// Both are placeholders -- Daniel fills them in once the form/alias exist;
+// until then the links simply don't render (a broken link is worse than no
+// link). The "Copy feedback report" button below works either way, since it
+// only builds text -- it doesn't depend on either destination existing.
+//
+// FEEDBACK_FORM_URL: a Google Form (or similar) -- no account needed from a
+// tester, lands in a Sheet.
+// FEEDBACK_EMAIL: a non-personal address (a DuckDuckGo Email Protection
+// alias, or a dedicated project inbox) -- NOT a GitHub noreply address,
+// which silently discards mail sent to it.
+const FEEDBACK_FORM_URL = '';
+const FEEDBACK_EMAIL = '';
+const FEEDBACK_ISSUES_URL = 'https://github.com/Daniel-Waiger/micronaut-planner/issues/new';
 
 function loadTheme() {
   try {
@@ -34,7 +51,7 @@ function osPrefersLight() {
   return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches;
 }
 
-export function renderShell(root, store, router, { onReset, onNewBlank } = {}) {
+export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueCount } = {}) {
   root.textContent = '';
 
   const header = document.createElement('header');
@@ -112,6 +129,54 @@ export function renderShell(root, store, router, { onReset, onNewBlank } = {}) {
     });
     headerActions.appendChild(resetBtn);
   }
+
+  // Feedback (Wave 1, alpha-pilot-readiness): the button always works --
+  // it only builds and copies text, no destination required. The two links
+  // are conditional on Daniel having filled in the corresponding constant
+  // above; a link to nowhere is worse than no link.
+  const feedbackBtn = document.createElement('button');
+  feedbackBtn.type = 'button';
+  feedbackBtn.className = 'theme-toggle';
+  feedbackBtn.textContent = 'Copy feedback report';
+  feedbackBtn.title =
+    'Copies the current step, browser, knowledge-pack status, and your full study as text -- paste it into the feedback form or email.';
+  feedbackBtn.addEventListener('click', async () => {
+    const report = buildFeedbackReport({
+      currentStepId: router.current(),
+      kbIssueCount,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      experiment: store.get(),
+    });
+    const ok = await copyToClipboard(report);
+    showToast(ok ? 'Copied a feedback report -- paste it into the form or an email.' : 'Could not copy automatically -- select and copy the report text yourself.');
+  });
+  headerActions.appendChild(feedbackBtn);
+
+  if (FEEDBACK_FORM_URL) {
+    const formLink = document.createElement('a');
+    formLink.className = 'theme-toggle';
+    formLink.href = FEEDBACK_FORM_URL;
+    formLink.target = '_blank';
+    formLink.rel = 'noopener noreferrer';
+    formLink.textContent = 'Report an issue';
+    headerActions.appendChild(formLink);
+  }
+
+  if (FEEDBACK_EMAIL) {
+    const mailLink = document.createElement('a');
+    mailLink.className = 'theme-toggle';
+    mailLink.href = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent('Micronaut Planner feedback')}`;
+    mailLink.textContent = 'Email feedback';
+    headerActions.appendChild(mailLink);
+  }
+
+  const issuesLink = document.createElement('a');
+  issuesLink.className = 'theme-toggle';
+  issuesLink.href = FEEDBACK_ISSUES_URL;
+  issuesLink.target = '_blank';
+  issuesLink.rel = 'noopener noreferrer';
+  issuesLink.textContent = 'GitHub issue';
+  headerActions.appendChild(issuesLink);
 
   headerActions.appendChild(themeToggle);
   header.appendChild(headerActions);

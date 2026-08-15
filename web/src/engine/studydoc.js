@@ -27,9 +27,57 @@ import { conditionIssues, expandConditions } from './conditions.js';
 import { effectiveNamingFields, planFilenames, studyNameIssues } from './plan.js';
 import { readoutState, selectControls } from './controls.js';
 import { buildLadder } from './stages.js';
+import { derivePanelFacts, resolveMarkerToken, resolvePanel } from './spectra.js';
+import { ANTIBODY_CONJUGATION_MODES, channelSpectralField, normalizeChannels } from './panelAssembly.js';
 
-function assayLabel(assay, index) {
+/**
+ * An assay's display label, falling back to a 1-based positional name.
+ * Exported so engine/conformance.js labels its per-assay report rows the
+ * SAME way this document model does -- two copies of this fallback would
+ * let a renamed/blank assay show as "Assay 3" in one place and "Assay 2" in
+ * another, the same two-renderings-of-one-fact defect this module's header
+ * already names as the reason it exists. (The single-file build also
+ * forbids two top-level symbols of the same name across web/src, which is
+ * what surfaced the duplicate.)
+ */
+export function assayLabel(assay, index) {
   return (assay && typeof assay.label === 'string' && assay.label.trim()) || `Assay ${index + 1}`;
+}
+
+/**
+ * One row per channel/marker for a per-assay panel table (the bench card's
+ * Channels section, render/benchcard.js). Same precedence as panelDerived
+ * just above: the structured `channels` (with a real `target` and
+ * `conjugation`) when at least one exists, else the free-text markers field
+ * resolved the same way the Color panel step reads it -- so the bench card
+ * and the Color panel can never show a different channel list for the same
+ * assay. TOTAL: a channel/token whose spectral field is empty or
+ * unresolved still gets a row (state carries why), never silently omitted.
+ */
+function buildPanelRows(channels, markersText, markerIndex, markersKb, spectra) {
+  if (channels.length > 0) {
+    return channels.map((c) => {
+      const spectralField = channelSpectralField(c).trim();
+      const resolved = spectralField ? resolveMarkerToken(spectralField, markerIndex, markersKb, spectra) : null;
+      return {
+        target: c.target || '',
+        fluorophore: spectralField,
+        conjugation: c.conjugation,
+        state: resolved ? resolved.state : 'unrecognized',
+        excitationPeakNm: resolved && resolved.state === 'known' ? resolved.excitationPeakNm : null,
+        emissionPeakNm: resolved && resolved.state === 'known' ? resolved.emissionPeakNm : null,
+      };
+    });
+  }
+  const { entries } = resolvePanel(markersText, markerIndex, markersKb, spectra);
+  return entries.map((e) => ({
+    target: '',
+    fluorophore: e.token,
+    conjugation: null,
+    state: e.state,
+    excitationPeakNm: e.state === 'known' ? e.excitationPeakNm : null,
+    emissionPeakNm: e.state === 'known' ? e.emissionPeakNm : null,
+  }));
 }
 
 /**
@@ -66,7 +114,9 @@ function readoutMessageFor(state, readoutText, readoutLabel, readoutRuleCount) {
 /**
  * Build the full study document. `kb` is the shaped knowledge pack
  * (engine/kbpack.js's shapeAppKb output: readouts, controlRules, stages,
- * stageRules). `config` is the naming config (ui/steps/naming.js's
+ * stageRules -- and, as of the alpha-readiness controls fix, `index`/
+ * `markersKb`/`spectra`, needed to derive `panel.derived.*` before
+ * selectControls runs). `config` is the naming config (ui/steps/naming.js's
  * NAMING_CONFIG) and `baseTemplate` its BASE_TEMPLATE -- both passed in
  * rather than imported, same reason engine/plan.js's studyNameIssues
  * already takes them: engine/ must never import from ui/.
@@ -82,6 +132,9 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
   const controlRules = (kb && kb.controlRules) || [];
   const stages = (kb && kb.stages) || [];
   const stageRules = (kb && kb.stageRules) || [];
+  const markerIndex = kb && kb.index;
+  const markersKb = kb && kb.markersKb;
+  const spectra = kb && kb.spectra;
 
   const assayDocs = assays.map((assay, index) => {
     const view = assayView(exp, assay.id);
@@ -94,7 +147,48 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
     const canonical = rState === 'known' ? view.readout : null;
     const readoutLabel = canonical && readouts[canonical] ? readouts[canonical].label : null;
 
-    const firedControls = selectControls(controlRules, view);
+    // engine/controls.js's predicate DSL only reads plain paths off the
+    // flat view -- it cannot resolve a marker alias or ask "is this an
+    // antibody" itself. `derived` is computed here, once, and handed in as
+    // ordinary data so 'panel'-kind rules (isotype/secondary-only/FMO/
+    // single-stain, and the no-markers-declared guard every panel rule
+    // shares) can gate on the real panel content instead of firing as a
+    // block. See derivePanelFacts's own header for the defect this fixes.
+    //
+    // The structured panel (engine/panelAssembly.js, Wave 2A) is preferred
+    // over the free-text derivation whenever at least one channel exists --
+    // a filled-in channel's `conjugation` states unambiguously whether an
+    // antibody is involved, where the free-text path can only approximate
+    // it from markers.json's `class`. Falls back to the free-text field
+    // when panel.channels is empty, which is every assay before Wave 2A and
+    // every assay that never adopts the structured editor -- the free-text
+    // path is not being retired.
+    const channels = normalizeChannels(view.panel && view.panel.channels);
+    const markersText = (view.naming && view.naming.fields && view.naming.fields.markers) || '';
+    let panelDerived;
+    if (channels.length > 0) {
+      // hasAntibody/hasMarkersDeclared read from the CHANNEL's existence and
+      // its stated conjugation -- a channel the user has started (a target,
+      // an antibody conjugation mode) is a real declared fact even before
+      // they have typed the fluorophore's name. fluorophoreCount is
+      // narrower on purpose: it gates single-stain/FMO controls, which are
+      // specifically about SPILLOVER between named dyes, so only channels
+      // with an actual spectral identity filled in count toward it.
+      const withFluorophore = channels.filter((c) => (c.conjugation === 'tag-ligand' ? c.conjugateDye : c.fluorophore).trim());
+      panelDerived = {
+        fluorophoreCount: withFluorophore.length,
+        hasAntibody: channels.some((c) => ANTIBODY_CONJUGATION_MODES.has(c.conjugation)),
+        hasTag: channels.some((c) => c.conjugation === 'tag-ligand'),
+        classes: [],
+        hasMarkersDeclared: true,
+      };
+    } else {
+      panelDerived = derivePanelFacts(markersText, markerIndex, markersKb, spectra);
+    }
+    const viewWithDerivedPanel = { ...view, panel: { ...view.panel, derived: panelDerived } };
+    const panelRows = buildPanelRows(channels, markersText, markerIndex, markersKb, spectra);
+
+    const firedControls = selectControls(controlRules, viewWithDerivedPanel);
     const readoutControls = firedControls
       .filter((r) => r.kind === 'readout')
       .map((r) => ({ id: r.id, title: r.title, why: r.why }));
@@ -127,6 +221,7 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
       label: assayLabel(assay, index),
       readout: { text: view.readoutText || '', state: rState, canonical, label: readoutLabel },
       modality: (view.acquisition && view.acquisition.modality) || '',
+      panelRows,
       specimen: {
         organism: (view.specimen && view.specimen.organism) || '',
         sampleType: (view.specimen && view.specimen.sampleType) || '',

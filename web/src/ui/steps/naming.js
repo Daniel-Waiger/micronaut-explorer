@@ -1,10 +1,11 @@
 import { finalizeFields } from '../../engine/naming.js';
-import { validateFields, validateTargetPath } from '../../engine/validation.js';
+import { DEFAULT_PROFILE, validateFields, validateTargetPath } from '../../engine/validation.js';
 import { editTagFor } from '../../core/provenance.js';
 import { formatReplicateToken } from '../../engine/conditions.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 import { createAdvicePanel } from '../advice.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
+import { copyToClipboard } from '../clipboard.js';
 
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
@@ -44,14 +45,9 @@ export const NAMING_CONFIG = {
 // (fields.ext won't match the tail), which is what we want for a stem.
 export const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
 
-const DEFAULT_PROFILE = {
-  allowedExperimentTypes: [],
-  allowedMarkers: [],
-  samplePattern: '^E\\d{2}$',
-  magnificationPattern: '^X\\d{2,3}$',
-  notesPattern: '^[A-Za-z0-9_-]+$',
-  unknownMarkerPolicy: 'warn',
-};
+// DEFAULT_PROFILE itself now lives in engine/validation.js -- see its own
+// comment there for why (one profile shared with engine/conformance.js,
+// not a second local copy that could quietly diverge).
 
 // Prefixes formatReplicateToken uses for the two number-typed replicate
 // fields -- kept alongside FIELD_DEFS so currentRawFields() can look one up
@@ -130,36 +126,6 @@ const FIELD_DEFS = [
     hint: 'Anything else worth remembering about this file. Totally optional.',
   },
 ];
-
-/**
- * Copy `text` to the clipboard. navigator.clipboard can be restricted under
- * file:// or by permissions policy even when it exists, so fall back to the
- * classic hidden-textarea + execCommand('copy') trick.
- */
-async function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      // fall through to the execCommand fallback
-    }
-  }
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-  let ok = false;
-  try {
-    ok = document.execCommand('copy');
-  } catch {
-    ok = false;
-  }
-  document.body.removeChild(textarea);
-  return ok;
-}
 
 export const namingStep = {
   id: 'naming',

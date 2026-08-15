@@ -52,7 +52,12 @@ const ASSAY_SEEDS = [
       readoutText: 'Bacterial viability',
       'design.factors': [{ name: 'species', levels: ['PAERUGINOSA', 'SAUREUS'] }],
       'acquisition.modality': 'confocal',
-      'naming.fields.markers': 'SYTO9-PI',
+      // 'PI' alone is deliberately NOT a resolvable alias anywhere in this
+      // app (markers.py's own docstring: too ambiguous for even exact-match
+      // lookup -- Principal Investigator, the constant, ...), so the seeded
+      // study spells out the real BacLight reagent name instead of leaning
+      // on an abbreviation the KB refuses to recognize.
+      'naming.fields.markers': 'SYTO9-PROPIDIUM IODIDE',
       'naming.fields.exptype': 'VIABILITY',
       'naming.fields.magnification': 'X40',
     },

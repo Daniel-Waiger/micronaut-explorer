@@ -1,0 +1,244 @@
+{
+  "objective": "can you add more fluorophores to my platform? i want to have a wide cover more dyes, and FPs",
+  "assumptions": [
+    "The active product is the web Planner. Classic runtime behavior remains parked; only src/microscopy_naming_assistant/markers.py is in scope because it is the web marker-KB source of truth.",
+    "The producer-to-consumer path remains src/microscopy_naming_assistant/markers.py -> tools/export_markers_kb.py -> web/kb/markers.json and web/kb.dev.js -> web/src/engine/kbpack.js -> web/src/engine/spectra.js -> panel, study-document, controls, and bench-card consumers -> dist/index.html.",
+    "The spectra v1 schema remains unchanged: overlapRules plus fluorophores; direct entries contain excitationPeakNm, emissionPeakNm, reviewStatus, and optional note; family entries additionally contain isFamily and variants; variant entries contain only excitationPeakNm and emissionPeakNm.",
+    "The current 300-900 nm plausibility range, emissionPeakNm > excitationPeakNm invariant, and data-driven 25 nm emission/20 nm excitation proximity thresholds remain unchanged.",
+    "This increment adds a balanced, microscopy-relevant cohort rather than claiming an exhaustive catalog.",
+    "Ratiometric, multi-state, or photoconvertible probes that cannot be represented honestly by one excitation/emission pair remain out of scope, including FURA2, BCECF, SNARF, JC-1, Indo-1, MitoSOX Red, and photoactivatable or photoconvertible fluorescent proteins.",
+    "Authoritative-source verification does not equal local experimental validation. New entries retain reviewStatus claude-drafted and the persistent UI warning until a microscopy specialist approves them.",
+    "Peak values are copied only from exact authoritative product/form records, FPbase records, or primary papers. Values are never averaged across solvents, conjugates, binding states, oxidation states, or pH states.",
+    "Generic loaders, resolvers, overlap scoring, and rendering are data-driven; production engine/UI changes are not planned unless regression tests demonstrate a concrete consumer defect.",
+    "Exact branded or numbered variants receive distinct canonicals or existing-family variants. Existing generic aliases must not silently collapse chemically distinct dyes or protein variants.",
+    "Pre-existing untracked .agents content is unrelated and must not be touched."
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "title": "Curate an authoritative spectral source ledger",
+      "files": [
+        "docs/references/planner-fluorophore-sources.json"
+      ],
+      "depends_on": [],
+      "parallel_safe": false,
+      "scope": "Create a reference-only scientific evidence producer, not a runtime KB. Give every proposed canonical and family variant an exact display name, category, excitationPeakNm, emissionPeakNm, measurement context/state/solvent when reported, authoritative source URL, retrieval date, and, for fluorescent proteins, an FPbase record plus primary DOI when FPbase supplies one. Cover 72 proposed direct canonicals: organic labels ALEXA700, ALEXA790, ATTO390, ATTO465, ATTO532, ATTO594, ATTO680, ATTO725, ATTO740, CF350, CF405S, CF514, CF555, CF594, CF633, CF680, CF750, CF790, DYLIGHT405, DYLIGHT594, DYLIGHT680, DYLIGHT755, DYLIGHT800, OREGONGREEN488, PACIFICBLUE, PACIFICORANGE, CASCADEBLUE; fluorescent proteins TAGBFP2, MTURQUOISE2, MCERULEAN3, SUPERFOLDERGFP, MCLOVER3, MGREENLANTERN, MORANGE2, MAPPLE, MRUBY3, MSCARLETI, MSCARLET3, MKATE2, FUSIONRED, IRFP670, IRFP713, MIRFP680, MIRFP720; live-cell/organelle probes RHODAMINE123, FM143, FM464, LIPIDTOXGREEN, LIPIDTOXRED, LIPIDTOXDEEPRED; nucleic-acid dyes 7AAD, ETHIDIUMHOMODIMER1, TOPRO1, TOPRO3, TOPRO5, YOPRO1, YOPRO3; functional indicators FLUO3, CALCIUMGREEN1, CALCIUMORANGE, RHOD2, XRHOD1, CELLROXGREEN, CELLROXORANGE, CELLROXDEEPRED, DHE, MITOSOXGREEN, PHRODOGREEN, PHRODORED; near-IR labels IRDYE680RD, IRDYE800CW, DIR; and 11 variants: LYSOTRACKER blue/yellow/deep red, LIVEDEAD aqua/yellow/near ir, and SYTO 40/41/42/45/RNASelect. Authoritative starting points: Thermo Fisher Molecular Probes spectral table https://www.thermofisher.com/us/en/home/references/molecular-probes-the-handbook/tables/spectral-characteristics-and-recommended-bandpass-filter-sets-for-molecular-probes-dyes.html ; Alexa Fluor overview https://www.thermofisher.com/us/en/home/life-science/cell-analysis/fluorophores/alexa-fluor-brand-overview.html ; cell-imaging guide https://assets.thermofisher.com/TFS-Assets/BID/Reference-Materials/fluorophore-reagent-selection-guide-cell-imaging-selection-guide.pdf ; MitoTracker table https://www.thermofisher.com/us/en/home/references/molecular-probes-the-handbook/tables/spectral-characteristics-of-the-mitotracker-probes.html ; LysoTracker/LysoSensor table https://www.thermofisher.com/es/en/home/references/molecular-probes-the-handbook/tables/summary-of-our-lysotracker-and-lysosensor-probes.html ; cell-permeant nucleic-acid table https://www.thermofisher.com/us/en/home/references/molecular-probes-the-handbook/tables/cell-permeant-cyanine-nucleic-acid-stains.html ; CellROX comparison https://www.thermofisher.com/us/en/home/brands/molecular-probes/key-molecular-probes-products/cellrox-reagents-kits-ros-detection.html ; pHrodo reference https://www.thermofisher.com/us/en/home/brands/molecular-probes/key-molecular-probes-products/phrodo-indicators.html ; ATTO official properties https://www.atto-tec.com/fileadmin/user_upload/Katalog_Flyer_Support/Dye_Properties.pdf ; Biotium CF table https://biotium.com/faqs/where-can-i-find-technical-details-for-all-of-the-cf-dyes/ ; FPbase API https://www.fpbase.org/api/ and https://www.fpbase.org/api/proteins/basic/?format=json ; FPbase paper https://doi.org/10.1038/s41592-019-0352-8 ; LI-COR IRDye 680RD https://bio.licor.com/bio/reagents/irdye-680rd-nhs-ester ; and the exact official IRDye 800CW product record. Use exact vendor product pages/manuals when overview tables do not uniquely identify a formulation. Do not create a ledger row when no authoritative source yields an exact representable pair.",
+      "verification": "Parse the file as JSON and assert exactly 72 direct canonical records plus exactly 11 family-variant records. Independently open every cited authoritative URL and confirm the two stored maxima and measurement context match the source in meaning. Require vendor, FPbase, or primary-paper URLs; exact FPbase protein records rather than generic searches; 300 <= excitationPeakNm < emissionPeakNm <= 900; explicit context for bound, oxidized, calcium-bound, pH-sensitive, or membrane-bound measurements; and no unsupported or averaged value. Confine substantive changes to this ledger."
+    },
+    {
+      "id": "T2",
+      "title": "Add canonical marker names and collision-free aliases",
+      "files": [
+        "src/microscopy_naming_assistant/markers.py"
+      ],
+      "depends_on": [
+        "T1"
+      ],
+      "parallel_safe": false,
+      "scope": "Add the 72 source-approved canonicals from T1 to MARKER_ALIASES with common exact product/protein spellings, punctuation, and spacing forms, including Alexa Fluor 700, ATTO 725, CF 405S, DyLight 800, Oregon Green 488, Pacific Blue, mTurquoise2, mScarlet-I, superfolder GFP/sfGFP, iRFP670, miRFP720, FM 1-43, 7-AAD, EthD-1, TO-PRO-5, YO-PRO-1, CellROX Deep Red, MitoSOX Green, pHrodo Green, IRDye 800CW, DiR, LIVEDEAD Near IR, and LIVE-DEAD Near IR. Audit the complete normalized alias index first. If an exact variant spelling currently aliases a generic canonical, reassign only that exact spelling while preserving the generic spelling; never retain two destinations for one normalized alias. Respect the existing tokenizer limitation: do not claim slash-containing LIVE/DEAD aliases are reachable. Do not add FAM, HEX, TAMRA, ROX, BCECF, SNARF, MitoSOX Red, or unsupported candidates opportunistically.",
+      "verification": "Run the marker-source unit tests and a normalized alias-index audit reporting zero aliases with multiple canonical destinations. Assert all 72 exact keys exist once; representative spellings resolve correctly; generic IRFP, MIRFP, MSCARLET, and MTURQUOISE spellings retain their previous destinations; and free-text-hostile short aliases are excluded from freeTextAliases or protected by AMBIGUOUS_IN_FREE_TEXT. Confine substantive changes to markers.py."
+    },
+    {
+      "id": "T3",
+      "title": "Classify new canonicals and family variants in the exporter",
+      "files": [
+        "tools/export_markers_kb.py"
+      ],
+      "depends_on": [
+        "T1",
+        "T2"
+      ],
+      "parallel_safe": false,
+      "scope": "Use the existing editorial class and FAMILY_VARIANTS machinery. Classify exact fluorescent proteins as protein; calcium, ROS, and pH reporters as indicator; live-cell/organelle and nucleic-acid reagents as stain; and general conjugatable labels as dye. Add only these family variants: LYSOTRACKER blue, yellow, deep red; LIVEDEAD aqua, yellow, near ir; SYTO 40, 41, 42, 45, RNASelect. Preserve every existing tag/moiety/target classification and prior family variant. Do not hand-edit generated marker JSON.",
+      "verification": "Run python tools/export_markers_kb.py and inspect the generated model. All 72 new canonicals have exactly one allowed class; all 17 named FPs are protein; the 12 functional reporters are indicator; the three family arrays contain all old variants plus exactly the requested additions; and no unrelated classification changes. Confine substantive changes to export_markers_kb.py; T4 owns generated files."
+    },
+    {
+      "id": "T4",
+      "title": "Regenerate marker KB mirrors from their producers",
+      "files": [
+        "web/kb/markers.json",
+        "web/kb.dev.js"
+      ],
+      "depends_on": [
+        "T3"
+      ],
+      "parallel_safe": false,
+      "scope": "Run the existing marker exporter so web/kb/markers.json and gitignored web/kb.dev.js mirror markers.py and export_markers_kb.py. Do not manually patch generated output.",
+      "verification": "Run python tools/export_markers_kb.py twice and confirm the second run is byte-identical for both outputs. Assert markers.json canonical count rises from 96 to 168, class values remain within the enum, alias/freeTextAlias arrays are normalized-duplicate-free, and LYSOTRACKER, LIVEDEAD, and SYTO expose exactly the requested additions. Run node --test web/tests/kb.test.js and node --test web/tests/kbpack.test.js. Only markers.json is expected tracked output; web/kb.dev.js is generated and gitignored."
+    },
+    {
+      "id": "T5",
+      "title": "Add source-backed organic-label and near-IR spectra",
+      "files": [
+        "web/kb/spectra.json"
+      ],
+      "depends_on": [
+        "T1",
+        "T4"
+      ],
+      "parallel_safe": false,
+      "scope": "Add direct entries from the T1 ledger for ALEXA700, ALEXA790, ATTO390, ATTO465, ATTO532, ATTO594, ATTO680, ATTO725, ATTO740, CF350, CF405S, CF514, CF555, CF594, CF633, CF680, CF750, CF790, DYLIGHT405, DYLIGHT594, DYLIGHT680, DYLIGHT755, DYLIGHT800, OREGONGREEN488, PACIFICBLUE, PACIFICORANGE, CASCADEBLUE, IRDYE680RD, IRDYE800CW, and DIR. Copy exact values and condition notes from the ledger; do not add source-only fields rejected by the whitelist loader. Preserve overlapRules byte-for-byte and keep reviewStatus claude-drafted.",
+      "verification": "Assert all 30 keys exist once as non-family entries using only the allowed runtime fields; every peak equals its T1 ledger value; all keys exist in markers.json; all pass plausibility; overlapRules are unchanged; and node --test web/tests/spectra.test.js passes. Confine substantive changes to spectra.json."
+    },
+    {
+      "id": "T6",
+      "title": "Add exact named fluorescent-protein spectra",
+      "files": [
+        "web/kb/spectra.json"
+      ],
+      "depends_on": [
+        "T5"
+      ],
+      "parallel_safe": false,
+      "scope": "Append direct entries for TAGBFP2, MTURQUOISE2, MCERULEAN3, SUPERFOLDERGFP, MCLOVER3, MGREENLANTERN, MORANGE2, MAPPLE, MRUBY3, MSCARLETI, MSCARLET3, MKATE2, FUSIONRED, IRFP670, IRFP713, MIRFP680, and MIRFP720 using exact default-state maxima from each T1 FPbase record, with primary-paper DOI cross-checks where available. Keep these distinct from existing generic MTURQUOISE, MSCARLET, IRFP, and MIRFP entries. Exclude photoswitchable, photoconvertible, and multiple-state FPs.",
+      "verification": "Assert all 17 keys exist once as non-family entries; maxima equal the cited FPbase records; marker class is protein; exact variant aliases resolve to the exact variant while generic aliases retain their old canonical; every peak passes plausibility; node --test web/tests/spectra.test.js passes; and no existing generic FP peak or family definition changes. Confine substantive changes to spectra.json."
+    },
+    {
+      "id": "T7",
+      "title": "Add live-cell, nucleic-acid, ion, ROS, pH, and family spectra",
+      "files": [
+        "web/kb/spectra.json"
+      ],
+      "depends_on": [
+        "T6"
+      ],
+      "parallel_safe": false,
+      "scope": "Append ledger-backed entries for RHODAMINE123, FM143, FM464, LIPIDTOXGREEN, LIPIDTOXRED, LIPIDTOXDEEPRED, 7AAD, ETHIDIUMHOMODIMER1, TOPRO1, TOPRO3, TOPRO5, YOPRO1, YOPRO3, FLUO3, CALCIUMGREEN1, CALCIUMORANGE, RHOD2, XRHOD1, CELLROXGREEN, CELLROXORANGE, CELLROXDEEPRED, DHE, MITOSOXGREEN, PHRODOGREEN, and PHRODORED. Extend LYSOTRACKER, LIVEDEAD, and SYTO with the 11 T1 variants. Direct-entry notes identify bound, oxidized, calcium-bound, acidic, lipid-bound, or other source conditions. Family variant objects stay peak-only; their contexts remain in the ledger. Do not represent FURA2, BCECF, SNARF, JC-1, Indo-1, MitoSOX Red, or other incompatible probes with misleading single peaks.",
+      "verification": "Assert all 25 direct entries and 11 variants exist once, exactly match T1, and satisfy the whitelist and plausibility guards. Every variant key must exist in markers.json. Resolving LysoTracker Deep Red, LIVEDEAD Near IR, and SYTO RNASelect returns known exact variants. Existing FURA2/RFP/ARL gaps and HALO/SNAP/CLIP/PHALLOIDIN/WGA no-intrinsic handling remain unchanged; overlapRules are unchanged; and node --test web/tests/spectra.test.js passes. Confine substantive changes to spectra.json."
+    },
+    {
+      "id": "T8",
+      "title": "Lock new marker classes, aliases, and variants with producer tests",
+      "files": [
+        "web/tests/kb.test.js"
+      ],
+      "depends_on": [
+        "T4"
+      ],
+      "parallel_safe": true,
+      "scope": "Add table-driven assertions for all 72 new canonicals, representative punctuation/case/spacing aliases, class assignments, collision-free normalized aliases, and exact LYSOTRACKER/LIVEDEAD/SYTO additions. Reuse existing KB loader and alias helpers rather than reimplementing normalization.",
+      "verification": "Run node --test web/tests/kb.test.js. The test must fail for a missing, misclassified, multiply resolved, or unsafe free-text canonical; explicitly cover Alexa Fluor 790, CF 405S, mScarlet-I, sfGFP, 7-AAD, IRDye 800CW, LysoTracker Deep Red, LIVEDEAD Near IR, and SYTO RNASelect; and pass against regenerated markers.json. Confine changes to kb.test.js."
+    },
+    {
+      "id": "T9",
+      "title": "Add source-parity and resolver regression tests for spectra",
+      "files": [
+        "web/tests/spectra.test.js"
+      ],
+      "depends_on": [
+        "T1",
+        "T7"
+      ],
+      "parallel_safe": true,
+      "scope": "Load the T1 ledger and assert exact peak parity for every new direct/variant record, runtime-field whitelists, plausibility, marker-to-spectrum coverage, family-variant subset integrity, and draft review status. Add table-driven resolver cases spanning direct organic dye, exact FP variant, stain, indicator, near-IR dye, family variant, generic-family ambiguity, existing deliberate gap, and no-intrinsic class. Add representative pairwise cases from the ledger for emission error, excitation warning, and separated/no-warning outcomes, reading thresholds from overlapRules.",
+      "verification": "Run node --test web/tests/spectra.test.js. Require zero pack issues; exact ledger/runtime equality for 72 additions and 11 variants; zero orphan keys or family mismatches; all marker canonicals accounted for by spectrum, no-intrinsic class, or unchanged deliberate-gap set; successful exact resolution for Alexa Fluor 790, mScarlet-I, CellROX Deep Red, IRDye 800CW, LysoTracker Deep Red, LIVEDEAD Near IR, and SYTO RNASelect; and threshold-correct pairwise outcomes. Confine changes to spectra.test.js."
+    },
+    {
+      "id": "T10",
+      "title": "Verify generated-pack wiring exposes the expanded KB",
+      "files": [
+        "web/tests/kbpack.test.js"
+      ],
+      "depends_on": [
+        "T4",
+        "T7"
+      ],
+      "parallel_safe": true,
+      "scope": "Verify web/src/engine/kbpack.js exposes representative additions from every category through the real generated markers and spectra packs without bypassing the total/nonthrowing loader. Do not duplicate KB records in fixtures.",
+      "verification": "Run node --test web/tests/kbpack.test.js. Require ALEXA790, ATTO740, CF790, DYLIGHT800, MSCARLET3, MIRFP720, LIPIDTOXDEEPRED, TOPRO5, CELLROXDEEPRED, PHRODORED, IRDYE800CW, and the new LYSOTRACKER/LIVEDEAD/SYTO variants; loading remains total/nonthrowing; and no fallback fixture supplies the data. Confine changes to kbpack.test.js."
+    },
+    {
+      "id": "T11",
+      "title": "Exercise study-document and bench-card consumers",
+      "files": [
+        "web/tests/studydoc.test.js",
+        "web/tests/benchcard.test.js"
+      ],
+      "depends_on": [
+        "T9",
+        "T10"
+      ],
+      "parallel_safe": false,
+      "scope": "Extend the existing downstream tests with a mixed panel containing an exact FP variant, near-IR dye, functional indicator, and family variant. Prove the real kbpack -> spectra resolver -> study-document panelRows -> bench-card path consumes KB-derived identities and peaks. Do not copy peak constants into consumer code or fixtures; derive expectations from spectra.json or the source ledger. The panel DOM itself remains covered by the served-artifact browser check in T12 because the web project deliberately has no DOM-test dependency.",
+      "verification": "Run node --test web/tests/studydoc.test.js web/tests/benchcard.test.js. A panel containing mScarlet-I, IRDye 800CW, CellROX Deep Red, and LysoTracker Deep Red yields four known panelRows with KB-derived excitation/emission facts and bench-card output; a generic unresolved family remains ambiguous; and FURA2 remains spectrum-unavailable. Tests must fail if the consumers hard-code spectral values. Confine changes to the two named tests."
+    },
+    {
+      "id": "T12",
+      "title": "Run the full suite and verify the served shipped artifact",
+      "files": [
+        "web/kb/markers.json",
+        "web/kb.dev.js",
+        "dist/index.html"
+      ],
+      "depends_on": [
+        "T8",
+        "T9",
+        "T10",
+        "T11"
+      ],
+      "parallel_safe": false,
+      "scope": "Regenerate marker mirrors, run all web and Python gates, rebuild the shipped single-file Planner, and inspect dist/index.html over HTTP. The shipped artifact, not only development modules, must demonstrate the full producer-to-consumer path. No commit, push, PR, or deployment is part of this task.",
+      "verification": "Run in order: python tools/export_markers_kb.py; run it again and confirm byte-identical outputs; node --test web/tests/*.test.js; python -m pytest -q tests/test_single_file_build.py; python -m pytest -q -m \"not integration\"; python -m pytest -q -m integration; python tools/build_single_file.py --web-dir web --out dist. Then run python tools/serve_dir.py dist and inspect http://localhost:8000. Require HTTP 200, no console errors, recognized KB-derived rows for mScarlet-I, IRDye 800CW, CellROX Deep Red, and LysoTracker Deep Red, the persistent unreviewed warning, honest FURA2 spectrum-unavailable behavior, a data-driven overlap warning/error for a deliberately close new pair, matching study-document/bench-card data, embedded marker/spectra records, and no development-only fetch. Any failure blocks completion."
+    }
+  ],
+  "batches": [
+    [
+      "T1"
+    ],
+    [
+      "T2"
+    ],
+    [
+      "T3"
+    ],
+    [
+      "T4"
+    ],
+    [
+      "T5",
+      "T8"
+    ],
+    [
+      "T6"
+    ],
+    [
+      "T7"
+    ],
+    [
+      "T9",
+      "T10"
+    ],
+    [
+      "T11"
+    ],
+    [
+      "T12"
+    ]
+  ],
+  "risks": [
+    {
+      "risk": "Vendor pages report different maxima for free dye, conjugate, bound form, solvent, pH, or oxidation state.",
+      "mitigation": "T1 records exact identity and context, prefers exact product manuals over overview tables, forbids averaging, and T9 enforces numeric parity between evidence and runtime data."
+    },
+    {
+      "risk": "An exact name may already alias a generic canonical, producing incorrect resolution.",
+      "mitigation": "T2 audits the normalized alias index first; T8 requires zero multi-destination aliases and explicit generic-versus-variant tests."
+    },
+    {
+      "risk": "The single-peak model can misrepresent ratiometric, multi-state, or photoconvertible probes.",
+      "mitigation": "Exclude incompatible probes, retain FURA2 as an explicit gap, document supported measurement states, and require a future schema decision before multi-peak additions."
+    },
+    {
+      "risk": "Peak proximity is only a qualitative proxy for full spectral bleed-through.",
+      "mitigation": "Do not change thresholds or imply quantitative compatibility; retain the warning and threshold-driven regression cases."
+    },
+    {
+      "risk": "A large content increment can hide omissions or source drift.",
+      "mitigation": "Use exact enumerated sets, split spectrum edits by category, generate marker mirrors, and enforce complete ledger-to-runtime equality."
+    },
+    {
+      "risk": "Development tests can pass while the built artifact embeds stale KB data.",
+      "mitigation": "T12 regenerates immediately before build and verifies the served dist/index.html with representatives from every producer branch."
+    }
+  ]
+}

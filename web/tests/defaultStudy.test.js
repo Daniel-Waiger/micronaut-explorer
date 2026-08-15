@@ -79,7 +79,7 @@ test('only the assays with a real paper sub-group get a crossing factor', () => 
 
 test('each assay carries its real markers and exptype', () => {
   const [viability, cytoskeleton, ros, scratch] = createDefaultStudy().assays;
-  assert.equal(viability.naming.fields.markers, 'SYTO9-PI');
+  assert.equal(viability.naming.fields.markers, 'SYTO9-PROPIDIUM IODIDE');
   assert.equal(viability.naming.fields.exptype, 'VIABILITY');
   assert.equal(cytoskeleton.naming.fields.markers, 'PHALLOIDIN-DAPI');
   assert.equal(cytoskeleton.naming.fields.exptype, 'CYTOSKELETON');

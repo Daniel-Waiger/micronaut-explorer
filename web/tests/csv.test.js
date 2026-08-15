@@ -5,46 +5,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { buildStudyDocument } from '../src/engine/studydoc.js';
 import { renderCsv } from '../src/engine/render/csv.js';
-import { shapeAppKb } from '../src/engine/kbpack.js';
 import { emptyExperiment } from '../src/core/schema.js';
 import { createDefaultStudy } from '../src/core/defaultStudy.js';
-
-const NAMING_CONFIG = {
-  template: '{date}_{modality}_{exptype}_{markers}_{magnification}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}',
-  defaults: {
-    date: '1970-01-01',
-    modality: 'UNKNOWN',
-    exptype: 'UNKNOWN',
-    markers: 'UNKNOWN',
-    magnification: 'UNKNOWN',
-    sample: 'UNKNOWN',
-  },
-  optionalFields: ['group', 'biorep', 'techrep', 'notes'],
-  uppercaseFields: ['modality', 'exptype', 'sample', 'magnification', 'markers', 'group'],
-  safeCharPattern: '[^A-Za-z0-9_-]+',
-};
-const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-function readKbJson(stem) {
-  return JSON.parse(readFileSync(path.join(here, '..', 'kb', `${stem}.json`), 'utf-8'));
-}
-
-function realKb() {
-  return shapeAppKb({
-    markers: readKbJson('markers'),
-    questions: readKbJson('questions'),
-    advisor: readKbJson('advisor'),
-    readouts: readKbJson('readouts'),
-    controls: readKbJson('controls'),
-    stages: readKbJson('stages'),
-  });
-}
+import { NAMING_CONFIG, BASE_TEMPLATE, realKb } from './fixtures.js';
 
 test('renderCsv is deterministic on the same document', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
@@ -96,6 +61,46 @@ test('renderCsv quotes a field containing a comma per RFC 4180, and never leaves
   };
   const csv = renderCsv(doc);
   assert.match(csv, /"Assay, with a comma"/);
+});
+
+test('renderCsv neutralizes a leading =/+/-/@ so a spreadsheet app never treats a cell as a formula', () => {
+  const doc = {
+    assays: [
+      {
+        label: '=HYPERLINK("http://evil","click")',
+        modality: '+cmd',
+        filenames: [
+          {
+            row: { group: '-CTL', factorLevels: {}, bioRep: 1, techRep: null },
+            filename: 'a.tif',
+            error: null,
+          },
+        ],
+      },
+    ],
+  };
+  const csv = renderCsv(doc);
+  const dataLine = csv.split('\r\n')[1];
+  // Every formula-triggering cell is apostrophe-prefixed; none starts a
+  // field with a bare =/+/-/@.
+  assert.match(dataLine, /'=HYPERLINK/);
+  assert.match(dataLine, /,'\+cmd,/);
+  assert.match(dataLine, /,'-CTL,/);
+});
+
+test('renderCsv does not touch a value that merely CONTAINS =/+/-/@ mid-string', () => {
+  const doc = {
+    assays: [
+      {
+        label: 'A+B assay',
+        modality: 'confocal',
+        filenames: [{ row: { group: 'CTL', factorLevels: {}, bioRep: 1, techRep: null }, filename: 'a.tif', error: null }],
+      },
+    ],
+  };
+  const csv = renderCsv(doc);
+  assert.match(csv, /A\+B assay/);
+  assert.ok(!csv.includes("'A+B assay"));
 });
 
 test('renderCsv on a malformed/missing document renders header-only, never throws', () => {

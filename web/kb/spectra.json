@@ -51,6 +51,54 @@
     "JF646": { "excitationPeakNm": 646, "emissionPeakNm": 664, "reviewStatus": "claude-drafted" },
     "SIRACTIN": { "excitationPeakNm": 652, "emissionPeakNm": 674, "reviewStatus": "claude-drafted", "note": "SiR (silicon-rhodamine) actin probe; same parent dye as SiR-tubulin, so the two are NOT spectrally distinguishable from each other -- a real cross-check finding, not a drafting error." },
     "SIRTUBULIN": { "excitationPeakNm": 652, "emissionPeakNm": 674, "reviewStatus": "claude-drafted", "note": "SiR (silicon-rhodamine) tubulin probe; same parent dye as SiR-actin." },
+    "SIRDNA": { "excitationPeakNm": 652, "emissionPeakNm": 674, "reviewStatus": "claude-drafted", "note": "SiR (silicon-rhodamine) DNA probe; same parent dye as SiR-actin/SiR-tubulin, so none of the three SiR probes are spectrally distinguishable from each other." },
+    "DCFDA": { "excitationPeakNm": 495, "emissionPeakNm": 529, "reviewStatus": "claude-drafted", "note": "Peaks are for the oxidized, fluorescent DCF product -- the non-fluorescent DCFH-DA/H2DCFDA loading form has no meaningful excitation/emission peak until intracellular oxidation converts it." },
+    "ALEXA350": { "excitationPeakNm": 346, "emissionPeakNm": 442, "reviewStatus": "claude-drafted" },
+    "CF488A": { "excitationPeakNm": 490, "emissionPeakNm": 515, "reviewStatus": "claude-drafted" },
+    "CF568": { "excitationPeakNm": 562, "emissionPeakNm": 583, "reviewStatus": "claude-drafted" },
+    "CF647": { "excitationPeakNm": 650, "emissionPeakNm": 665, "reviewStatus": "claude-drafted" },
+    "CELLTRACKERGREEN": { "excitationPeakNm": 492, "emissionPeakNm": 517, "reviewStatus": "claude-drafted", "note": "CMFDA, the active fluorescent form after intracellular esterase cleavage." },
+    "CELLTRACKERRED": { "excitationPeakNm": 577, "emissionPeakNm": 602, "reviewStatus": "claude-drafted", "note": "CMTPX." },
+    "CELLTRACKERBLUE": { "excitationPeakNm": 353, "emissionPeakNm": 466, "reviewStatus": "claude-drafted", "note": "CMAC." },
+    "CELLTRACEVIOLET": { "excitationPeakNm": 405, "emissionPeakNm": 450, "reviewStatus": "claude-drafted" },
+    "CFSE": { "excitationPeakNm": 494, "emissionPeakNm": 521, "reviewStatus": "claude-drafted" },
+    "DIO": { "excitationPeakNm": 484, "emissionPeakNm": 501, "reviewStatus": "claude-drafted", "note": "DiOC18(3), a lipophilic membrane dye." },
+    "DII": { "excitationPeakNm": 549, "emissionPeakNm": 565, "reviewStatus": "claude-drafted", "note": "DiIC18(3), a lipophilic membrane dye." },
+    "DID": { "excitationPeakNm": 644, "emissionPeakNm": 665, "reviewStatus": "claude-drafted", "note": "DiIC18(5), a lipophilic membrane dye." },
+    "TMRM": { "excitationPeakNm": 548, "emissionPeakNm": 573, "reviewStatus": "claude-drafted", "note": "A mitochondrial-membrane-potential dye; peaks are for the free (unquenched) dye." },
+    "TMRE": { "excitationPeakNm": 549, "emissionPeakNm": 575, "reviewStatus": "claude-drafted", "note": "A mitochondrial-membrane-potential dye; peaks are for the free (unquenched) dye." },
+    "NILERED": { "excitationPeakNm": 552, "emissionPeakNm": 636, "reviewStatus": "claude-drafted", "note": "A lipid-droplet stain; both peaks shift substantially with the polarity of the lipid environment -- treat as indicative only." },
+
+    "ALEXA700": { "excitationPeakNm": 702, "emissionPeakNm": 723, "reviewStatus": "claude-drafted", "note": "vendor spectral table; dye" },
+    "ALEXA790": { "excitationPeakNm": 782, "emissionPeakNm": 805, "reviewStatus": "claude-drafted", "note": "vendor spectral table; dye" },
+    "ATTO390": { "excitationPeakNm": 390, "emissionPeakNm": 476, "reviewStatus": "claude-drafted", "note": "current Leica ATTO product optical properties; solvent not reported" },
+    "ATTO465": { "excitationPeakNm": 453, "emissionPeakNm": 506, "reviewStatus": "claude-drafted", "note": "current Leica ATTO product optical properties; aqueous solution noted, measurement solvent not reported" },
+    "ATTO532": { "excitationPeakNm": 532, "emissionPeakNm": 552, "reviewStatus": "claude-drafted", "note": "current Leica ATTO product optical properties; solvent not reported" },
+    "ATTO594": { "excitationPeakNm": 603, "emissionPeakNm": 626, "reviewStatus": "claude-drafted", "note": "current Leica ATTO product optical properties; solvent not reported" },
+    "ATTO680": { "excitationPeakNm": 681, "emissionPeakNm": 698, "reviewStatus": "claude-drafted", "note": "current Leica ATTO product optical properties; solvent not reported" },
+    "ATTO725": { "excitationPeakNm": 728, "emissionPeakNm": 751, "reviewStatus": "claude-drafted", "note": "current Leica ATTO product optical properties; solvent not reported" },
+    "ATTO740": { "excitationPeakNm": 743, "emissionPeakNm": 763, "reviewStatus": "claude-drafted", "note": "current Leica ATTO product optical properties; solvent not reported" },
+    "CF350": { "excitationPeakNm": 347, "emissionPeakNm": 448, "reviewStatus": "claude-drafted", "note": "antibody conjugate in PBS, pH 7.4" },
+    "CF405S": { "excitationPeakNm": 404, "emissionPeakNm": 431, "reviewStatus": "claude-drafted", "note": "antibody conjugate in PBS, approximately pH 7.4" },
+    "CF514": { "excitationPeakNm": 516, "emissionPeakNm": 548, "reviewStatus": "claude-drafted", "note": "antibody conjugate in PBS, pH 7.4" },
+    "CF555": { "excitationPeakNm": 555, "emissionPeakNm": 565, "reviewStatus": "claude-drafted", "note": "antibody conjugate in PBS, approximately pH 7.4" },
+    "CF594": { "excitationPeakNm": 593, "emissionPeakNm": 614, "reviewStatus": "claude-drafted", "note": "antibody conjugate in PBS, approximately pH 7.4" },
+    "CF633": { "excitationPeakNm": 630, "emissionPeakNm": 650, "reviewStatus": "claude-drafted", "note": "antibody conjugate in PBS" },
+    "CF680": { "excitationPeakNm": 681, "emissionPeakNm": 698, "reviewStatus": "claude-drafted", "note": "vendor dye specification" },
+    "CF750": { "excitationPeakNm": 755, "emissionPeakNm": 777, "reviewStatus": "claude-drafted", "note": "free-acid dye in water" },
+    "CF790": { "excitationPeakNm": 784, "emissionPeakNm": 806, "reviewStatus": "claude-drafted", "note": "antibody conjugate in PBS, pH 7.4" },
+    "DYLIGHT405": { "excitationPeakNm": 400, "emissionPeakNm": 420, "reviewStatus": "claude-drafted", "note": "amine-reactive dye; vendor specification" },
+    "DYLIGHT594": { "excitationPeakNm": 593, "emissionPeakNm": 618, "reviewStatus": "claude-drafted", "note": "amine-reactive dye; vendor specification" },
+    "DYLIGHT680": { "excitationPeakNm": 682, "emissionPeakNm": 715, "reviewStatus": "claude-drafted", "note": "amine-reactive dye; vendor specification" },
+    "DYLIGHT755": { "excitationPeakNm": 754, "emissionPeakNm": 776, "reviewStatus": "claude-drafted", "note": "amine-reactive dye; vendor specification" },
+    "DYLIGHT800": { "excitationPeakNm": 770, "emissionPeakNm": 794, "reviewStatus": "claude-drafted", "note": "amine-reactive dye; vendor specification" },
+    "OREGONGREEN488": { "excitationPeakNm": 496, "emissionPeakNm": 524, "reviewStatus": "claude-drafted", "note": "vendor spectral table; dye and BAPTA indicators" },
+    "PACIFICBLUE": { "excitationPeakNm": 410, "emissionPeakNm": 455, "reviewStatus": "claude-drafted", "note": "vendor spectral table; dye" },
+    "PACIFICORANGE": { "excitationPeakNm": 400, "emissionPeakNm": 551, "reviewStatus": "claude-drafted", "note": "vendor spectral table; dye" },
+    "CASCADEBLUE": { "excitationPeakNm": 400, "emissionPeakNm": 420, "reviewStatus": "claude-drafted", "note": "vendor spectral table; dye" },
+    "IRDYE680RD": { "excitationPeakNm": 672, "emissionPeakNm": 694, "reviewStatus": "claude-drafted", "note": "NHS ester in 1X PBS" },
+    "IRDYE800CW": { "excitationPeakNm": 774, "emissionPeakNm": 789, "reviewStatus": "claude-drafted", "note": "NHS ester in 1X PBS" },
+    "DIR": { "excitationPeakNm": 750, "emissionPeakNm": 779, "reviewStatus": "claude-drafted", "note": "lipid-bound dye" },
 
     "GFP": { "excitationPeakNm": 488, "emissionPeakNm": 507, "reviewStatus": "claude-drafted" },
     "YFP": { "excitationPeakNm": 514, "emissionPeakNm": 527, "reviewStatus": "claude-drafted" },
@@ -66,6 +114,23 @@
     "CITRINE": { "excitationPeakNm": 516, "emissionPeakNm": 529, "reviewStatus": "claude-drafted" },
     "IRFP": { "excitationPeakNm": 690, "emissionPeakNm": 713, "reviewStatus": "claude-drafted", "note": "iRFP713, the most common near-infrared iRFP variant; other iRFP variants differ." },
     "MIRFP": { "excitationPeakNm": 683, "emissionPeakNm": 703, "reviewStatus": "claude-drafted", "note": "Approximate; several named miRFP variants (miRFP670/703/720) differ by tens of nm -- treat this single entry as indicative only until a specific variant is confirmed." },
+    "TAGBFP2": { "excitationPeakNm": 399, "emissionPeakNm": 454, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MTURQUOISE2": { "excitationPeakNm": 434, "emissionPeakNm": 474, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MCERULEAN3": { "excitationPeakNm": 433, "emissionPeakNm": 475, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "SUPERFOLDERGFP": { "excitationPeakNm": 488, "emissionPeakNm": 510, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MCLOVER3": { "excitationPeakNm": 506, "emissionPeakNm": 518, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MGREENLANTERN": { "excitationPeakNm": 503, "emissionPeakNm": 514, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MORANGE2": { "excitationPeakNm": 549, "emissionPeakNm": 565, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MAPPLE": { "excitationPeakNm": 568, "emissionPeakNm": 592, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MRUBY3": { "excitationPeakNm": 558, "emissionPeakNm": 592, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MSCARLETI": { "excitationPeakNm": 569, "emissionPeakNm": 593, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MSCARLET3": { "excitationPeakNm": 569, "emissionPeakNm": 592, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "MKATE2": { "excitationPeakNm": 588, "emissionPeakNm": 633, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "FUSIONRED": { "excitationPeakNm": 580, "emissionPeakNm": 608, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state" },
+    "IRFP670": { "excitationPeakNm": 643, "emissionPeakNm": 670, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state; biliverdin-binding NIR FP" },
+    "IRFP713": { "excitationPeakNm": 690, "emissionPeakNm": 713, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state; biliverdin-binding NIR FP" },
+    "MIRFP680": { "excitationPeakNm": 661, "emissionPeakNm": 680, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state; biliverdin-binding NIR FP" },
+    "MIRFP720": { "excitationPeakNm": 702, "emissionPeakNm": 720, "reviewStatus": "claude-drafted", "note": "FPbase default fluorescent state; biliverdin-binding NIR FP" },
     "MEMERALD": { "excitationPeakNm": 487, "emissionPeakNm": 509, "reviewStatus": "claude-drafted" },
     "MRUBY": { "excitationPeakNm": 558, "emissionPeakNm": 605, "reviewStatus": "claude-drafted" },
     "GCAMP": {
@@ -75,6 +140,31 @@
       "note": "Spectrally ~one dye (cpEGFP) across every GCaMP variant despite markers.json's isFamily:true -- variants (6f/6s/7/...) differ in Ca2+ affinity and kinetics, not color, so this entry deliberately has no per-variant sub-entries."
     },
     "FLUO4": { "excitationPeakNm": 494, "emissionPeakNm": 516, "reviewStatus": "claude-drafted" },
+    "RHODAMINE123": { "excitationPeakNm": 507, "emissionPeakNm": 529, "reviewStatus": "claude-drafted", "note": "vendor spectral table; dye" },
+    "FM143": { "excitationPeakNm": 479, "emissionPeakNm": 598, "reviewStatus": "claude-drafted", "note": "lipid-bound dye" },
+    "FM464": { "excitationPeakNm": 506, "emissionPeakNm": 750, "reviewStatus": "claude-drafted", "note": "lipid-bound dye" },
+    "LIPIDTOXGREEN": { "excitationPeakNm": 495, "emissionPeakNm": 505, "reviewStatus": "claude-drafted", "note": "neutral-lipid droplet stain in fixed cells" },
+    "LIPIDTOXRED": { "excitationPeakNm": 577, "emissionPeakNm": 609, "reviewStatus": "claude-drafted", "note": "neutral-lipid droplet stain in fixed cells" },
+    "LIPIDTOXDEEPRED": { "excitationPeakNm": 637, "emissionPeakNm": 655, "reviewStatus": "claude-drafted", "note": "neutral-lipid droplet stain in fixed cells" },
+    "7AAD": { "excitationPeakNm": 546, "emissionPeakNm": 647, "reviewStatus": "claude-drafted", "note": "dye/nucleic-acid complex" },
+    "ETHIDIUMHOMODIMER1": { "excitationPeakNm": 528, "emissionPeakNm": 617, "reviewStatus": "claude-drafted", "note": "dye/nucleic-acid complex" },
+    "TOPRO1": { "excitationPeakNm": 514, "emissionPeakNm": 533, "reviewStatus": "claude-drafted", "note": "dye/nucleic-acid complex" },
+    "TOPRO3": { "excitationPeakNm": 642, "emissionPeakNm": 660, "reviewStatus": "claude-drafted", "note": "dye/nucleic-acid complex" },
+    "TOPRO5": { "excitationPeakNm": 748, "emissionPeakNm": 768, "reviewStatus": "claude-drafted", "note": "DNA complex in 10 mM Tris, 1 mM EDTA, 50 mM NaCl, pH 7.4" },
+    "YOPRO1": { "excitationPeakNm": 491, "emissionPeakNm": 509, "reviewStatus": "claude-drafted", "note": "dye/nucleic-acid complex" },
+    "YOPRO3": { "excitationPeakNm": 612, "emissionPeakNm": 631, "reviewStatus": "claude-drafted", "note": "dye/nucleic-acid complex" },
+    "FLUO3": { "excitationPeakNm": 506, "emissionPeakNm": 526, "reviewStatus": "claude-drafted", "note": "Ca2+-bound indicator" },
+    "CALCIUMGREEN1": { "excitationPeakNm": 506, "emissionPeakNm": 531, "reviewStatus": "claude-drafted", "note": "high-Ca2+ indicator in water" },
+    "CALCIUMORANGE": { "excitationPeakNm": 549, "emissionPeakNm": 576, "reviewStatus": "claude-drafted", "note": "high-Ca2+ indicator in water" },
+    "RHOD2": { "excitationPeakNm": 552, "emissionPeakNm": 581, "reviewStatus": "claude-drafted", "note": "Ca2+-bound indicator" },
+    "XRHOD1": { "excitationPeakNm": 580, "emissionPeakNm": 602, "reviewStatus": "claude-drafted", "note": "Ca2+-bound indicator" },
+    "CELLROXGREEN": { "excitationPeakNm": 485, "emissionPeakNm": 520, "reviewStatus": "claude-drafted", "note": "oxidized, DNA-bound product" },
+    "CELLROXORANGE": { "excitationPeakNm": 545, "emissionPeakNm": 565, "reviewStatus": "claude-drafted", "note": "oxidized product" },
+    "CELLROXDEEPRED": { "excitationPeakNm": 644, "emissionPeakNm": 665, "reviewStatus": "claude-drafted", "note": "oxidized product" },
+    "DHE": { "excitationPeakNm": 518, "emissionPeakNm": 605, "reviewStatus": "claude-drafted", "note": "oxidized ethidium product bound to DNA" },
+    "MITOSOXGREEN": { "excitationPeakNm": 488, "emissionPeakNm": 510, "reviewStatus": "claude-drafted", "note": "oxidized product targeted to mitochondria in live cells" },
+    "PHRODOGREEN": { "excitationPeakNm": 509, "emissionPeakNm": 533, "reviewStatus": "claude-drafted", "note": "acidic-state fluorescence; intensity increases as pH decreases" },
+    "PHRODORED": { "excitationPeakNm": 560, "emissionPeakNm": 585, "reviewStatus": "claude-drafted", "note": "acidic-state fluorescence; intensity increases as pH decreases" },
 
     "MITOTRACKER": {
       "isFamily": true,
@@ -90,8 +180,11 @@
       "isFamily": true,
       "reviewStatus": "claude-drafted",
       "variants": {
+        "lysotracker blue": { "excitationPeakNm": 373, "emissionPeakNm": 422 },
         "lysotracker green": { "excitationPeakNm": 504, "emissionPeakNm": 511 },
-        "lysotracker red": { "excitationPeakNm": 577, "emissionPeakNm": 590 }
+        "lysotracker red": { "excitationPeakNm": 577, "emissionPeakNm": 590 },
+        "lysotracker yellow": { "excitationPeakNm": 465, "emissionPeakNm": 535 },
+        "lysotracker deep red": { "excitationPeakNm": 647, "emissionPeakNm": 668 }
       }
     },
     "SYTOX": {
@@ -102,6 +195,67 @@
         "sytox green": { "excitationPeakNm": 504, "emissionPeakNm": 523 },
         "sytox orange": { "excitationPeakNm": 547, "emissionPeakNm": 570 },
         "sytox red": { "excitationPeakNm": 640, "emissionPeakNm": 658 }
+      }
+    },
+    "BODIPY": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "note": "The bare 'BODIPY' name is a whole dye class, not one spectrum -- these four named variants are the ones common enough to draft with confidence; many real BODIPY dyes are still, correctly, not covered here.",
+      "variants": {
+        "bodipy fl": { "excitationPeakNm": 505, "emissionPeakNm": 513 },
+        "bodipy tmr": { "excitationPeakNm": 542, "emissionPeakNm": 574 },
+        "bodipy tr": { "excitationPeakNm": 588, "emissionPeakNm": 616 },
+        "bodipy 630": { "excitationPeakNm": 625, "emissionPeakNm": 640 }
+      }
+    },
+    "CELLMASK": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "variants": {
+        "cellmask green": { "excitationPeakNm": 522, "emissionPeakNm": 535 },
+        "cellmask orange": { "excitationPeakNm": 554, "emissionPeakNm": 567 },
+        "cellmask deep red": { "excitationPeakNm": 649, "emissionPeakNm": 666 }
+      }
+    },
+    "ERTRACKER": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "variants": {
+        "er-tracker green": { "excitationPeakNm": 504, "emissionPeakNm": 511 },
+        "er-tracker red": { "excitationPeakNm": 587, "emissionPeakNm": 615 },
+        "er-tracker blue-white dpx": { "excitationPeakNm": 374, "emissionPeakNm": 430 }
+      }
+    },
+    "SYTO": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "note": "Distinct from SYTOX above: SYTO stains are cell-permeant (label live and dead cells alike); SYTOX stains are impermeant to live cells (dead-cell/nucleic-acid-exposed indicators only).",
+      "variants": {
+        "syto 40": { "excitationPeakNm": 420, "emissionPeakNm": 441 },
+        "syto 41": { "excitationPeakNm": 430, "emissionPeakNm": 454 },
+        "syto 42": { "excitationPeakNm": 433, "emissionPeakNm": 460 },
+        "syto 45": { "excitationPeakNm": 455, "emissionPeakNm": 484 },
+        "syto rnaselect": { "excitationPeakNm": 490, "emissionPeakNm": 530 },
+        "syto9": { "excitationPeakNm": 480, "emissionPeakNm": 500 },
+        "syto13": { "excitationPeakNm": 488, "emissionPeakNm": 509 },
+        "syto60": { "excitationPeakNm": 652, "emissionPeakNm": 678 },
+        "syto82": { "excitationPeakNm": 541, "emissionPeakNm": 560 },
+        "syto85": { "excitationPeakNm": 567, "emissionPeakNm": 585 }
+      }
+    },
+    "LIVEDEAD": {
+      "isFamily": true,
+      "reviewStatus": "claude-drafted",
+      "note": "The real product-line spelling uses 'LIVE/DEAD Fixable ...'; aliases here use a hyphen/space instead because splitMarkers treats '/' as a field delimiter.",
+      "variants": {
+        "livedead aqua": { "excitationPeakNm": 367, "emissionPeakNm": 526 },
+        "livedead blue": { "excitationPeakNm": 350, "emissionPeakNm": 450 },
+        "livedead green": { "excitationPeakNm": 495, "emissionPeakNm": 520 },
+        "livedead violet": { "excitationPeakNm": 416, "emissionPeakNm": 451 },
+        "livedead red": { "excitationPeakNm": 595, "emissionPeakNm": 615 },
+        "livedead far red": { "excitationPeakNm": 650, "emissionPeakNm": 665 },
+        "livedead yellow": { "excitationPeakNm": 400, "emissionPeakNm": 575 },
+        "livedead near ir": { "excitationPeakNm": 750, "emissionPeakNm": 775 }
       }
     }
   }

@@ -109,13 +109,17 @@ export const guideStep = {
         'A qualitative check for spectral spillover across the markers you entered on Naming — ' +
           'flags fluorophore pairs whose excitation or emission peaks sit too close together. ' +
           'Not a spectral-overlap integral, and the spectral values are Claude-drafted, not yet ' +
-          'reviewed.',
+          'reviewed. Below it, an optional structured panel editor lets you name each channel’s ' +
+          'target and how its fluorophore is attached (direct antibody, indirect, genetically ' +
+          'encoded, a direct-binding probe, or a self-labeling tag) — more precise than the ' +
+          'markers field, and what tells Overview whether an antibody is actually involved.',
       ],
       [
         'Overview',
-        'A read-only summary of the whole study: a visual study map, the recommended ' +
-          'controls, a step-by-step “how to run this project” walkthrough, and every planned ' +
-          'filename. Nothing is entered here — it reads from the other steps.',
+        'A read-only summary of the whole study: a visual study map, a conformance check (one ' +
+          'pass/fail verdict for the whole study), the recommended controls, a step-by-step ' +
+          '“how to run this project” walkthrough, and every planned filename. Nothing is ' +
+          'entered here — it reads from the other steps.',
       ],
     ]);
 
@@ -170,6 +174,18 @@ export const guideStep = {
       'A consistent set of planned filenames for every condition in the design.',
       'A visual study map (Overview) you can download as an SVG.',
       'An exportable study document (Markdown) and a print / save-as-PDF view.',
+      'A file manifest (CSV) — one row per planned filename with its group, factors, and ' +
+        'replicates — and a full raw-data dump (JSON) of the study document, both on Overview.',
+      'A bench card per assay (Overview) — a compact, print-oriented single-assay summary: ' +
+        'channels, controls with their reasons, and two worked filename examples.',
+      'A copy-paste prompt for your own LLM (Overview) — the study as JSON plus ground rules ' +
+        'that keep the model from inventing a domain fact.',
+      'An optional "Ask about this step" panel (Describe) — off by default. Left off, or if ' +
+        'no local model is configured, it works exactly like the copy-paste prompt above: you ' +
+        'get text to paste into whatever LLM you already use. If you opt in and point it at a ' +
+        'local Ollama server, the app calls that server directly over your own network — no ' +
+        'API key, nothing sent anywhere else. Either way it can only explain the current step; ' +
+        'it never writes an answer into your study for you.',
     ]);
 
     section(main, 'Saving your work');
@@ -188,6 +204,12 @@ export const guideStep = {
         'instrument model — always confirm real acquisition settings at the microscope. The ' +
         'built-in guidance content is still being reviewed by a microscopy specialist, so ' +
         'treat specific wording as provisional.'
+    );
+    para(
+      main,
+      'Found something wrong, or missing? Use “Copy feedback report” in the header — it copies ' +
+        'the current step, your browser, and your full study as text, ready to paste into the ' +
+        'feedback form or an email. It never sends anything on its own.'
     );
   },
 };

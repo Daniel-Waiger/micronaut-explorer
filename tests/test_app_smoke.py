@@ -113,7 +113,14 @@ def test_series_sidecar_offers_one_row_per_image(tmp_path: Path, monkeypatch) ->
     rows = build_series_rows(at.session_state["suggestions"], config)
     assert len(rows) == 2
 
-    assert any(b.label == "Download per-series sidecar (CSV)" for b in at.download_button)
+    # Streamlit 1.37 (the project's supported floor) renders download
+    # buttons as generic UnknownElements in AppTest and does not expose the
+    # later `at.download_button` convenience accessor. `get` is stable at
+    # both the floor and current versions and still proves the real widget
+    # is present by its protocol element type and label.
+    assert any(
+        b.label == "Download per-series sidecar (CSV)" for b in at.get("download_button")
+    )
 
 
 @pytest.mark.smoke

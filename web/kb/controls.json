@@ -6,7 +6,7 @@
       "kind": "panel",
       "title": "Unstained / autofluorescence control",
       "why": "Fixed tissue and many cell types autofluoresce, especially in the green channel. Without an unstained sample imaged at the same settings, you cannot tell whether a dim signal is real stain or background autofluorescence.",
-      "when": { "all": [{ "exists": "naming.fields.markers" }, { "ne": ["naming.fields.markers", "NONE"] }] },
+      "when": { "eq": ["panel.derived.hasMarkersDeclared", true] },
       "priority": 10
     },
     {
@@ -14,15 +14,23 @@
       "kind": "panel",
       "title": "Single-stain controls (one channel at a time)",
       "why": "When two or more fluorophores are imaged together, their emission spectra can overlap (spectral spillover/bleed-through). A sample stained with only ONE of the fluorophores, imaged on every channel, is what lets you tell real co-localization apart from spillover before you trust a multi-channel image.",
-      "when": { "all": [{ "exists": "naming.fields.markers" }, { "ne": ["naming.fields.markers", "NONE"] }] },
+      "when": { "all": [{ "eq": ["panel.derived.hasMarkersDeclared", true] }, { "gt": ["panel.derived.fluorophoreCount", 1] }] },
       "priority": 20
+    },
+    {
+      "id": "panel-fmo-control",
+      "kind": "panel",
+      "title": "Fluorescence-minus-one (FMO) controls",
+      "why": "Once a panel passes about three colors, spectral spillover from every OTHER channel can shift where a real positive/negative boundary sits on a given channel -- a single-stain control alone does not show you that shifted boundary. An FMO sample (every fluorophore except the one you're gating on) does: it reproduces the real spillover background, so the gate you draw on the full panel is honest.",
+      "when": { "all": [{ "eq": ["panel.derived.hasMarkersDeclared", true] }, { "gt": ["panel.derived.fluorophoreCount", 2] }] },
+      "priority": 25
     },
     {
       "id": "panel-secondary-only-control",
       "kind": "panel",
       "title": "Secondary-antibody-only control",
       "why": "For indirect immunofluorescence (primary antibody + fluorophore-conjugated secondary), the secondary can bind nonspecifically or the sample can autofluoresce at the secondary's wavelength. Omitting the primary but keeping the secondary isolates that background from real signal.",
-      "when": { "all": [{ "exists": "naming.fields.markers" }, { "ne": ["naming.fields.markers", "NONE"] }] },
+      "when": { "all": [{ "eq": ["panel.derived.hasMarkersDeclared", true] }, { "eq": ["panel.derived.hasAntibody", true] }] },
       "priority": 30
     },
     {
@@ -30,8 +38,16 @@
       "kind": "panel",
       "title": "Isotype control",
       "why": "A primary antibody of the same host species and isotype but with no specificity for your target tests whether staining comes from genuine target binding or nonspecific antibody binding (e.g. Fc receptor binding).",
-      "when": { "all": [{ "exists": "naming.fields.markers" }, { "ne": ["naming.fields.markers", "NONE"] }] },
+      "when": { "all": [{ "eq": ["panel.derived.hasMarkersDeclared", true] }, { "eq": ["panel.derived.hasAntibody", true] }] },
       "priority": 40
+    },
+    {
+      "id": "panel-antibody-specificity-control",
+      "kind": "panel",
+      "title": "Biological specificity control",
+      "why": "An isotype control rules out nonspecific ANTIBODY binding, but not whether the primary itself is truly specific to your intended target. A blocking-peptide competition, a knockdown/knockout of the target, or a known-negative sample/tissue confirms the signal tracks the biology, not just the reagent.",
+      "when": { "all": [{ "eq": ["panel.derived.hasMarkersDeclared", true] }, { "eq": ["panel.derived.hasAntibody", true] }] },
+      "priority": 41
     },
     {
       "id": "viability-heat-killed-control",

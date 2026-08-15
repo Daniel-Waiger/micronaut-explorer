@@ -3,6 +3,7 @@
     "cerulean",
     "citrine",
     "clip",
+    "dir",
     "emerald",
     "halo",
     "snap",
@@ -10,6 +11,40 @@
     "venus"
   ],
   "markers": {
+    "7AAD": {
+      "aliases": [
+        "7 aad",
+        "7-aad",
+        "7-aminoactinomycin d",
+        "7aad"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "7 aad",
+        "7-aad",
+        "7-aminoactinomycin d",
+        "7aad"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ALEXA350": {
+      "aliases": [
+        "af350",
+        "alexa 350",
+        "alexa fluor 350",
+        "alexa350"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af350",
+        "alexa 350",
+        "alexa fluor 350",
+        "alexa350"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "ALEXA405": {
       "aliases": [
         "af405",
@@ -214,6 +249,23 @@
       "isFamily": false,
       "variants": []
     },
+    "ALEXA700": {
+      "aliases": [
+        "af700",
+        "alexa 700",
+        "alexa fluor 700",
+        "alexa700"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af700",
+        "alexa 700",
+        "alexa fluor 700",
+        "alexa700"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "ALEXA750": {
       "aliases": [
         "af750",
@@ -231,6 +283,38 @@
       "isFamily": false,
       "variants": []
     },
+    "ALEXA790": {
+      "aliases": [
+        "af790",
+        "alexa 790",
+        "alexa fluor 790",
+        "alexa790"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "af790",
+        "alexa 790",
+        "alexa fluor 790",
+        "alexa790"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ANNEXINV": {
+      "aliases": [
+        "annexin v",
+        "annexin-v",
+        "annexinv"
+      ],
+      "class": "moiety",
+      "freeTextAliases": [
+        "annexin v",
+        "annexin-v",
+        "annexinv"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "ARL": {
       "aliases": [
         "arl"
@@ -238,6 +322,19 @@
       "class": "dye",
       "freeTextAliases": [
         "arl"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO390": {
+      "aliases": [
+        "atto 390",
+        "atto390"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 390",
+        "atto390"
       ],
       "isFamily": false,
       "variants": []
@@ -251,6 +348,19 @@
       "freeTextAliases": [
         "atto 425",
         "atto425"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO465": {
+      "aliases": [
+        "atto 465",
+        "atto465"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 465",
+        "atto465"
       ],
       "isFamily": false,
       "variants": []
@@ -277,6 +387,19 @@
       "freeTextAliases": [
         "atto 520",
         "atto520"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO532": {
+      "aliases": [
+        "atto 532",
+        "atto532"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 532",
+        "atto532"
       ],
       "isFamily": false,
       "variants": []
@@ -316,6 +439,19 @@
       "freeTextAliases": [
         "atto 590",
         "atto590"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO594": {
+      "aliases": [
+        "atto 594",
+        "atto594"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 594",
+        "atto594"
       ],
       "isFamily": false,
       "variants": []
@@ -363,6 +499,19 @@
       "isFamily": false,
       "variants": []
     },
+    "ATTO680": {
+      "aliases": [
+        "atto 680",
+        "atto680"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 680",
+        "atto680"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "ATTO700": {
       "aliases": [
         "atto 700",
@@ -372,6 +521,32 @@
       "freeTextAliases": [
         "atto 700",
         "atto700"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO725": {
+      "aliases": [
+        "atto 725",
+        "atto725"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 725",
+        "atto725"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "ATTO740": {
+      "aliases": [
+        "atto 740",
+        "atto740"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "atto 740",
+        "atto740"
       ],
       "isFamily": false,
       "variants": []
@@ -389,14 +564,27 @@
     },
     "BODIPY": {
       "aliases": [
-        "bodipy"
+        "bodipy",
+        "bodipy 630",
+        "bodipy fl",
+        "bodipy tmr",
+        "bodipy tr"
       ],
       "class": "dye",
       "freeTextAliases": [
-        "bodipy"
+        "bodipy",
+        "bodipy 630",
+        "bodipy fl",
+        "bodipy tmr",
+        "bodipy tr"
       ],
       "isFamily": true,
-      "variants": []
+      "variants": [
+        "bodipy 630",
+        "bodipy fl",
+        "bodipy tmr",
+        "bodipy tr"
+      ]
     },
     "CALCEIN": {
       "aliases": [
@@ -413,15 +601,169 @@
       "isFamily": false,
       "variants": []
     },
+    "CALCIUMGREEN1": {
+      "aliases": [
+        "calcium green 1",
+        "calcium green-1",
+        "calciumgreen1"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "calcium green 1",
+        "calcium green-1",
+        "calciumgreen1"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CALCIUMORANGE": {
+      "aliases": [
+        "calcium orange",
+        "calciumorange"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "calcium orange",
+        "calciumorange"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CASCADEBLUE": {
+      "aliases": [
+        "cascade blue",
+        "cascadeblue"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cascade blue",
+        "cascadeblue"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "CELLMASK": {
       "aliases": [
         "cell mask",
-        "cellmask"
+        "cellmask",
+        "cellmask deep red",
+        "cellmask green",
+        "cellmask orange"
       ],
       "class": "dye",
       "freeTextAliases": [
         "cell mask",
-        "cellmask"
+        "cellmask",
+        "cellmask deep red",
+        "cellmask green",
+        "cellmask orange"
+      ],
+      "isFamily": true,
+      "variants": [
+        "cellmask deep red",
+        "cellmask green",
+        "cellmask orange"
+      ]
+    },
+    "CELLROXDEEPRED": {
+      "aliases": [
+        "cellrox deep red",
+        "cellrox deep red reagent",
+        "cellroxdeepred"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "cellrox deep red",
+        "cellrox deep red reagent",
+        "cellroxdeepred"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLROXGREEN": {
+      "aliases": [
+        "cellrox green",
+        "cellrox green reagent",
+        "cellroxgreen"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "cellrox green",
+        "cellrox green reagent",
+        "cellroxgreen"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLROXORANGE": {
+      "aliases": [
+        "cellrox orange",
+        "cellrox orange reagent",
+        "cellroxorange"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "cellrox orange",
+        "cellrox orange reagent",
+        "cellroxorange"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLTRACEVIOLET": {
+      "aliases": [
+        "celltrace violet",
+        "celltrace-violet"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "celltrace violet",
+        "celltrace-violet"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLTRACKERBLUE": {
+      "aliases": [
+        "celltracker blue",
+        "celltracker-blue",
+        "cmac"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "celltracker blue",
+        "celltracker-blue",
+        "cmac"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLTRACKERGREEN": {
+      "aliases": [
+        "celltracker green",
+        "celltracker-green",
+        "cmfda"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "celltracker green",
+        "celltracker-green",
+        "cmfda"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CELLTRACKERRED": {
+      "aliases": [
+        "celltracker red",
+        "celltracker-red",
+        "cmtpx"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "celltracker red",
+        "celltracker-red",
+        "cmtpx"
       ],
       "isFamily": false,
       "variants": []
@@ -435,6 +777,166 @@
       "isFamily": false,
       "variants": []
     },
+    "CF350": {
+      "aliases": [
+        "cf 350",
+        "cf350"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 350",
+        "cf350"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF405S": {
+      "aliases": [
+        "cf 405 s",
+        "cf 405s",
+        "cf405s"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 405 s",
+        "cf 405s",
+        "cf405s"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF488A": {
+      "aliases": [
+        "cf 488a",
+        "cf488",
+        "cf488a"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 488a",
+        "cf488",
+        "cf488a"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF514": {
+      "aliases": [
+        "cf 514",
+        "cf514"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 514",
+        "cf514"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF555": {
+      "aliases": [
+        "cf 555",
+        "cf555"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 555",
+        "cf555"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF568": {
+      "aliases": [
+        "cf 568",
+        "cf568"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 568",
+        "cf568"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF594": {
+      "aliases": [
+        "cf 594",
+        "cf594"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 594",
+        "cf594"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF633": {
+      "aliases": [
+        "cf 633",
+        "cf633"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 633",
+        "cf633"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF647": {
+      "aliases": [
+        "cf 647",
+        "cf647"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 647",
+        "cf647"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF680": {
+      "aliases": [
+        "cf 680",
+        "cf680"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 680",
+        "cf680"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF750": {
+      "aliases": [
+        "cf 750",
+        "cf750"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 750",
+        "cf750"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CF790": {
+      "aliases": [
+        "cf 790",
+        "cf790"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cf 790",
+        "cf790"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "CFP": {
       "aliases": [
         "cfp"
@@ -442,6 +944,17 @@
       "class": "protein",
       "freeTextAliases": [
         "cfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "CFSE": {
+      "aliases": [
+        "cfse"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cfse"
       ],
       "isFamily": false,
       "variants": []
@@ -534,6 +1047,87 @@
       "isFamily": false,
       "variants": []
     },
+    "DCFDA": {
+      "aliases": [
+        "cm-h2dcfda",
+        "dcf",
+        "dcf-da",
+        "dcfda",
+        "h2dcfda"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "cm-h2dcfda",
+        "dcf",
+        "dcf-da",
+        "dcfda",
+        "h2dcfda"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DHE": {
+      "aliases": [
+        "dhe",
+        "dihydroethidium"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "dhe",
+        "dihydroethidium"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DID": {
+      "aliases": [
+        "did"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "did"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DII": {
+      "aliases": [
+        "dii"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dii"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DIO": {
+      "aliases": [
+        "dio"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dio"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DIR": {
+      "aliases": [
+        "di-r",
+        "diic18 7",
+        "diic18(7)",
+        "dir"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "di-r",
+        "diic18 7",
+        "diic18(7)"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "DRAQ5": {
       "aliases": [
         "draq 5",
@@ -543,6 +1137,19 @@
       "freeTextAliases": [
         "draq 5",
         "draq5"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DYLIGHT405": {
+      "aliases": [
+        "dylight 405",
+        "dylight405"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dylight 405",
+        "dylight405"
       ],
       "isFamily": false,
       "variants": []
@@ -573,6 +1180,19 @@
       "isFamily": false,
       "variants": []
     },
+    "DYLIGHT594": {
+      "aliases": [
+        "dylight 594",
+        "dylight594"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dylight 594",
+        "dylight594"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "DYLIGHT650": {
       "aliases": [
         "dylight 650",
@@ -586,17 +1206,87 @@
       "isFamily": false,
       "variants": []
     },
+    "DYLIGHT680": {
+      "aliases": [
+        "dylight 680",
+        "dylight680"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dylight 680",
+        "dylight680"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DYLIGHT755": {
+      "aliases": [
+        "dylight 755",
+        "dylight755"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dylight 755",
+        "dylight755"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "DYLIGHT800": {
+      "aliases": [
+        "dylight 800",
+        "dylight800"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "dylight 800",
+        "dylight800"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "ERTRACKER": {
       "aliases": [
         "er tracker",
         "er-tracker",
+        "er-tracker blue-white dpx",
+        "er-tracker green",
+        "er-tracker red",
         "ertracker"
       ],
       "class": "dye",
       "freeTextAliases": [
         "er tracker",
         "er-tracker",
+        "er-tracker blue-white dpx",
+        "er-tracker green",
+        "er-tracker red",
         "ertracker"
+      ],
+      "isFamily": true,
+      "variants": [
+        "er-tracker blue-white dpx",
+        "er-tracker green",
+        "er-tracker red"
+      ]
+    },
+    "ETHIDIUMHOMODIMER1": {
+      "aliases": [
+        "ethd 1",
+        "ethd-1",
+        "ethd1",
+        "ethidium homodimer 1",
+        "ethidium homodimer-1",
+        "ethidiumhomodimer1"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "ethd 1",
+        "ethd-1",
+        "ethd1",
+        "ethidium homodimer 1",
+        "ethidium homodimer-1",
+        "ethidiumhomodimer1"
       ],
       "isFamily": false,
       "variants": []
@@ -608,6 +1298,21 @@
       "class": "dye",
       "freeTextAliases": [
         "fitc"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "FLUO3": {
+      "aliases": [
+        "fluo 3",
+        "fluo-3",
+        "fluo3"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "fluo 3",
+        "fluo-3",
+        "fluo3"
       ],
       "isFamily": false,
       "variants": []
@@ -627,6 +1332,40 @@
       "isFamily": false,
       "variants": []
     },
+    "FM143": {
+      "aliases": [
+        "fm 1 43",
+        "fm 1-43",
+        "fm1-43",
+        "fm143"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "fm 1 43",
+        "fm 1-43",
+        "fm1-43",
+        "fm143"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "FM464": {
+      "aliases": [
+        "fm 4 64",
+        "fm 4-64",
+        "fm4-64",
+        "fm464"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "fm 4 64",
+        "fm 4-64",
+        "fm4-64",
+        "fm464"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "FURA2": {
       "aliases": [
         "fura 2",
@@ -638,6 +1377,21 @@
         "fura 2",
         "fura-2",
         "fura2"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "FUSIONRED": {
+      "aliases": [
+        "fusion red",
+        "fusion-red",
+        "fusionred"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "fusion red",
+        "fusion-red",
+        "fusionred"
       ],
       "isFamily": false,
       "variants": []
@@ -731,6 +1485,36 @@
       "isFamily": false,
       "variants": []
     },
+    "IRDYE680RD": {
+      "aliases": [
+        "ir dye 680rd",
+        "irdye 680rd",
+        "irdye680rd"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "ir dye 680rd",
+        "irdye 680rd",
+        "irdye680rd"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "IRDYE800CW": {
+      "aliases": [
+        "ir dye 800cw",
+        "irdye 800cw",
+        "irdye800cw"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "ir dye 800cw",
+        "irdye 800cw",
+        "irdye800cw"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "IRFP": {
       "aliases": [
         "irfp"
@@ -738,6 +1522,36 @@
       "class": "protein",
       "freeTextAliases": [
         "irfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "IRFP670": {
+      "aliases": [
+        "i-rfp670",
+        "irfp 670",
+        "irfp670"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "i-rfp670",
+        "irfp 670",
+        "irfp670"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "IRFP713": {
+      "aliases": [
+        "i-rfp713",
+        "irfp 713",
+        "irfp713"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "i-rfp713",
+        "irfp 713",
+        "irfp713"
       ],
       "isFamily": false,
       "variants": []
@@ -772,25 +1586,155 @@
       "isFamily": false,
       "variants": []
     },
+    "LIPIDTOXDEEPRED": {
+      "aliases": [
+        "hcs lipidtox deep red",
+        "hcs lipidtox deep red neutral lipid stain",
+        "lipidtox deep red"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "hcs lipidtox deep red",
+        "hcs lipidtox deep red neutral lipid stain",
+        "lipidtox deep red"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "LIPIDTOXGREEN": {
+      "aliases": [
+        "hcs lipidtox green",
+        "hcs lipidtox green neutral lipid stain",
+        "lipidtox green"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "hcs lipidtox green",
+        "hcs lipidtox green neutral lipid stain",
+        "lipidtox green"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "LIPIDTOXRED": {
+      "aliases": [
+        "hcs lipidtox red",
+        "hcs lipidtox red neutral lipid stain",
+        "lipidtox red"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "hcs lipidtox red",
+        "hcs lipidtox red neutral lipid stain",
+        "lipidtox red"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "LIVEDEAD": {
+      "aliases": [
+        "live dead",
+        "live-dead",
+        "live-dead aqua",
+        "live-dead near ir",
+        "live-dead yellow",
+        "livedead",
+        "livedead aqua",
+        "livedead blue",
+        "livedead far red",
+        "livedead green",
+        "livedead near ir",
+        "livedead red",
+        "livedead violet",
+        "livedead yellow"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "live dead",
+        "live-dead",
+        "live-dead aqua",
+        "live-dead near ir",
+        "live-dead yellow",
+        "livedead",
+        "livedead aqua",
+        "livedead blue",
+        "livedead far red",
+        "livedead green",
+        "livedead near ir",
+        "livedead red",
+        "livedead violet",
+        "livedead yellow"
+      ],
+      "isFamily": true,
+      "variants": [
+        "livedead aqua",
+        "livedead blue",
+        "livedead far red",
+        "livedead green",
+        "livedead near ir",
+        "livedead red",
+        "livedead violet",
+        "livedead yellow"
+      ]
+    },
     "LYSOTRACKER": {
       "aliases": [
         "lyso tracker",
         "lysotracker",
+        "lysotracker blue",
+        "lysotracker deep red",
         "lysotracker green",
-        "lysotracker red"
+        "lysotracker red",
+        "lysotracker yellow"
       ],
-      "class": "dye",
+      "class": "stain",
       "freeTextAliases": [
         "lyso tracker",
         "lysotracker",
+        "lysotracker blue",
+        "lysotracker deep red",
         "lysotracker green",
-        "lysotracker red"
+        "lysotracker red",
+        "lysotracker yellow"
       ],
       "isFamily": true,
       "variants": [
+        "lysotracker blue",
+        "lysotracker deep red",
         "lysotracker green",
-        "lysotracker red"
+        "lysotracker red",
+        "lysotracker yellow"
       ]
+    },
+    "MAPPLE": {
+      "aliases": [
+        "m apple",
+        "m-apple",
+        "mapple"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m apple",
+        "m-apple",
+        "mapple"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MCERULEAN3": {
+      "aliases": [
+        "m cerulean3",
+        "m-cerulean3",
+        "mcerulean3"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m cerulean3",
+        "m-cerulean3",
+        "mcerulean3"
+      ],
+      "isFamily": false,
+      "variants": []
     },
     "MCHERRY": {
       "aliases": [
@@ -799,6 +1743,21 @@
       "class": "protein",
       "freeTextAliases": [
         "mcherry"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MCLOVER3": {
+      "aliases": [
+        "m clover3",
+        "m-clover3",
+        "mclover3"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m clover3",
+        "m-clover3",
+        "mclover3"
       ],
       "isFamily": false,
       "variants": []
@@ -815,6 +1774,21 @@
       "isFamily": false,
       "variants": []
     },
+    "MGREENLANTERN": {
+      "aliases": [
+        "m greenlantern",
+        "m-greenlantern",
+        "mgreenlantern"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m greenlantern",
+        "m-greenlantern",
+        "mgreenlantern"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "MIRFP": {
       "aliases": [
         "mirfp"
@@ -822,6 +1796,49 @@
       "class": "protein",
       "freeTextAliases": [
         "mirfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MIRFP680": {
+      "aliases": [
+        "mi-rfp680",
+        "mirfp 680",
+        "mirfp680"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mi-rfp680",
+        "mirfp 680",
+        "mirfp680"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MIRFP720": {
+      "aliases": [
+        "mi-rfp720",
+        "mirfp 720",
+        "mirfp720"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mi-rfp720",
+        "mirfp 720",
+        "mirfp720"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MITOSOXGREEN": {
+      "aliases": [
+        "mitosox green",
+        "mitosoxgreen"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "mitosox green",
+        "mitosoxgreen"
       ],
       "isFamily": false,
       "variants": []
@@ -852,6 +1869,21 @@
         "mitotracker red"
       ]
     },
+    "MKATE2": {
+      "aliases": [
+        "m-kate2",
+        "mkate 2",
+        "mkate2"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m-kate2",
+        "mkate 2",
+        "mkate2"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "MNEONGREEN": {
       "aliases": [
         "mneongreen",
@@ -861,6 +1893,21 @@
       "freeTextAliases": [
         "mneongreen",
         "neongreen"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MORANGE2": {
+      "aliases": [
+        "m orange2",
+        "m-orange2",
+        "morange2"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m orange2",
+        "m-orange2",
+        "morange2"
       ],
       "isFamily": false,
       "variants": []
@@ -876,6 +1923,21 @@
       "isFamily": false,
       "variants": []
     },
+    "MRUBY3": {
+      "aliases": [
+        "m ruby3",
+        "m-ruby3",
+        "mruby3"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m ruby3",
+        "m-ruby3",
+        "mruby3"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "MSCARLET": {
       "aliases": [
         "mscarlet"
@@ -883,6 +1945,36 @@
       "class": "protein",
       "freeTextAliases": [
         "mscarlet"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MSCARLET3": {
+      "aliases": [
+        "m-scarlet3",
+        "mscarlet 3",
+        "mscarlet3"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m-scarlet3",
+        "mscarlet 3",
+        "mscarlet3"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "MSCARLETI": {
+      "aliases": [
+        "mscarlet i",
+        "mscarlet-i",
+        "mscarleti"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "mscarlet i",
+        "mscarlet-i",
+        "mscarleti"
       ],
       "isFamily": false,
       "variants": []
@@ -898,6 +1990,77 @@
       "isFamily": false,
       "variants": []
     },
+    "MTURQUOISE2": {
+      "aliases": [
+        "m turquoise2",
+        "m-turquoise2",
+        "mturquoise2"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m turquoise2",
+        "m-turquoise2",
+        "mturquoise2"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "NILERED": {
+      "aliases": [
+        "nile red",
+        "nilered"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "nile red",
+        "nilered"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "OREGONGREEN488": {
+      "aliases": [
+        "oregon green 488",
+        "oregon green488",
+        "oregongreen 488",
+        "oregongreen488"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "oregon green 488",
+        "oregon green488",
+        "oregongreen 488",
+        "oregongreen488"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "PACIFICBLUE": {
+      "aliases": [
+        "pacific blue",
+        "pacificblue"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "pacific blue",
+        "pacificblue"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "PACIFICORANGE": {
+      "aliases": [
+        "pacific orange",
+        "pacificorange"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "pacific orange",
+        "pacificorange"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "PHALLOIDIN": {
       "aliases": [
         "phalloidin"
@@ -905,6 +2068,32 @@
       "class": "moiety",
       "freeTextAliases": [
         "phalloidin"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "PHRODOGREEN": {
+      "aliases": [
+        "phrodo green",
+        "phrodogreen"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "phrodo green",
+        "phrodogreen"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "PHRODORED": {
+      "aliases": [
+        "phrodo red",
+        "phrodored"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "phrodo red",
+        "phrodored"
       ],
       "isFamily": false,
       "variants": []
@@ -933,6 +2122,38 @@
       "isFamily": false,
       "variants": []
     },
+    "RHOD2": {
+      "aliases": [
+        "rhod 2",
+        "rhod-2",
+        "rhod2"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "rhod 2",
+        "rhod-2",
+        "rhod2"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "RHODAMINE123": {
+      "aliases": [
+        "rho 123",
+        "rho123",
+        "rhodamine 123",
+        "rhodamine123"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "rho 123",
+        "rho123",
+        "rhodamine 123",
+        "rhodamine123"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "SIRACTIN": {
       "aliases": [
         "sir actin",
@@ -944,6 +2165,21 @@
         "sir actin",
         "sir-actin",
         "siractin"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "SIRDNA": {
+      "aliases": [
+        "sir dna",
+        "sir-dna",
+        "sirdna"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "sir dna",
+        "sir-dna",
+        "sirdna"
       ],
       "isFamily": false,
       "variants": []
@@ -983,7 +2219,7 @@
       "aliases": [
         "sox"
       ],
-      "class": "dye",
+      "class": "target",
       "freeTextAliases": [
         "sox"
       ],
@@ -994,12 +2230,71 @@
       "aliases": [
         "sox2"
       ],
-      "class": "dye",
+      "class": "target",
       "freeTextAliases": [
         "sox2"
       ],
       "isFamily": false,
       "variants": []
+    },
+    "SUPERFOLDERGFP": {
+      "aliases": [
+        "sf gfp",
+        "sfgfp",
+        "superfolder gfp",
+        "superfoldergfp"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "sf gfp",
+        "sfgfp",
+        "superfolder gfp",
+        "superfoldergfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "SYTO": {
+      "aliases": [
+        "syto",
+        "syto 40",
+        "syto 41",
+        "syto 42",
+        "syto 45",
+        "syto rnaselect",
+        "syto13",
+        "syto60",
+        "syto82",
+        "syto85",
+        "syto9"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "syto",
+        "syto 40",
+        "syto 41",
+        "syto 42",
+        "syto 45",
+        "syto rnaselect",
+        "syto13",
+        "syto60",
+        "syto82",
+        "syto85",
+        "syto9"
+      ],
+      "isFamily": true,
+      "variants": [
+        "syto 40",
+        "syto 41",
+        "syto 42",
+        "syto 45",
+        "syto rnaselect",
+        "syto13",
+        "syto60",
+        "syto82",
+        "syto85",
+        "syto9"
+      ]
     },
     "SYTOX": {
       "aliases": [
@@ -1024,6 +2319,23 @@
         "sytox orange",
         "sytox red"
       ]
+    },
+    "TAGBFP2": {
+      "aliases": [
+        "m-tagbfp2",
+        "mtagbfp2",
+        "tag bfp2",
+        "tagbfp2"
+      ],
+      "class": "protein",
+      "freeTextAliases": [
+        "m-tagbfp2",
+        "mtagbfp2",
+        "tag bfp2",
+        "tagbfp2"
+      ],
+      "isFamily": false,
+      "variants": []
     },
     "TDTOMATO": {
       "aliases": [
@@ -1050,6 +2362,79 @@
         "texas red",
         "texas-red",
         "texasred"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TMRE": {
+      "aliases": [
+        "tmre"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "tmre"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TMRM": {
+      "aliases": [
+        "tmrm"
+      ],
+      "class": "dye",
+      "freeTextAliases": [
+        "tmrm"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TOPRO1": {
+      "aliases": [
+        "to pro 1",
+        "to-pro-1",
+        "topro 1",
+        "topro1"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "to pro 1",
+        "to-pro-1",
+        "topro 1",
+        "topro1"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TOPRO3": {
+      "aliases": [
+        "to pro 3",
+        "to-pro-3",
+        "topro 3",
+        "topro3"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "to pro 3",
+        "to-pro-3",
+        "topro 3",
+        "topro3"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "TOPRO5": {
+      "aliases": [
+        "to pro 5",
+        "to-pro-5",
+        "topro 5",
+        "topro5"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "to pro 5",
+        "to-pro-5",
+        "topro 5",
+        "topro5"
       ],
       "isFamily": false,
       "variants": []
@@ -1085,6 +2470,21 @@
       "isFamily": false,
       "variants": []
     },
+    "XRHOD1": {
+      "aliases": [
+        "x rhod 1",
+        "x-rhod-1",
+        "xrhod1"
+      ],
+      "class": "indicator",
+      "freeTextAliases": [
+        "x rhod 1",
+        "x-rhod-1",
+        "xrhod1"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
     "YFP": {
       "aliases": [
         "yfp"
@@ -1092,6 +2492,40 @@
       "class": "protein",
       "freeTextAliases": [
         "yfp"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "YOPRO1": {
+      "aliases": [
+        "yo pro 1",
+        "yo-pro-1",
+        "yopro 1",
+        "yopro1"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "yo pro 1",
+        "yo-pro-1",
+        "yopro 1",
+        "yopro1"
+      ],
+      "isFamily": false,
+      "variants": []
+    },
+    "YOPRO3": {
+      "aliases": [
+        "yo pro 3",
+        "yo-pro-3",
+        "yopro 3",
+        "yopro3"
+      ],
+      "class": "stain",
+      "freeTextAliases": [
+        "yo pro 3",
+        "yo-pro-3",
+        "yopro 3",
+        "yopro3"
       ],
       "isFamily": false,
       "variants": []

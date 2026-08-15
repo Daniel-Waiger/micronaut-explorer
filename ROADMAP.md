@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-08-02
+Last updated: 2026-08-12
 
 Near-term worklist: [TASKS.md](TASKS.md). This file is the high-level direction.
 
@@ -47,18 +47,47 @@ ideas that were on its backlog, all now deferred.
   CSV manifest (assay, group, factors, replicates, filename) and a full-fidelity JSON dump
   of the same study document. See
   [docs/plans/planner-web-exports.md](docs/plans/planner-web-exports.md).
+- **Alpha-pilot-readiness (Wave 0 — review fixes):** an xhigh code review of the four
+  commits above found 15 issues, several confirmed by running the real committed KB
+  through the app's own code. Fixed: the Color panel's family-variant dedupe,
+  hyphenated-alias tokenizing, and "no markers declared" sentinel handling; the controls
+  engine's isotype/secondary-antibody-control rules firing on every panel regardless of
+  whether an antibody was involved (a NEW `panel.derived.hasAntibody` fact, computed from
+  a NEW `target` marker class distinct from `moiety`, fixes this) plus a new FMO control
+  rule; the deploy workflow's own build pipeline was previously untested and unverified
+  before publishing; `web/kb/markers.json`/`spectra.json` gained the default study's own
+  missing markers (`SYTO9`, `DCF`) plus a ~20-entry common-dye sweep.
+- **Alpha-pilot-readiness (Wave 1 — feedback path):** a "Copy feedback report" header
+  button (build-independent: step, browser, KB health, full study as text) plus a GitHub
+  issues link; a Google Form / non-GitHub-email link is wired but left for Daniel to fill
+  in (`FEEDBACK_FORM_URL`/`FEEDBACK_EMAIL` in `ui/shell.js`).
+- **Alpha-pilot-readiness (Wave 2 — the rest of the roadmap, minus the LLM seam):**
+  - **Structured panel assembly:** the long-reserved `panel.channels` is now a real editor
+    (target, fluorophore, conjugation mode) — more precise than the free-text markers
+    field, and what lets the controls engine know with certainty whether an antibody is
+    involved. `engine/studydoc.js` prefers it over the free-text field once any channel
+    exists.
+  - **Bench card export:** a compact, print-oriented single-assay Markdown summary
+    (channels, controls with reasons, two worked filenames), one per assay, on Overview.
+  - **Conformance check:** one pass/fail verdict for the whole study, composed from every
+    validator the app already runs per-step (design issues, naming-field patterns, path
+    length, spillover flags, cross-assay collisions) — surfaced on Overview.
+  - **"Export for your own LLM":** a copy-paste prompt (ground rules + the study as JSON +
+    suggested questions) for whatever model the user already has open. The safer,
+    zero-infrastructure stand-in for the in-app LLM seam below — this app never calls a
+    model or holds a key.
+
+  Full per-wave detail in TASKS.md's "Recently shipped."
 
 Scope decisions and the use-case map behind the above:
 [docs/plans/planner-web-mvp-usecases.md](docs/plans/planner-web-mvp-usecases.md).
 
 ### Next
-- **Bench card** export (a compact, print-oriented single-assay summary — deliberately
-  deferred from the CSV/JSON exports above; needs real UX/content design, not yet
-  specified), the **LLM seam** (manual-paste provider first, then opt-in Ollama +
-  diagnostics), and a **conformance check**.
-- Fuller **panel assembly** (`panel.targets`/`panel.channels`, direct/indirect conjugation
-  structure) — deliberately out of scope for the color panel above, which reads the
-  existing free-text markers field instead. Still reserved, zero consumers.
+- The **LLM seam** (in-app providers: manual-paste, then opt-in local Ollama +
+  diagnostics) — the only item left from the original roadmap, explicitly deferred until
+  after the alpha pilot. See docs/plans (or ask Daniel) for the connection options if
+  "how would this even work without an API key" comes up — local Ollama needs no key,
+  since `http://localhost` is a secure origin browsers already trust.
 
 **⚠ Parked review — `web/kb/spectra.json` content.** Every fluorophore's excitation/
 emission peak values are Claude-drafted from common published references (same "Claude
@@ -66,7 +95,9 @@ drafts, Daniel corrects" arrangement as `advisor.json`), not yet verified agains
 actual reference sources or filter sets. The two overlap thresholds
 (`emissionProximityNm`/`excitationProximityNm`) are likewise a judgment call pending
 review once `K-3` (instruments/objectives/lines/detectors) exists. Flagged in-app too (a
-persistent banner on the Color panel step).
+persistent banner on the Color panel step). The pack grew substantially in Wave 0 (a
+~20-entry common-dye sweep, several new fluorophore families) — still entirely unreviewed
+and now a higher-priority review target given the added surface.
 
 ### Content — owned by Daniel, not code
 Authored in the knowledge pack (`web/kb/`): fluorophore identities and spectra,

@@ -72,6 +72,24 @@ export function tagSlot(experiment, path, tag, detail = null) {
 }
 
 /**
+ * Flag the slot at `path` as awaiting confirmation, WITHOUT changing its
+ * tag. The exact inverse of promoteOnUserEdit's `needsReview: false`, and
+ * the reason both live here: `needsReview` is a sibling of `tag` on the slot
+ * (not part of tagSlot's `detail`), so a caller setting it by hand would be
+ * reaching into a shape only this module should know.
+ *
+ * Used by core/draft.js for every slot in a model-drafted study: the value
+ * is real and PROVISIONAL-tagged, and it must additionally be visible as
+ * unconfirmed until a user says otherwise.
+ */
+export function markNeedsReview(experiment, path) {
+  const slot = experiment.provenance?.slots?.[path];
+  if (!slot) return experiment;
+  slot.needsReview = true;
+  return experiment;
+}
+
+/**
  * Retag the slot at `path` as `user_edited` and clear `needsReview`.
  *
  * Load-bearing: repo lesson E8 proves that without a retag on user edit, a

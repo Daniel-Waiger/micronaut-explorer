@@ -397,6 +397,287 @@ button:focus-visible {
   opacity: 0.7;
 }
 
+/* Guidance panel (local-llm-guidance): opt-in "ask about this step".
+   Deliberately its own visual vocabulary, one notch quieter than
+   .advice-section -- this is a tool the user reaches for, not something
+   that pushes itself in front of them the way advisor notes do. */
+.guidance-section {
+  margin-bottom: 20px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.guidance-heading {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+.guidance-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.guidance-settings {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.guidance-endpoint,
+.guidance-model,
+.guidance-question {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.guidance-question {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.guidance-ask,
+.guidance-copy {
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
+.guidance-ask:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.guidance-reply {
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.guidance-paste-label {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.guidance-paste-box {
+  width: 100%;
+  min-height: 140px;
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.draft-button {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 14px;
+  margin-left: 8px;
+  cursor: pointer;
+}
+
+.draft-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Phase 1 (chat-LLM round trip): same card idiom as .guidance-section, kept
+   as its own block rather than merged with it -- this is always visible
+   (unlike guidance-section's Ollama settings), and a shared class would
+   couple their visibility by accident. */
+.chatllm-section {
+  margin: 12px 0 20px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.chatllm-heading {
+  font-size: 12.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+.chatllm-hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.chatllm-scope,
+.chatllm-copy,
+.chatllm-target,
+.chatllm-read-reply {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.chatllm-copy,
+.chatllm-target,
+.chatllm-read-reply {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  padding: 6px 14px;
+  margin-right: 8px;
+}
+
+.chatllm-prompt-box,
+.chatllm-reply-box {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  margin-top: 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.chatllm-linkout-label {
+  display: block;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* Deliberately NOT .issue-warning/var(--warn) -- see the .advice-section
+   comment above: --warn/--danger stay reserved for validation output, so a
+   privacy notice is never mistakable for "something is wrong with your
+   data" just because it's the same amber. This is a consequence a user
+   should notice, same category as .advice-pitfall, so it borrows THAT
+   vocabulary (an accent left-border) instead of inventing a third one. */
+.chatllm-linkout-warning {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  background: var(--panel-2);
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.chatllm-linkout-row {
+  margin-top: 8px;
+}
+
+.chatllm-reply-label {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.chatllm-repairs,
+.chatllm-issues,
+.chatllm-asks {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.chatllm-repairs p {
+  margin: 0;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Rows in .chatllm-issues carry .issue/.issue-error from ui/steps/
+   describe.js -- this IS validation output (a dropped proposal, a paste
+   that failed to parse), the exact category .issue-error already names, so
+   it reuses that vocabulary rather than a fourth "amber-ish" style. */
+
+.chatllm-asks p {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 3px solid var(--line);
+  color: var(--ink);
+}
+
+/* Which tier proposed a row. The deterministic scan matched literal text the
+   user wrote; the model inferred from it. Same list, different warrant, so
+   they must not read alike. */
+.proposal-source {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.proposal-source-llm {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Accept is a STRONG write and can replace an existing value, so what would
+   be lost is stated before the click, not discovered after it. */
+.proposal-replaces {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--warn);
+}
+
+/* The one thing separating a model's guess from an answer the user gave --
+   the control itself is pre-filled in both cases. */
+.question-provisional {
+  font-size: 12px;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
 .issues-list {
   list-style: none;
   margin: 0;
@@ -456,6 +737,7 @@ button:focus-visible {
   flex-wrap: wrap;
   background: var(--panel);
   border: 1px solid var(--line);
+  border-left: 3px solid var(--line);
   border-radius: 8px;
   padding: 10px 14px;
 }
@@ -466,6 +748,48 @@ button:focus-visible {
   text-transform: uppercase;
   color: var(--muted);
   flex: 0 0 auto;
+}
+
+/* Per-state accents (Decision 5's five states, never-silent): the state
+   label and the row's left border both carry the color, so a panel with a
+   mix of states is scannable at a glance without reading every sentence --
+   'known' reads as resolved, 'unrecognized' and 'ambiguous-family' read as
+   needing the user's attention, 'spectrum-unavailable' reads as a content
+   gap (not the user's fault), 'no-intrinsic-spectrum' reads as neutral
+   information rather than a problem. */
+.panel-row-known {
+  border-left-color: var(--ok);
+}
+.panel-row-known .panel-state {
+  color: var(--ok);
+}
+
+.panel-row-unrecognized {
+  border-left-color: var(--danger);
+}
+.panel-row-unrecognized .panel-state {
+  color: var(--danger);
+}
+
+.panel-row-ambiguous-family {
+  border-left-color: var(--warn);
+}
+.panel-row-ambiguous-family .panel-state {
+  color: var(--warn);
+}
+
+.panel-row-spectrum-unavailable {
+  border-left-color: var(--warn);
+}
+.panel-row-spectrum-unavailable .panel-state {
+  color: var(--warn);
+}
+
+.panel-row-no-intrinsic-spectrum {
+  border-left-color: var(--accent);
+}
+.panel-row-no-intrinsic-spectrum .panel-state {
+  color: var(--accent);
 }
 
 .panel-row-text {
@@ -728,7 +1052,8 @@ button:focus-visible {
   .assay-switcher-bar,
   .shell-nav,
   .shell-status,
-  .overview-actions {
+  .overview-actions,
+  .overview-assay-benchcard-btn {
     display: none;
   }
 
@@ -1025,10 +1350,49 @@ button:focus-visible {
   background: var(--panel);
 }
 
+/* The conformance gate (engine/conformance.js, surfaced on Overview): one
+   pass/fail verdict above the per-assay tree. */
+.conformance {
+  margin: 4px 0 20px;
+}
+
+.conformance-verdict {
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+}
+
+.conformance-pass {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.conformance-fail {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.overview-assay-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
 .overview-assay-title {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 8px;
+}
+
+.overview-assay-benchcard-btn {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 .overview-node {

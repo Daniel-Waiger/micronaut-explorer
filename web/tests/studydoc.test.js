@@ -7,50 +7,12 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { buildStudyDocument } from '../src/engine/studydoc.js';
 import { renderMarkdown } from '../src/engine/render/markdown.js';
 import { renderMermaid } from '../src/engine/render/mermaid.js';
-import { shapeAppKb } from '../src/engine/kbpack.js';
 import { emptyExperiment } from '../src/core/schema.js';
 import { createDefaultStudy } from '../src/core/defaultStudy.js';
-
-// Duplicated as local literals rather than imported, like advisor.test.js's
-// REAL_NAMING_TEMPLATE -- ui/steps/naming.js touches `document` and must
-// stay importable without a DOM.
-const NAMING_CONFIG = {
-  template: '{date}_{modality}_{exptype}_{markers}_{magnification}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}',
-  defaults: {
-    date: '1970-01-01',
-    modality: 'UNKNOWN',
-    exptype: 'UNKNOWN',
-    markers: 'UNKNOWN',
-    magnification: 'UNKNOWN',
-    sample: 'UNKNOWN',
-  },
-  optionalFields: ['group', 'biorep', 'techrep', 'notes'],
-  uppercaseFields: ['modality', 'exptype', 'sample', 'magnification', 'markers', 'group'],
-  safeCharPattern: '[^A-Za-z0-9_-]+',
-};
-const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
-
-const here = path.dirname(fileURLToPath(import.meta.url));
-function readKbJson(stem) {
-  return JSON.parse(readFileSync(path.join(here, '..', 'kb', `${stem}.json`), 'utf-8'));
-}
-
-function realKb() {
-  return shapeAppKb({
-    markers: readKbJson('markers'),
-    questions: readKbJson('questions'),
-    advisor: readKbJson('advisor'),
-    readouts: readKbJson('readouts'),
-    controls: readKbJson('controls'),
-    stages: readKbJson('stages'),
-  });
-}
+import { NAMING_CONFIG, BASE_TEMPLATE, readKbJson, realKb } from './fixtures.js';
 
 // --- Determinism ---------------------------------------------------------
 
@@ -131,6 +93,124 @@ test('every planned-filename entry carries its condition row (group/factorLevels
       assert.ok('group' in entry.row && 'factorLevels' in entry.row && 'bioRep' in entry.row && 'techRep' in entry.row);
     }
   }
+});
+
+test('panelRows falls back to the free-text markers field (same tokens as the Color panel step) when panel.channels is empty', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const viability = doc.assays.find((a) => a.label === 'Bacterial viability');
+  const fluorophores = viability.panelRows.map((r) => r.fluorophore);
+  assert.deepEqual(fluorophores, ['SYTO9', 'PROPIDIUM IODIDE']);
+  assert.ok(viability.panelRows.every((r) => r.state === 'known'));
+  assert.ok(viability.panelRows.every((r) => typeof r.excitationPeakNm === 'number'));
+});
+
+test('panelRows reads from structured channels (target + resolved spectral field) once at least one channel exists', () => {
+  const study = createDefaultStudy();
+  const viabilityAssay = study.assays.find((a) => a.label === 'Bacterial viability');
+  viabilityAssay.panel = {
+    targets: [],
+    channels: [{ id: 'ch1', target: 'Nucleic acid', fluorophore: 'DAPI', conjugation: 'direct-probe', conjugateDye: '' }],
+  };
+  const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const viability = doc.assays.find((a) => a.label === 'Bacterial viability');
+  assert.deepEqual(viability.panelRows, [
+    { target: 'Nucleic acid', fluorophore: 'DAPI', conjugation: 'direct-probe', state: 'known', excitationPeakNm: 358, emissionPeakNm: 461 },
+  ]);
+});
+
+test('a mixed expanded panel reaches panelRows with identities and peaks from the real spectra pack', () => {
+  const study = createDefaultStudy();
+  const assay = study.assays[0];
+  const fluorophores = ['mScarlet-I', 'IRDye 800CW', 'CellROX Deep Red', 'LysoTracker Deep Red'];
+  assay.panel = {
+    targets: [],
+    channels: fluorophores.map((fluorophore, index) => ({
+      id: `expanded-${index + 1}`,
+      target: `Target ${index + 1}`,
+      fluorophore,
+      conjugation: 'direct-probe',
+      conjugateDye: '',
+    })),
+  };
+
+  const kb = realKb();
+  const rawSpectra = readKbJson('spectra').fluorophores;
+  const expectedByName = {
+    'mScarlet-I': rawSpectra.MSCARLETI,
+    'IRDye 800CW': rawSpectra.IRDYE800CW,
+    'CellROX Deep Red': rawSpectra.CELLROXDEEPRED,
+    'LysoTracker Deep Red': rawSpectra.LYSOTRACKER.variants['lysotracker deep red'],
+  };
+  const rows = buildStudyDocument(study, kb, NAMING_CONFIG, BASE_TEMPLATE).assays[0].panelRows;
+
+  assert.equal(rows.length, fluorophores.length);
+  for (const row of rows) {
+    const expected = expectedByName[row.fluorophore];
+    assert.ok(expected, `unexpected panel row '${row.fluorophore}'`);
+    assert.equal(row.state, 'known', row.fluorophore);
+    assert.equal(row.excitationPeakNm, expected.excitationPeakNm, `${row.fluorophore} excitation`);
+    assert.equal(row.emissionPeakNm, expected.emissionPeakNm, `${row.fluorophore} emission`);
+  }
+
+  // Perturb the shaped runtime pack in memory and require the document to
+  // follow it. This fails if buildStudyDocument ever copies these familiar
+  // values into consumer code instead of resolving the supplied KB.
+  kb.spectra.MSCARLETI.excitationPeakNm = rawSpectra.MSCARLETI.excitationPeakNm + 1;
+  kb.spectra.MSCARLETI.emissionPeakNm = rawSpectra.MSCARLETI.emissionPeakNm + 1;
+  const changedRow = buildStudyDocument(study, kb, NAMING_CONFIG, BASE_TEMPLATE).assays[0].panelRows[0];
+  assert.equal(changedRow.excitationPeakNm, rawSpectra.MSCARLETI.excitationPeakNm + 1);
+  assert.equal(changedRow.emissionPeakNm, rawSpectra.MSCARLETI.emissionPeakNm + 1);
+});
+
+test('panelRows preserve honest ambiguous-family and spectrum-unavailable states', () => {
+  const study = createDefaultStudy();
+  study.assays[0].panel = {
+    targets: [],
+    channels: [
+      { id: 'generic-family', target: '', fluorophore: 'LysoTracker', conjugation: 'direct-probe', conjugateDye: '' },
+      { id: 'unsupported-spectrum', target: '', fluorophore: 'FURA2', conjugation: 'direct-probe', conjugateDye: '' },
+    ],
+  };
+  const rows = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE).assays[0].panelRows;
+  assert.deepEqual(
+    rows.map(({ fluorophore, state, excitationPeakNm, emissionPeakNm }) => ({
+      fluorophore,
+      state,
+      excitationPeakNm,
+      emissionPeakNm,
+    })),
+    [
+      { fluorophore: 'LysoTracker', state: 'ambiguous-family', excitationPeakNm: null, emissionPeakNm: null },
+      { fluorophore: 'FURA2', state: 'spectrum-unavailable', excitationPeakNm: null, emissionPeakNm: null },
+    ]
+  );
+});
+
+test('a filled-in structured panel.channels takes precedence over the free-text markers field for control gating', () => {
+  // The default study's bacterial-viability assay uses SYTO9/PI (free text,
+  // no antibody) -- without a structured channel, the panel controls should
+  // be the non-antibody set (verified elsewhere). Add a channel declaring an
+  // indirect-antibody conjugation and confirm the antibody-gated controls
+  // now fire, purely from the structured data.
+  const study = createDefaultStudy();
+  const viabilityAssay = study.assays.find((a) => a.label === 'Bacterial viability');
+  viabilityAssay.panel = {
+    targets: [],
+    channels: [{ id: 'ch1', target: 'Some target', fluorophore: '', conjugation: 'antibody-indirect', conjugateDye: '' }],
+  };
+  const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const viabilityDoc = doc.assays.find((a) => a.label === 'Bacterial viability');
+  const panelControlIds = viabilityDoc.controls.panel.map((c) => c.id);
+  assert.ok(panelControlIds.includes('panel-isotype-control'), 'a structured antibody-indirect channel should fire isotype-control');
+  assert.ok(panelControlIds.includes('panel-secondary-only-control'));
+});
+
+test('an empty panel.channels array falls back to the free-text markers field, unchanged from before Wave 2A', () => {
+  const study = createDefaultStudy();
+  const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const viabilityDoc = doc.assays.find((a) => a.label === 'Bacterial viability');
+  const panelControlIds = viabilityDoc.controls.panel.map((c) => c.id);
+  assert.ok(!panelControlIds.includes('panel-isotype-control'), 'SYTO9/PI alone (no antibody) should not request an isotype control');
 });
 
 test('cross-assay filename collisions are flagged (or not) via studyNameIssues, not duplicated logic', () => {

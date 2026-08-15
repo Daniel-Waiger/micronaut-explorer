@@ -7,7 +7,16 @@ import { loadKb, indexKb, kbMarker } from '../src/core/kb.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const markersJsonPath = path.join(here, '..', 'kb', 'markers.json');
+const sourceLedgerPath = path.join(
+  here,
+  '..',
+  '..',
+  'docs',
+  'references',
+  'planner-fluorophore-sources.json'
+);
 const realRaw = JSON.parse(readFileSync(markersJsonPath, 'utf-8'));
+const sourceLedger = JSON.parse(readFileSync(sourceLedgerPath, 'utf-8'));
 
 function minimalRaw(overrides = {}) {
   return {
@@ -199,4 +208,105 @@ test('the real KB marks family markers with isFamily and non-empty variants wher
   assert.equal(kbMarker(kb, 'HALO').class, 'tag');
   assert.equal(kbMarker(kb, 'PHALLOIDIN').class, 'moiety');
   assert.equal(kbMarker(kb, 'GFP').class, 'protein');
+});
+
+test('all 72 source-approved canonicals exist once with their editorial classes', () => {
+  const { kb, issues } = loadKb(realRaw);
+  assert.deepEqual(issues, []);
+  assert.equal(sourceLedger.directRecords.length, 72);
+
+  const classForCategory = {
+    'organic/NIR': 'dye',
+    'fluorescent protein': 'protein',
+    'live-cell/organelle': 'stain',
+    'nucleic-acid stain': 'stain',
+    indicator: 'indicator',
+  };
+  const expected = new Set();
+  for (const row of sourceLedger.directRecords) {
+    assert.ok(!expected.has(row.id), `duplicate source-ledger canonical '${row.id}'`);
+    expected.add(row.id);
+    const entry = kbMarker(kb, row.id);
+    assert.ok(entry, `missing source-approved canonical '${row.id}'`);
+    assert.equal(entry.class, classForCategory[row.category], `${row.id} class`);
+    assert.equal(entry.isFamily, false, `${row.id} must be a direct canonical`);
+  }
+  assert.equal(expected.size, 72);
+});
+
+test('the normalized real alias index has one owner per spelling and resolves representative additions', () => {
+  const { kb, issues } = loadKb(realRaw);
+  assert.deepEqual(issues, []);
+  const { aliasToCanonical, freeTextAliasToCanonical } = indexKb(kb);
+
+  // indexKb owns lowercasing. Checking every producer alias against its
+  // indexed owner catches a later duplicate alias silently overwriting the
+  // earlier canonical in the Map.
+  for (const [canonical, entry] of Object.entries(kb.markers)) {
+    for (const alias of entry.aliases) {
+      assert.equal(aliasToCanonical.get(alias.toLowerCase()), canonical, `alias '${alias}'`);
+    }
+    for (const alias of entry.freeTextAliases) {
+      assert.equal(
+        freeTextAliasToCanonical.get(alias.toLowerCase()),
+        canonical,
+        `free-text alias '${alias}'`
+      );
+    }
+  }
+
+  const representativeAliases = {
+    'Alexa Fluor 790': 'ALEXA790',
+    'CF 405S': 'CF405S',
+    'mScarlet-I': 'MSCARLETI',
+    sfGFP: 'SUPERFOLDERGFP',
+    '7-AAD': '7AAD',
+    'IRDye 800CW': 'IRDYE800CW',
+    'LysoTracker Deep Red': 'LYSOTRACKER',
+    'LIVEDEAD Near IR': 'LIVEDEAD',
+    'LIVE-DEAD Near IR': 'LIVEDEAD',
+    'SYTO RNASelect': 'SYTO',
+  };
+  for (const [alias, canonical] of Object.entries(representativeAliases)) {
+    assert.equal(aliasToCanonical.get(alias.toLowerCase()), canonical, alias);
+  }
+
+  // DiR's short exact spelling is useful in structured metadata but is a
+  // directory-command false positive in prose, so it must never leak into
+  // the free-text index.
+  assert.equal(aliasToCanonical.get('dir'), 'DIR');
+  assert.equal(freeTextAliasToCanonical.has('dir'), false);
+});
+
+test('LYSOTRACKER, LIVEDEAD, and SYTO expose exactly the old plus 11 approved variants', () => {
+  const { kb } = loadKb(realRaw);
+  assert.deepEqual(kbMarker(kb, 'LYSOTRACKER').variants, [
+    'lysotracker blue',
+    'lysotracker deep red',
+    'lysotracker green',
+    'lysotracker red',
+    'lysotracker yellow',
+  ]);
+  assert.deepEqual(kbMarker(kb, 'LIVEDEAD').variants, [
+    'livedead aqua',
+    'livedead blue',
+    'livedead far red',
+    'livedead green',
+    'livedead near ir',
+    'livedead red',
+    'livedead violet',
+    'livedead yellow',
+  ]);
+  assert.deepEqual(kbMarker(kb, 'SYTO').variants, [
+    'syto 40',
+    'syto 41',
+    'syto 42',
+    'syto 45',
+    'syto rnaselect',
+    'syto13',
+    'syto60',
+    'syto82',
+    'syto85',
+    'syto9',
+  ]);
 });

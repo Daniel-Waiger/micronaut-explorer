@@ -75,18 +75,43 @@ def test_family_markers_have_variants_that_are_real_members_of_their_alias_list(
         assert set(entry["variants"]) <= set(entry["aliases"])
 
 
-def test_bodipy_is_a_family_even_with_no_spelled_out_variants_yet() -> None:
+def test_bodipy_is_a_family_with_named_variants() -> None:
+    # Was `variants == []` (a family with nothing spelled out -- every
+    # "BODIPY ..." spelling was unreachable, always 'ambiguous-family' at
+    # best). The alpha-readiness content pass named four common BODIPY
+    # variants explicitly; the bare "bodipy" alias still correctly resolves
+    # 'ambiguous-family' since BODIPY names a whole dye class, not one color.
     entry = export_markers_kb.build_kb()["markers"]["BODIPY"]
     assert entry["isFamily"] is True
-    assert entry["variants"] == []
+    assert entry["variants"] == ["bodipy 630", "bodipy fl", "bodipy tmr", "bodipy tr"]
 
 
 def test_tag_and_moiety_classes() -> None:
     kb = export_markers_kb.build_kb()
     for canonical in ("HALO", "SNAP", "CLIP"):
         assert kb["markers"][canonical]["class"] == "tag"
-    for canonical in ("PHALLOIDIN", "WGA"):
+    # ANNEXINV (sold as a fluorophore CONJUGATE, e.g. "Annexin V-FITC")
+    # joined PHALLOIDIN/WGA here in the alpha-readiness content pass -- none
+    # of the three has an intrinsic spectrum, and none involves an antibody.
+    for canonical in ("PHALLOIDIN", "WGA", "ANNEXINV"):
         assert kb["markers"][canonical]["class"] == "moiety"
+
+
+def test_target_class_is_distinct_from_moiety() -> None:
+    # SOX/SOX2 are transcription-factor ANTIBODY TARGETS -- previously
+    # misclassified "dye" by the _classify() fallback, which is what let the
+    # Color panel treat them as an unfilled dye spectrum instead of "not a
+    # dye at all," and let engine/controls.js's isotype/secondary-antibody
+    # rules fire on non-antibody panels indiscriminately (their gate could
+    # only see 'moiety', which also covers PHALLOIDIN/WGA/ANNEXINV -- none
+    # of which involve an antibody). 'target' is deliberately its OWN class,
+    # not folded into 'moiety', so engine/controls.js can gate
+    # antibody-specific content on it precisely.
+    kb = export_markers_kb.build_kb()
+    for canonical in ("SOX", "SOX2"):
+        assert kb["markers"][canonical]["class"] == "target"
+    for canonical in ("PHALLOIDIN", "WGA", "ANNEXINV"):
+        assert kb["markers"][canonical]["class"] != "target"
 
 
 def test_protein_and_indicator_classes() -> None:
@@ -142,6 +167,6 @@ def test_committed_file_is_valid_json_with_the_documented_shape() -> None:
     for canonical, entry in data["markers"].items():
         assert isinstance(entry["aliases"], list) and entry["aliases"], canonical
         assert set(entry["freeTextAliases"]) <= set(entry["aliases"]), canonical
-        assert entry["class"] in {"dye", "protein", "tag", "moiety", "stain", "indicator"}
+        assert entry["class"] in {"dye", "protein", "tag", "moiety", "target", "stain", "indicator"}
         assert isinstance(entry["isFamily"], bool)
         assert isinstance(entry["variants"], list)

@@ -325,12 +325,23 @@ test('summarizeTrigger returns null for a path not in the curated label map', ()
   assert.equal(summarizeTrigger({ eq: ['naming.fields.sample', 'E02'] }), null);
 });
 
+test('summarizeTrigger on an `exists` predicate over a labeled path', () => {
+  assert.equal(
+    summarizeTrigger({ exists: 'acquisition.smallestFeatureNm' }),
+    'the smallest feature to resolve is set'
+  );
+});
+
+test('summarizeTrigger returns null for `exists` on a path not in the curated label map', () => {
+  assert.equal(summarizeTrigger({ exists: 'naming.fields.sample' }), null);
+});
+
 test('summarizeTrigger returns null for every predicate shape it does not summarize', () => {
   const unsummarizable = [
     { matches: ['acquisition.modality', 'STED'] },
     { gt: ['design.biologicalReplicates', 1] },
     { lt: ['design.biologicalReplicates', 1] },
-    { exists: 'acquisition.modality' },
+    { exists: 123 }, // non-string arg
     { empty: 'acquisition.modality' },
     { ne: ['acquisition.modality', 'STED'] },
     { all: [{ eq: ['acquisition.modality', 'STED'] }] },
@@ -522,17 +533,25 @@ test('selectAdvice(rules, emptyExperiment(), surface) is EMPTY for every surface
 
 test('every committed rule fires on at least one experiment (the never-fires guard)', () => {
   const { rules } = loadAdvisorRules(realAdvisorRaw);
-  for (const rule of rules) {
-    // Try every canonical modality option plus a couple of common free-text
-    // values -- sufficient because every committed rule is modality-gated
-    // today; a future non-modality rule will need a fixture added here.
-    const candidates = [...(realQuestionsRaw.find((q) => q.id === 'modality')?.options || []), 'sted', 'confocal'];
-    const fired = candidates.some((modality) => {
+  // Every committed rule today is either modality-gated or gated on
+  // acquisition.smallestFeatureNm being set (the Nyquist tip) -- a future
+  // rule keyed on some OTHER field will need a fixture added here too.
+  const modalityCandidates = [...(realQuestionsRaw.find((q) => q.id === 'modality')?.options || []), 'sted', 'confocal'];
+  const experimentCandidates = [
+    ...modalityCandidates.map((modality) => {
       const exp = emptyExperiment();
       exp.acquisition = { ...exp.acquisition, modality };
-      return selectAdvice([rule], exp, null).length > 0;
-    });
-    assert.ok(fired, `rule '${rule.id}' never fired for any candidate modality -- describePredicate: ${describePredicate(rule.when)}`);
+      return exp;
+    }),
+    (() => {
+      const exp = emptyExperiment();
+      exp.acquisition = { ...exp.acquisition, smallestFeatureNm: 250 };
+      return exp;
+    })(),
+  ];
+  for (const rule of rules) {
+    const fired = experimentCandidates.some((exp) => selectAdvice([rule], exp, null).length > 0);
+    assert.ok(fired, `rule '${rule.id}' never fired for any candidate experiment -- describePredicate: ${describePredicate(rule.when)}`);
   }
 });
 
