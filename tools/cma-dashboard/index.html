@@ -146,13 +146,13 @@
 const EMBEDDED = {
   "run": "Spectral/picker main synchronization",
   "orchestrator": "Codex gpt-5.6-sol warm-context",
-  "active_model": "Codex gpt-5.6-sol",
+  "active_model": "gpt-5.6-luna merge simulation",
   "active_status": "running",
-  "phase": "B2",
+  "phase": "B3",
   "state_note": "",
   "current_task": {
-    "id": "MS2",
-    "title": "Commit verified local wave"
+    "id": "MS3",
+    "title": "Merge origin/main into feature branch"
   },
   "crit_title": "Open defects",
   "stats": [
@@ -165,6 +165,11 @@ const EMBEDDED = {
       "k": "Overlap",
       "v": "2 files",
       "tone": "warn"
+    },
+    {
+      "k": "Local wave",
+      "v": "33f71b8",
+      "tone": "ok"
     }
   ],
   "defects": [],
@@ -180,15 +185,15 @@ const EMBEDDED = {
       "id": "MS2",
       "phase": "Tasks",
       "title": "Commit the verified local wave",
-      "status": "running",
+      "status": "done",
       "by": "gpt-5.6-luna git ops"
     },
     {
       "id": "MS3",
       "phase": "Tasks",
       "title": "Merge origin/main into the feature branch",
-      "status": "pending",
-      "by": "queued"
+      "status": "running",
+      "by": "gpt-5.6-luna simulation"
     },
     {
       "id": "MS4",
@@ -206,9 +211,13 @@ const EMBEDDED = {
     {
       "time": "17:40:54",
       "msg": "MS1 complete: Claude merged lane confirmed; overlaps limited to app.css and generated dashboard"
+    },
+    {
+      "time": "17:42:31",
+      "msg": "MS2 committed 27-file verified wave with required Codex trailer"
     }
   ],
-  "snapshot_at": "2026-08-15 17:40"
+  "snapshot_at": "2026-08-15 17:42"
 };
 /* CMA:EMBEDDED:END */
 
