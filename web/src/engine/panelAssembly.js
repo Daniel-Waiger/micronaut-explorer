@@ -51,6 +51,41 @@ export const CONJUGATION_LABELS = {
 // fix was written to close -- see spectra.js's derivePanelFacts header).
 export const ANTIBODY_CONJUGATION_MODES = new Set(['antibody-direct', 'antibody-indirect']);
 
+// Color-panel patch: a qualitative default detection-filter suggestion, shown
+// pre-filled in the filter inputs (ui/steps/panel.js) the moment a channel's
+// fluorophore resolves, rather than an empty pair waiting on the user to look
+// up their own numbers first. WIDTH_NM=30 is the midpoint of the "20-40 nm
+// wide" range spectra.json's own overlapRules note already documents for
+// typical bandpass emission filters -- same domain-judgment posture as that
+// note and spectra.js's peak-proximity thresholds, not a claim about any real
+// vendor part. Centered on the EMISSION peak: `filterCenterNm`/
+// `filterBandwidthNm` describe the detection filter the user's camera/PMT
+// actually looks through, which observes emitted light, not excitation.
+const DEFAULT_FILTER_BANDWIDTH_NM = 30;
+
+/**
+ * The default (unedited) filter suggestion for a channel whose fluorophore
+ * resolved to a known emission peak -- `null` when it didn't, so a caller
+ * never renders a fabricated center wavelength for a fluorophore this app
+ * has no spectral data for.
+ */
+export function defaultChannelFilterPair(emissionPeakNm) {
+  if (typeof emissionPeakNm !== 'number' || !Number.isFinite(emissionPeakNm)) return null;
+  return { filterCenterNm: Math.round(emissionPeakNm), filterBandwidthNm: DEFAULT_FILTER_BANDWIDTH_NM };
+}
+
+/**
+ * The color actually shown for a channel: the user's explicit `channel.color`
+ * override when set, else `computedDefault` (engine/color.js's
+ * `wavelengthToColor` over the channel's resolved emission peak), else `null`
+ * when neither exists -- the UI renders `null` as a neutral placeholder
+ * swatch, never a guessed color.
+ */
+export function effectiveChannelColor(channel, computedDefault) {
+  const override = channel && typeof channel.color === 'string' ? channel.color.trim() : '';
+  return override || computedDefault || null;
+}
+
 function panelFluorophoreFinitePeaks(entry) {
   return (
     entry &&
@@ -140,6 +175,10 @@ export function emptyChannel(id) {
     conjugateDye: '',
     filterCenterNm: null,
     filterBandwidthNm: null,
+    // '' means "use the spectrum-derived default color" (engine/color.js) --
+    // only a non-empty value is a user override, mirroring how `color` !==
+    // '' is the one signal the UI needs to show a "reset to default" control.
+    color: '',
   };
 }
 
@@ -186,6 +225,7 @@ export function normalizeChannels(raw) {
       conjugation: CONJUGATION_MODES.includes(entry.conjugation) ? entry.conjugation : 'direct-probe',
       conjugateDye: typeof entry.conjugateDye === 'string' ? entry.conjugateDye : '',
       ...normalizePanelFilterPair(entry),
+      color: typeof entry.color === 'string' ? entry.color : '',
     });
   }
   return channels;
@@ -295,13 +335,10 @@ export function seedChannelsFromMarkers(resolvePanelResult, markersKb, kbMarker,
       if (markerClass === 'target') conjugation = 'antibody-indirect';
       else if (markerClass === 'tag') conjugation = 'tag-ligand';
       return {
-        id: makeId(),
-        target: '',
+        ...emptyChannel(makeId()),
         fluorophore: conjugation === 'tag-ligand' ? '' : entry.token,
         conjugation,
         conjugateDye: conjugation === 'tag-ligand' ? entry.token : '',
-        filterCenterNm: null,
-        filterBandwidthNm: null,
       };
     });
 }

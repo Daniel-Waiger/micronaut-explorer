@@ -8,6 +8,8 @@ import {
   ANTIBODY_CONJUGATION_MODES,
   CONJUGATION_MODES,
   channelSpectralField,
+  defaultChannelFilterPair,
+  effectiveChannelColor,
   emptyChannel,
   normalizeChannels,
   panelFluorophoreOptions,
@@ -110,11 +112,37 @@ test('panelFluorophoreWriteValue updates by current id and mode without losing s
   assert.deepEqual(panelFluorophoreWriteValue(null, 'direct', 'x'), []);
 });
 
-test('emptyChannel has every field, defaulting to a non-antibody direct probe', () => {
+test('emptyChannel has every field, defaulting to a non-antibody direct probe with auto color', () => {
   const channel = emptyChannel('c1');
   assert.deepEqual(channel, {
-    id: 'c1', target: '', fluorophore: '', conjugation: 'direct-probe', conjugateDye: '', filterCenterNm: null, filterBandwidthNm: null,
+    id: 'c1',
+    target: '',
+    fluorophore: '',
+    conjugation: 'direct-probe',
+    conjugateDye: '',
+    filterCenterNm: null,
+    filterBandwidthNm: null,
+    color: '',
   });
+});
+
+test('defaultChannelFilterPair centers a 30 nm bandwidth on the emission peak', () => {
+  assert.deepEqual(defaultChannelFilterPair(525), { filterCenterNm: 525, filterBandwidthNm: 30 });
+  assert.deepEqual(defaultChannelFilterPair(524.6), { filterCenterNm: 525, filterBandwidthNm: 30 });
+});
+
+test('defaultChannelFilterPair returns null when there is no emission peak -- never fabricates a center', () => {
+  assert.equal(defaultChannelFilterPair(null), null);
+  assert.equal(defaultChannelFilterPair(undefined), null);
+  assert.equal(defaultChannelFilterPair(NaN), null);
+  assert.equal(defaultChannelFilterPair('525'), null);
+});
+
+test('effectiveChannelColor prefers the explicit override, else the computed default, else null', () => {
+  assert.equal(effectiveChannelColor({ color: '#ff0000' }, '#0000ff'), '#ff0000');
+  assert.equal(effectiveChannelColor({ color: '' }, '#0000ff'), '#0000ff');
+  assert.equal(effectiveChannelColor({ color: '' }, null), null);
+  assert.equal(effectiveChannelColor(null, null), null);
 });
 
 test('CONJUGATION_MODES and ANTIBODY_CONJUGATION_MODES agree: every antibody mode is a real conjugation mode', () => {
@@ -157,6 +185,14 @@ test('normalizeChannels preserves legacy channels and accepts only complete vali
     { id: 'bad-bandwidth', filterCenterNm: null, filterBandwidthNm: null },
     { id: 'not-numbers', filterCenterNm: null, filterBandwidthNm: null },
   ]);
+});
+
+test('normalizeChannels preserves a valid color override and drops a non-string color back to auto', () => {
+  const [withColor] = normalizeChannels([{ id: 'a', color: '#3366ff' }]);
+  assert.equal(withColor.color, '#3366ff');
+
+  const [badColor] = normalizeChannels([{ id: 'a', color: 42 }]);
+  assert.equal(badColor.color, '');
 });
 
 test('normalizeChannels never throws on non-array/malformed input', () => {

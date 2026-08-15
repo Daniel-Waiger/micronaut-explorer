@@ -876,6 +876,45 @@ button:focus-visible {
   cursor: default;
 }
 
+/* Color-panel patch: per-fluorophore color swatches -- read-only on the
+   free-text list above, editable/overridable via a native color picker on
+   the structured channel row. */
+.panel-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  flex: 0 0 auto;
+  display: inline-block;
+}
+
+.panel-color-input {
+  width: 30px;
+  height: 26px;
+  padding: 1px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.panel-color-reset {
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.panel-color-reset:hover {
+  color: var(--ink);
+}
+
 .describe-textarea {
   width: 100%;
   min-height: 120px;

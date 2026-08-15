@@ -31,11 +31,14 @@ import { assayView, scopeWrite } from '../../core/assay.js';
 import { kbMarker } from '../../core/kb.js';
 import { shortId } from '../../core/ids.js';
 import { flagPanelOverlaps, resolveMarkerToken, resolvePanel } from '../../engine/spectra.js';
+import { wavelengthToColor } from '../../engine/color.js';
 import {
   ANTIBODY_CONJUGATION_MODES,
   CONJUGATION_LABELS,
   CONJUGATION_MODES,
   channelSpectralField,
+  defaultChannelFilterPair,
+  effectiveChannelColor,
   emptyChannel,
   normalizeChannels,
   panelFluorophoreOptions,
@@ -87,6 +90,16 @@ function appendRow(list, entry) {
   row.appendChild(text);
 
   if (entry.state === 'known') {
+    // Informational only here -- read-only, derived straight from the
+    // emission peak (engine/color.js). The editable, overridable color lives
+    // on the structured channel below, where there is somewhere to persist
+    // an override; this free-text row has no per-token storage of its own.
+    const swatch = document.createElement('span');
+    swatch.className = 'panel-color-swatch';
+    swatch.style.backgroundColor = wavelengthToColor(entry.emissionPeakNm) || 'transparent';
+    swatch.title = `Color from ${entry.emissionPeakNm} nm emission peak`;
+    row.appendChild(swatch);
+
     const badge = document.createElement('span');
     badge.className = 'panel-badge';
     badge.title = 'Spectral value drafted by Claude from common published references -- not yet reviewed by a microscopy specialist.';
@@ -321,6 +334,61 @@ export function createPanelStep(kb) {
         });
         row.appendChild(dragHandle);
 
+        // Color, per fluorophore (color-panel patch): a swatch computed from
+        // the channel's own resolved emission peak (engine/color.js), with a
+        // native color picker to override it and a reset link back to auto.
+        // Resolved the SAME way the free-text list above does (spectra.js's
+        // resolveMarkerToken) so this channel's default can never disagree
+        // with what the Color panel's qualitative check already knows about
+        // this fluorophore name.
+        const channelSpectralValue = channelSpectralField(channel).trim();
+        const channelResolved = channelSpectralValue
+          ? resolveMarkerToken(channelSpectralValue, kb.index, kb.markersKb, kb.spectra)
+          : null;
+        const computedColor =
+          channelResolved && channelResolved.state === 'known' ? wavelengthToColor(channelResolved.emissionPeakNm) : null;
+        const effectiveColor = effectiveChannelColor(channel, computedColor);
+        const isColorOverride = Boolean(channel.color);
+
+        const colorSwatch = document.createElement('span');
+        colorSwatch.className = 'panel-color-swatch';
+        colorSwatch.style.backgroundColor = effectiveColor || 'transparent';
+        row.appendChild(colorSwatch);
+
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.className = 'panel-color-input';
+        colorInput.value = effectiveColor || '#808080';
+        colorInput.title = isColorOverride
+          ? 'Your chosen color'
+          : effectiveColor
+            ? 'Default color, from this fluorophore’s emission peak -- pick one to override'
+            : 'Pick a channel color';
+        colorInput.addEventListener('input', () => {
+          const next = currentChannels();
+          next[index] = { ...next[index], color: colorInput.value };
+          writeChannelsData(next);
+          colorSwatch.style.backgroundColor = colorInput.value;
+        });
+        colorInput.addEventListener('change', () => {
+          writeChannelsStructure(currentChannels()); // structural: reveals/hides the reset control
+        });
+        row.appendChild(colorInput);
+
+        if (isColorOverride) {
+          const colorResetBtn = document.createElement('button');
+          colorResetBtn.type = 'button';
+          colorResetBtn.className = 'panel-color-reset';
+          colorResetBtn.textContent = 'auto';
+          colorResetBtn.title = 'Reset to the color computed from this fluorophore’s emission peak';
+          colorResetBtn.addEventListener('click', () => {
+            const next = currentChannels();
+            next[index] = { ...next[index], color: '' };
+            writeChannelsStructure(next);
+          });
+          row.appendChild(colorResetBtn);
+        }
+
         const targetInput = channelField(document.createElement('input'), 'panel-row-text');
         targetInput.type = 'text';
         targetInput.placeholder = 'Target (e.g. F-actin, Sox2)';
@@ -421,11 +489,33 @@ export function createPanelStep(kb) {
           return input;
         }
 
-        const centerInput = filterInput('Filter center (nm)', 'e.g. 525', channel.filterCenterNm, 300, 900);
-        const bandwidthInput = filterInput('Bandwidth (nm)', 'e.g. 50', channel.filterBandwidthNm, 1, 300);
+        // Filters, upfront by default (color-panel patch): a channel whose
+        // fluorophore resolves shows a pre-filled suggestion the moment it
+        // resolves (engine/panelAssembly.js's defaultChannelFilterPair) --
+        // never an empty pair of boxes waiting on the user to look up their
+        // own numbers first. Nothing is written to the store until the user
+        // actually edits a field (see writeFilterPair below); a channel with
+        // an explicit, already-saved pair always shows exactly that, never
+        // the computed default.
+        const hasSavedFilterPair = typeof channel.filterCenterNm === 'number' && typeof channel.filterBandwidthNm === 'number';
+        const computedFilterDefault =
+          !hasSavedFilterPair && channelResolved && channelResolved.state === 'known'
+            ? defaultChannelFilterPair(channelResolved.emissionPeakNm)
+            : null;
+        const displayedCenterNm = hasSavedFilterPair ? channel.filterCenterNm : computedFilterDefault ? computedFilterDefault.filterCenterNm : null;
+        const displayedBandwidthNm = hasSavedFilterPair
+          ? channel.filterBandwidthNm
+          : computedFilterDefault
+            ? computedFilterDefault.filterBandwidthNm
+            : null;
+
+        const centerInput = filterInput('Filter center (nm)', 'e.g. 525', displayedCenterNm, 300, 900);
+        const bandwidthInput = filterInput('Bandwidth (nm)', 'e.g. 50', displayedBandwidthNm, 1, 300);
         const filterHint = document.createElement('span');
         filterHint.className = 'panel-filter-hint';
-        filterHint.textContent = 'Optional; both values are required. Use the microscope’s actual detection filter.';
+        filterHint.textContent = computedFilterDefault
+          ? 'Suggested from this fluorophore’s emission peak -- edit to match the microscope’s actual detection filter.'
+          : 'Optional; both values are required. Use the microscope’s actual detection filter.';
         filterRow.appendChild(filterHint);
 
         function writeFilterPair() {
