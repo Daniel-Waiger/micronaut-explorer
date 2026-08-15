@@ -530,7 +530,13 @@ if "suggestions" in st.session_state:
         if changed:
             st.rerun()
 
-    with st.expander("Metadata read from files", expanded=False):
+    # Streamlit rejects an expander nested inside another expander. This
+    # section contains four independently useful tier expanders below, so
+    # make the section itself a bordered container and keep those tiers
+    # collapsible. A nested-expander crash used to abort every preview as
+    # soon as metadata keys were available under current Streamlit versions.
+    with st.container(border=True):
+        st.write("### Metadata read from files")
         st.caption(
             "Exactly what the reader found inside each file — the same record Fiji shows "
             "under Image > Show Info. Use it to check whether a field was genuinely absent "
@@ -567,7 +573,8 @@ if "suggestions" in st.session_state:
                     "is often the copy date rather than the true acquisition date."
                 )
 
-            st.code(selected.metadata_text or "(no metadata found in this file)")
+            with st.expander("Raw metadata", expanded=False):
+                st.code(selected.metadata_text or "(no metadata found in this file)")
 
             st.write("#### Harvested metadata keys")
             if not selected.key_paths:

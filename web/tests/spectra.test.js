@@ -480,6 +480,26 @@ test('derivePanelFacts never throws on malformed inputs', () => {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const realSpectraRaw = JSON.parse(readFileSync(path.join(here, '..', 'kb', 'spectra.json'), 'utf-8'));
 const realMarkersRaw = JSON.parse(readFileSync(path.join(here, '..', 'kb', 'markers.json'), 'utf-8'));
+const sourceLedgerRaw = JSON.parse(
+  readFileSync(
+    path.join(here, '..', '..', 'docs', 'references', 'planner-fluorophore-sources.json'),
+    'utf-8'
+  )
+);
+
+const SOURCE_VARIANT_KEYS = {
+  LYSOTRACKERBLUE: 'lysotracker blue',
+  LYSOTRACKERYELLOW: 'lysotracker yellow',
+  LYSOTRACKERDEEPRED: 'lysotracker deep red',
+  LIVEDEADAQUA: 'livedead aqua',
+  LIVEDEADYELLOW: 'livedead yellow',
+  LIVEDEADNEARIR: 'livedead near ir',
+  SYTO40: 'syto 40',
+  SYTO41: 'syto 41',
+  SYTO42: 'syto 42',
+  SYTO45: 'syto 45',
+  SYTORNASELECT: 'syto rnaselect',
+};
 
 // The canonicals deliberately excluded from spectra.json as honest content
 // gaps (docs/plans/planner-web-color-panel.md), updated by the alpha-
@@ -501,6 +521,58 @@ const DELIBERATELY_UNCOVERED = new Set(['RFP', 'FURA2', 'ARL', 'HALO', 'SNAP', '
 test('the real web/kb/spectra.json loads with zero issues', () => {
   const { issues } = loadSpectraKb(realSpectraRaw);
   assert.deepEqual(issues, []);
+});
+
+test('all 72 direct and 11 family additions exactly match the source ledger and runtime whitelist', () => {
+  assert.equal(sourceLedgerRaw.directRecords.length, 72);
+  assert.equal(sourceLedgerRaw.familyVariantRecords.length, 11);
+  const directFields = new Set([
+    'excitationPeakNm',
+    'emissionPeakNm',
+    'reviewStatus',
+    'note',
+  ]);
+
+  for (const row of sourceLedgerRaw.directRecords) {
+    const entry = realSpectraRaw.fluorophores[row.id];
+    assert.ok(entry && entry.isFamily !== true, `${row.id}: missing direct spectrum`);
+    assert.deepEqual(
+      Object.keys(entry).filter((key) => !directFields.has(key)),
+      [],
+      `${row.id}: unrecognized runtime field`
+    );
+    assert.equal(entry.excitationPeakNm, row.excitationPeakNm, `${row.id}: excitation`);
+    assert.equal(entry.emissionPeakNm, row.emissionPeakNm, `${row.id}: emission`);
+    assert.equal(entry.note, row.measurementContext, `${row.id}: condition note`);
+    assert.equal(entry.reviewStatus, 'claude-drafted', `${row.id}: review status`);
+    assert.ok(realMarkersRaw.markers[row.id], `${row.id}: missing marker canonical`);
+    assert.ok(
+      300 <= entry.excitationPeakNm &&
+        entry.excitationPeakNm < entry.emissionPeakNm &&
+        entry.emissionPeakNm <= 900,
+      `${row.id}: implausible peak pair`
+    );
+  }
+
+  for (const row of sourceLedgerRaw.familyVariantRecords) {
+    const variantKey = SOURCE_VARIANT_KEYS[row.id];
+    assert.ok(variantKey, `${row.id}: missing runtime variant-key mapping`);
+    const familyEntry = realSpectraRaw.fluorophores[row.family];
+    const variant = familyEntry?.variants?.[variantKey];
+    assert.ok(variant, `${row.id}: missing '${row.family}' variant '${variantKey}'`);
+    assert.deepEqual(
+      Object.keys(variant).sort(),
+      ['emissionPeakNm', 'excitationPeakNm'],
+      `${row.id}: family variants stay peak-only`
+    );
+    assert.equal(variant.excitationPeakNm, row.excitationPeakNm, `${row.id}: excitation`);
+    assert.equal(variant.emissionPeakNm, row.emissionPeakNm, `${row.id}: emission`);
+    assert.equal(familyEntry.reviewStatus, 'claude-drafted', `${row.family}: review status`);
+    assert.ok(
+      realMarkersRaw.markers[row.family].variants.includes(variantKey),
+      `${row.id}: variant missing from markers.json`
+    );
+  }
 });
 
 test('every top-level web/kb/spectra.json fluorophore key exists as a canonical in web/kb/markers.json', () => {
@@ -548,4 +620,61 @@ test('resolveMarkerToken against the REAL packs: a known dye, a family variant, 
   assert.equal(resolveMarkerToken('FURA2', markerIndex, markersKb, fluorophores).state, 'spectrum-unavailable');
   assert.equal(resolveMarkerToken('BODIPY FL', markerIndex, markersKb, fluorophores).state, 'known');
   assert.equal(resolveMarkerToken('SOX2', markerIndex, markersKb, fluorophores).state, 'no-intrinsic-spectrum');
+});
+
+test('the real resolver covers every new category plus unchanged ambiguity/gap/no-intrinsic states', () => {
+  const { kb: markersKb } = loadKb(realMarkersRaw);
+  const markerIndex = indexKb(markersKb);
+  const { fluorophores } = loadSpectraKb(realSpectraRaw);
+  const cases = [
+    ['Alexa Fluor 790', 'ALEXA790', 'known'],
+    ['mScarlet-I', 'MSCARLETI', 'known'],
+    ['LipidTOX Deep Red', 'LIPIDTOXDEEPRED', 'known'],
+    ['CellROX Deep Red', 'CELLROXDEEPRED', 'known'],
+    ['IRDye 800CW', 'IRDYE800CW', 'known'],
+    ['LysoTracker Deep Red', 'LYSOTRACKER', 'known', 'lysotracker deep red'],
+    ['LIVEDEAD Near IR', 'LIVEDEAD', 'known', 'livedead near ir'],
+    ['LIVE-DEAD Near IR', 'LIVEDEAD', 'known', 'livedead near ir'],
+    ['SYTO RNASelect', 'SYTO', 'known', 'syto rnaselect'],
+    ['LYSOTRACKER', 'LYSOTRACKER', 'ambiguous-family'],
+    ['FURA2', 'FURA2', 'spectrum-unavailable'],
+    ['HALO', 'HALO', 'no-intrinsic-spectrum'],
+  ];
+  for (const [token, canonical, state, variantKey] of cases) {
+    const resolved = resolveMarkerToken(token, markerIndex, markersKb, fluorophores);
+    assert.equal(resolved.canonical, canonical, token);
+    assert.equal(resolved.state, state, token);
+    assert.equal(resolved.variantKey, variantKey, token);
+  }
+});
+
+test('ledger-backed pairs respect the real overlap thresholds for error, warning, and separation', () => {
+  const { kb: markersKb } = loadKb(realMarkersRaw);
+  const markerIndex = indexKb(markersKb);
+  const { fluorophores, overlapRules } = loadSpectraKb(realSpectraRaw);
+  const resolve = (token) => resolveMarkerToken(token, markerIndex, markersKb, fluorophores);
+
+  const emissionPair = [resolve('mScarlet-I'), resolve('mScarlet3')];
+  const emissionGap = Math.abs(emissionPair[0].emissionPeakNm - emissionPair[1].emissionPeakNm);
+  assert.ok(emissionGap <= overlapRules.emissionProximityNm);
+  const emissionFlags = flagPanelOverlaps(emissionPair, overlapRules);
+  assert.ok(emissionFlags.some((flag) => flag.severity === 'error' && /emission peaks/.test(flag.message)));
+
+  const excitationPair = [resolve('Pacific Orange'), resolve('DyLight 405')];
+  const excitationGap = Math.abs(
+    excitationPair[0].excitationPeakNm - excitationPair[1].excitationPeakNm
+  );
+  const distantEmissionGap = Math.abs(
+    excitationPair[0].emissionPeakNm - excitationPair[1].emissionPeakNm
+  );
+  assert.ok(excitationGap <= overlapRules.excitationProximityNm);
+  assert.ok(distantEmissionGap > overlapRules.emissionProximityNm);
+  const excitationFlags = flagPanelOverlaps(excitationPair, overlapRules);
+  assert.deepEqual(excitationFlags.map((flag) => flag.severity), ['warning']);
+
+  const separatedFlags = flagPanelOverlaps(
+    [resolve('Alexa Fluor 790'), resolve('CF 350')],
+    overlapRules
+  );
+  assert.deepEqual(separatedFlags, []);
 });

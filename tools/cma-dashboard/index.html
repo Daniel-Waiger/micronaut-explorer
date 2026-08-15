@@ -144,11 +144,11 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "chat-LLM round trip + planning-gap advisories",
+  "run": "feat/alpha-pilot-readiness merged with codex/fluorophore-expansion",
   "orchestrator": "Claude Sonnet 5",
   "active_model": "Claude Sonnet 5",
   "active_status": "idle",
-  "phase": "Phase 1 complete -- ready for review/commit",
+  "phase": "Merged -- verifying combined suite before push",
   "state_note": "GPU/context/unload fixes + cold-start UI already shipped (uncommitted); now building llmreply.js/llmdraftprompt.js/chatTargets.js",
   "current_task": null,
   "crit_title": "Open defects",
@@ -278,9 +278,13 @@ const EMBEDDED = {
     {
       "time": "12:09:31",
       "msg": "P1-7 done. Found and fixed a real staleness bug during verification: the dev server boots from web/kb.dev.js (a generated snapshot), not web/kb/*.json directly -- edited the source JSON without regenerating the snapshot, so the new question invisibly didn't appear in the live app despite loadQuestions() proving correct in isolation. Fixed via 'python tools/export_markers_kb.py' (also regenerates markers.json, confirmed byte-identical/deterministic via git diff). Full round trip re-verified after the fix: Nyquist question appears, paste-back proposal accepted, advisor tip fires with correct 'Applies when...' trigger clause. Python gates: KB validity 8/8, build-pipeline 24/24, built artifact confirmed embeds new content. Nothing committed yet -- all work is in the working tree for review."
+    },
+    {
+      "time": "15:51:41",
+      "msg": "Merged origin/codex/fluorophore-expansion (a2f7bd3 fluorophore expansion, 32fa097 Streamlit fix, c4d4289 handover) into feat/alpha-pilot-readiness. Pre-merge git merge-tree simulation showed zero conflicts; only tools/cma-dashboard/index.html conflicted (generated snapshot), resolved by regeneration per Codex's own instruction, not hand-merge."
     }
   ],
-  "snapshot_at": "2026-08-15 12:09"
+  "snapshot_at": "2026-08-15 15:51"
 };
 /* CMA:EMBEDDED:END */
 

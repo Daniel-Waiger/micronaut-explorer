@@ -308,7 +308,15 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
   }
 
   if (spectraEntry.isFamily) {
-    const variant = spectraEntry.variants[needle];
+    // Some branded families have punctuation-only alias variants (for
+    // example LIVE-DEAD versus LIVEDEAD) while spectra.json deliberately
+    // keeps one semantic variant record. Try the exact spelling first,
+    // then the punctuation-collapsed spelling already owned by the same
+    // canonical. This preserves one source-backed peak record without
+    // degrading an exact branded alias to an ambiguous bare family.
+    const collapsedNeedle = needle.replaceAll('-', '');
+    const variantKey = spectraEntry.variants[needle] ? needle : collapsedNeedle;
+    const variant = spectraEntry.variants[variantKey];
     if (!variant) {
       return { token, canonical, state: 'ambiguous-family' };
     }
@@ -321,7 +329,7 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
       // entries, not one (see its own header). Absent for every other
       // state/non-family entry, so a caller can branch on its presence
       // instead of re-deriving isFamily.
-      variantKey: needle,
+      variantKey,
       state: 'known',
       excitationPeakNm: variant.excitationPeakNm,
       emissionPeakNm: variant.emissionPeakNm,
