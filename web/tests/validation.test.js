@@ -131,7 +131,10 @@ test('validateTargetPath warns when over MAX_PATH_LENGTH', () => {
   assert.equal(issues.length, 1);
   assert.equal(issues[0].severity, 'warning');
   assert.equal(issues[0].field, 'target_path');
-  assert.ok(issues[0].message.includes('MAX_PATH'));
+  // Plain language, not the Win32 constant name -- a user reading this
+  // message never needs to know it's called MAX_PATH internally.
+  assert.ok(issues[0].message.includes('Windows'));
+  assert.ok(issues[0].message.includes(String(MAX_PATH_LENGTH)));
   // The offending path must be visible in the message, not summarized away.
   assert.ok(issues[0].message.includes(longPath));
 });
