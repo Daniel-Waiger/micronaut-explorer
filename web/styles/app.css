@@ -1703,16 +1703,22 @@ button:focus-visible {
   position: relative;
   /* Fill the available width like every other row in this step (.panel-row,
      the fluorophore picker, ...) instead of capping out at the SVG's own
-     720px viewBox width -- the viewBox's aspect ratio still holds via the
-     SVG's own width:100%/height:auto below, so this only makes the chart
-     wider, never distorted. */
+     720px viewBox width. */
   width: 100%;
 }
 
 .spectral-view-svg {
   display: block;
   width: 100%;
-  height: auto;
+  /* Fixed, not auto: height:auto held the viewBox's 720:316 aspect ratio,
+     so filling a wide .shell-main also scaled the height up right along
+     with the width (a 1500px-wide chart came out ~660px tall) -- only the
+     width was ever meant to adapt. A capped height plus the SVG's own
+     preserveAspectRatio="none" (ui/spectralView.js) lets the viewBox
+     stretch horizontally to fill whatever width it's given without
+     dragging height along; the curves read a little wider/flatter on a
+     wide screen, the same tradeoff any responsive line chart makes. */
+  height: 320px;
   overflow: visible;
   border: 1px solid var(--line);
   border-radius: 8px;

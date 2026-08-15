@@ -462,6 +462,13 @@ export function renderSpectralView(container, entries, overlapRules, interaction
     'svg',
     {
       viewBox: `0 0 ${spectralViewWidth} ${spectralViewHeight}`,
+      // Stretch to fill whatever box CSS gives this SVG (width: 100%,
+      // height: a fixed value -- app.css's .spectral-view-svg) instead of
+      // the default "preserve aspect ratio, letterbox" behavior. Without
+      // this, a rendered box wider-than-720:316 would just center a
+      // 720:316 chart inside it with blank bars on both sides -- exactly
+      // undoing the "fill the available width" fix this SVG's CSS makes.
+      preserveAspectRatio: 'none',
       role: 'group',
       'aria-labelledby': 'spectral-view-title spectral-view-description',
     },
