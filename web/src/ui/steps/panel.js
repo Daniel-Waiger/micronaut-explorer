@@ -272,17 +272,31 @@ export function createPanelStep(kb) {
         const resolved = token
           ? resolveMarkerToken(token, kb.index, kb.markersKb, kb.spectra)
           : { token: 'Unnamed channel', canonical: null, state: 'unrecognized' };
+        // Same effective-color computation as the channel row's own swatch
+        // (appendColorControls) -- the spectral view and the row it came
+        // from can never show a channel in two different colors.
+        const computedColor = resolved.state === 'known' ? wavelengthToColor(resolved.emissionPeakNm) : null;
         return {
           ...resolved,
           channelId: channel.id,
           filterCenterNm: channel.filterCenterNm,
           filterBandwidthNm: channel.filterBandwidthNm,
+          color: effectiveChannelColor(channel, computedColor),
         };
       }
 
       function refreshSpectralView() {
         const channels = currentChannels();
-        const plotEntries = channels.length > 0 ? channels.map(resolvedChannelEntry) : entries;
+        // The free-text path has no channel to override color on -- the
+        // wavelength-derived default (same as its row's read-only swatch)
+        // is the only color available, same posture as appendRow's swatch.
+        const plotEntries =
+          channels.length > 0
+            ? channels.map(resolvedChannelEntry)
+            : entries.map((entry) => ({
+                ...entry,
+                color: entry.state === 'known' ? wavelengthToColor(entry.emissionPeakNm) : null,
+              }));
         renderSpectralView(spectralHost, plotEntries, kb.overlapRules, spectralViewState);
       }
 

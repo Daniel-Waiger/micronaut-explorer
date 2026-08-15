@@ -44,6 +44,19 @@ function spectralViewFwhm(overlapRules) {
   return spectralViewPlausibleFwhm(value) ? value : SPECTRAL_VIEW_DEFAULT_FWHM_NM;
 }
 
+const SPECTRAL_VIEW_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
+
+// A curve/filter's own color (color-panel patch: ui/steps/panel.js's
+// effectiveChannelColor -- the user's override or the wavelength-derived
+// default), threaded through so the plot can render each channel in ITS
+// color instead of an arbitrary rotating series palette. `null` when the
+// caller didn't supply one (or supplied something malformed) -- the
+// renderer's own series-N fallback is what draws in that case, never a
+// fabricated color here.
+function spectralViewValidColor(value) {
+  return typeof value === 'string' && SPECTRAL_VIEW_COLOR_PATTERN.test(value) ? value : null;
+}
+
 /** Normalized Gaussian intensity: 1 at peak and 0.5 at ±FWHM/2. */
 export function spectralViewIntensityAt(wavelengthNm, peakNm, fwhmNm) {
   if (
@@ -82,6 +95,7 @@ function spectralViewFilterBand(entry) {
     startNm,
     endNm,
     clipped: startNm !== rawStartNm || endNm !== rawEndNm,
+    color: spectralViewValidColor(entry.color),
   };
 }
 
@@ -128,6 +142,7 @@ export function buildSpectralViewModel(entries, overlapRules) {
         excitationPeakNm: spectralViewFiniteNumber(entry.excitationPeakNm) ? entry.excitationPeakNm : null,
         reviewStatus: entry.reviewStatus || null,
         fwhmNm: curveFwhmNm,
+        color: spectralViewValidColor(entry.color),
         points,
         sourceIndex,
       };

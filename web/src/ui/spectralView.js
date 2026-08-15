@@ -47,6 +47,20 @@ function spectralViewSeriesClass(index) {
   return `spectral-view-series-${index % spectralViewSeriesCount}`;
 }
 
+// Color-panel patch: a curve/filter with its own color (engine/
+// spectralView.js's spectralViewValidColor -- the channel's user-picked or
+// wavelength-derived color) renders in THAT color instead of the rotating
+// series palette. Inline style, not a class, so it wins over
+// .spectral-view-series-N's color/fill/stroke by specificity while leaving
+// that class's stroke-dasharray untouched -- overlapping same-hued curves
+// still read apart by dash pattern, not just hue.
+function spectralViewApplyColor(element, color) {
+  if (!color) return;
+  element.style.color = color;
+  element.style.fill = color;
+  element.style.stroke = color;
+}
+
 function spectralViewFilterSeriesIndex(filter, model, fallbackIndex) {
   const matched = model.curves.findIndex(
     (curve) =>
@@ -206,6 +220,7 @@ function spectralViewAppendFilters(svg, model, records) {
         labelText
       )
     );
+    spectralViewApplyColor(group, filter.color);
     record.group = group;
     svg.append(group);
   }
@@ -259,6 +274,7 @@ function spectralViewAppendCurves(svg, model, records) {
       ),
       label
     );
+    spectralViewApplyColor(group, curve.color);
     record.group = group;
     svg.append(group);
   }
@@ -280,6 +296,7 @@ function spectralViewAppendLegend(wrapper, records) {
       `${sampleClass} ${spectralViewSeriesClass(record.seriesIndex)}`
     );
     sample.setAttribute('aria-hidden', 'true');
+    spectralViewApplyColor(sample, record.item.color);
     const label =
       record.kind === 'curve'
         ? `${record.name} · ${record.item.emissionPeakNm} nm peak`

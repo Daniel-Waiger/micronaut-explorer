@@ -223,6 +223,51 @@ test('interactive spectrum identifies, emphasizes, and independently toggles cur
   }
 });
 
+test("a curve/filter with its own color renders in THAT color, overriding the rotating series palette but keeping its dash pattern", () => {
+  const originalDocument = globalThis.document;
+  const fakeDocument = new FakeDocument();
+  globalThis.document = fakeDocument;
+  try {
+    const container = fakeDocument.createElement('div');
+    const state = spectralViewCreateState();
+    const entry = { ...spectralEntry(), color: '#3366ff' };
+    renderSpectralView(container, [entry], { schematicEmissionFwhmNm: 50 }, state);
+
+    const curveGroup = container.querySelector('.spectral-view-curve-group');
+    const filterGroup = container.querySelector('.spectral-view-filter-group');
+    const legendSamples = container.querySelectorAll('.spectral-view-legend-sample, .spectral-view-filter-sample');
+
+    for (const el of [curveGroup, filterGroup, ...legendSamples]) {
+      assert.equal(el.style.color, '#3366ff');
+      assert.equal(el.style.fill, '#3366ff');
+      assert.equal(el.style.stroke, '#3366ff');
+    }
+    // The series class (dash pattern) is still applied -- color overrides
+    // via inline style, it doesn't replace the class.
+    assert.match(curveGroup.className, /spectral-view-series-0/);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
+test('an entry with no/malformed color leaves the rotating series palette untouched (no inline style)', () => {
+  const originalDocument = globalThis.document;
+  const fakeDocument = new FakeDocument();
+  globalThis.document = fakeDocument;
+  try {
+    const container = fakeDocument.createElement('div');
+    const state = spectralViewCreateState();
+    renderSpectralView(container, [{ ...spectralEntry(), color: 'not-a-hex-color' }], { schematicEmissionFwhmNm: 50 }, state);
+
+    const curveGroup = container.querySelector('.spectral-view-curve-group');
+    assert.equal(curveGroup.style.color, undefined);
+    assert.equal(curveGroup.style.fill, undefined);
+    assert.equal(curveGroup.style.stroke, undefined);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});
+
 test('Enter toggles a focused series and malformed interaction state degrades safely', () => {
   const originalDocument = globalThis.document;
   const fakeDocument = new FakeDocument();

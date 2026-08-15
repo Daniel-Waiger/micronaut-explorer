@@ -78,6 +78,20 @@ test('a curve with no/malformed emissionFwhmNm falls back to the pack-wide schem
   }
 });
 
+test("a curve and its filter carry the entry's own color through -- valid hex kept, malformed/missing dropped to null", () => {
+  const withColor = known('A', 500, { color: '#3366ff', filterCenterNm: 500, filterBandwidthNm: 30 });
+  const model = buildSpectralViewModel([withColor], {});
+  assert.equal(model.curves[0].color, '#3366ff');
+  assert.equal(model.filters[0].color, '#3366ff');
+
+  for (const badColor of [undefined, null, '', 'blue', '#zzzzzz', '#fff', 123]) {
+    const entry = known('B', 500, { color: badColor, filterCenterNm: 500, filterBandwidthNm: 30 });
+    const badModel = buildSpectralViewModel([entry], {});
+    assert.equal(badModel.curves[0].color, null, JSON.stringify(badColor));
+    assert.equal(badModel.filters[0].color, null, JSON.stringify(badColor));
+  }
+});
+
 test('only known entries get curves; complete valid filters get clipped renderer bands', () => {
   const entries = [
     known('Known', 520, { channelId: 'a', filterCenterNm: 525, filterBandwidthNm: 50 }),
@@ -96,6 +110,7 @@ test('only known entries get curves; complete valid filters get clipped renderer
     startNm: 300,
     endNm: 360,
     clipped: true,
+    color: null,
   });
   assert.equal(model.filters.at(-1).endNm, 900);
   assert.equal(model.filters.at(-1).clipped, true);
