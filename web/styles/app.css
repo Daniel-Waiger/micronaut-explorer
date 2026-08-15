@@ -140,13 +140,52 @@ button:focus-visible {
 .shell-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
   padding: 16px 10px;
   border-right: 1px solid var(--line);
   background: var(--panel);
+  /* Stays on screen while .shell-main's own content scrolls the page past
+     it -- #app has no height cap, so it's the WHOLE page that scrolls, not
+     an inner .shell-main viewport; align-self: start keeps this box at its
+     own content height instead of stretching to match .shell-main's (often
+     much taller) height, which is what gives sticky positioning room to
+     actually move as the page scrolls. */
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+.nav-toggle {
+  align-self: flex-end;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.nav-toggle:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.nav-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .nav-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font: inherit;
   font-size: 14px;
   text-align: left;
@@ -156,6 +195,40 @@ button:focus-visible {
   border-radius: 8px;
   padding: 10px 12px;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.nav-step-icon {
+  flex: 0 0 auto;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.nav-step-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed: the icon-only rail. The class lives on .shell-body (the grid
+   container) rather than .shell-nav alone, so the SAME toggle also narrows
+   the grid track and hands the reclaimed width to .shell-main -- collapsing
+   the nav should make room for content, not just shrink an item inside a
+   column that stays 200px regardless. */
+.shell-body.shell-nav-collapsed {
+  grid-template-columns: 60px 1fr;
+}
+
+.shell-body.shell-nav-collapsed .nav-toggle {
+  align-self: center;
+}
+
+.shell-body.shell-nav-collapsed .nav-step {
+  justify-content: center;
+  padding: 10px 4px;
+}
+
+.shell-body.shell-nav-collapsed .nav-step-label {
+  display: none;
 }
 
 .nav-step:hover {
@@ -1603,7 +1676,12 @@ button:focus-visible {
 
 .spectral-view-chart {
   position: relative;
-  width: min(100%, 720px);
+  /* Fill the available width like every other row in this step (.panel-row,
+     the fluorophore picker, ...) instead of capping out at the SVG's own
+     720px viewBox width -- the viewBox's aspect ratio still holds via the
+     SVG's own width:100%/height:auto below, so this only makes the chart
+     wider, never distorted. */
+  width: 100%;
 }
 
 .spectral-view-svg {

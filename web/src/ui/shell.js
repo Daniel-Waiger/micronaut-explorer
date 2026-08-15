@@ -10,6 +10,40 @@ import { buildFeedbackReport } from '../core/feedbackReport.js';
 import { copyToClipboard } from './clipboard.js';
 
 const THEME_KEY = 'micronaut.theme';
+const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
+
+// One glyph per step, matching this codebase's existing convention of a
+// plain Unicode character standing in for an icon (the drag handle's '↕',
+// the reorder buttons' '↑'/'↓', the delete pill's '×') rather than pulling
+// in an icon font/library -- web/ is a deliberately zero-dependency project.
+// Purely decorative: every nav button also carries an explicit aria-label
+// (below), so a screen reader never has to guess a name from an emoji.
+const NAV_STEP_ICONS = {
+  study: '📋',
+  describe: '📝',
+  design: '📐',
+  naming: '🏷️',
+  panel: '🎨',
+  overview: '📊',
+  guide: '📖',
+};
+const NAV_STEP_ICON_FALLBACK = '•';
+
+function loadNavCollapsed() {
+  try {
+    return localStorage.getItem(NAV_COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveNavCollapsed(collapsed) {
+  try {
+    localStorage.setItem(NAV_COLLAPSED_KEY, collapsed ? '1' : '0');
+  } catch {
+    // Convenience only, same posture as theme persistence below.
+  }
+}
 
 // Alpha-pilot feedback destinations (Wave 1 of alpha-pilot-readiness).
 // Both are placeholders -- Daniel fills them in once the form/alias exist;
@@ -285,9 +319,41 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
   const body = document.createElement('div');
   body.className = 'shell-body';
 
+  // Starts from the last persisted choice so a reload doesn't flash
+  // expanded-then-collapse (or vice versa) for a returning user -- same
+  // load-before-first-paint posture as the theme toggle above.
+  let navCollapsed = loadNavCollapsed();
+  if (navCollapsed) body.classList.add('shell-nav-collapsed');
+
   const nav = document.createElement('nav');
   nav.className = 'shell-nav';
   nav.setAttribute('aria-label', 'Steps');
+
+  // A toggle button, not the whole nav's textContent rebuilt on every
+  // collapse -- renderNav (below) only ever touches navSteps, so the toggle
+  // survives every step-navigation re-render untouched.
+  const navToggle = document.createElement('button');
+  navToggle.type = 'button';
+  navToggle.className = 'nav-toggle';
+  function updateNavToggle() {
+    navToggle.textContent = navCollapsed ? '»' : '«';
+    const label = navCollapsed ? 'Expand step navigation' : 'Collapse step navigation';
+    navToggle.title = label;
+    navToggle.setAttribute('aria-label', label);
+    navToggle.setAttribute('aria-expanded', String(!navCollapsed));
+  }
+  navToggle.addEventListener('click', () => {
+    navCollapsed = !navCollapsed;
+    saveNavCollapsed(navCollapsed);
+    body.classList.toggle('shell-nav-collapsed', navCollapsed);
+    updateNavToggle();
+  });
+  updateNavToggle();
+  nav.appendChild(navToggle);
+
+  const navSteps = document.createElement('div');
+  navSteps.className = 'nav-steps';
+  nav.appendChild(navSteps);
 
   const main = document.createElement('main');
   main.className = 'shell-main';
@@ -305,14 +371,31 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
   root.appendChild(status);
 
   function renderNav(activeId) {
-    nav.textContent = '';
+    navSteps.textContent = '';
     for (const step of router.steps) {
+      const label = step.title || step.id;
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'nav-step' + (step.id === activeId ? ' active' : '');
-      btn.textContent = step.title || step.id;
+      btn.title = label;
+      // Always the real step name, independent of collapsed state -- the
+      // icon span below is aria-hidden, so this is the button's ONLY
+      // accessible name when collapsed hides the visible label text.
+      btn.setAttribute('aria-label', label);
+
+      const icon = document.createElement('span');
+      icon.className = 'nav-step-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = NAV_STEP_ICONS[step.id] || NAV_STEP_ICON_FALLBACK;
+      btn.appendChild(icon);
+
+      const labelSpan = document.createElement('span');
+      labelSpan.className = 'nav-step-label';
+      labelSpan.textContent = label;
+      btn.appendChild(labelSpan);
+
       btn.addEventListener('click', () => router.navigate(step.id));
-      nav.appendChild(btn);
+      navSteps.appendChild(btn);
     }
   }
 
