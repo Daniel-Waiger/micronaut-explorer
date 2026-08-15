@@ -66,6 +66,8 @@ function buildPanelRows(channels, markersText, markerIndex, markersKb, spectra) 
         state: resolved ? resolved.state : 'unrecognized',
         excitationPeakNm: resolved && resolved.state === 'known' ? resolved.excitationPeakNm : null,
         emissionPeakNm: resolved && resolved.state === 'known' ? resolved.emissionPeakNm : null,
+        filterCenterNm: c.filterCenterNm,
+        filterBandwidthNm: c.filterBandwidthNm,
       };
     });
   }
@@ -77,6 +79,8 @@ function buildPanelRows(channels, markersText, markerIndex, markersKb, spectra) 
     state: e.state,
     excitationPeakNm: e.state === 'known' ? e.excitationPeakNm : null,
     emissionPeakNm: e.state === 'known' ? e.emissionPeakNm : null,
+    filterCenterNm: null,
+    filterBandwidthNm: null,
   }));
 }
 

@@ -1,0 +1,31 @@
+{
+  "branch": "codex/fluorophore-expansion",
+  "owner": "Codex/gpt-5.6-sol-medium",
+  "status": "complete",
+  "tasks": {
+    "FP1": "done",
+    "FP2": "done",
+    "FP3": "done"
+  },
+  "owned_files": [
+    "docs/plans/planner-web-fluorophore-picker-task-graph.json",
+    "docs/plans/planner-web-fluorophore-picker-ownership.json",
+    "web/src/engine/panelAssembly.js",
+    "web/src/ui/fluorophorePicker.js",
+    "web/src/ui/steps/panel.js",
+    "web/styles/app.css",
+    "web/tests/panelAssembly.test.js",
+    "web/tests/fluorophorePicker.test.js",
+    "dist/index.html",
+    "tools/cma-dashboard/index.html",
+    "docs/plans/planner-web-spectral-visualization-handover.md"
+  ],
+  "read_only_cross_lane": [
+    "web/src/llm/",
+    "web/src/engine/llmreply.js",
+    "web/src/ui/guidance.js",
+    "web/src/ui/steps/describe.js",
+    "web/kb/questions.json",
+    "web/kb/advisor.json"
+  ]
+}

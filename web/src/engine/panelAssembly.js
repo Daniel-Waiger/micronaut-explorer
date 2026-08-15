@@ -51,9 +51,117 @@ export const CONJUGATION_LABELS = {
 // fix was written to close -- see spectra.js's derivePanelFacts header).
 export const ANTIBODY_CONJUGATION_MODES = new Set(['antibody-direct', 'antibody-indirect']);
 
+function panelFluorophoreFinitePeaks(entry) {
+  return (
+    entry &&
+    typeof entry.excitationPeakNm === 'number' &&
+    Number.isFinite(entry.excitationPeakNm) &&
+    typeof entry.emissionPeakNm === 'number' &&
+    Number.isFinite(entry.emissionPeakNm)
+  );
+}
+
+function panelFluorophoreDisplayName(value) {
+  if (!value.includes(' ')) return value === value.toLowerCase() ? value.toUpperCase() : value;
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/**
+ * Flatten the normalized spectra map into the complete native-select catalog.
+ * A non-family contributes its canonical key; a family contributes each exact
+ * variant key because selecting the bare family would be spectrally ambiguous.
+ * TOTAL and immutable: malformed entries are skipped and never break the UI.
+ */
+export function panelFluorophoreOptions(fluorophores) {
+  if (!fluorophores || typeof fluorophores !== 'object' || Array.isArray(fluorophores)) return [];
+  const options = [];
+  const seenValues = new Set();
+
+  function appendOption(value, canonical, peaks, isVariant) {
+    const normalizedValue = typeof value === 'string' ? value.trim() : '';
+    const dedupeKey = normalizedValue.toLowerCase();
+    if (!normalizedValue || seenValues.has(dedupeKey) || !panelFluorophoreFinitePeaks(peaks)) return;
+    seenValues.add(dedupeKey);
+    options.push({
+      value: normalizedValue,
+      label:
+        `${panelFluorophoreDisplayName(normalizedValue)} — ` +
+        `Ex ${peaks.excitationPeakNm} / Em ${peaks.emissionPeakNm} nm`,
+      canonical,
+      excitationPeakNm: peaks.excitationPeakNm,
+      emissionPeakNm: peaks.emissionPeakNm,
+      isVariant,
+    });
+  }
+
+  for (const [canonical, entry] of Object.entries(fluorophores)) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) continue;
+    if (entry.isFamily === true) {
+      const variants = entry.variants;
+      if (!variants || typeof variants !== 'object' || Array.isArray(variants)) continue;
+      for (const [variantKey, peaks] of Object.entries(variants)) {
+        appendOption(variantKey, canonical, peaks, true);
+      }
+    } else {
+      appendOption(canonical, canonical, entry, false);
+    }
+  }
+
+  return options.sort(
+    (left, right) =>
+      left.label.localeCompare(right.label, 'en', { numeric: true, sensitivity: 'base' }) ||
+      left.value.localeCompare(right.value)
+  );
+}
+
+/** Write one picker value into the mode-appropriate field by stable channel id. */
+export function panelFluorophoreWriteValue(channels, channelId, value) {
+  const savedValue = typeof value === 'string' ? value : '';
+  if (!Array.isArray(channels)) return [];
+  return channels.map((channel) => {
+    if (!channel || channel.id !== channelId) return channel;
+    return channel.conjugation === 'tag-ligand'
+      ? { ...channel, conjugateDye: savedValue }
+      : { ...channel, fluorophore: savedValue };
+  });
+}
+
 /** A brand-new, empty channel. `id` is caller-supplied (shortId()). */
 export function emptyChannel(id) {
-  return { id, target: '', fluorophore: '', conjugation: 'direct-probe', conjugateDye: '' };
+  return {
+    id,
+    target: '',
+    fluorophore: '',
+    conjugation: 'direct-probe',
+    conjugateDye: '',
+    filterCenterNm: null,
+    filterBandwidthNm: null,
+  };
+}
+
+// Detection filters are deliberately an all-or-nothing user statement: a
+// center without a bandwidth (or vice versa) cannot honestly describe a band.
+// Keep this local so the serialized channel shape has one normalization rule.
+function normalizePanelFilterPair(entry) {
+  const center = entry.filterCenterNm;
+  const bandwidth = entry.filterBandwidthNm;
+  if (
+    typeof center === 'number' &&
+    Number.isFinite(center) &&
+    center >= 300 &&
+    center <= 900 &&
+    typeof bandwidth === 'number' &&
+    Number.isFinite(bandwidth) &&
+    bandwidth > 0 &&
+    bandwidth <= 300
+  ) {
+    return { filterCenterNm: center, filterBandwidthNm: bandwidth };
+  }
+  return { filterCenterNm: null, filterBandwidthNm: null };
 }
 
 /**
@@ -77,9 +185,70 @@ export function normalizeChannels(raw) {
       fluorophore: typeof entry.fluorophore === 'string' ? entry.fluorophore : '',
       conjugation: CONJUGATION_MODES.includes(entry.conjugation) ? entry.conjugation : 'direct-probe',
       conjugateDye: typeof entry.conjugateDye === 'string' ? entry.conjugateDye : '',
+      ...normalizePanelFilterPair(entry),
     });
   }
   return channels;
+}
+
+/**
+ * Return a new channel array with `sourceId` immediately before `targetId`.
+ * Invalid ids and self-drops intentionally leave the ordering unchanged.
+ */
+export function reorderPanelChannels(channels, sourceId, targetId) {
+  const ordered = Array.isArray(channels) ? channels.slice() : [];
+  if (typeof sourceId !== 'string' || !sourceId || typeof targetId !== 'string' || !targetId || sourceId === targetId) {
+    return ordered;
+  }
+  const sourceIndex = ordered.findIndex((channel) => channel && channel.id === sourceId);
+  const targetIndex = ordered.findIndex((channel) => channel && channel.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return ordered;
+
+  const [source] = ordered.splice(sourceIndex, 1);
+  ordered.splice(ordered.findIndex((channel) => channel && channel.id === targetId), 0, source);
+  return ordered;
+}
+
+/** Return a new array after moving one channel by an integer offset. */
+export function shiftPanelChannel(channels, id, delta) {
+  const ordered = Array.isArray(channels) ? channels.slice() : [];
+  if (typeof id !== 'string' || !id || !Number.isInteger(delta) || delta === 0) return ordered;
+  const sourceIndex = ordered.findIndex((channel) => channel && channel.id === id);
+  const targetIndex = sourceIndex + delta;
+  if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= ordered.length) return ordered;
+
+  const [source] = ordered.splice(sourceIndex, 1);
+  ordered.splice(targetIndex, 0, source);
+  return ordered;
+}
+
+/**
+ * Return channels ordered by a caller-supplied emission resolver. Finite
+ * emission values come first in ascending order; unresolved values retain
+ * their relative order at the end.
+ */
+export function sortPanelChannelsByEmission(channels, emissionForChannel) {
+  const ordered = Array.isArray(channels) ? channels.slice() : [];
+  if (typeof emissionForChannel !== 'function') return ordered;
+
+  return ordered
+    .map((channel, index) => {
+      let emission = null;
+      try {
+        const candidate = emissionForChannel(channel);
+        if (typeof candidate === 'number' && Number.isFinite(candidate)) emission = candidate;
+      } catch {
+        // A malformed resolver makes this channel unresolved, not fatal.
+      }
+      return { channel, index, emission };
+    })
+    .sort((left, right) => {
+      if (left.emission === null && right.emission === null) return left.index - right.index;
+      if (left.emission === null) return 1;
+      if (right.emission === null) return -1;
+      return left.emission - right.emission || left.index - right.index;
+    })
+    .map(({ channel }) => channel);
 }
 
 /**
@@ -131,6 +300,8 @@ export function seedChannelsFromMarkers(resolvePanelResult, markersKb, kbMarker,
         fluorophore: conjugation === 'tag-ligand' ? '' : entry.token,
         conjugation,
         conjugateDye: conjugation === 'tag-ligand' ? entry.token : '',
+        filterCenterNm: null,
+        filterBandwidthNm: null,
       };
     });
 }

@@ -36,6 +36,8 @@ test('renders the mixed expanded panel using KB-derived study-document peaks', (
       fluorophore,
       conjugation: 'direct-probe',
       conjugateDye: '',
+      filterCenterNm: index === 0 ? 620 : null,
+      filterBandwidthNm: index === 0 ? 40 : null,
     })),
   };
 
@@ -57,6 +59,8 @@ test('renders the mixed expanded panel using KB-derived study-document peaks', (
       `bench card must render the real KB peaks for ${fluorophore}`
     );
   }
+  assert.ok(card.includes('| mScarlet-I | 569/593 | 620/40 |'));
+  assert.ok(card.includes('| IRDye 800CW | 774/789 | _(not set)_ |'));
 
   // A changed runtime spectrum must flow through the document into the
   // rendered card; matching only the committed values would not disprove
@@ -70,6 +74,22 @@ test('renders the mixed expanded panel using KB-derived study-document peaks', (
       `| IRDye 800CW | ${rawSpectra.IRDYE800CW.excitationPeakNm + 1}/${rawSpectra.IRDYE800CW.emissionPeakNm + 1} |`
     )
   );
+});
+
+test('detection filters are explicit and malformed or absent values never become invented defaults', () => {
+  const card = renderBenchCard({
+    label: 'Filter contract',
+    panelRows: [
+      { target: '', fluorophore: 'A', excitationPeakNm: 480, emissionPeakNm: 520, filterCenterNm: 525, filterBandwidthNm: 50 },
+      { target: '', fluorophore: 'B', excitationPeakNm: 550, emissionPeakNm: 590, filterCenterNm: 600, filterBandwidthNm: null },
+      { target: '', fluorophore: 'C', excitationPeakNm: null, emissionPeakNm: null, filterCenterNm: '650', filterBandwidthNm: 40 },
+    ],
+    controls: {},
+    filenames: [],
+  });
+  assert.ok(card.includes('| A | 480/520 | 525/50 |'));
+  assert.ok(card.includes('| B | 550/590 | _(not set)_ |'));
+  assert.ok(card.includes('| C | _(unresolved)_ | _(not set)_ |'));
 });
 
 test('never throws on a missing/malformed assay, and says so plainly', () => {

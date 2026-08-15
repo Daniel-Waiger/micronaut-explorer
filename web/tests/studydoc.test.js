@@ -102,6 +102,7 @@ test('panelRows falls back to the free-text markers field (same tokens as the Co
   assert.deepEqual(fluorophores, ['SYTO9', 'PROPIDIUM IODIDE']);
   assert.ok(viability.panelRows.every((r) => r.state === 'known'));
   assert.ok(viability.panelRows.every((r) => typeof r.excitationPeakNm === 'number'));
+  assert.ok(viability.panelRows.every((r) => r.filterCenterNm === null && r.filterBandwidthNm === null));
 });
 
 test('panelRows reads from structured channels (target + resolved spectral field) once at least one channel exists', () => {
@@ -114,8 +115,57 @@ test('panelRows reads from structured channels (target + resolved spectral field
   const doc = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const viability = doc.assays.find((a) => a.label === 'Bacterial viability');
   assert.deepEqual(viability.panelRows, [
-    { target: 'Nucleic acid', fluorophore: 'DAPI', conjugation: 'direct-probe', state: 'known', excitationPeakNm: 358, emissionPeakNm: 461 },
+    {
+      target: 'Nucleic acid',
+      fluorophore: 'DAPI',
+      conjugation: 'direct-probe',
+      state: 'known',
+      excitationPeakNm: 358,
+      emissionPeakNm: 461,
+      filterCenterNm: null,
+      filterBandwidthNm: null,
+    },
   ]);
+});
+
+test('panelRows preserve structured channel order and propagate complete filters without inventing defaults', () => {
+  const study = createDefaultStudy();
+  study.assays[0].panel = {
+    targets: [],
+    channels: [
+      {
+        id: 'far-red',
+        target: 'ROS',
+        fluorophore: 'CellROX Deep Red',
+        conjugation: 'direct-probe',
+        conjugateDye: '',
+        filterCenterNm: 690,
+        filterBandwidthNm: 50,
+      },
+      {
+        id: 'red',
+        target: 'Reporter',
+        fluorophore: 'mScarlet-I',
+        conjugation: 'genetically-encoded',
+        conjugateDye: '',
+      },
+    ],
+  };
+  const rows = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE).assays[0].panelRows;
+  assert.deepEqual(rows.map((row) => row.fluorophore), ['CellROX Deep Red', 'mScarlet-I']);
+  assert.deepEqual(
+    rows.map(({ filterCenterNm, filterBandwidthNm }) => ({ filterCenterNm, filterBandwidthNm })),
+    [
+      { filterCenterNm: 690, filterBandwidthNm: 50 },
+      { filterCenterNm: null, filterBandwidthNm: null },
+    ]
+  );
+
+  study.assays[0].panel.channels[0].filterCenterNm = 710;
+  study.assays[0].panel.channels[0].filterBandwidthNm = 40;
+  const changed = buildStudyDocument(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE).assays[0].panelRows[0];
+  assert.equal(changed.filterCenterNm, 710);
+  assert.equal(changed.filterBandwidthNm, 40);
 });
 
 test('a mixed expanded panel reaches panelRows with identities and peaks from the real spectra pack', () => {

@@ -86,6 +86,7 @@ test('a well-formed pack loads with zero issues', () => {
   assert.equal(issues.length, 0);
   assert.equal(overlapRules.emissionProximityNm, 25);
   assert.equal(overlapRules.excitationProximityNm, 20);
+  assert.equal(overlapRules.schematicEmissionFwhmNm, 50);
   assert.deepEqual(fluorophores.DYEA, { isFamily: false, reviewStatus: 'claude-drafted', excitationPeakNm: 490, emissionPeakNm: 525 });
 });
 
@@ -197,9 +198,38 @@ test('missing/non-numeric overlapRules thresholds default and are reported, neve
   const { overlapRules, issues } = loadSpectraKb({ version: 1, fluorophores: {}, overlapRules: {} });
   assert.equal(overlapRules.emissionProximityNm, 25);
   assert.equal(overlapRules.excitationProximityNm, 20);
+  assert.equal(overlapRules.schematicEmissionFwhmNm, 50);
   assert.equal(overlapRules.reviewStatus, 'claude-drafted');
   assert.ok(issues.some((i) => /emissionProximityNm is missing/.test(i.message)));
   assert.ok(issues.some((i) => /excitationProximityNm is missing/.test(i.message)));
+});
+
+test('schematic curve width is data-driven, backwards-compatible, and rejects implausible provided values', () => {
+  const supplied = loadSpectraKb({
+    version: 1,
+    fluorophores: {},
+    overlapRules: { emissionProximityNm: 25, excitationProximityNm: 20, schematicEmissionFwhmNm: 72 },
+  });
+  assert.equal(supplied.overlapRules.schematicEmissionFwhmNm, 72);
+  assert.deepEqual(supplied.issues, []);
+
+  const absent = loadSpectraKb({
+    version: 1,
+    fluorophores: {},
+    overlapRules: { emissionProximityNm: 25, excitationProximityNm: 20 },
+  });
+  assert.equal(absent.overlapRules.schematicEmissionFwhmNm, 50);
+  assert.deepEqual(absent.issues, []);
+
+  for (const bad of [-1, 0, 301, Infinity, '50']) {
+    const malformed = loadSpectraKb({
+      version: 1,
+      fluorophores: {},
+      overlapRules: { emissionProximityNm: 25, excitationProximityNm: 20, schematicEmissionFwhmNm: bad },
+    });
+    assert.equal(malformed.overlapRules.schematicEmissionFwhmNm, 50, String(bad));
+    assert.ok(malformed.issues.some((i) => /schematicEmissionFwhmNm/.test(i.message)), String(bad));
+  }
 });
 
 // --- resolveMarkerToken: the five-state resolution --------------------------

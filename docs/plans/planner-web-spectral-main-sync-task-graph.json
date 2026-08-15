@@ -1,0 +1,55 @@
+{
+  "name": "planner-web-spectral-main-sync",
+  "objective": "Publish the verified spectral visualization and fluorophore picker wave on a feature branch synchronized with Claude's newly merged main, without rebasing or altering main.",
+  "invariants": [
+    "origin/main is fetched and treated as the integration source; no rebase or force push is used.",
+    "The verified spectral/picker wave is committed with the required Codex agent trailer before integration.",
+    "Claude's merged LLM/question/advisor changes and Codex's panel/spectral changes both survive the merge.",
+    "The combined tree passes the full web suite, build tests, deterministic double build, and an independent frontier review before push.",
+    "Only codex/fluorophore-expansion is pushed; main is not modified by this run."
+  ],
+  "tasks": [
+    {
+      "id": "MS1",
+      "title": "Fetch and audit Claude's merged main",
+      "files": [],
+      "scope": "Fetch origin, verify the published main/feature refs, inspect c4d4289..origin/main and identify overlap/couplings with the local spectral/picker wave.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "verification": "Record exact refs and changed-file overlap; confirm the target contains Claude's question/advisor/chat-LLM changes and the prior Codex expansion."
+    },
+    {
+      "id": "MS2",
+      "title": "Commit the verified local wave",
+      "files": ["web/", "docs/plans/", "tools/cma-dashboard/index.html"],
+      "scope": "Commit the complete already-verified spectral visualization, filter interaction, fluorophore picker, tests, plans, and handover with the required Agent trailer.",
+      "depends_on": ["MS1"],
+      "parallel_safe": false,
+      "verification": "Commit contains only the declared Codex wave, has Agent: Codex/gpt-5.6-sol-medium, and leaves no unstaged wave files."
+    },
+    {
+      "id": "MS3",
+      "title": "Merge origin/main into the feature branch",
+      "files": ["web/styles/app.css", "tools/cma-dashboard/index.html"],
+      "scope": "Merge origin/main into codex/fluorophore-expansion without rebase. Resolve only mechanical overlap while preserving both lanes; regenerate the dashboard snapshot through update.py if required.",
+      "depends_on": ["MS2"],
+      "parallel_safe": false,
+      "verification": "origin/main is an ancestor of HEAD; both Claude and Codex representative symbols/data are present; no unresolved conflicts."
+    },
+    {
+      "id": "MS4",
+      "title": "Verify and push the synchronized branch",
+      "files": ["dist/index.html"],
+      "scope": "Run combined full tests, build gates, deterministic double build, preview freshness, independent frontier review, then push the feature branch normally.",
+      "depends_on": ["MS3"],
+      "parallel_safe": false,
+      "verification": "All gates pass, verifier returns PASS, push succeeds without force, and local HEAD equals origin/codex/fluorophore-expansion."
+    }
+  ],
+  "batches": [
+    { "id": "B1", "tasks": ["MS1"] },
+    { "id": "B2", "tasks": ["MS2"] },
+    { "id": "B3", "tasks": ["MS3"] },
+    { "id": "B4", "tasks": ["MS4"] }
+  ]
+}

@@ -144,296 +144,71 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "Planner fluorophore expansion",
-  "orchestrator": "CMA orchestrator",
-  "active_model": "gpt-5.6-sol-medium",
-  "active_status": "done",
-  "phase": "",
-  "state_note": "Fluorophore expansion and Streamlit repair complete, independently approved, committed, and pushed; BioIO/metadata readers parked by user",
-  "current_task": null,
+  "run": "Spectral/picker main synchronization",
+  "orchestrator": "Codex gpt-5.6-sol warm-context",
+  "active_model": "Codex gpt-5.6-sol",
+  "active_status": "running",
+  "phase": "B2",
+  "state_note": "",
+  "current_task": {
+    "id": "MS2",
+    "title": "Commit verified local wave"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "Source ledger",
-      "v": "83 records",
+      "k": "origin/main",
+      "v": "2127b53",
       "tone": "ok"
     },
     {
-      "k": "Source URLs",
-      "v": "46 live",
-      "tone": "ok"
-    },
-    {
-      "k": "Marker canonicals",
-      "v": "168 total",
-      "tone": "ok"
-    },
-    {
-      "k": "Alias collisions",
-      "v": "0",
-      "tone": "ok"
-    },
-    {
-      "k": "New classes",
-      "v": "17 protein / 12 indicator / 13 stain / 30 dye",
-      "tone": "ok"
-    },
-    {
-      "k": "New family variants",
-      "v": "11",
-      "tone": "ok"
-    },
-    {
-      "k": "Python marker/export tests",
-      "v": "40 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Marker KB JS tests",
-      "v": "19 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Marker export",
-      "v": "byte-identical twice",
-      "tone": "ok"
-    },
-    {
-      "k": "Spectra ledger parity",
-      "v": "72 direct + 11 variants",
-      "tone": "ok"
-    },
-    {
-      "k": "Spectra tests",
-      "v": "50 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "KB pack tests",
-      "v": "16 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Streamlit smoke",
-      "v": "15 floor + 15 current",
-      "tone": "ok"
-    },
-    {
-      "k": "Python non-reader",
-      "v": "343 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Web suite",
-      "v": "608 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Single-file build",
-      "v": "24 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Smoke floor/current",
-      "v": "15 + 15 passed",
-      "tone": "ok"
+      "k": "Overlap",
+      "v": "2 files",
+      "tone": "warn"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "T1",
-      "phase": "Batch 1",
-      "title": "Curate an authoritative spectral source ledger",
+      "id": "MS1",
+      "phase": "Tasks",
+      "title": "Fetch and audit Claude's merged main",
       "status": "done",
-      "by": "gpt-5.6-sol-medium verified"
+      "by": "gpt-5.6-luna audit"
     },
     {
-      "id": "T2",
-      "phase": "Batch 2",
-      "title": "Add canonical marker names and collision-free aliases",
-      "status": "done",
-      "by": "27 tests + alias audit"
+      "id": "MS2",
+      "phase": "Tasks",
+      "title": "Commit the verified local wave",
+      "status": "running",
+      "by": "gpt-5.6-luna git ops"
     },
     {
-      "id": "T3",
-      "phase": "Batch 3",
-      "title": "Classify new canonicals and family variants in the exporter",
-      "status": "done",
-      "by": "classification audit passed"
+      "id": "MS3",
+      "phase": "Tasks",
+      "title": "Merge origin/main into the feature branch",
+      "status": "pending",
+      "by": "queued"
     },
     {
-      "id": "T4",
-      "phase": "Batch 4",
-      "title": "Regenerate marker KB mirrors from their producers",
-      "status": "resolved",
-      "by": "DIR exact-alias invariant fixed; full T4 verification passed"
-    },
-    {
-      "id": "T5",
-      "phase": "Batch 5",
-      "title": "Add source-backed organic-label and near-IR spectra",
-      "status": "done",
-      "by": "30/30 ledger parity + suite green"
-    },
-    {
-      "id": "T6",
-      "phase": "Batch 6",
-      "title": "Add exact named fluorescent-protein spectra",
-      "status": "done",
-      "by": "17/17 FP parity + exact aliases"
-    },
-    {
-      "id": "T7",
-      "phase": "Batch 7",
-      "title": "Add live-cell, nucleic-acid, ion, ROS, pH, and family spectra",
-      "status": "done",
-      "by": "25 direct + 11 variants; 47 spectra tests"
-    },
-    {
-      "id": "T8",
-      "phase": "Batch 5",
-      "title": "Lock new marker classes, aliases, and variants with producer tests",
-      "status": "done",
-      "by": "19 producer acceptance tests"
-    },
-    {
-      "id": "T9",
-      "phase": "Batch 8",
-      "title": "Add source-parity and resolver regression tests for spectra",
-      "status": "done",
-      "by": "50 source-parity/resolver tests"
-    },
-    {
-      "id": "T10",
-      "phase": "Batch 8",
-      "title": "Verify generated-pack wiring exposes the expanded KB",
-      "status": "done",
-      "by": "16 real-pack wiring tests"
-    },
-    {
-      "id": "T11",
-      "phase": "Batch 9",
-      "title": "Exercise study-document and bench-card consumers",
-      "status": "done",
-      "by": "36 downstream consumer tests"
-    },
-    {
-      "id": "T12",
-      "phase": "Batch 10",
-      "title": "Run the full suite and verify the served shipped artifact",
-      "status": "done",
-      "by": "independent-CMA-approved"
-    },
-    {
-      "id": "R1",
-      "phase": "Repair",
-      "title": "Remove_nested_Streamlit_expanders",
-      "status": "resolved",
-      "by": "gpt-5.6-sol-medium"
-    },
-    {
-      "id": "R2",
-      "phase": "Repair",
-      "title": "Validate_metadata_reader_environment",
-      "status": "done",
-      "by": "user-parked-readers"
-    },
-    {
-      "id": "R3",
-      "phase": "Repair",
-      "title": "Rerun_all_gates_and_rebuild",
-      "status": "done",
-      "by": "independent-CMA-approved"
+      "id": "MS4",
+      "phase": "Tasks",
+      "title": "Verify and push the synchronized branch",
+      "status": "pending",
+      "by": "queued"
     }
   ],
   "log": [
     {
-      "time": "18:02:19",
-      "msg": "T1 dispatched: authoritative vendor, FPbase, and primary-source verification"
+      "time": "17:39:30",
+      "msg": "Daniel authorized verify, sync, and push; main remains read-only target"
     },
     {
-      "time": "18:03:03",
-      "msg": "Live dashboard started at http://localhost:8778 (separate from Claude Code)"
-    },
-    {
-      "time": "18:04:33",
-      "msg": "T1 executor switched to gpt-5.6-sol medium per user request"
-    },
-    {
-      "time": "18:06:34",
-      "msg": "Board moved to :8778 (Opus took :8777 for local-llm-guidance); run state preserved intact"
-    },
-    {
-      "time": "21:46:02",
-      "msg": "T1 source ledger verified; corrected stale/formulation-specific source mismatches and started T2"
-    },
-    {
-      "time": "21:51:48",
-      "msg": "T2 complete: 72 new canonicals, representative aliases verified, generic FP parents preserved"
-    },
-    {
-      "time": "21:53:18",
-      "msg": "T3 complete; X-03 coupling notice posted before marker pack generation"
-    },
-    {
-      "time": "21:53:49",
-      "msg": "T4 verification caught DIR exact-lookup invariant failure"
-    },
-    {
-      "time": "21:54:37",
-      "msg": "D1 resolved; T4 complete and beginning source-backed spectra batches"
-    },
-    {
-      "time": "21:56:32",
-      "msg": "T5 content parity passed; spectra completeness test correctly awaits remaining staged entries"
-    },
-    {
-      "time": "21:58:55",
-      "msg": "T5-T7 complete; all source-backed spectra and family resolution verified"
-    },
-    {
-      "time": "22:04:36",
-      "msg": "T8-T10 complete; producer, source-parity/resolver, and real-kbpack wiring tests green; T11 started"
-    },
-    {
-      "time": "23:22:47",
-      "msg": "T11 complete with 36 consumer tests; T12 deterministic regeneration and full gates started"
-    },
-    {
-      "time": "23:35:00",
-      "msg": "Independent review findings fixed and re-review approved; T12 held on unrelated legacy failures and browser URL policy"
-    },
-    {
-      "time": "23:38:19",
-      "msg": "User authorized resolving all actionable issues in this worktree; validating failures under .venv before edits"
-    },
-    {
-      "time": "23:40:06",
-      "msg": "Confirmed the worktree lacks the documented .venv; nested expander is a genuine compatibility defect, metadata failure requires a proper dependency environment"
-    },
-    {
-      "time": "23:42:11",
-      "msg": "Stopped dependency installation before BioIO was installed; metadata-reader gate parked by user"
-    },
-    {
-      "time": "23:49:26",
-      "msg": "Current Streamlit 1.61.1 smoke suite passes 12/12 without BioIO installed"
-    },
-    {
-      "time": "23:53:33",
-      "msg": "All active code gates green; entering mandatory independent verification"
-    },
-    {
-      "time": "00:03:28",
-      "msg": "Final independent verification approved with no blocking findings; all active worktree gates green"
-    },
-    {
-      "time": "00:10:08",
-      "msg": "Handover prepared: stale E1 cleared; branch pushed and ready for integration"
+      "time": "17:40:54",
+      "msg": "MS1 complete: Claude merged lane confirmed; overlaps limited to app.css and generated dashboard"
     }
   ],
-  "snapshot_at": "2026-08-14 00:10"
+  "snapshot_at": "2026-08-15 17:40"
 };
 /* CMA:EMBEDDED:END */
 

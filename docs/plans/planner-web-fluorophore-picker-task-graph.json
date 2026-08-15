@@ -1,0 +1,63 @@
+{
+  "name": "planner-web-fluorophore-picker",
+  "objective": "Replace manual entry of known Color-panel fluorophores with a complete library dropdown while retaining an explicit custom-entry path for genuinely new information and saving either choice into panel.channels.",
+  "invariants": [
+    "Every valid non-family spectrum and every valid family variant appears exactly once in the picker.",
+    "Known selections save the library value into the active channel's fluorophore-bearing field; custom text is the only manually entered fluorophore data.",
+    "Tag-ligand channels write conjugateDye; all other conjugation modes write fluorophore.",
+    "Existing custom values remain visible/editable and existing known aliases resolve to a library selection without a destructive rewrite.",
+    "All writes read current store state inside the handler so sibling edits cannot be clobbered.",
+    "No commit or push occurs without separate user authorization."
+  ],
+  "tasks": [
+    {
+      "id": "FP1",
+      "title": "Build the complete fluorophore option catalog",
+      "files": [
+        "web/src/engine/panelAssembly.js",
+        "web/tests/panelAssembly.test.js"
+      ],
+      "scope": "Add a pure total catalog helper over the normalized spectra map. Emit every valid non-family canonical and every valid family variant exactly once with exact value, excitation/emission peaks, deterministic alphabetical order, and no mutation.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "verification": "Test synthetic malformed/family inputs plus the real loaded KB; prove uniqueness, deterministic ordering, representative ALEXA488/SYTO9/family entries, finite peaks, total degraded behavior, and no input mutation."
+    },
+    {
+      "id": "FP2",
+      "title": "Create and wire the library/custom picker",
+      "files": [
+        "web/src/ui/fluorophorePicker.js",
+        "web/src/ui/steps/panel.js",
+        "web/styles/app.css",
+        "web/tests/fluorophorePicker.test.js"
+      ],
+      "scope": "Render an accessible native select with all catalog options, an empty prompt, and a final explicit custom-entry choice. Show free text only in custom mode. Map existing known aliases to their library value, preserve existing custom text, and save changes through the active channel's current fluorophore-bearing field.",
+      "depends_on": [
+        "FP1"
+      ],
+      "parallel_safe": false,
+      "verification": "Drive known selection, clear, custom reveal/type, existing custom reload, existing alias selection, tag-ligand write, ordinary fluorophore write, sibling target preservation, conjugation rerender, and accessibility labels in a deterministic DOM harness."
+    },
+    {
+      "id": "FP3",
+      "title": "Verify the shipped picker artifact",
+      "files": [
+        "dist/index.html",
+        "tools/cma-dashboard/index.html",
+        "docs/plans/planner-web-fluorophore-picker-ownership.json",
+        "docs/plans/planner-web-spectral-visualization-handover.md"
+      ],
+      "scope": "Run focused and full web tests, build tests, deterministic double build, no-fetch and duplicate-symbol checks, served-artifact freshness checks, and a frontier adversarial verifier. Fix every blocking finding and update handover/board state.",
+      "depends_on": [
+        "FP2"
+      ],
+      "parallel_safe": false,
+      "verification": "Focused picker/catalog tests, full web suite, 24 build tests, two byte-identical builds, stable multi-request preview server, and gpt-5.6-sol high read-only adversarial review."
+    }
+  ],
+  "batches": [
+    { "id": "B1", "tasks": ["FP1"] },
+    { "id": "B2", "tasks": ["FP2"] },
+    { "id": "B3", "tasks": ["FP3"] }
+  ]
+}

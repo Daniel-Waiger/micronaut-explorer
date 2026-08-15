@@ -1,0 +1,288 @@
+{
+  "name": "planner-web-spectral-visualization",
+  "objective": "Make Color-panel spillover understandable with honest schematic emission curves, optional user-entered detection-filter overlays, and persisted wavelength-aware channel ordering without claiming measured spectra or quantitative bleed-through.",
+  "invariants": [
+    "Curves are normalized Gaussian schematics derived from KB emission peaks and one explicitly draft global FWHM; they are never labeled or used as measured spectra.",
+    "Detection filters are optional user inputs in center/bandwidth nanometers; the app never invents instrument filters.",
+    "Drag/drop and move controls change channel array order only; physical peak positions remain data-driven and immovable.",
+    "Existing five-state spectral resolution, review warning, peak-proximity flags, and free-text fallback remain intact.",
+    "All new web/src top-level symbols use spectral-specific names and must pass the single-file duplicate-symbol gate.",
+    "The built artifact remains self-contained and makes no fetch calls.",
+    "Claude's LLM/Describe files, questions.json, and advisor.json are read-only and out of scope."
+  ],
+  "tasks": [
+    {
+      "id": "SV1",
+      "title": "Add the schematic curve-width KB contract",
+      "files": [
+        "web/kb/spectra.json",
+        "web/src/engine/spectra.js",
+        "web/tests/spectra.test.js",
+        "web/tests/kbpack.test.js"
+      ],
+      "scope": "Add overlapRules.schematicEmissionFwhmNm=50 with claude-drafted review status context, normalize it through loadSpectraKb with a backwards-compatible safe default, and expose it unchanged through shapeAppKb. Do not add per-fluorophore curve points or claim this is a measured width.",
+      "invariants": [
+        "Existing proximity thresholds and every fluorophore peak remain byte-for-byte unchanged.",
+        "Missing or malformed schematic width never throws and falls back to 50 nm.",
+        "Runtime tests mutate the supplied width to prove consumers are data-driven."
+      ],
+      "depends_on": [],
+      "parallel_safe": false,
+      "verification": "Run spectra.test.js and kbpack.test.js; assert real pack loads with zero issues, malformed widths degrade safely, and a non-default supplied width reaches returned overlapRules."
+    },
+    {
+      "id": "SV2",
+      "title": "Build the pure spectral-view model",
+      "files": [
+        "web/src/engine/spectralView.js",
+        "web/tests/spectralView.test.js"
+      ],
+      "scope": "Create a pure total module that samples normalized Gaussian schematic emission curves, validates optional center/bandwidth filter bands, derives a bounded wavelength domain, and returns a deterministic left-to-right visual model for known entries. Unknown/ambiguous/unavailable entries remain visible outside the curve model through the existing state rows.",
+      "invariants": [
+        "Intensity is 1 at the emission peak and 0.5 at peak plus or minus FWHM/2 within numeric tolerance.",
+        "No NaN, Infinity, negative bandwidth, or out-of-range filter reaches SVG consumers.",
+        "Input arrays and channel objects are never mutated.",
+        "Series order is emission wavelength ascending with stable tie-breaking."
+      ],
+      "depends_on": [
+        "SV1"
+      ],
+      "parallel_safe": false,
+      "verification": "Run spectralView.test.js with happy path, malformed input, tied peaks, near-edge filters, non-default KB FWHM, and no-known-entry cases."
+    },
+    {
+      "id": "SV3",
+      "title": "Persist filters and channel ordering",
+      "files": [
+        "web/src/engine/panelAssembly.js",
+        "web/tests/panelAssembly.test.js"
+      ],
+      "scope": "Extend normalized structured channels with optional filterCenterNm/filterBandwidthNm, add total immutable move/shift helpers, and add stable emission-order sorting driven by a caller-supplied resolver. Preserve backward compatibility for saved channels without filter fields.",
+      "invariants": [
+        "Invalid or half-valid filter values normalize to null rather than fabricated defaults.",
+        "Unknown emission channels sort after known channels while preserving their relative order.",
+        "Bad ids, self-drops, empty arrays, and malformed callbacks are no-ops and never throw."
+      ],
+      "depends_on": [],
+      "parallel_safe": true,
+      "verification": "Run panelAssembly.test.js with legacy shape, valid and invalid filters, drag-before-target, keyboard shifts, stable wavelength sort, duplicate peaks, and unresolved channels."
+    },
+    {
+      "id": "SV4",
+      "title": "Propagate filters into study documents",
+      "files": [
+        "web/src/engine/studydoc.js",
+        "web/tests/studydoc.test.js"
+      ],
+      "scope": "Carry normalized optional filter center/bandwidth values from structured channels into panelRows. Free-text fallback rows receive null filter values. Preserve all identity, state, peak, and control-gating behavior.",
+      "invariants": [
+        "Structured channel order is preserved in panelRows.",
+        "Free-text fallback remains unchanged except for explicit null filter fields.",
+        "Unresolved spectra still keep their filter settings and honest state."
+      ],
+      "depends_on": [
+        "SV3"
+      ],
+      "parallel_safe": false,
+      "verification": "Run studydoc.test.js; mutate stored filter values and require exact propagation while existing peak mutation and ambiguity tests remain green."
+    },
+    {
+      "id": "SV5",
+      "title": "Show filters on bench cards",
+      "files": [
+        "web/src/engine/render/benchcard.js",
+        "web/tests/benchcard.test.js"
+      ],
+      "scope": "Add a Detection filter (nm) column using center/bandwidth notation for complete filters and an explicit not-set value otherwise. Keep Markdown escaping/shape and all existing channel content intact.",
+      "invariants": [
+        "Bench-card row order matches persisted channel order.",
+        "No invented default filter is printed.",
+        "Malformed panel rows remain total and readable."
+      ],
+      "depends_on": [
+        "SV4"
+      ],
+      "parallel_safe": false,
+      "verification": "Run benchcard.test.js with complete, absent, malformed, and reordered filters; retain the runtime-KB peak mutation proof."
+    },
+    {
+      "id": "SV6",
+      "title": "Render the accessible spectral SVG",
+      "files": [
+        "web/src/ui/spectralView.js",
+        "web/styles/app.css"
+      ],
+      "scope": "Render a responsive accessible SVG with wavelength axis, normalized curve paths, peak labels, translucent filter bands, curve/filter legend, empty state, and a persistent schematic-not-measured caption. Use DOM/SVG APIs without innerHTML interpolation or network dependencies; isolate CSS under spectral-view selectors.",
+      "invariants": [
+        "Filter bands render behind curves and clip to the plotted wavelength domain.",
+        "Meaning is carried by labels and line styles as well as color.",
+        "The SVG has a concise accessible title/description and scales without horizontal page overflow."
+      ],
+      "depends_on": [
+        "SV2"
+      ],
+      "parallel_safe": false,
+      "verification": "Run node syntax/import checks and visually inspect light/dark layouts at desktop and narrow widths using a panel with overlapping Deep Red dyes and at least two explicit filters."
+    },
+    {
+      "id": "SV7",
+      "title": "Wire filters, drag/drop, and wavelength ordering into Color panel",
+      "files": [
+        "web/src/ui/steps/panel.js"
+      ],
+      "scope": "Use structured channels when present and free-text entries otherwise to refresh the spectral view. Add optional numeric filter center/bandwidth inputs, a drag handle/drop target, accessible move up/down buttons, and Order by emission wavelength. Persist every change through panel.channels and refresh without moving physical peak positions.",
+      "invariants": [
+        "Typing into a filter never destroys target, conjugation, fluorophore, or channel id fields.",
+        "Sort is offered only for structured channels and known emissions; unresolved rows remain stable at the end.",
+        "Drag/drop and keyboard controls share the same immutable reorder helpers.",
+        "The existing free-text resolver, flags, seeding, advice panel, and review banner remain visible and correct."
+      ],
+      "depends_on": [
+        "SV2",
+        "SV3",
+        "SV6"
+      ],
+      "parallel_safe": false,
+      "verification": "Exercise add/seed/edit/filter/drag/move/sort/remove flows in the built app; reload after each persisted operation; verify known-left-to-right ordering and stable unresolved tail."
+    },
+    {
+      "id": "SV8",
+      "title": "Run end-to-end build and adversarial verification",
+      "files": [
+        "dist/index.html",
+        "tools/cma-dashboard/index.html",
+        "docs/plans/planner-web-spectral-visualization-ownership.json"
+      ],
+      "scope": "Run affected tests, full JavaScript and non-reader Python suites, deterministic single-file build twice, duplicate-symbol gate, no-fetch check, visual interaction verification, ownership/dashboard updates, and independent adversarial review. Fix every blocking defect before completion.",
+      "invariants": [
+        "BioIO and metadata-reader integration remain parked and excluded exactly as authorized.",
+        "A repaired failed task is recorded resolved, never relabeled done.",
+        "No commit, push, PR, merge, or Claude-worktree edit without separate user authorization."
+      ],
+      "depends_on": [
+        "SV1",
+        "SV2",
+        "SV3",
+        "SV4",
+        "SV5",
+        "SV6",
+        "SV7"
+      ],
+      "parallel_safe": false,
+      "verification": "All web tests, non-reader Python tests, build tests, two identical builds, source collision scan, visual desktop/mobile checks, and an independent high-reasoning verifier pass."
+    },
+    {
+      "id": "IV1",
+      "title": "Add hover, focus, and independent on/off state",
+      "files": [
+        "web/src/ui/spectralView.js",
+        "web/src/ui/steps/panel.js"
+      ],
+      "scope": "Make every curve and detection-filter band mouse- and keyboard-interactive. Hover/focus must name and emphasize the element, dim peers, expose a plain-language details card, and support independent on/off state through both the plot and accessible legend buttons. Preserve state across spectrum refreshes within one Color-panel visit.",
+      "invariants": [
+        "Every interactive SVG data element has an accessible name, role, pressed state, and Enter/Space toggle.",
+        "Every element that can be turned off retains a visible legend control that can turn it back on.",
+        "Curve and filter visibility states are independent and are not persisted into assay scientific data.",
+        "Renderer refreshes after filter edits do not reset visibility state."
+      ],
+      "depends_on": [
+        "SV8"
+      ],
+      "parallel_safe": false,
+      "verification": "Drive mouse hover, focus, plot click, legend click, Enter, and Space in the served built artifact. Toggle a curve and its filter independently, edit a filter to force refresh, and prove the retained states and accurate accessible text."
+    },
+    {
+      "id": "IV2",
+      "title": "Clarify chart text and print filter values",
+      "files": [
+        "web/src/ui/spectralView.js",
+        "web/styles/app.css"
+      ],
+      "scope": "Increase axis and data-label contrast, add haloed fluorophore peak labels, print each center/bandwidth value directly on its filter band, and style hover/focus/legend states in both themes without changing scientific values.",
+      "invariants": [
+        "Filter text uses the exact user-entered center/bandwidth values and includes nm units.",
+        "Line style and text continue to carry identity without relying on color alone.",
+        "All new selectors remain scoped under spectral-view classes and do not alter Claude's LLM UI."
+      ],
+      "depends_on": [
+        "IV1"
+      ],
+      "parallel_safe": false,
+      "verification": "Inspect dark and light built-artifact screenshots, computed text colors, direct SYTO9 identification, overlapping filter labels, and narrow-width layout."
+    },
+    {
+      "id": "IV3",
+      "title": "Verify shipped interaction artifact",
+      "files": [
+        "dist/index.html",
+        "tools/cma-dashboard/index.html",
+        "docs/plans/planner-web-spectral-visualization-ownership.json",
+        "docs/plans/planner-web-spectral-visualization-handover.md"
+      ],
+      "scope": "Run the full web/build gates, deterministic single-file build twice, no-fetch and duplicate-symbol checks, live built-artifact interaction traces, dashboard/handover updates, and a frontier adversarial verifier. Fix every blocking defect before handover.",
+      "invariants": [
+        "Only the built single-file artifact is accepted as browser evidence.",
+        "BioIO and metadata-reader integrations remain parked.",
+        "No commit or push occurs without separate user authorization."
+      ],
+      "depends_on": [
+        "IV2"
+      ],
+      "parallel_safe": false,
+      "verification": "Full web suite, 24 build tests, two byte-identical builds, built-artifact mouse/keyboard/theme checks, and independent high-reasoning adversarial review."
+    }
+  ],
+  "batches": [
+    {
+      "id": "B1",
+      "tasks": [
+        "SV1",
+        "SV3"
+      ]
+    },
+    {
+      "id": "B2",
+      "tasks": [
+        "SV2",
+        "SV4"
+      ]
+    },
+    {
+      "id": "B3",
+      "tasks": [
+        "SV5",
+        "SV6"
+      ]
+    },
+    {
+      "id": "B4",
+      "tasks": [
+        "SV7"
+      ]
+    },
+    {
+      "id": "B5",
+      "tasks": [
+        "SV8"
+      ]
+    },
+    {
+      "id": "B6",
+      "tasks": [
+        "IV1"
+      ]
+    },
+    {
+      "id": "B7",
+      "tasks": [
+        "IV2"
+      ]
+    },
+    {
+      "id": "B8",
+      "tasks": [
+        "IV3"
+      ]
+    }
+  ]
+}

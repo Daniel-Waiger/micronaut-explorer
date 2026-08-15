@@ -138,6 +138,7 @@ test('a raw object with every sub-pack present yields zero issues', () => {
   assert.deepEqual(stageRules, []);
   assert.deepEqual(spectra, {});
   assert.equal(overlapRules.emissionProximityNm, 25);
+  assert.equal(overlapRules.schematicEmissionFwhmNm, 50);
   assert.deepEqual(issues, []);
   assert.ok(index); // indexKb's own shape, exercised by kb.test.js
 });
@@ -153,13 +154,19 @@ test('raw.spectra reaches the returned spectra/overlapRules -- the same wiring g
     stages: { version: 1, stages: [], rules: [] },
     spectra: {
       version: 1,
-      overlapRules: { emissionProximityNm: 25, excitationProximityNm: 20, reviewStatus: 'claude-drafted' },
+      overlapRules: {
+        emissionProximityNm: 25,
+        excitationProximityNm: 20,
+        schematicEmissionFwhmNm: 64,
+        reviewStatus: 'claude-drafted',
+      },
       fluorophores: { DYEA: { excitationPeakNm: 490, emissionPeakNm: 525, reviewStatus: 'claude-drafted' } },
     },
   });
   assert.equal(issues.length, 0);
   assert.ok(spectra.DYEA);
   assert.equal(overlapRules.emissionProximityNm, 25);
+  assert.equal(overlapRules.schematicEmissionFwhmNm, 64);
 });
 
 test('the real generated marker and spectra packs expose the representative fluorophore expansion', () => {

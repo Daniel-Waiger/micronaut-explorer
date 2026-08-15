@@ -83,6 +83,9 @@ const NO_MARKERS_SENTINELS = new Set([
 const DEFAULT_REVIEW_STATUS = 'claude-drafted';
 const DEFAULT_EMISSION_PROXIMITY_NM = 25;
 const DEFAULT_EXCITATION_PROXIMITY_NM = 20;
+const SPECTRAL_VIEW_DEFAULT_EMISSION_FWHM_NM = 50;
+const SPECTRAL_VIEW_MIN_FWHM_NM = 5;
+const SPECTRAL_VIEW_MAX_FWHM_NM = 300;
 
 // Peak plausibility (Decision: content is hand-drafted and hand-edited, so a
 // type check alone lets a transposed digit through clean). The visible
@@ -260,9 +263,35 @@ export function loadSpectraKb(raw) {
       ? rawOverlapRules.reviewStatus.trim()
       : DEFAULT_REVIEW_STATUS;
 
+  const rawSchematicEmissionFwhmNm = rawOverlapRules.schematicEmissionFwhmNm;
+  const validSchematicEmissionFwhm =
+    typeof rawSchematicEmissionFwhmNm === 'number' &&
+    Number.isFinite(rawSchematicEmissionFwhmNm) &&
+    rawSchematicEmissionFwhmNm >= SPECTRAL_VIEW_MIN_FWHM_NM &&
+    rawSchematicEmissionFwhmNm <= SPECTRAL_VIEW_MAX_FWHM_NM;
+  const schematicEmissionFwhmNm = validSchematicEmissionFwhm
+    ? rawSchematicEmissionFwhmNm
+    : SPECTRAL_VIEW_DEFAULT_EMISSION_FWHM_NM;
+  // Optional for old/synthetic packs: absence is a backwards-compatible
+  // default. A present but invalid value is reported because silently
+  // accepting it would reshape every schematic curve in the UI.
+  if (rawSchematicEmissionFwhmNm !== undefined && !validSchematicEmissionFwhm) {
+    issues.push(
+      spectraIssue(
+        'overlapRules',
+        `overlapRules.schematicEmissionFwhmNm must be ${SPECTRAL_VIEW_MIN_FWHM_NM}-${SPECTRAL_VIEW_MAX_FWHM_NM} nm -- defaulting to ${schematicEmissionFwhmNm}`
+      )
+    );
+  }
+
   return {
     fluorophores,
-    overlapRules: { emissionProximityNm, excitationProximityNm, reviewStatus: overlapReviewStatus },
+    overlapRules: {
+      emissionProximityNm,
+      excitationProximityNm,
+      schematicEmissionFwhmNm,
+      reviewStatus: overlapReviewStatus,
+    },
     issues,
   };
 }
@@ -281,7 +310,16 @@ export function loadSpectraKb(raw) {
  */
 export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) {
   const needle = typeof token === 'string' ? token.trim().toLowerCase() : '';
-  const canonical = markerIndex && markerIndex.aliasToCanonical ? markerIndex.aliasToCanonical.get(needle) : undefined;
+  const indexedCanonical = markerIndex && markerIndex.aliasToCanonical ? markerIndex.aliasToCanonical.get(needle) : undefined;
+  // The spectra pack is itself authoritative for a picker selection. A few
+  // spectrum-backed products intentionally have no marker taxonomy/aliases;
+  // their exact canonical key must still round-trip as a known fluorophore.
+  const directSpectraCanonical = needle
+    ? Object.keys(
+        fluorophores && typeof fluorophores === 'object' && !Array.isArray(fluorophores) ? fluorophores : {}
+      ).find((key) => key.toLowerCase() === needle)
+    : undefined;
+  const canonical = indexedCanonical || directSpectraCanonical;
 
   if (!canonical) {
     return { token, canonical: null, state: 'unrecognized' };

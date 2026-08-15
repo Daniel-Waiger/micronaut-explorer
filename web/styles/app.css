@@ -6,6 +6,7 @@
    wins over the OS preference in both directions. */
 
 :root {
+  color-scheme: dark;
   --bg: #0d1117;
   --panel: #161b22;
   --panel-2: #1c2128;
@@ -23,6 +24,7 @@
 
 @media (prefers-color-scheme: light) {
   :root {
+    color-scheme: light;
     --bg: #f7f9fa;
     --panel: #ffffff;
     --panel-2: #ffffff;
@@ -38,6 +40,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0d1117;
   --panel: #161b22;
   --panel-2: #1c2128;
@@ -52,6 +55,7 @@
 }
 
 :root[data-theme="light"] {
+  color-scheme: light;
   --bg: #f7f9fa;
   --panel: #ffffff;
   --panel-2: #ffffff;
@@ -638,6 +642,70 @@ button:focus-visible {
   flex: 1 1 260px;
   font-size: 13.5px;
   color: var(--ink);
+}
+
+/* Structured channel controls share .panel-row-text with the resolved-text
+   spans above, so keep control styling explicitly element-scoped. This also
+   prevents native light-theme defaults from producing white fields inside
+   the dark panel. */
+.panel-channel-main input.panel-row-text,
+.panel-channel-main select.panel-row-text {
+  min-width: 0;
+  min-height: 36px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 9px;
+}
+
+.panel-channel-main input.panel-row-text::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.panel-channel-main select.panel-row-text option {
+  color: var(--ink);
+  background: var(--panel);
+}
+
+.panel-channel-main input.panel-row-text:focus-visible,
+.panel-channel-main select.panel-row-text:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.panel-channel-main input.panel-row-text:disabled,
+.panel-channel-main select.panel-row-text:disabled {
+  color: var(--muted);
+  background: var(--panel);
+  opacity: 0.7;
+}
+
+.panel-fluorophore-picker {
+  flex: 1 1 300px;
+  min-width: min(100%, 260px);
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+}
+
+.panel-fluorophore-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.panel-fluorophore-picker .panel-row-text {
+  width: 100%;
+  flex: none;
+}
+
+.panel-fluorophore-custom[hidden] {
+  display: none;
 }
 
 .panel-badge {
@@ -1305,4 +1373,324 @@ button:focus-visible {
   gap: 8px;
   margin-left: auto;
   flex-shrink: 0;
+}
+
+/* Interactive schematic spectral view: isolated because it is a compact
+   explanatory graphic rather than a global charting system. Series classes
+   pair a color with a dash pattern, and every data element also has a named,
+   keyboard-operable visibility control. */
+.spectral-view {
+  margin: 20px 0;
+  min-width: 0;
+}
+
+.spectral-view-heading {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.spectral-view-caption,
+.spectral-view-empty {
+  max-width: 76ch;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.spectral-view-empty {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--panel);
+}
+
+.spectral-view-chart {
+  position: relative;
+  width: min(100%, 720px);
+}
+
+.spectral-view-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  font-family: var(--sans);
+}
+
+.spectral-view-grid { stroke: var(--line); stroke-width: 1; opacity: 0.72; }
+.spectral-view-axis { stroke: var(--ink); stroke-width: 1; opacity: 0.72; }
+.spectral-view-tick,
+.spectral-view-axis-label { fill: var(--ink); font-size: 12px; font-weight: 550; }
+.spectral-view-axis-label { font-size: 12.5px; font-weight: 650; }
+.spectral-view-data {
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 120ms ease;
+}
+.spectral-view-filter { opacity: 0.2; }
+.spectral-view-curve {
+  fill: none;
+  stroke-width: 3;
+  transition: stroke-width 120ms ease, filter 120ms ease;
+}
+.spectral-view-peak { stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.8; }
+.spectral-view-peak-label,
+.spectral-view-filter-label {
+  font-size: 11.5px;
+  font-weight: 750;
+  letter-spacing: 0.01em;
+  paint-order: stroke fill;
+  stroke: var(--panel);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.spectral-view-peak-value { font-size: 10px; font-weight: 650; }
+.spectral-view-filter-label { font-size: 10.5px; }
+.spectral-view-data.spectral-view-active .spectral-view-curve {
+  stroke-width: 5;
+  filter: drop-shadow(0 0 3px currentColor);
+}
+.spectral-view-data.spectral-view-active .spectral-view-filter {
+  opacity: 0.42;
+  stroke-width: 2;
+}
+.spectral-view-data.spectral-view-muted { opacity: 0.2; }
+.spectral-view-data.spectral-view-off { opacity: 0.08; }
+.spectral-view-data.spectral-view-off.spectral-view-active { opacity: 0.55; }
+.spectral-view-data:focus { outline: none; }
+.spectral-view-data:focus .spectral-view-curve,
+.spectral-view-data:focus .spectral-view-filter {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.spectral-view-series-0 { color: var(--accent); fill: var(--accent); stroke: var(--accent); stroke-dasharray: none; }
+.spectral-view-series-1 { color: var(--warn); fill: var(--warn); stroke: var(--warn); stroke-dasharray: 8 3; }
+.spectral-view-series-2 { color: var(--danger); fill: var(--danger); stroke: var(--danger); stroke-dasharray: 3 3; }
+.spectral-view-series-3 { color: var(--ok); fill: var(--ok); stroke: var(--ok); stroke-dasharray: 10 3 2 3; }
+.spectral-view-series-4 { color: var(--ink); fill: var(--ink); stroke: var(--ink); stroke-dasharray: 1 3; }
+.spectral-view-series-5 { color: var(--muted); fill: var(--muted); stroke: var(--muted); stroke-dasharray: 12 3; }
+.spectral-view-series-6 { color: var(--accent); fill: var(--accent); stroke: var(--accent); stroke-dasharray: 5 2 1 2; }
+.spectral-view-series-7 { color: var(--warn); fill: var(--warn); stroke: var(--warn); stroke-dasharray: 6 4; }
+
+.spectral-view-tooltip {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  gap: 2px;
+  width: max-content;
+  max-width: min(250px, calc(100% - 16px));
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: var(--panel-2);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 24%);
+  font-size: 11.5px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.spectral-view-tooltip[hidden] { display: none; }
+.spectral-view-tooltip-name { font-size: 13px; color: var(--ink); }
+.spectral-view-tooltip-summary { color: var(--muted); }
+
+.spectral-view-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  max-width: 720px;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
+  border-radius: 7px;
+  color: var(--ink);
+  background: var(--panel-2);
+  font-size: 12.5px;
+}
+
+.spectral-view-details-name { color: var(--ink); }
+.spectral-view-details-summary { color: var(--muted); }
+
+.spectral-view-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spectral-view-legend-item {
+  min-width: 0;
+}
+
+.spectral-view-legend-button {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: opacity 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.spectral-view-legend-button:hover,
+.spectral-view-legend-button.spectral-view-active {
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+
+.spectral-view-legend-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.spectral-view-legend-button.spectral-view-muted { opacity: 0.38; }
+.spectral-view-legend-button.spectral-view-off { opacity: 0.5; }
+.spectral-view-legend-button.spectral-view-off.spectral-view-active { opacity: 1; }
+.spectral-view-legend-text { min-width: 0; }
+
+.spectral-view-legend-state {
+  margin-left: auto;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--panel);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.spectral-view-legend-sample {
+  display: inline-block;
+  flex: 0 0 26px;
+  height: 0;
+  border-top: 3px solid currentColor;
+}
+
+.spectral-view-legend-sample.spectral-view-series-1 { border-top-style: dashed; }
+.spectral-view-legend-sample.spectral-view-series-2 { border-top-style: dotted; }
+.spectral-view-legend-sample.spectral-view-series-3,
+.spectral-view-legend-sample.spectral-view-series-5,
+.spectral-view-legend-sample.spectral-view-series-6,
+.spectral-view-legend-sample.spectral-view-series-7 { border-top-style: dashed; }
+
+.spectral-view-filter-sample {
+  width: 18px;
+  height: 12px;
+  border: 1px solid currentColor;
+  background: color-mix(in srgb, currentColor 28%, transparent);
+}
+
+@media (max-width: 560px) {
+  .spectral-view-svg { min-width: 0; }
+  .spectral-view-peak-label { font-size: 9.5px; }
+  .spectral-view-filter-label { font-size: 9px; }
+  .spectral-view-legend { display: grid; grid-template-columns: 1fr; }
+}
+
+/* Structured Color-panel channel controls. The channel order is persisted;
+   drag/drop is supplemented by explicit arrow buttons for keyboard users. */
+.panel-channel-card {
+  display: grid;
+  gap: 0;
+  border-radius: 8px;
+  transition: outline-color 120ms ease, background 120ms ease;
+}
+
+.panel-channel-card.panel-channel-drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.panel-channel-main {
+  border-radius: 8px 8px 0 0;
+}
+
+.panel-channel-drag {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: var(--panel-2);
+  cursor: grab;
+  font: inherit;
+}
+
+.panel-channel-drag:active { cursor: grabbing; }
+
+.panel-channel-moves {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.panel-channel-move {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.panel-channel-move:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.panel-filter-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 190px) minmax(140px, 190px) minmax(180px, 1fr);
+  gap: 10px;
+  align-items: end;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: var(--panel-2);
+}
+
+.panel-filter-field {
+  display: grid;
+  gap: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.panel-filter-field input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--ink);
+  background: var(--panel);
+  font: inherit;
+  font-size: 13px;
+}
+
+.panel-filter-hint {
+  align-self: center;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+@media (max-width: 700px) {
+  .panel-filter-row { grid-template-columns: 1fr 1fr; }
+  .panel-filter-hint { grid-column: 1 / -1; }
+}
+
+@media (max-width: 440px) {
+  .panel-filter-row { grid-template-columns: 1fr; }
+  .panel-filter-hint { grid-column: auto; }
 }

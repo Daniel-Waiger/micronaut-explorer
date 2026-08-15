@@ -30,7 +30,7 @@
 import { assayView, scopeWrite } from '../../core/assay.js';
 import { kbMarker } from '../../core/kb.js';
 import { shortId } from '../../core/ids.js';
-import { flagPanelOverlaps, resolvePanel } from '../../engine/spectra.js';
+import { flagPanelOverlaps, resolveMarkerToken, resolvePanel } from '../../engine/spectra.js';
 import {
   ANTIBODY_CONJUGATION_MODES,
   CONJUGATION_LABELS,
@@ -38,9 +38,16 @@ import {
   channelSpectralField,
   emptyChannel,
   normalizeChannels,
+  panelFluorophoreOptions,
+  panelFluorophoreWriteValue,
+  reorderPanelChannels,
   seedChannelsFromMarkers,
+  shiftPanelChannel,
+  sortPanelChannelsByEmission,
 } from '../../engine/panelAssembly.js';
 import { createAdvicePanel } from '../advice.js';
+import { fluorophorePickerCreate } from '../fluorophorePicker.js';
+import { renderSpectralView, spectralViewCreateState } from '../spectralView.js';
 
 const STATE_LABELS = {
   unrecognized: 'Not recognized',
@@ -94,15 +101,20 @@ function summaryText(channels) {
   if (channels.length === 0) return 'No channels yet.';
   const antibodyCount = channels.filter((c) => ANTIBODY_CONJUGATION_MODES.has(c.conjugation)).length;
   const filled = channels.filter((c) => channelSpectralField(c).trim()).length;
+  const filterCount = channels.filter(
+    (c) => typeof c.filterCenterNm === 'number' && typeof c.filterBandwidthNm === 'number'
+  ).length;
   return (
     `${channels.length} channel(s), ${filled} with a fluorophore named -- ` +
     (antibodyCount > 0
       ? `${antibodyCount} use an antibody (isotype/secondary-antibody controls will be recommended on Overview).`
-      : 'none use an antibody.')
+      : 'none use an antibody.') +
+    ` ${filterCount} detection filter(s) entered.`
   );
 }
 
 export function createPanelStep(kb) {
+  const fluorophoreOptions = panelFluorophoreOptions(kb.spectra);
   return {
     id: 'panel',
     title: 'Color panel',
@@ -187,6 +199,15 @@ export function createPanelStep(kb) {
         }
       }
 
+      // Curves are intentionally rendered from the same resolved entries as
+      // the state rows above. Structured channels take over once present so
+      // their user-entered filters can be overlaid; until then the free-text
+      // markers remain the one quick-path source.
+      const spectralHost = document.createElement('section');
+      spectralHost.className = 'spectral-view-host';
+      const spectralViewState = spectralViewCreateState();
+      main.appendChild(spectralHost);
+
       // --- Structured panel assembly (Wave 2A) --------------------------
       const assemblyHeading = document.createElement('div');
       assemblyHeading.className = 'proposals-heading';
@@ -198,7 +219,9 @@ export function createPanelStep(kb) {
       assemblyExplainer.textContent =
         'Optional: name each channel’s biological target and how its fluorophore is attached. More precise than the ' +
         'markers field above -- in particular, it is what tells the Overview step’s controls whether an antibody is ' +
-        'actually involved, so it can recommend an isotype control only when one is warranted.';
+        'actually involved, so it can recommend an isotype control only when one is warranted. Enter a detection ' +
+        'filter as center/bandwidth nm to overlay it above. Drag channel handles or use the arrow buttons to reorder; ' +
+        'ordering changes the saved channel list, never a fluorophore’s physical wavelength.';
       main.appendChild(assemblyExplainer);
 
       const channelsList = document.createElement('div');
@@ -207,6 +230,7 @@ export function createPanelStep(kb) {
       summary.className = 'panel-empty';
       const controlsRow = document.createElement('div');
       controlsRow.className = 'overview-actions';
+      let draggedChannelId = null;
 
       function currentChannels() {
         const currentPanel = assayView(store.get(), assayId).panel;
@@ -221,11 +245,32 @@ export function createPanelStep(kb) {
       function writeChannelsData(channels) {
         writeChannels(channels);
         summary.textContent = summaryText(channels);
+        refreshSpectralView();
       }
 
       function writeChannelsStructure(channels) {
         writeChannels(channels);
         renderChannelsList();
+        refreshSpectralView();
+      }
+
+      function resolvedChannelEntry(channel) {
+        const token = channelSpectralField(channel).trim();
+        const resolved = token
+          ? resolveMarkerToken(token, kb.index, kb.markersKb, kb.spectra)
+          : { token: 'Unnamed channel', canonical: null, state: 'unrecognized' };
+        return {
+          ...resolved,
+          channelId: channel.id,
+          filterCenterNm: channel.filterCenterNm,
+          filterBandwidthNm: channel.filterBandwidthNm,
+        };
+      }
+
+      function refreshSpectralView() {
+        const channels = currentChannels();
+        const plotEntries = channels.length > 0 ? channels.map(resolvedChannelEntry) : entries;
+        renderSpectralView(spectralHost, plotEntries, kb.overlapRules, spectralViewState);
       }
 
       function channelField(input, className) {
@@ -234,8 +279,47 @@ export function createPanelStep(kb) {
       }
 
       function appendChannelRow(channel, index) {
+        const channelCard = document.createElement('div');
+        channelCard.className = 'panel-channel-card';
+        channelCard.dataset.channelId = channel.id;
+        channelCard.addEventListener('dragover', (event) => {
+          event.preventDefault();
+          channelCard.classList.add('panel-channel-drop-target');
+        });
+        channelCard.addEventListener('dragleave', () => channelCard.classList.remove('panel-channel-drop-target'));
+        channelCard.addEventListener('drop', (event) => {
+          event.preventDefault();
+          channelCard.classList.remove('panel-channel-drop-target');
+          const transferred = event.dataTransfer ? event.dataTransfer.getData('text/plain') : '';
+          const sourceId = transferred || draggedChannelId;
+          draggedChannelId = null;
+          writeChannelsStructure(reorderPanelChannels(currentChannels(), sourceId, channel.id));
+        });
+
         const row = document.createElement('div');
-        row.className = 'panel-row';
+        row.className = 'panel-row panel-channel-main';
+
+        const dragHandle = document.createElement('button');
+        dragHandle.type = 'button';
+        dragHandle.className = 'panel-channel-drag';
+        dragHandle.draggable = true;
+        dragHandle.textContent = '↕';
+        dragHandle.title = 'Drag to reorder this channel';
+        dragHandle.setAttribute('aria-label', `Drag ${channelSpectralField(channel).trim() || 'unnamed channel'} to reorder`);
+        dragHandle.addEventListener('dragstart', (event) => {
+          draggedChannelId = channel.id;
+          if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', channel.id);
+          }
+        });
+        dragHandle.addEventListener('dragend', () => {
+          draggedChannelId = null;
+          for (const card of channelsList.querySelectorAll('.panel-channel-drop-target')) {
+            card.classList.remove('panel-channel-drop-target');
+          }
+        });
+        row.appendChild(dragHandle);
 
         const targetInput = channelField(document.createElement('input'), 'panel-row-text');
         targetInput.type = 'text';
@@ -264,19 +348,45 @@ export function createPanelStep(kb) {
         });
         row.appendChild(conjugationSelect);
 
-        const dyeInput = channelField(document.createElement('input'), 'panel-row-text');
-        dyeInput.type = 'text';
         const isTagLigand = channel.conjugation === 'tag-ligand';
-        dyeInput.placeholder = isTagLigand ? 'Ligand dye (e.g. JF549)' : 'Fluorophore (e.g. Alexa Fluor 488)';
-        dyeInput.value = isTagLigand ? channel.conjugateDye : channel.fluorophore;
-        dyeInput.addEventListener('input', () => {
-          const next = currentChannels();
-          next[index] = isTagLigand
-            ? { ...next[index], conjugateDye: dyeInput.value }
-            : { ...next[index], fluorophore: dyeInput.value };
-          writeChannelsData(next);
+        const savedSpectralValue = channelSpectralField(channel);
+        const resolvedSpectralValue = savedSpectralValue.trim()
+          ? resolveMarkerToken(savedSpectralValue, kb.index, kb.markersKb, kb.spectra)
+          : null;
+        const libraryValue =
+          resolvedSpectralValue && resolvedSpectralValue.state === 'known'
+            ? resolvedSpectralValue.variantKey || resolvedSpectralValue.canonical || ''
+            : '';
+        const dyePicker = fluorophorePickerCreate({
+          options: fluorophoreOptions,
+          currentValue: savedSpectralValue,
+          libraryValue,
+          isTagLigand,
+          onChange(value) {
+            writeChannelsData(panelFluorophoreWriteValue(currentChannels(), channel.id, value));
+          },
         });
-        row.appendChild(dyeInput);
+        row.appendChild(dyePicker);
+
+        const moveControls = document.createElement('span');
+        moveControls.className = 'panel-channel-moves';
+        for (const [label, delta, title] of [
+          ['↑', -1, 'Move channel up'],
+          ['↓', 1, 'Move channel down'],
+        ]) {
+          const moveButton = document.createElement('button');
+          moveButton.type = 'button';
+          moveButton.className = 'assay-pill-delete panel-channel-move';
+          moveButton.textContent = label;
+          moveButton.title = title;
+          moveButton.setAttribute('aria-label', `${title}: ${channelSpectralField(channel).trim() || 'unnamed channel'}`);
+          moveButton.disabled = index + delta < 0 || index + delta >= currentChannels().length;
+          moveButton.addEventListener('click', () => {
+            writeChannelsStructure(shiftPanelChannel(currentChannels(), channel.id, delta));
+          });
+          moveControls.appendChild(moveButton);
+        }
+        row.appendChild(moveControls);
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
@@ -289,7 +399,59 @@ export function createPanelStep(kb) {
         });
         row.appendChild(removeBtn);
 
-        channelsList.appendChild(row);
+        const filterRow = document.createElement('div');
+        filterRow.className = 'panel-filter-row';
+
+        function filterInput(labelText, placeholder, value, min, max) {
+          const label = document.createElement('label');
+          label.className = 'panel-filter-field';
+          const labelSpan = document.createElement('span');
+          labelSpan.textContent = labelText;
+          label.appendChild(labelSpan);
+          const input = document.createElement('input');
+          input.type = 'number';
+          input.min = String(min);
+          input.max = String(max);
+          input.step = '1';
+          input.inputMode = 'numeric';
+          input.placeholder = placeholder;
+          input.value = typeof value === 'number' ? String(value) : '';
+          label.appendChild(input);
+          filterRow.appendChild(label);
+          return input;
+        }
+
+        const centerInput = filterInput('Filter center (nm)', 'e.g. 525', channel.filterCenterNm, 300, 900);
+        const bandwidthInput = filterInput('Bandwidth (nm)', 'e.g. 50', channel.filterBandwidthNm, 1, 300);
+        const filterHint = document.createElement('span');
+        filterHint.className = 'panel-filter-hint';
+        filterHint.textContent = 'Optional; both values are required. Use the microscope’s actual detection filter.';
+        filterRow.appendChild(filterHint);
+
+        function writeFilterPair() {
+          const center = centerInput.value.trim() === '' ? null : Number(centerInput.value);
+          const bandwidth = bandwidthInput.value.trim() === '' ? null : Number(bandwidthInput.value);
+          const valid =
+            Number.isFinite(center) &&
+            center >= 300 &&
+            center <= 900 &&
+            Number.isFinite(bandwidth) &&
+            bandwidth > 0 &&
+            bandwidth <= 300;
+          const next = currentChannels();
+          next[index] = {
+            ...next[index],
+            filterCenterNm: valid ? center : null,
+            filterBandwidthNm: valid ? bandwidth : null,
+          };
+          writeChannelsData(next);
+        }
+        centerInput.addEventListener('input', writeFilterPair);
+        bandwidthInput.addEventListener('input', writeFilterPair);
+
+        channelCard.appendChild(row);
+        channelCard.appendChild(filterRow);
+        channelsList.appendChild(channelCard);
       }
 
       function renderChannelsList() {
@@ -307,6 +469,22 @@ export function createPanelStep(kb) {
           writeChannelsStructure([...currentChannels(), emptyChannel(shortId())]);
         });
         controlsRow.appendChild(addBtn);
+
+        if (channels.length > 1) {
+          const sortBtn = document.createElement('button');
+          sortBtn.type = 'button';
+          sortBtn.className = 'copy-button';
+          sortBtn.textContent = 'Order by emission wavelength';
+          sortBtn.title = 'Known fluorophores left-to-right by emission peak; unresolved channels stay in their current relative order at the end.';
+          sortBtn.addEventListener('click', () => {
+            const sorted = sortPanelChannelsByEmission(currentChannels(), (candidate) => {
+              const resolved = resolvedChannelEntry(candidate);
+              return resolved.state === 'known' ? resolved.emissionPeakNm : null;
+            });
+            writeChannelsStructure(sorted);
+          });
+          controlsRow.appendChild(sortBtn);
+        }
 
         // Seeding is a ONE-TIME bootstrap (engine/panelAssembly.js's own
         // header): only offered while channels is still empty, so it can
@@ -329,6 +507,7 @@ export function createPanelStep(kb) {
       main.appendChild(summary);
       main.appendChild(controlsRow);
       renderChannelsList();
+      refreshSpectralView();
 
       const advicePanel = createAdvicePanel(advisor || [], 'panel');
       main.appendChild(advicePanel.element);

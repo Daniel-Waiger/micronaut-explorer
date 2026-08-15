@@ -4,7 +4,8 @@
 // Exports pass (docs/plans/planner-web-exports.md) because it needed real
 // UX/content design, not just another renderer over the existing model;
 // this is that design, done minimally: modality/specimen/readout, the
-// channel table (target/fluorophore/ex-em, from studydoc.js's panelRows --
+// channel table (target/fluorophore/ex-em/detection filter, from
+// studydoc.js's panelRows --
 // see its header for why that array exists), the recommended controls with
 // their reasons (never a bare checklist -- see controls.json's own
 // discipline: "a control the user does not understand is a control they
@@ -34,12 +35,22 @@ function channelsTable(panelRows) {
   if (rows.length === 0) {
     return '_No channels declared yet -- fill in the markers field or the structured panel on the Color panel step._';
   }
-  const lines = ['| Target | Fluorophore | Ex/Em (nm) |', '| --- | --- | --- |'];
+  const lines = [
+    '| Target | Fluorophore | Ex/Em (nm) | Detection filter (center/bandwidth nm) |',
+    '| --- | --- | --- | --- |',
+  ];
   for (const row of rows) {
     const target = row.target && row.target.trim() ? row.target.trim() : '--';
     const fluorophore = row.fluorophore && row.fluorophore.trim() ? row.fluorophore.trim() : '_(not named)_';
     const exEm = row.excitationPeakNm != null && row.emissionPeakNm != null ? `${row.excitationPeakNm}/${row.emissionPeakNm}` : '_(unresolved)_';
-    lines.push(`| ${target} | ${fluorophore} | ${exEm} |`);
+    const hasFilter =
+      typeof row.filterCenterNm === 'number' &&
+      Number.isFinite(row.filterCenterNm) &&
+      typeof row.filterBandwidthNm === 'number' &&
+      Number.isFinite(row.filterBandwidthNm) &&
+      row.filterBandwidthNm > 0;
+    const detectionFilter = hasFilter ? `${row.filterCenterNm}/${row.filterBandwidthNm}` : '_(not set)_';
+    lines.push(`| ${target} | ${fluorophore} | ${exEm} | ${detectionFilter} |`);
   }
   return lines.join('\n');
 }

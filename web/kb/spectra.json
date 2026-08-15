@@ -3,8 +3,9 @@
   "overlapRules": {
     "emissionProximityNm": 25,
     "excitationProximityNm": 20,
+    "schematicEmissionFwhmNm": 50,
     "reviewStatus": "claude-drafted",
-    "note": "Thresholds are a domain judgment call pending review against FACSI's actual filter sets (K-3, instruments/objectives/lines/detectors, not yet authored). Emission proximity is the primary (error-severity) check: typical bandpass emission filters are 20-40 nm wide and most dye/FP emission curves have a 40-60 nm FWHM, so peaks this close will substantially co-register in each other's detection window regardless of exact filter choice. Excitation proximity is secondary (warning-severity): standard laser lines are spaced 40-100+ nm apart specifically so one line excites one dye class, and this flag makes the existing confocal-sequential-scanning advisor tip panel-specific and concrete."
+    "note": "Thresholds are a domain judgment call pending review against FACSI's actual filter sets (K-3, instruments/objectives/lines/detectors, not yet authored). Emission proximity is the primary (error-severity) check: typical bandpass emission filters are 20-40 nm wide and many dye/FP emission curves have a 40-60 nm FWHM, so peaks this close will substantially co-register in each other's detection window regardless of exact filter choice. Excitation proximity is secondary (warning-severity): standard laser lines are spaced 40-100+ nm apart specifically so one line excites one dye class. schematicEmissionFwhmNm is only the normalized Gaussian width used by the explanatory plot when measured curve points are unavailable; it is not a fluorophore-specific measurement and must not be used as a quantitative spillover integral."
   },
   "fluorophores": {
     "ALEXA405": { "excitationPeakNm": 401, "emissionPeakNm": 421, "reviewStatus": "claude-drafted" },
