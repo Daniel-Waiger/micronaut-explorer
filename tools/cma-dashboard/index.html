@@ -144,11 +144,11 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "feat/alpha-pilot-readiness merged with codex/fluorophore-expansion",
+  "run": "chat-LLM round trip + planning-gap advisories",
   "orchestrator": "Claude Sonnet 5",
   "active_model": "Claude Sonnet 5",
-  "active_status": "idle",
-  "phase": "Merged -- verifying combined suite before push",
+  "active_status": "done",
+  "phase": "Merged, pushed, live on main",
   "state_note": "GPU/context/unload fixes + cold-start UI already shipped (uncommitted); now building llmreply.js/llmdraftprompt.js/chatTargets.js",
   "current_task": null,
   "crit_title": "Open defects",
@@ -282,9 +282,17 @@ const EMBEDDED = {
     {
       "time": "15:51:41",
       "msg": "Merged origin/codex/fluorophore-expansion (a2f7bd3 fluorophore expansion, 32fa097 Streamlit fix, c4d4289 handover) into feat/alpha-pilot-readiness. Pre-merge git merge-tree simulation showed zero conflicts; only tools/cma-dashboard/index.html conflicted (generated snapshot), resolved by regeneration per Codex's own instruction, not hand-merge."
+    },
+    {
+      "time": "15:55:14",
+      "msg": "Merged codex/fluorophore-expansion into feat/alpha-pilot-readiness (zero conflicts except the generated dashboard snapshot, resolved by regeneration). Merged feat/alpha-pilot-readiness into main (zero conflicts). Both pushed. 656/656 JS tests, 32/32 Python KB/build tests, clean single-file build, all on the merged main tree."
+    },
+    {
+      "time": "15:55:14",
+      "msg": "Found conformance.js contains a raw NUL byte in a string literal (defaults[field] ?? '\\x00', pre-existing since Wave 2C, not introduced this session) -- likely a deliberate never-collides sentinel, but as a raw byte rather than escaped \\u0000 it makes 'file'/grep misclassify the whole source file as binary. Not a functional bug (Node parses fine, build succeeded), flagged as a follow-up, not fixed inline during the push."
     }
   ],
-  "snapshot_at": "2026-08-15 15:51"
+  "snapshot_at": "2026-08-15 15:55"
 };
 /* CMA:EMBEDDED:END */
 
