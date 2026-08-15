@@ -146,14 +146,11 @@
 const EMBEDDED = {
   "run": "Spectral/picker main synchronization",
   "orchestrator": "Codex gpt-5.6-sol warm-context",
-  "active_model": "Codex repairing verification process",
-  "active_status": "running",
-  "phase": "B4",
-  "state_note": "No source defect found; committing final records, then fresh independent verification before push.",
-  "current_task": {
-    "id": "MS4",
-    "title": "Verify and push synchronized branch"
-  },
+  "active_model": "gpt-5.6-sol high verifier: PASS",
+  "active_status": "complete",
+  "phase": "complete",
+  "state_note": "Complete: merged with origin/main, 680 web + 45 Python green, deterministic artifact, independent verifier PASS; authorized normal push next.",
+  "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
@@ -195,17 +192,14 @@ const EMBEDDED = {
       "k": "Artifact",
       "v": "640759 bytes",
       "tone": "ok"
-    }
-  ],
-  "defects": [
+    },
     {
-      "id": "MS-V1",
-      "location": "verification",
-      "title": "First frontier verifier stopped before independent gate rerun",
-      "body": "",
-      "repro": ""
+      "k": "Verifier",
+      "v": "PASS",
+      "tone": "ok"
     }
   ],
+  "defects": [],
   "tasks": [
     {
       "id": "MS1",
@@ -232,8 +226,8 @@ const EMBEDDED = {
       "id": "MS4",
       "phase": "Tasks",
       "title": "Verify and push the synchronized branch",
-      "status": "running",
-      "by": "Codex + frontier verifier"
+      "status": "resolved",
+      "by": "Codex + gpt-5.6-sol high"
     }
   ],
   "log": [
@@ -264,9 +258,17 @@ const EMBEDDED = {
     {
       "time": "17:50:51",
       "msg": "MS-V1 opened: first verifier correctly withheld PASS due dirty final records and incomplete independent rerun"
+    },
+    {
+      "time": "18:00:25",
+      "msg": "MS-V1 resolved: clean committed tree received fresh independent full-gate PASS"
+    },
+    {
+      "time": "18:00:25",
+      "msg": "MS4 verified; normal feature-branch push authorized"
     }
   ],
-  "snapshot_at": "2026-08-15 17:50"
+  "snapshot_at": "2026-08-15 18:00"
 };
 /* CMA:EMBEDDED:END */
 

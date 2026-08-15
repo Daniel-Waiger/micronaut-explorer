@@ -66,6 +66,7 @@ The remaining couplings are indirect: `realKb()` loads every KB JSON, integratio
 - The read-only merge simulation predicted one conflict only in `tools/cma-dashboard/index.html`. The real merge matched: `web/styles/app.css` auto-merged both isolated feature blocks, and the dashboard snapshot was regenerated through `tools/cma-dashboard/update.py` rather than hand-merged.
 - The combined tree passes 680/680 web tests and 45/45 Python KB/export/build tests. Five consecutive served-artifact requests contained both the fluorophore picker and Claude's chat-target code.
 - The combined single-file artifact built twice byte-identically at 640,759 bytes, SHA-256 `5827c1048e42e391c67e7bf552beb91bb6d7980586f10e4445b4e5675f20eb8f`, below the 2 MiB cap and with the duplicate-top-level/static-import gates passing.
+- The first post-merge verifier correctly withheld PASS because final dashboard/handover edits were still dirty and it had been asked to conclude before independently rerunning the gates; no source defect was found. After those records were committed, a fresh `gpt-5.6-sol` high verifier independently reran all 680 web and 45 Python gates, rebuilt twice at the same hash, checked merge topology/trailers/conflict markers/CSS/dashboard parsing, exercised the 190/190 picker round-trip and representative Claude/Codex paths, and returned PASS. Its normal non-force push dry-run also succeeded.
 
 ## Files
 
