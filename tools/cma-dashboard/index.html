@@ -146,13 +146,13 @@
 const EMBEDDED = {
   "run": "Spectral/picker main synchronization",
   "orchestrator": "Codex gpt-5.6-sol warm-context",
-  "active_model": "gpt-5.6-luna merge simulation",
+  "active_model": "Codex repairing verification process",
   "active_status": "running",
-  "phase": "B3",
-  "state_note": "",
+  "phase": "B4",
+  "state_note": "No source defect found; committing final records, then fresh independent verification before push.",
   "current_task": {
-    "id": "MS3",
-    "title": "Merge origin/main into feature branch"
+    "id": "MS4",
+    "title": "Verify and push synchronized branch"
   },
   "crit_title": "Open defects",
   "stats": [
@@ -170,9 +170,42 @@ const EMBEDDED = {
       "k": "Local wave",
       "v": "33f71b8",
       "tone": "ok"
+    },
+    {
+      "k": "Merge",
+      "v": "8493c99",
+      "tone": "ok"
+    },
+    {
+      "k": "Unresolved conflicts",
+      "v": "0",
+      "tone": "ok"
+    },
+    {
+      "k": "Web tests",
+      "v": "680 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Python gates",
+      "v": "45 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Artifact",
+      "v": "640759 bytes",
+      "tone": "ok"
     }
   ],
-  "defects": [],
+  "defects": [
+    {
+      "id": "MS-V1",
+      "location": "verification",
+      "title": "First frontier verifier stopped before independent gate rerun",
+      "body": "",
+      "repro": ""
+    }
+  ],
   "tasks": [
     {
       "id": "MS1",
@@ -192,15 +225,15 @@ const EMBEDDED = {
       "id": "MS3",
       "phase": "Tasks",
       "title": "Merge origin/main into the feature branch",
-      "status": "running",
-      "by": "gpt-5.6-luna simulation"
+      "status": "done",
+      "by": "gpt-5.6-luna merge ops"
     },
     {
       "id": "MS4",
       "phase": "Tasks",
       "title": "Verify and push the synchronized branch",
-      "status": "pending",
-      "by": "queued"
+      "status": "running",
+      "by": "Codex + frontier verifier"
     }
   ],
   "log": [
@@ -219,9 +252,21 @@ const EMBEDDED = {
     {
       "time": "17:44:50",
       "msg": "Merged origin/main; regenerated Codex synchronization dashboard snapshot"
+    },
+    {
+      "time": "17:46:52",
+      "msg": "MS3 complete: origin/main merged without rebase; dashboard regenerated; app.css preserved both lanes"
+    },
+    {
+      "time": "17:48:30",
+      "msg": "Combined post-merge suites and served-artifact freshness checks passed"
+    },
+    {
+      "time": "17:50:51",
+      "msg": "MS-V1 opened: first verifier correctly withheld PASS due dirty final records and incomplete independent rerun"
     }
   ],
-  "snapshot_at": "2026-08-15 17:44"
+  "snapshot_at": "2026-08-15 17:50"
 };
 /* CMA:EMBEDDED:END */
 

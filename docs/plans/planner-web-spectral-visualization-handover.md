@@ -3,7 +3,7 @@
 Date: 2026-08-15
 Branch: `codex/fluorophore-expansion`
 Base/current published tip before this wave: `c4d4289` (branched from `feat/alpha-pilot-readiness`, never `main`)
-State: implementation and frontier verification complete; this wave is intentionally uncommitted and unpushed pending Daniel's approval.
+State: implementation and frontier verification complete; Daniel authorized publication, the wave is committed, and `origin/main` has been merged locally without rebase. Final feature-branch push is gated only on the combined frontier review recorded below.
 
 ## Delivered
 
@@ -59,6 +59,14 @@ Claude's current uncommitted lane adds the chat-LLM copy/paste proposal flow, Ol
 
 The remaining couplings are indirect: `realKb()` loads every KB JSON, integration must rerun the combined JS suite after Claude's `questions.json`/`advisor.json` work lands, and the concatenating build must rerun once both sets of new top-level symbols are present.
 
+### Post-merge synchronization verification
+
+- Fetched `origin/main` at `2127b53bbbb75dbcb88d9c12660e5e32a8756f7d`, which contains the earlier Codex expansion and Claude's merged proposal-review, chat-LLM, Ollama, validation, question/advisor, and guidance work.
+- Committed this wave as `33f71b8bf961da3307d793e9af77e513090a8934`, then merged `origin/main` without rebase as `8493c993efb2b18278ab7da0e825f5aac64eba03`. Both commits carry the required Codex trailer.
+- The read-only merge simulation predicted one conflict only in `tools/cma-dashboard/index.html`. The real merge matched: `web/styles/app.css` auto-merged both isolated feature blocks, and the dashboard snapshot was regenerated through `tools/cma-dashboard/update.py` rather than hand-merged.
+- The combined tree passes 680/680 web tests and 45/45 Python KB/export/build tests. Five consecutive served-artifact requests contained both the fluorophore picker and Claude's chat-target code.
+- The combined single-file artifact built twice byte-identically at 640,759 bytes, SHA-256 `5827c1048e42e391c67e7bf552beb91bb6d7980586f10e4445b4e5675f20eb8f`, below the 2 MiB cap and with the duplicate-top-level/static-import gates passing.
+
 ## Files
 
 The authoritative scope and ownership are in:
@@ -71,7 +79,7 @@ Runtime work is in `web/kb/spectra.json`, `web/src/engine/spectralView.js`, pane
 
 ## Still on the table
 
-1. Daniel reviews the diff and explicitly authorizes commit/push for this new wave; no publication action has been taken.
+1. Push the synchronized `codex/fluorophore-expansion` branch normally after the combined frontier verifier passes; then it is ready for a fast-forward/ordinary merge into `main`.
 2. Refresh the open preview and human-smoke the 190-item picker (known dye, custom dye, tag-ligand), hover/focus, curve/filter toggles, native drag, and a 360–440 px layout because localhost browser policy blocked the final automated visual pass.
 3. After Claude's uncommitted wave is integrated, rerun all JS/build gates and resolve any mechanical `app.css` merge.
 4. Microscopy-specialist review remains required for the prior peak ledger and the new global schematic-width wording.
