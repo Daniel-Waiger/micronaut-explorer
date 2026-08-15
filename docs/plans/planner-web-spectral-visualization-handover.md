@@ -3,7 +3,7 @@
 Date: 2026-08-15
 Branch: `codex/fluorophore-expansion`
 Base/current published tip before this wave: `c4d4289` (branched from `feat/alpha-pilot-readiness`, never `main`)
-State: implementation and frontier verification complete; Daniel authorized publication, the wave is committed, and `origin/main` has been merged locally without rebase. Final feature-branch push is gated only on the combined frontier review recorded below.
+State: implementation and frontier verification complete. Daniel explicitly authorized the final merge after the synchronized feature branch passed independent review; this record accompanies the normal fast-forward publication to both the feature branch and `main`.
 
 ## Delivered
 
@@ -67,6 +67,7 @@ The remaining couplings are indirect: `realKb()` loads every KB JSON, integratio
 - The combined tree passes 680/680 web tests and 45/45 Python KB/export/build tests. Five consecutive served-artifact requests contained both the fluorophore picker and Claude's chat-target code.
 - The combined single-file artifact built twice byte-identically at 640,759 bytes, SHA-256 `5827c1048e42e391c67e7bf552beb91bb6d7980586f10e4445b4e5675f20eb8f`, below the 2 MiB cap and with the duplicate-top-level/static-import gates passing.
 - The first post-merge verifier correctly withheld PASS because final dashboard/handover edits were still dirty and it had been asked to conclude before independently rerunning the gates; no source defect was found. After those records were committed, a fresh `gpt-5.6-sol` high verifier independently reran all 680 web and 45 Python gates, rebuilt twice at the same hash, checked merge topology/trailers/conflict markers/CSS/dashboard parsing, exercised the 190/190 picker round-trip and representative Claude/Codex paths, and returned PASS. Its normal non-force push dry-run also succeeded.
+- Final publication uses a normal atomic push of one already-verified commit to `codex/fluorophore-expansion` and `main`. Because `origin/main` is an ancestor of the feature tip, this is a fast-forward with no rebase, force push, extra conflict resolution, or source change after verification.
 
 ## Files
 
@@ -80,7 +81,7 @@ Runtime work is in `web/kb/spectra.json`, `web/src/engine/spectralView.js`, pane
 
 ## Still on the table
 
-1. Push the synchronized `codex/fluorophore-expansion` branch normally after the combined frontier verifier passes; then it is ready for a fast-forward/ordinary merge into `main`.
+1. Optional human smoke only: native drag/drop, clipboard/chat link-outs, a real Ollama request, and the 360–440 px responsive layout.
 2. Refresh the open preview and human-smoke the 190-item picker (known dye, custom dye, tag-ligand), hover/focus, curve/filter toggles, native drag, and a 360–440 px layout because localhost browser policy blocked the final automated visual pass.
 3. After Claude's uncommitted wave is integrated, rerun all JS/build gates and resolve any mechanical `app.css` merge.
 4. Microscopy-specialist review remains required for the prior peak ledger and the new global schematic-width wording.

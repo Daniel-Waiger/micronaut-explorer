@@ -146,10 +146,10 @@
 const EMBEDDED = {
   "run": "Spectral/picker main synchronization",
   "orchestrator": "Codex gpt-5.6-sol warm-context",
-  "active_model": "gpt-5.6-sol high verifier: PASS",
+  "active_model": "gpt-5.6-luna atomic Git merge",
   "active_status": "complete",
-  "phase": "complete",
-  "state_note": "Complete: merged with origin/main, 680 web + 45 Python green, deterministic artifact, independent verifier PASS; authorized normal push next.",
+  "phase": "merged",
+  "state_note": "Verified spectral/picker + Claude integration published by normal atomic fast-forward to feature branch and main; no force or rebase.",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
@@ -196,6 +196,11 @@ const EMBEDDED = {
     {
       "k": "Verifier",
       "v": "PASS",
+      "tone": "ok"
+    },
+    {
+      "k": "Main publication",
+      "v": "fast-forward",
       "tone": "ok"
     }
   ],
@@ -266,9 +271,13 @@ const EMBEDDED = {
     {
       "time": "18:00:25",
       "msg": "MS4 verified; normal feature-branch push authorized"
+    },
+    {
+      "time": "18:04:53",
+      "msg": "Daniel explicitly authorized merge; final dashboard/handover commit prepared for atomic feature+main push"
     }
   ],
-  "snapshot_at": "2026-08-15 18:00"
+  "snapshot_at": "2026-08-15 18:04"
 };
 /* CMA:EMBEDDED:END */
 
