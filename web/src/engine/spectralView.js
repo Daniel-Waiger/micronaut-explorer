@@ -1,11 +1,15 @@
 // Pure model for the Color panel's explanatory spectrum plot.
 //
-// IMPORTANT: spectra.json currently contains peak positions, not measured
-// curve samples. These normalized Gaussian curves are therefore SCHEMATIC:
-// useful for showing why nearby emissions can occupy the same user-entered
-// detection window, but never a quantitative spillover integral. The width
-// comes from overlapRules.schematicEmissionFwhmNm so the domain judgement is
-// reviewable data rather than an invisible renderer constant.
+// IMPORTANT: spectra.json currently contains peak positions (plus, as of the
+// color-panel curve-shape patch, a per-fluorophore emissionFwhmNm), not
+// measured curve samples. These normalized Gaussian curves are therefore
+// still SCHEMATIC -- useful for showing why nearby emissions can occupy the
+// same user-entered detection window, but never a quantitative spillover
+// integral, and a single symmetric Gaussian is itself an approximation of
+// real (often asymmetric, red-tailed) emission bands. Each curve's width
+// comes from its own fluorophore's emissionFwhmNm when the spectra pack has
+// one, else from overlapRules.schematicEmissionFwhmNm -- both reviewable
+// data, not an invisible renderer constant.
 
 export const SPECTRAL_VIEW_MIN_NM = 300;
 export const SPECTRAL_VIEW_MAX_NM = 900;
@@ -14,16 +18,30 @@ export const SPECTRAL_VIEW_DEFAULT_FWHM_NM = 50;
 
 const SPECTRAL_VIEW_MIN_FILTER_WIDTH_NM = 1;
 const SPECTRAL_VIEW_MAX_FILTER_WIDTH_NM = 300;
+// Not named module-level constants: the single-file build (tools/
+// build_single_file.py) concatenates every web/src module into one scope and
+// rejects two top-level declarations sharing a name, and spectra.js already
+// declares its OWN same-valued SPECTRAL_VIEW_MIN_FWHM_NM/MAX_FWHM_NM for its
+// schematicEmissionFwhmNm validation -- inline literals here, not a second
+// top-level name for the same 5-300 nm bound.
+const SPECTRAL_VIEW_FWHM_BOUNDS_NM = [5, 300];
 
 function spectralViewFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+// Shared by the pack-wide schematicEmissionFwhmNm and every per-curve
+// emissionFwhmNm below -- ONE plausibility bound so an out-of-range width
+// can't reach the renderer from either path, including an entry that
+// bypassed spectra.js's own loader (e.g. a hand-built test entry).
+function spectralViewPlausibleFwhm(value) {
+  const [minNm, maxNm] = SPECTRAL_VIEW_FWHM_BOUNDS_NM;
+  return spectralViewFiniteNumber(value) && value >= minNm && value <= maxNm;
+}
+
 function spectralViewFwhm(overlapRules) {
   const value = overlapRules && overlapRules.schematicEmissionFwhmNm;
-  return spectralViewFiniteNumber(value) && value >= 5 && value <= 300
-    ? value
-    : SPECTRAL_VIEW_DEFAULT_FWHM_NM;
+  return spectralViewPlausibleFwhm(value) ? value : SPECTRAL_VIEW_DEFAULT_FWHM_NM;
 }
 
 /** Normalized Gaussian intensity: 1 at peak and 0.5 at ±FWHM/2. */
@@ -75,11 +93,16 @@ function spectralViewFilterBand(entry) {
  */
 export function buildSpectralViewModel(entries, overlapRules) {
   const source = Array.isArray(entries) ? entries : [];
+  // The pack-wide schematic width: the FALLBACK for a fluorophore with no
+  // emissionFwhmNm of its own (an older/synthetic spectra pack, or a real
+  // entry whose width was implausible and dropped by spectra.js), not the
+  // width every curve shares -- see the per-curve fallback just below.
   const fwhmNm = spectralViewFwhm(overlapRules);
   const curves = source
     .map((entry, sourceIndex) => ({ entry, sourceIndex }))
     .filter(({ entry }) => entry && entry.state === 'known' && spectralViewFiniteNumber(entry.emissionPeakNm))
     .map(({ entry, sourceIndex }) => {
+      const curveFwhmNm = spectralViewPlausibleFwhm(entry.emissionFwhmNm) ? entry.emissionFwhmNm : fwhmNm;
       const points = [];
       for (
         let wavelengthNm = SPECTRAL_VIEW_MIN_NM;
@@ -88,7 +111,7 @@ export function buildSpectralViewModel(entries, overlapRules) {
       ) {
         points.push({
           wavelengthNm,
-          intensity: spectralViewIntensityAt(wavelengthNm, entry.emissionPeakNm, fwhmNm),
+          intensity: spectralViewIntensityAt(wavelengthNm, entry.emissionPeakNm, curveFwhmNm),
         });
       }
       return {
@@ -104,7 +127,7 @@ export function buildSpectralViewModel(entries, overlapRules) {
         emissionPeakNm: entry.emissionPeakNm,
         excitationPeakNm: spectralViewFiniteNumber(entry.excitationPeakNm) ? entry.excitationPeakNm : null,
         reviewStatus: entry.reviewStatus || null,
-        fwhmNm,
+        fwhmNm: curveFwhmNm,
         points,
         sourceIndex,
       };

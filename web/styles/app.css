@@ -1813,8 +1813,26 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+/* The fluorophore picker stacks a label above its <select> (a taller,
+   two-row control), so centering the row on .panel-row's default
+   align-items: center leaves every plain single-row control (drag handle,
+   target/conjugation inputs, color controls, move/remove buttons) floating
+   above the picker's actual select box instead of lining up with it.
+   Bottom-align the row so every control's baseline matches the picker's
+   select baseline; the small round color swatch/picker/reset stay
+   self-centered since bottom-aligning a 16-26px control against much taller
+   siblings would read as its own, different kind of offset. */
 .panel-channel-main {
   border-radius: 8px 8px 0 0;
+  align-items: flex-end;
+}
+
+.panel-color-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px; /* matches .panel-channel-main input/select's min-height */
+  flex: 0 0 auto;
 }
 
 .panel-channel-drag {

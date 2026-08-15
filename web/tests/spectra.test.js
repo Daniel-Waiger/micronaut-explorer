@@ -165,6 +165,44 @@ test("a family variant with an implausible peak pair is dropped and reported, si
   assert.ok(issues.some((i) => i.field === 'FAM' && /variant 'fam transposed' has an implausible/.test(i.message)));
 });
 
+test('a valid emissionFwhmNm is kept on both a direct entry and a family variant', () => {
+  const { fluorophores } = loadSpectraKb({
+    version: 1,
+    fluorophores: {
+      DYEA: { excitationPeakNm: 490, emissionPeakNm: 525, emissionFwhmNm: 40 },
+      FAM: { isFamily: true, variants: { 'fam red': { excitationPeakNm: 579, emissionPeakNm: 599, emissionFwhmNm: 55 } } },
+    },
+  });
+  assert.equal(fluorophores.DYEA.emissionFwhmNm, 40);
+  assert.equal(fluorophores.FAM.variants['fam red'].emissionFwhmNm, 55);
+});
+
+test('a missing emissionFwhmNm is simply absent, never a fabricated default, and reports no issue', () => {
+  const { fluorophores, issues } = loadSpectraKb({
+    version: 1,
+    overlapRules: { emissionProximityNm: 25, excitationProximityNm: 20, reviewStatus: 'claude-drafted' },
+    fluorophores: { DYEA: { excitationPeakNm: 490, emissionPeakNm: 525 } },
+  });
+  assert.equal('emissionFwhmNm' in fluorophores.DYEA, false);
+  assert.equal(issues.length, 0);
+});
+
+test('an implausible emissionFwhmNm is dropped and reported, but does not drop the whole entry', () => {
+  const { fluorophores, issues } = loadSpectraKb({
+    version: 1,
+    fluorophores: {
+      DYEA: { excitationPeakNm: 490, emissionPeakNm: 525, emissionFwhmNm: -5 },
+      FAM: { isFamily: true, variants: { 'fam red': { excitationPeakNm: 579, emissionPeakNm: 599, emissionFwhmNm: 'wide' } } },
+    },
+  });
+  assert.ok(fluorophores.DYEA);
+  assert.equal('emissionFwhmNm' in fluorophores.DYEA, false);
+  assert.ok(fluorophores.FAM.variants['fam red']);
+  assert.equal('emissionFwhmNm' in fluorophores.FAM.variants['fam red'], false);
+  assert.ok(issues.some((i) => i.field === 'DYEA' && /implausible emissionFwhmNm/.test(i.message)));
+  assert.ok(issues.some((i) => i.field === 'FAM' && /implausible emissionFwhmNm/.test(i.message)));
+});
+
 test("a family entry ('isFamily: true') requires a non-empty 'variants' object", () => {
   for (const variants of [undefined, {}, [], 'nope']) {
     const { fluorophores, issues } = loadSpectraKb({
@@ -280,6 +318,24 @@ test("a plain (non-family) recognized dye with a spectra.json entry resolves 'kn
   assert.equal(resolved.excitationPeakNm, 490);
   assert.equal(resolved.emissionPeakNm, 525);
   assert.equal(resolved.reviewStatus, 'claude-drafted');
+});
+
+test("resolveMarkerToken carries a resolved fluorophore's emissionFwhmNm through to the caller (plain and family-variant), absent when the pack has none", () => {
+  const { markerIndex, markersKb } = fixtures();
+  const { fluorophores } = loadSpectraKb({
+    version: 1,
+    fluorophores: {
+      DYEA: { excitationPeakNm: 490, emissionPeakNm: 525, emissionFwhmNm: 40 },
+      FAMILYDYE: {
+        isFamily: true,
+        variants: { 'familydye red': { excitationPeakNm: 579, emissionPeakNm: 599, emissionFwhmNm: 55 } },
+      },
+      HYDYE: { excitationPeakNm: 550, emissionPeakNm: 570 }, // no width authored -- must stay absent, not defaulted
+    },
+  });
+  assert.equal(resolveMarkerToken('DYEA', markerIndex, markersKb, fluorophores).emissionFwhmNm, 40);
+  assert.equal(resolveMarkerToken('FAMILYDYE RED', markerIndex, markersKb, fluorophores).emissionFwhmNm, 55);
+  assert.equal(resolveMarkerToken('HYDYE', markerIndex, markersKb, fluorophores).emissionFwhmNm, undefined);
 });
 
 test('resolution is case/whitespace-insensitive on the token, matching splitMarkers uppercasing', () => {
@@ -559,6 +615,11 @@ test('all 72 direct and 11 family additions exactly match the source ledger and 
   const directFields = new Set([
     'excitationPeakNm',
     'emissionPeakNm',
+    // emissionFwhmNm (color-panel curve-shape patch) is a claude-drafted
+    // CLASS-based estimate, not a vendor-sourced peak -- it deliberately has
+    // no ledger row of its own and isn't value-checked below, only allowed
+    // to be present without failing this "no undocumented field" guard.
+    'emissionFwhmNm',
     'reviewStatus',
     'note',
   ]);
@@ -590,10 +651,13 @@ test('all 72 direct and 11 family additions exactly match the source ledger and 
     const familyEntry = realSpectraRaw.fluorophores[row.family];
     const variant = familyEntry?.variants?.[variantKey];
     assert.ok(variant, `${row.id}: missing '${row.family}' variant '${variantKey}'`);
+    // Peak-only plus the same claude-drafted emissionFwhmNm every direct
+    // record may carry (see directFields above) -- not ledger-verified,
+    // just allowed.
     assert.deepEqual(
       Object.keys(variant).sort(),
-      ['emissionPeakNm', 'excitationPeakNm'],
-      `${row.id}: family variants stay peak-only`
+      ['emissionFwhmNm', 'emissionPeakNm', 'excitationPeakNm'],
+      `${row.id}: family variants stay peak(+width)-only`
     );
     assert.equal(variant.excitationPeakNm, row.excitationPeakNm, `${row.id}: excitation`);
     assert.equal(variant.emissionPeakNm, row.emissionPeakNm, `${row.id}: emission`);

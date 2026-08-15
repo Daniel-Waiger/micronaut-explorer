@@ -56,6 +56,28 @@ test('missing or malformed FWHM uses the explicit safe schematic default', () =>
   }
 });
 
+test('a curve with its own emissionFwhmNm uses that width, not the pack-wide schematic one -- curves can differ in shape', () => {
+  const entries = [known('Narrow', 500, { emissionFwhmNm: 25 }), known('Wide', 600, { emissionFwhmNm: 80 })];
+  const model = buildSpectralViewModel(entries, { schematicEmissionFwhmNm: 50 });
+  assert.equal(model.fwhmNm, 50, 'the model-level fallback is unaffected');
+  const narrow = model.curves.find((c) => c.token === 'Narrow');
+  const wide = model.curves.find((c) => c.token === 'Wide');
+  assert.equal(narrow.fwhmNm, 25);
+  assert.equal(wide.fwhmNm, 80);
+  assert.notEqual(narrow.fwhmNm, wide.fwhmNm);
+  // The actual sampled curve is narrower/wider to match: half-height sits at
+  // ±fwhmNm/2 from the peak (same identity spectralViewIntensityAt asserts).
+  assert.ok(Math.abs(spectralViewIntensityAt(500 + 12.5, 500, narrow.fwhmNm) - 0.5) < 1e-9);
+  assert.ok(Math.abs(spectralViewIntensityAt(600 + 40, 600, wide.fwhmNm) - 0.5) < 1e-9);
+});
+
+test('a curve with no/malformed emissionFwhmNm falls back to the pack-wide schematic width', () => {
+  for (const extra of [{}, { emissionFwhmNm: null }, { emissionFwhmNm: -1 }, { emissionFwhmNm: 'wide' }]) {
+    const model = buildSpectralViewModel([known('A', 500, extra)], { schematicEmissionFwhmNm: 63 });
+    assert.equal(model.curves[0].fwhmNm, 63);
+  }
+});
+
 test('only known entries get curves; complete valid filters get clipped renderer bands', () => {
   const entries = [
     known('Known', 520, { channelId: 'a', filterCenterNm: 525, filterBandwidthNm: 50 }),

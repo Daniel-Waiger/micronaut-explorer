@@ -111,15 +111,29 @@ function peaksArePlausible(excitationPeakNm, emissionPeakNm) {
   );
 }
 
+// emissionFwhmNm (color-panel patch, curve-shape fix) is OPTIONAL, unlike the
+// two peaks: a fluorophore entry with no width is still a fully usable
+// spectral record (every consumer that existed before this field shipped
+// worked from peaks alone), so a missing/implausible width is dropped
+// silently rather than invalidating the whole entry -- see spectralView.js's
+// own fallback to the pack-wide schematicEmissionFwhmNm when a specific
+// entry has none. Bounds reuse SPECTRAL_VIEW_MIN_FWHM_NM/MAX_FWHM_NM above --
+// the same plausible-width range engine/spectralView.js already enforces on
+// user-entered detection filter widths, not a second judgment call.
+function fwhmIsPlausible(emissionFwhmNm) {
+  return typeof emissionFwhmNm === 'number' && emissionFwhmNm >= SPECTRAL_VIEW_MIN_FWHM_NM && emissionFwhmNm <= SPECTRAL_VIEW_MAX_FWHM_NM;
+}
+
 const KNOWN_FLUOROPHORE_KEYS = new Set([
   'excitationPeakNm',
   'emissionPeakNm',
+  'emissionFwhmNm',
   'isFamily',
   'variants',
   'reviewStatus',
   'note',
 ]);
-const KNOWN_VARIANT_KEYS = new Set(['excitationPeakNm', 'emissionPeakNm']);
+const KNOWN_VARIANT_KEYS = new Set(['excitationPeakNm', 'emissionPeakNm', 'emissionFwhmNm']);
 
 function spectraIssue(field, message) {
   return { field, message, severity: 'error' };
@@ -150,7 +164,14 @@ function normalizeVariantEntry(canonical, variantKey, entry, issues) {
     );
     return null;
   }
-  return { excitationPeakNm, emissionPeakNm };
+  if ('emissionFwhmNm' in entry && !fwhmIsPlausible(entry.emissionFwhmNm)) {
+    issues.push(
+      spectraIssue(canonical, `variant '${variantKey}' has an implausible emissionFwhmNm (${JSON.stringify(entry.emissionFwhmNm)}) -- dropped, falling back to the pack-wide schematic width`)
+    );
+  }
+  return fwhmIsPlausible(entry.emissionFwhmNm)
+    ? { excitationPeakNm, emissionPeakNm, emissionFwhmNm: entry.emissionFwhmNm }
+    : { excitationPeakNm, emissionPeakNm };
 }
 
 /**
@@ -210,7 +231,14 @@ function normalizeFluorophoreEntry(canonical, entry, issues) {
     );
     return null;
   }
-  return { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm };
+  if ('emissionFwhmNm' in entry && !fwhmIsPlausible(entry.emissionFwhmNm)) {
+    issues.push(
+      spectraIssue(canonical, `fluorophore entry has an implausible emissionFwhmNm (${JSON.stringify(entry.emissionFwhmNm)}) -- dropped, falling back to the pack-wide schematic width`)
+    );
+  }
+  return fwhmIsPlausible(entry.emissionFwhmNm)
+    ? { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm, emissionFwhmNm: entry.emissionFwhmNm }
+    : { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm };
 }
 
 /**
@@ -371,6 +399,11 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
       state: 'known',
       excitationPeakNm: variant.excitationPeakNm,
       emissionPeakNm: variant.emissionPeakNm,
+      // Present only when the variant's own record has one (normalizeVariantEntry
+      // already dropped an implausible value) -- absent, not a fabricated
+      // number, when spectralView.js should fall back to its pack-wide
+      // schematic width instead.
+      emissionFwhmNm: variant.emissionFwhmNm,
       reviewStatus: spectraEntry.reviewStatus,
     };
   }
@@ -381,6 +414,7 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
     state: 'known',
     excitationPeakNm: spectraEntry.excitationPeakNm,
     emissionPeakNm: spectraEntry.emissionPeakNm,
+    emissionFwhmNm: spectraEntry.emissionFwhmNm,
     reviewStatus: spectraEntry.reviewStatus,
   };
 }

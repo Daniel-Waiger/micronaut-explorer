@@ -350,10 +350,20 @@ export function createPanelStep(kb) {
         const effectiveColor = effectiveChannelColor(channel, computedColor);
         const isColorOverride = Boolean(channel.color);
 
+        // A fixed-height wrapper, not loose siblings directly in `row`: the
+        // row bottom-aligns its children (see .panel-channel-main's CSS
+        // comment) so these small controls line up against the FLUOROPHORE
+        // PICKER's select baseline, not against the row's own padded height
+        // -- centering them on their own private box is what actually lines
+        // their visual center up with the plain inputs' center.
+        const colorControls = document.createElement('span');
+        colorControls.className = 'panel-color-controls';
+        row.appendChild(colorControls);
+
         const colorSwatch = document.createElement('span');
         colorSwatch.className = 'panel-color-swatch';
         colorSwatch.style.backgroundColor = effectiveColor || 'transparent';
-        row.appendChild(colorSwatch);
+        colorControls.appendChild(colorSwatch);
 
         const colorInput = document.createElement('input');
         colorInput.type = 'color';
@@ -373,7 +383,7 @@ export function createPanelStep(kb) {
         colorInput.addEventListener('change', () => {
           writeChannelsStructure(currentChannels()); // structural: reveals/hides the reset control
         });
-        row.appendChild(colorInput);
+        colorControls.appendChild(colorInput);
 
         if (isColorOverride) {
           const colorResetBtn = document.createElement('button');
@@ -386,7 +396,7 @@ export function createPanelStep(kb) {
             next[index] = { ...next[index], color: '' };
             writeChannelsStructure(next);
           });
-          row.appendChild(colorResetBtn);
+          colorControls.appendChild(colorResetBtn);
         }
 
         const targetInput = channelField(document.createElement('input'), 'panel-row-text');
