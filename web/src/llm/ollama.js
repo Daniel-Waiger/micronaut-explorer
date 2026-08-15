@@ -16,10 +16,54 @@
 
 const DEFAULT_TIMEOUT_MS = 30000;
 
+// Ollama loads a model at its own native context length (131072 for
+// llama3.1:8b) unless told otherwise, which burns VRAM on KV cache far
+// beyond what a single study's worth of text ever needs and forces a
+// partial CPU/GPU split on cards that would otherwise fit the model
+// entirely. 8192 is generous for this app's prompts (a full study plus the
+// question bank) while staying small enough to keep even an 8B model
+// fully GPU-resident on a 16GB card.
+const DEFAULT_NUM_CTX = 8192;
+
+// The most recently used {endpoint, model}, shared across every provider
+// instance in this page load (guidance.js and describe.js each mint their
+// own via createOllamaProvider). Module-level rather than per-instance so
+// the single pagehide listener below can unload whichever model was
+// actually warm, regardless of which call site last used it.
+let lastUsed = null;
+
+function unloadLastUsed() {
+  if (!lastUsed || typeof fetch !== 'function') return;
+  const { endpoint, model } = lastUsed;
+  // `keepalive: true`, not navigator.sendBeacon: verified directly against a
+  // real Ollama server that sendBeacon's actual POST fails with
+  // net::ERR_FAILED after a successful CORS preflight (Ollama's CORS
+  // middleware and beacon's transport apparently do not get along), while a
+  // keepalive fetch carrying the identical body succeeds and does unload the
+  // model. keepalive fetch is also allowed to keep running past the page
+  // already unloading, same guarantee sendBeacon exists for.
+  fetch(`${endpoint.replace(/\/+$/, '')}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages: [], keep_alive: 0 }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+// Registered once per page load -- this module is an ES module singleton,
+// so top-level code here runs exactly once regardless of how many
+// createOllamaProvider() calls follow. The point is to dump the model on
+// tab close rather than leave it resident until Ollama's own keep-alive
+// timeout.
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('pagehide', unloadLastUsed);
+}
+
 export function createOllamaProvider({
   endpoint,
   model,
   keepAlive = -1,
+  numCtx = DEFAULT_NUM_CTX,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   fetchImpl,
 } = {}) {
@@ -37,6 +81,10 @@ export function createOllamaProvider({
       if (!doFetch) {
         throw new Error('No fetch implementation available for the Ollama provider.');
       }
+      // Recorded before the request settles: worst case an unload beacon
+      // fires for a model that never actually finished loading, which is a
+      // harmless no-op, and this is the only point every call path shares.
+      lastUsed = { endpoint, model };
 
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -54,6 +102,7 @@ export function createOllamaProvider({
           model,
           stream: false,
           keep_alive: keepAlive,
+          options: { num_ctx: numCtx },
           messages: [
             ...(system ? [{ role: 'system', content: system }] : []),
             { role: 'user', content: user || '' },
