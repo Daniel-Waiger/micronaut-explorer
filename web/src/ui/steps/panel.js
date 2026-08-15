@@ -454,8 +454,16 @@ export function createPanelStep(kb) {
           currentValue: savedSpectralValue,
           libraryValue,
           isTagLigand,
-          onChange(value) {
-            writeChannelsData(panelFluorophoreWriteValue(currentChannels(), channel.id, value));
+          onChange(value, isStructural) {
+            // Structural (a discrete library pick, not a custom-name
+            // keystroke): the color swatch and the filter defaults below
+            // both derive from the fluorophore field, so they need a real
+            // re-render to pick up the new selection -- writeChannelsData
+            // alone left them showing whatever the row resolved to before
+            // this pick (often nothing, for a brand-new channel).
+            const next = panelFluorophoreWriteValue(currentChannels(), channel.id, value);
+            if (isStructural) writeChannelsStructure(next);
+            else writeChannelsData(next);
           },
         });
         row.appendChild(dyePicker);

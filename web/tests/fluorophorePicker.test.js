@@ -155,6 +155,43 @@ test('custom choice alone reveals free text and emits additions, clearing a prio
   });
 });
 
+test('onChange reports isStructural=true only for a resolved library pick, false for switching to/typing a custom name', () => {
+  // Custom-mode transitions and keystrokes must stay non-structural: this
+  // component's own customInput.focus() call (and the user's next
+  // keystroke) depend on THIS render's customInput surviving -- a caller
+  // that treated them as structural and re-rendered would detach it from
+  // under the cursor. Regression coverage for that exact failure mode.
+  withFluorophorePickerDocument(() => {
+    const changes = [];
+    const picker = fluorophorePickerCreate({
+      options: fluorophorePickerOptions,
+      currentValue: '',
+      libraryValue: '',
+      onChange: (value, isStructural) => changes.push([value, isStructural]),
+    });
+    const select = picker.querySelector('select');
+    const custom = picker.querySelector('.panel-fluorophore-custom');
+    const customOption = picker.querySelectorAll('option').find((option) => /Not in library/.test(option.textContent));
+
+    select.value = 'syto9';
+    select.dispatch('change');
+    assert.deepEqual(changes, [['syto9', true]]);
+
+    select.value = customOption.value;
+    select.dispatch('change');
+    assert.deepEqual(changes.at(-1), ['', false]);
+
+    custom.value = 'N';
+    custom.dispatch('input');
+    custom.value = 'No';
+    custom.dispatch('input');
+    assert.deepEqual(changes.slice(-2), [
+      ['N', false],
+      ['No', false],
+    ]);
+  });
+});
+
 test('saved custom dyes remain editable, while selecting a known dye hides free text and emits its key', () => {
   withFluorophorePickerDocument(() => {
     const changes = [];

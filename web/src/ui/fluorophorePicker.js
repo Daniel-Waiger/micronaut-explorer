@@ -70,15 +70,28 @@ export function fluorophorePickerCreate({
   customInput.value = startsCustom ? savedValue : '';
   customInput.hidden = !startsCustom;
 
-  function fluorophorePickerEmit(value) {
-    if (typeof onChange === 'function') onChange(value);
+  // `isStructural` (second callback arg) tells the caller whether this
+  // change resolved to a REAL library fluorophore -- safe, and necessary,
+  // for a caller that derives other fields (a color/filter default) from
+  // the fluorophore to fully re-render. `false` for anything that doesn't:
+  // switching TO custom-entry mode (nothing recognized yet) and every
+  // keystroke while typing the custom name both leave this component's OWN
+  // customInput on screen expecting to keep focus -- a caller-triggered
+  // structural re-render there would tear down and recreate that very
+  // input out from under the `customInput.focus()` call below (or the
+  // user's next keystroke), moving focus to <body> mid-edit. Defaults true
+  // so a caller that ignores the flag (only reads `value`) keeps its
+  // previous always-fine-to-rerender behavior for the common case this was
+  // always safe for: a plain library pick.
+  function fluorophorePickerEmit(value, isStructural = true) {
+    if (typeof onChange === 'function') onChange(value, isStructural);
   }
 
   select.addEventListener('change', () => {
     if (select.value === fluorophorePickerCustomValue) {
       customInput.hidden = false;
       customInput.value = '';
-      fluorophorePickerEmit('');
+      fluorophorePickerEmit('', false);
       customInput.focus();
       return;
     }
@@ -87,7 +100,7 @@ export function fluorophorePickerCreate({
     fluorophorePickerEmit(select.value);
   });
 
-  customInput.addEventListener('input', () => fluorophorePickerEmit(customInput.value));
+  customInput.addEventListener('input', () => fluorophorePickerEmit(customInput.value, false));
 
   wrapper.appendChild(select);
   wrapper.appendChild(customInput);
