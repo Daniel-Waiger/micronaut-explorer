@@ -21,7 +21,7 @@
   /* Desaturates the nav step emoji toward black/white (see .nav-step-icon) --
      brighter in dark mode, since a flat grayscale emoji reads too dark
      against this app's dark panel background otherwise. */
-  --nav-icon-filter: grayscale(1) brightness(1.35) contrast(0.9);
+  --nav-icon-filter: grayscale(1) brightness(1.05) contrast(1.2);
   --mono: ui-monospace, "Cascadia Code", Consolas, "SF Mono", monospace;
   --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
@@ -57,7 +57,7 @@
   --danger: #f87171;
   --warn: #fbbf24;
   --ok: #34d399;
-  --nav-icon-filter: grayscale(1) brightness(1.35) contrast(0.9);
+  --nav-icon-filter: grayscale(1) brightness(1.05) contrast(1.2);
 }
 
 :root[data-theme="light"] {
