@@ -1,7 +1,17 @@
 import { buildSpectralViewModel } from '../engine/spectralView.js';
 
 const spectralViewSvgNs = 'http://www.w3.org/2000/svg';
-const spectralViewWidth = 720;
+// Fallback ONLY: when the container's rendered width can't be measured
+// (hidden, not yet laid out, or a test's fake DOM with no clientWidth).
+// Every real render below uses the container's OWN measured width as the
+// viewBox width instead, so 1 viewBox unit maps to exactly 1 CSS pixel --
+// no scale factor, so nothing (text included) can end up non-uniformly
+// stretched by the chart's width:100%/fixed-height CSS box. An earlier
+// draft stretched a fixed 720-wide viewBox to fill the row instead
+// (preserveAspectRatio="none"), which visibly distorted every <text> glyph
+// along with the curves; matching the viewBox to the real pixel width
+// removes the scale factor at its source rather than fighting it after.
+const spectralViewDefaultWidth = 720;
 const spectralViewHeight = 316;
 const spectralViewPlot = { left: 58, right: 18, top: 64, bottom: 50 };
 const spectralViewSeriesCount = 8;
@@ -25,8 +35,8 @@ function spectralViewScale(value, domainMin, domainMax, rangeMin, rangeMax) {
   return rangeMin + ((value - domainMin) / (domainMax - domainMin)) * (rangeMax - rangeMin);
 }
 
-function spectralViewPath(curve, model) {
-  const plotWidth = spectralViewWidth - spectralViewPlot.left - spectralViewPlot.right;
+function spectralViewPath(curve, model, width) {
+  const plotWidth = width - spectralViewPlot.left - spectralViewPlot.right;
   const plotHeight = spectralViewHeight - spectralViewPlot.top - spectralViewPlot.bottom;
   return curve.points
     .map((point, index) => {
@@ -116,9 +126,9 @@ function spectralViewFilterRecords(model) {
   });
 }
 
-function spectralViewAppendAxis(svg, model) {
+function spectralViewAppendAxis(svg, model, width) {
   const plotBottom = spectralViewHeight - spectralViewPlot.bottom;
-  const plotRight = spectralViewWidth - spectralViewPlot.right;
+  const plotRight = width - spectralViewPlot.right;
   svg.append(
     spectralViewSvgElement(
       'line',
@@ -156,15 +166,15 @@ function spectralViewAppendAxis(svg, model) {
   svg.append(
     spectralViewSvgElement(
       'text',
-      { x: spectralViewWidth / 2, y: spectralViewHeight - 8, 'text-anchor': 'middle' },
+      { x: width / 2, y: spectralViewHeight - 8, 'text-anchor': 'middle' },
       'spectral-view-axis-label',
       'Emission wavelength (nm)'
     )
   );
 }
 
-function spectralViewAppendFilters(svg, model, records) {
-  const plotRight = spectralViewWidth - spectralViewPlot.right;
+function spectralViewAppendFilters(svg, model, records, width) {
+  const plotRight = width - spectralViewPlot.right;
   const plotBottom = spectralViewHeight - spectralViewPlot.bottom;
   const labelLaneRightEdges = [];
   for (const record of records) {
@@ -226,9 +236,9 @@ function spectralViewAppendFilters(svg, model, records) {
   }
 }
 
-function spectralViewAppendCurves(svg, model, records) {
+function spectralViewAppendCurves(svg, model, records, width) {
   const plotBottom = spectralViewHeight - spectralViewPlot.bottom;
-  const plotRight = spectralViewWidth - spectralViewPlot.right;
+  const plotRight = width - spectralViewPlot.right;
   for (const [index, record] of records.entries()) {
     const curve = record.item;
     const seriesClass = spectralViewSeriesClass(record.seriesIndex);
@@ -266,7 +276,7 @@ function spectralViewAppendCurves(svg, model, records) {
     );
     group.append(
       spectralViewSvgElement('title', {}, '', `${record.name}: ${record.summary}`),
-      spectralViewSvgElement('path', { d: spectralViewPath(curve, model) }, 'spectral-view-curve'),
+      spectralViewSvgElement('path', { d: spectralViewPath(curve, model, width) }, 'spectral-view-curve'),
       spectralViewSvgElement(
         'line',
         { x1: peakX, y1: spectralViewPlot.top, x2: peakX, y2: plotBottom },
@@ -430,6 +440,11 @@ function spectralViewRecordIsHidden(record, state) {
 /** Render a self-contained, schematic spectral comparison without network requests. */
 export function renderSpectralView(container, entries, overlapRules, interactionState) {
   if (!container || typeof container.replaceChildren !== 'function') return;
+  // Re-read on every call (including the resize-triggered re-renders below)
+  // so a resize always redraws with whatever entries/overlapRules/state the
+  // MOST RECENT data-triggered call passed, not whatever this particular
+  // closure happened to capture when its observer was created.
+  container.__spectralViewLatestArgs = { entries, overlapRules, interactionState };
   const state = interactionState || spectralViewCreateState();
   const model = buildSpectralViewModel(entries, overlapRules);
   const curveRecords = spectralViewCurveRecords(model);
@@ -457,18 +472,17 @@ export function renderSpectralView(container, entries, overlapRules, interaction
     return;
   }
 
+  // The viewBox width IS the container's own measured pixel width -- see
+  // spectralViewDefaultWidth's header comment for why (fallback only when
+  // unmeasurable). 1 viewBox unit == 1 CSS pixel, so nothing drawn against
+  // it (text included) needs a non-uniform scale to fill the row.
+  const width = Math.round(container.clientWidth) || spectralViewDefaultWidth;
+
   const chart = spectralViewElement('div', 'spectral-view-chart');
   const svg = spectralViewSvgElement(
     'svg',
     {
-      viewBox: `0 0 ${spectralViewWidth} ${spectralViewHeight}`,
-      // Stretch to fill whatever box CSS gives this SVG (width: 100%,
-      // height: a fixed value -- app.css's .spectral-view-svg) instead of
-      // the default "preserve aspect ratio, letterbox" behavior. Without
-      // this, a rendered box wider-than-720:316 would just center a
-      // 720:316 chart inside it with blank bars on both sides -- exactly
-      // undoing the "fill the available width" fix this SVG's CSS makes.
-      preserveAspectRatio: 'none',
+      viewBox: `0 0 ${width} ${spectralViewHeight}`,
       role: 'group',
       'aria-labelledby': 'spectral-view-title spectral-view-description',
     },
@@ -487,9 +501,9 @@ export function renderSpectralView(container, entries, overlapRules, interaction
       }, across 300 to 900 nanometers. Each curve and filter can be focused and toggled.`
     )
   );
-  spectralViewAppendFilters(svg, model, filterRecords);
-  spectralViewAppendAxis(svg, model);
-  spectralViewAppendCurves(svg, model, curveRecords);
+  spectralViewAppendFilters(svg, model, filterRecords, width);
+  spectralViewAppendAxis(svg, model, width);
+  spectralViewAppendCurves(svg, model, curveRecords, width);
   const tooltip = spectralViewElement('div', 'spectral-view-tooltip');
   tooltip.hidden = true;
   tooltip.setAttribute('aria-hidden', 'true');
@@ -512,4 +526,25 @@ export function renderSpectralView(container, entries, overlapRules, interaction
   spectralViewAppendLegend(section, records);
   spectralViewWireInteractions(chart, records, details, tooltip, state);
   container.replaceChildren(section);
+
+  // Keeps the viewBox width in sync with the container's ACTUAL rendered
+  // width as it changes (window resize, the step nav collapsing/expanding,
+  // ...) -- without this, only the first render would ever pick up the
+  // real width, and every layout change after it would silently reintroduce
+  // the non-uniform stretch this whole approach exists to avoid. Guarded so
+  // only the FIRST call for a given container attaches an observer;
+  // container.__spectralViewLatestArgs (set at the top of this function on
+  // every call) is what the resize handler re-renders with, so it always
+  // uses the latest data even though the observer itself was created once.
+  // Absent in this project's test environment (no ResizeObserver global) --
+  // every render still gets the right width THAT call, just without
+  // picking up a later resize with no other cause to re-render.
+  if (typeof ResizeObserver === 'function' && !container.__spectralViewResizeObserver) {
+    const observer = new ResizeObserver(() => {
+      const latest = container.__spectralViewLatestArgs;
+      if (latest) renderSpectralView(container, latest.entries, latest.overlapRules, latest.interactionState);
+    });
+    observer.observe(container);
+    container.__spectralViewResizeObserver = observer;
+  }
 }
