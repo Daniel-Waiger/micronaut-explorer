@@ -144,159 +144,157 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "chat-LLM round trip + planning-gap advisories",
-  "orchestrator": "Claude Sonnet 5",
+  "run": "zen-planner UX reframe",
+  "orchestrator": "Claude Opus",
   "active_model": "Claude Sonnet 5",
-  "active_status": "done",
-  "phase": "Merged, pushed, live on main -- CI workflow versions bumped",
-  "state_note": "GPU/context/unload fixes + cold-start UI already shipped (uncommitted); now building llmreply.js/llmdraftprompt.js/chatTargets.js",
+  "active_status": "idle",
+  "phase": "",
+  "state_note": "",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "Test suite",
-      "v": "646 passed",
+      "k": "JS tests",
+      "v": "716 passed",
       "tone": "ok"
     },
     {
-      "k": "Uncommitted",
-      "v": "ollama.js, guidance.js, describe.js, llmStatus.js, llmreply.js",
-      "tone": "warn"
-    },
-    {
-      "k": "Phase 1",
-      "v": "7/7 complete",
+      "k": "Build size",
+      "v": "744KB / 2MB gate",
       "tone": "ok"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "P1-0",
-      "phase": "Prep",
-      "title": "Real Ollama MVP test + GPU CUDA-install fix (unrelated infra bug found+fixed)",
+      "id": "P0-1",
+      "phase": "Phase 0",
+      "title": "Relabel arms to groups (UI text)",
       "status": "done",
-      "by": "Sonnet"
+      "by": ""
     },
     {
-      "id": "P1-0b",
-      "phase": "Prep",
-      "title": "num_ctx cap + unload-on-tab-close (llm/ollama.js)",
+      "id": "P0-2",
+      "phase": "Phase 0",
+      "title": "Relax sample-ID pattern + fixtures",
       "status": "done",
-      "by": "Sonnet"
+      "by": ""
     },
     {
-      "id": "P1-0c",
-      "phase": "Prep",
-      "title": "Cold-start transparency UI (ui/llmStatus.js, guidance.js, describe.js)",
-      "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "P1-1",
+      "id": "P1",
       "phase": "Phase 1",
-      "title": "engine/llmreply.js -- tolerant JSON extraction from a pasted reply",
+      "title": "IA reframe: Home, phased interview, declutter, groups rows, panel pre-load, filters, zen CSS, timings+ics",
       "status": "done",
       "by": "Sonnet"
     },
     {
-      "id": "P1-2",
-      "phase": "Phase 1",
-      "title": "engine/render/llmdraftprompt.js -- copy-out prompt with output contract",
-      "status": "done",
-      "by": "Sonnet"
+      "id": "P2",
+      "phase": "Phase 2",
+      "title": "Remote inference wiring + rate-limit UX + self-host recipe",
+      "status": "pending",
+      "by": ""
     },
     {
-      "id": "P1-3",
-      "phase": "Phase 1",
-      "title": "llm/chatTargets.js -- prefilled link-outs (ChatGPT/Claude)",
-      "status": "done",
-      "by": "Sonnet"
+      "id": "P3",
+      "phase": "Phase 3",
+      "title": "Doc upload -> advice (ephemeral)",
+      "status": "pending",
+      "by": ""
     },
     {
-      "id": "P1-4",
-      "phase": "Phase 1",
-      "title": "engine/llmproposals.js -- add parseLlmAsks (advisory, never writes)",
-      "status": "done",
-      "by": "Sonnet"
+      "id": "P4",
+      "phase": "Phase 4",
+      "title": "Google Calendar OAuth sync",
+      "status": "pending",
+      "by": ""
     },
     {
-      "id": "P1-5",
-      "phase": "Phase 1",
-      "title": "describe.js/guidance.js wiring -- paste-back UI, stale-config fix",
+      "id": "P5",
+      "phase": "Phase 5",
+      "title": "Walkthrough content, wiki, feedback, KB content",
       "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "P1-6",
-      "phase": "Phase 1",
-      "title": "Nyquist question + advisor rule (questions.json/advisor.json, HEADS-UP posted C-05)",
-      "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "P1-7",
-      "phase": "Verification",
-      "title": "New unit tests + full suite + browser + built-artifact pass",
-      "status": "done",
-      "by": "Sonnet"
+      "by": ""
     }
   ],
   "log": [
     {
-      "time": "11:39:56",
-      "msg": "Session continued from local-llm-guidance Wave C: real-Ollama MVP test, GPU/context/unload fixes, cold-start UI -- all verified, none committed"
+      "time": "15:32:30",
+      "msg": "Branch zen-planner created; starting Phase 0"
     },
     {
-      "time": "11:39:56",
-      "msg": "Approved plan: chat-LLM round trip (copy prompt -> paste JSON back) for zero-setup users, plus asks[] advisories (study question / Nyquist / controls / spillover) and a real Nyquist question. Magnification-per-acquisition deliberately deferred to Phase 2, post-pilot (5 load-bearing call sites incl. SCHEMA_VERSION migration)."
+      "time": "15:32:30",
+      "msg": "P0-1 done: arms relabeled to groups across design/study/naming/overview/guide"
     },
     {
-      "time": "11:39:56",
-      "msg": "llmreply.js written: string/escape-aware balanced-brace scan, fenced-block extraction, last-resort curly-quote/trailing-comma repairs (each reported, never silent), no relaxed parser"
+      "time": "15:32:30",
+      "msg": "P0-2 in progress: samplePattern relaxed in engine/validation.js"
     },
     {
-      "time": "11:43:30",
-      "msg": "llmdraftprompt.js + llmreply.js done, tested (19+12 new tests, all green, 629/629 total). describe.js refactored to share renderQuestionLines; DRAFT_SYSTEM_PROMPT replaced by imported PROPOSAL_SYSTEM_PROMPT; mergeProposals() helper extracted for reuse by the upcoming paste-back handler."
+      "time": "15:35:33",
+      "msg": "P0-2 done: samplePattern relaxed to ^[A-Za-z]{3}\\d{2}$ (validation.js + regex fixture); Classic's facsi_default.json deliberately left untouched (never fed to the web Planner, per validation.js's own header)"
     },
     {
-      "time": "11:44:39",
-      "msg": "chatTargets.js done, tested (7/7). linkOuts privacy flag added to llm/config.js, default off. 636/636 total."
+      "time": "15:35:33",
+      "msg": "Verified live against dist/ build: groups relabeled, E02 rejected with new message, ABC01 accepted -- 701/701 JS tests green, build 677KB"
     },
     {
-      "time": "11:46:14",
-      "msg": "parseLlmAsks added to llmproposals.js (advisory, never writes, capped at 12 entries/300 chars). 644/644. Starting the UI wiring -- the largest untested surface in this plan."
+      "time": "15:35:33",
+      "msg": "Phase 0 complete. Next: Phase 1 (IA reframe)."
     },
     {
-      "time": "11:54:50",
-      "msg": "P1-5 done + verified live in browser: stale-config fix (checkbox toggle reveals/hides Draft/Suggest instantly), full paste-back round trip (fenced JSON with prose -> 3 proposals + 1 ask rendered), link-out opt-in reveals ChatGPT/Claude buttons, and a deliberately-malformed paste correctly showed all 3 lanes (repair/issue/proposal) with proper CSS (reused .issue/.issue-error, not a new warning vocabulary -- app.css:308's reservation rule respected). Zero console errors throughout. 644/644 unit tests still green."
+      "time": "15:37:16",
+      "msg": "Starting Phase 1"
     },
     {
-      "time": "12:00:56",
-      "msg": "P1-6 done: Nyquist question added to questions.json (acquisition.smallestFeatureNm, number), advisor.json rule 'smallest-feature-pixel-size' (kind:tip, exists-gated, ~2.3x rule of thumb). Extended summarizeTrigger to handle exists on labeled paths (was eq/in only) -- needed 2 test fixes (advisor.test.js never-fires guard + summarizeTrigger unsummarizable list), both principled per the tests' own documented extension points, not workarounds. Python KB validity (8/8) + build pipeline (24/24) + single-file build all pass; built artifact confirmed embeds the new question/rule. 646/646 JS unit tests."
+      "time": "15:44:21",
+      "msg": "P1 progress: phase-tagged questions.json + interview.js filtering; groups-as-rows + organism field in design.js; filter bands now auto-overlay from free-text markers alone (panel.js) -- verified live: 0 structured channels, 2 filter bands rendered"
     },
     {
-      "time": "12:09:31",
-      "msg": "P1-7 done. Found and fixed a real staleness bug during verification: the dev server boots from web/kb.dev.js (a generated snapshot), not web/kb/*.json directly -- edited the source JSON without regenerating the snapshot, so the new question invisibly didn't appear in the live app despite loadQuestions() proving correct in isolation. Fixed via 'python tools/export_markers_kb.py' (also regenerates markers.json, confirmed byte-identical/deterministic via git diff). Full round trip re-verified after the fix: Nyquist question appears, paste-back proposal accepted, advisor tip fires with correct 'Applies when...' trigger clause. Python gates: KB validity 8/8, build-pipeline 24/24, built artifact confirmed embeds new content. Nothing committed yet -- all work is in the working tree for review."
+      "time": "15:58:25",
+      "msg": "P1 shipped: Home landing + auto-walkthrough (first-visit redirect to Guide, waivable), nav reorder (Home/Project/Study/Design/Microscopy/Naming/Overview/Guide), phase-tagged interview (project/microscopy/timing) split across 3 steps, declutter via <details> reveals in Project, groups-as-rows + organism field in Design, panel filter bands now auto-overlay from free-text markers (no more manual number entry), matte/soft color palette + bigger nav icons, Schedule section in Naming (timing interview + .ics download) -- verified live end-to-end against dist/ build including real .ics content fetched from the download blob"
     },
     {
-      "time": "15:51:41",
-      "msg": "Merged origin/codex/fluorophore-expansion (a2f7bd3 fluorophore expansion, 32fa097 Streamlit fix, c4d4289 handover) into feat/alpha-pilot-readiness. Pre-merge git merge-tree simulation showed zero conflicts; only tools/cma-dashboard/index.html conflicted (generated snapshot), resolved by regeneration per Codex's own instruction, not hand-merge."
+      "time": "15:58:25",
+      "msg": "Deferred, needs real content not just code: panel pre-load-from-study-design (no honest readout->marker KB mapping exists yet) and K-3 instrument/filter-set KB (the filter auto-overlay ships from emission-peak defaults instead, which resolves the immediate complaint)"
     },
     {
-      "time": "15:55:14",
-      "msg": "Merged codex/fluorophore-expansion into feat/alpha-pilot-readiness (zero conflicts except the generated dashboard snapshot, resolved by regeneration). Merged feat/alpha-pilot-readiness into main (zero conflicts). Both pushed. 656/656 JS tests, 32/32 Python KB/build tests, clean single-file build, all on the merged main tree."
+      "time": "15:58:25",
+      "msg": "710/710 JS tests, build 725KB under 2MB gate, fixed an import cycle (naming.js<->describe.js) by extracting ui/questionControl.js as a shared leaf module"
     },
     {
-      "time": "15:55:14",
-      "msg": "Found conformance.js contains a raw NUL byte in a string literal (defaults[field] ?? '\\x00', pre-existing since Wave 2C, not introduced this session) -- likely a deliberate never-collides sentinel, but as a raw byte rather than escaped \\u0000 it makes 'file'/grep misclassify the whole source file as binary. Not a functional bug (Node parses fine, build succeeded), flagged as a follow-up, not fixed inline during the push."
+      "time": "16:26:26",
+      "msg": "P1 follow-up (user feedback): Microscopy page redone as a name-builder-style field grid (ui/fieldInterview.js, shared with Naming's Schedule section) -- box+hover-hint+small check-mark-to-confirm, no more Answer/Skip buttons, empty box = skipped"
     },
     {
-      "time": "18:40:13",
-      "msg": "Bumped actions/checkout, setup-node, setup-python to v7 in deploy.yml and ci.yml (GitHub flagged Node 20 deprecation forcing a compat shim). Merged into main."
+      "time": "16:26:26",
+      "msg": "Date field now a native date picker; the 4 timing questions now use hours+minutes duration controls (stored as total minutes, unchanged for ics.js). All question wording moved to present tense; sample-ID hint now gives a real example (ABC01/XYZ12)"
+    },
+    {
+      "time": "16:26:26",
+      "msg": "New engine/interview.js phaseQuestions() (show every question in a phase, answered or not, with confirmed/currentValue/suggestedTag) -- 7 new unit tests. 716/716 JS tests, build 726KB, verified live: h+min duration correctly produces 1h15m -> 75min in the downloaded .ics"
+    },
+    {
+      "time": "17:13:42",
+      "msg": "P5 shipped: interactive walkthrough (ui/walkthrough.js) -- an 8-step spotlight/coach-mark tour over the REAL app nav (not a slideshow), launched from Home's 'Take the walkthrough' card and a new 'Start the tour' button on Guide"
+    },
+    {
+      "time": "17:13:42",
+      "msg": "Guide rewritten into a searchable wiki: live text-filter over real content, IA-accurate step descriptions (was stale since Phase 1's reorder -- still said 'Describe'/'Color panel'). Screenshots deliberately NOT embedded -- explained in guide.js's own header (zero-image-asset architecture + staleness risk on a still-changing UI); flagged for the user to override if real captures are wanted"
+    },
+    {
+      "time": "17:13:42",
+      "msg": "'GitHub issue' header link upgraded from a static link to a button that opens a prefilled issue (same report as Copy feedback report, truncated with an honest note past 6000 chars) -- a working one-click feedback path with no new external service needed"
+    },
+    {
+      "time": "17:13:42",
+      "msg": "Added spinning-disk confocal / two-photon / TIRF to the modality choices (well-established, uncontroversial additions); did NOT add new advisor-rule guidance for them or new readout/assay types -- would require specialist-reviewable domain content this pass shouldn't invent"
+    },
+    {
+      "time": "17:13:42",
+      "msg": "716/716 JS tests, build 744KB under 2MB gate, verified live end-to-end: full 8-step tour navigates real pages with correct headings, search filters/resets correctly, GitHub issue URL correctly prefilled and truncated, new modality options present"
     }
   ],
-  "snapshot_at": "2026-08-15 18:40"
+  "snapshot_at": "2026-08-16 17:13"
 };
 /* CMA:EMBEDDED:END */
 
