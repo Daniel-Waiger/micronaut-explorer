@@ -21,7 +21,13 @@ export const MAX_PATH_LENGTH = 260;
 export const DEFAULT_PROFILE = {
   allowedExperimentTypes: [],
   allowedMarkers: [],
-  samplePattern: '^E\\d{2}$',
+  // Any three-letter acronym + two digits (00-99): 100 IDs per acronym,
+  // covering whatever lab/project shorthand the sample actually uses --
+  // '^E\d{2}$' (the old pattern) accepted ONLY the single letter E, which
+  // rejected every other lab's acronym outright and even flagged the
+  // NAMING_CONFIG default sentinel 'UNKNOWN' as an invalid sample. See
+  // docs/plans/planner-web -- zen-planner, Phase 0.
+  samplePattern: '^[A-Za-z]{3}\\d{2}$',
   magnificationPattern: '^X\\d{2,3}$',
   notesPattern: '^[A-Za-z0-9_-]+$',
   unknownMarkerPolicy: 'warn',
@@ -98,17 +104,22 @@ export function validateFields(fields, profile) {
   // Each of these three messages leads with what the value should look like
   // in plain terms (safe to state directly: DEFAULT_PROFILE below is the
   // ONLY profile this app ever constructs, so "sample" always means this
-  // exact E## shape in practice) and keeps the regex afterward only as a
+  // exact XYZ## shape in practice) and keeps the regex afterward only as a
   // technical reference, not as the primary explanation -- a researcher
-  // hitting this error needs "use E01, not UNKNOWN", not a pattern to
+  // hitting this error needs "use ABC01, not UNKNOWN", not a pattern to
   // decode themselves.
+  //
+  // 'UNKNOWN' (NAMING_CONFIG's own default sentinel, ui/steps/naming.js) is
+  // deliberately NOT validated here: only a value the user actually typed
+  // is checked, so the placeholder default is never flagged as an error
+  // before the user has entered anything.
   const sample = String(fields.sample ?? '');
-  if (sample && !compileFullMatch(profile.samplePattern).test(sample)) {
+  if (sample && sample !== 'UNKNOWN' && !compileFullMatch(profile.samplePattern).test(sample)) {
     issues.push(
       validationIssue(
         'sample',
-        `'${sample}' isn't a valid sample ID -- it should be the letter E followed by two digits, ` +
-          `like E01 or E12. (Expected pattern: ${profile.samplePattern})`,
+        `'${sample}' isn't a valid sample ID -- it should be a three-letter code followed by two ` +
+          `digits, like ABC01 or XYZ12. (Expected pattern: ${profile.samplePattern})`,
         'error'
       )
     );

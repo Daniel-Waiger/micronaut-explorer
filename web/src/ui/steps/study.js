@@ -96,17 +96,17 @@ export const studyStep = {
     rqRow.appendChild(rqInput);
     main.appendChild(rqRow);
 
-    // --- Arm vocabulary -------------------------------------------------
+    // --- Group vocabulary -------------------------------------------------
     const vocabHeading = document.createElement('div');
     vocabHeading.className = 'design-subheading';
-    vocabHeading.textContent = 'Arm vocabulary';
+    vocabHeading.textContent = 'Group vocabulary';
     main.appendChild(vocabHeading);
 
     const vocabRow = document.createElement('label');
     vocabRow.className = 'field-row';
     const vocabLabel = document.createElement('span');
     vocabLabel.className = 'field-label';
-    vocabLabel.textContent = 'Default arms for new assays, comma-separated';
+    vocabLabel.textContent = 'Default groups for new assays, comma-separated';
     vocabRow.appendChild(vocabLabel);
     const vocabInput = document.createElement('input');
     vocabInput.type = 'text';
@@ -141,7 +141,7 @@ export const studyStep = {
     applyBtn.className = 'add-factor-button';
     applyBtn.textContent = 'Apply to all assays';
     applyBtn.title =
-      "Fills in this vocabulary's arms for every assay that hasn't customized its own -- an assay whose arms you already edited by hand is left alone.";
+      "Fills in this vocabulary's groups for every assay that hasn't customized its own -- an assay whose groups you already edited by hand is left alone.";
     applyBtn.addEventListener('click', () => {
       const experiment = store.get();
       const levels = (experiment.armVocabulary && experiment.armVocabulary.levels) || [];
@@ -161,7 +161,7 @@ export const studyStep = {
       if (showToast) {
         showToast(
           skipped > 0
-            ? `Applied to ${applied} assay(s); skipped ${skipped} that already have custom arms.`
+            ? `Applied to ${applied} assay(s); skipped ${skipped} that already have custom groups.`
             : `Applied to ${applied} assay(s).`
         );
       }

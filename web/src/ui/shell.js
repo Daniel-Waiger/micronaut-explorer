@@ -20,6 +20,7 @@ const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
 // decorative: every nav button also carries an explicit aria-label (below),
 // so a screen reader never has to guess a name from the emoji.
 const NAV_STEP_ICONS = {
+  home: '🏠',
   study: '📋',
   describe: '📝',
   design: '📐',
@@ -60,6 +61,8 @@ function saveNavCollapsed(collapsed) {
 const FEEDBACK_FORM_URL = '';
 const FEEDBACK_EMAIL = '';
 const FEEDBACK_ISSUES_URL = 'https://github.com/Daniel-Waiger/micronaut-planner/issues/new';
+// See the "GitHub issue" button below for why this exists.
+const GITHUB_ISSUE_BODY_LIMIT = 6000;
 
 function loadTheme() {
   try {
@@ -205,13 +208,39 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
     headerActions.appendChild(mailLink);
   }
 
-  const issuesLink = document.createElement('a');
-  issuesLink.className = 'theme-toggle';
-  issuesLink.href = FEEDBACK_ISSUES_URL;
-  issuesLink.target = '_blank';
-  issuesLink.rel = 'noopener noreferrer';
-  issuesLink.textContent = 'GitHub issue';
-  headerActions.appendChild(issuesLink);
+  // GitHub issue (zen-planner Phase 5's "easy feedback loop"): a BUTTON, not
+  // a plain link -- it builds the SAME report buildFeedbackReport produces
+  // for "Copy feedback report" above, one implementation, and opens GitHub's
+  // own issue-creation URL with title/body query params prefilled. GitHub
+  // Issues is already wired up and needs no new external service (unlike
+  // FEEDBACK_FORM_URL/FEEDBACK_EMAIL above, which are still unset
+  // placeholders) -- this is the "one click" feedback path that works today.
+  const issuesBtn = document.createElement('button');
+  issuesBtn.type = 'button';
+  issuesBtn.className = 'theme-toggle';
+  issuesBtn.textContent = 'GitHub issue';
+  issuesBtn.title =
+    'Opens a prefilled GitHub issue with the same report "Copy feedback report" copies -- review and edit before submitting; nothing is sent automatically.';
+  issuesBtn.addEventListener('click', () => {
+    const report = buildFeedbackReport({
+      currentStepId: router.current(),
+      kbIssueCount,
+      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
+      experiment: store.get(),
+    });
+    // GitHub does not publish an exact URL-length limit, but browsers and
+    // proxies commonly cap a URL well under 8KB -- a large study's JSON
+    // dump can exceed that easily. Truncate with an honest note rather than
+    // silently produce a URL that fails to open or arrives cut off with no
+    // explanation.
+    const body =
+      report.length > GITHUB_ISSUE_BODY_LIMIT
+        ? `${report.slice(0, GITHUB_ISSUE_BODY_LIMIT)}\n\n...(truncated -- use "Copy feedback report" for the full study JSON, then paste it here)`
+        : report;
+    const url = `${FEEDBACK_ISSUES_URL}?title=${encodeURIComponent('Feedback: ')}&body=${encodeURIComponent(body)}`;
+    window.open(url, '_blank', 'noopener');
+  });
+  headerActions.appendChild(issuesBtn);
 
   headerActions.appendChild(themeToggle);
   header.appendChild(headerActions);
@@ -389,6 +418,11 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
       btn.type = 'button';
       btn.className = 'nav-step' + (step.id === activeId ? ' active' : '');
       btn.title = label;
+      // Stable hook for ui/walkthrough.js (zen-planner Phase 5) to find and
+      // spotlight this button -- text-matching a nav label is fragile (it
+      // breaks the moment a step is retitled, which has already happened
+      // twice in this app's history), a dedicated data attribute is not.
+      btn.dataset.stepId = step.id;
       // Always the real step name, independent of collapsed state -- the
       // icon span below is aria-hidden, so this is the button's ONLY
       // accessible name when collapsed hides the visible label text.

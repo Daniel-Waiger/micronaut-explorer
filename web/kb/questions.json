@@ -1,142 +1,233 @@
 [
   {
     "id": "date",
-    "prompt": "When was this acquired?",
+    "prompt": "What date is this acquisition?",
+    "label": "Date",
+    "control": "date",
     "why": "The date is the first token in every filename this tool renders, and sorts your files chronologically without you having to name them that way.",
     "field": "naming.fields.date",
     "type": "text",
     "priority": 10,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "exptype",
     "prompt": "What kind of experiment is this?",
-    "why": "The experiment type groups related acquisitions together in a folder listing (e.g. CT for a control, G1G2 for a two-generation comparison).",
+    "label": "Experiment type",
+    "placeholder": "e.g. CT, G1G2",
+    "why": "A short code that groups related acquisitions together in a folder listing -- for example CT for a control, G1G2 for a two-generation comparison. Make up your own short code if these don't fit.",
     "field": "naming.fields.exptype",
     "type": "text",
     "priority": 20,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "sample",
-    "prompt": "What's the sample or specimen identifier?",
-    "why": "This is what tells two files with the same date and experiment type apart -- it should be unique within that experiment.",
+    "prompt": "What is the sample or specimen identifier?",
+    "label": "Sample ID",
+    "placeholder": "e.g. ABC01",
+    "why": "A short code unique to this specimen -- a three-letter code plus two digits, like ABC01 or XYZ12. It is what tells two files apart when they share the same date and experiment type.",
     "field": "naming.fields.sample",
     "type": "text",
     "priority": 30,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "magnification",
-    "prompt": "What magnification or objective was used?",
-    "why": "Filtering by magnification later (e.g. finding every 63x acquisition) only works if it's in the filename.",
+    "prompt": "What magnification is this acquired at?",
+    "label": "Magnification",
+    "placeholder": "e.g. X40, X100",
+    "why": "The zoom level or objective, like 40x or 100x -- lets you filter your files later (e.g. finding every 63x acquisition).",
     "field": "naming.fields.magnification",
     "type": "text",
     "priority": 40,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "markers",
-    "prompt": "Which markers or fluorophores were imaged?",
-    "why": "Markers are the main thing collaborators search filenames for -- worth getting into the name even if it's also in the metadata.",
+    "prompt": "Which markers or fluorophores are you imaging?",
+    "label": "Markers",
+    "placeholder": "e.g. DAPI-GFP",
+    "why": "The stains, dyes, or fluorescent proteins you are imaging, like DAPI or GFP -- the main thing collaborators search filenames for.",
     "field": "naming.fields.markers",
     "type": "text",
     "priority": 50,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "organism",
     "prompt": "What organism or cell line is this?",
+    "label": "Organism / cell line",
+    "placeholder": "e.g. mouse, HeLa cells",
     "why": "Groups this experiment with others on the same model system when you're searching later.",
     "field": "specimen.organism",
     "type": "text",
     "priority": 60,
-    "tag": "user"
+    "tag": "user",
+    "phase": "project"
   },
   {
     "id": "sampleType",
-    "prompt": "What type of sample is it (e.g. tissue section, cell culture, whole mount)?",
+    "prompt": "What type of sample is this?",
+    "label": "Sample type",
+    "placeholder": "e.g. tissue section, cell culture, whole mount",
     "why": "Sample type changes what acquisition settings and controls are typical -- later steps use this to tailor their suggestions.",
     "field": "specimen.sampleType",
     "type": "text",
     "priority": 70,
-    "tag": "user"
+    "tag": "user",
+    "phase": "project"
   },
   {
     "id": "preparation",
-    "prompt": "How was the sample prepared?",
+    "prompt": "How is the sample prepared?",
+    "label": "Preparation",
+    "placeholder": "e.g. fixed in 4% PFA, frozen section",
     "why": "Fixation and mounting method affects which controls and settings make sense, and is easy to forget by the time you write the paper.",
     "field": "specimen.preparation",
     "type": "text",
     "askWhen": { "exists": "specimen.organism" },
     "priority": 80,
-    "tag": "user"
+    "tag": "user",
+    "phase": "project"
   },
   {
     "id": "instrument",
-    "prompt": "Which instrument did you use?",
+    "prompt": "Which instrument are you using?",
+    "label": "Instrument",
+    "placeholder": "e.g. Leica SP8",
     "why": "Ties this experiment to the instrument's known objectives, lasers, and detectors for later acquisition guidance.",
     "field": "acquisition.instrument",
     "type": "text",
     "priority": 90,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "modality",
     "prompt": "What imaging modality is this?",
-    "why": "Modality drives modality-specific guidance later -- confocal, widefield and STED have different pitfalls worth flagging. Not every modality is optical: SEM/TEM/Raman samples typically have no biological or technical replicates in the usual sense, which is why those are separate, independently-optional questions.",
+    "label": "Modality",
+    "why": "Confocal, widefield, and STED each have different pitfalls worth flagging here. Not every modality is optical: SEM/TEM/Raman samples typically have no biological or technical replicates in the usual sense, which is why those are separate, independently-optional questions.",
     "field": "acquisition.modality",
     "type": "choice",
-    "options": ["confocal", "widefield", "STED", "light-sheet", "SEM", "TEM", "Raman"],
+    "options": ["confocal", "widefield", "spinning-disk confocal", "two-photon", "TIRF", "STED", "light-sheet", "SEM", "TEM", "Raman"],
     "allowOther": true,
     "priority": 100,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "smallestFeature",
-    "prompt": "What's the smallest feature you need to resolve, in nanometers?",
-    "why": "This is the number that actually sets how finely to sample the image (Nyquist sampling) -- leave it blank if you haven't decided, but it's worth deciding before you're at the microscope, not after.",
+    "prompt": "What is the smallest feature you need to resolve?",
+    "label": "Smallest feature (nm)",
+    "placeholder": "nanometers",
+    "why": "This is the number that actually sets how finely to sample the image (Nyquist sampling) -- worth deciding before you're at the microscope, not after. Leave blank if you haven't decided.",
     "field": "acquisition.smallestFeatureNm",
     "type": "number",
     "priority": 101,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "readout",
     "prompt": "What is this assay's readout?",
-    "why": "The readout drives the control guidance on the study overview -- a viability assay, a ROS assay, and a migration assay each need a different reference control, and the app can only suggest the right ones once it knows which you're running.",
+    "label": "Readout",
+    "why": "What you are actually measuring -- a viability assay, a ROS assay, and a migration assay each need a different reference control, and the app can only suggest the right ones once it knows which you're running.",
     "field": "readoutText",
     "type": "choice",
     "options": ["Bacterial viability", "Macrophage cytoskeleton", "Intracellular ROS", "Scratch / migration"],
     "allowOther": true,
     "priority": 15,
-    "tag": "user"
+    "tag": "user",
+    "phase": "project"
   },
   {
     "id": "biologicalReplicates",
     "prompt": "How many biological replicates?",
-    "why": "Determines how many condition rows the design expands into and whether the sample size is worth flagging as low.",
+    "label": "Biological replicates",
+    "placeholder": "count",
+    "why": "A biological replicate is a repeat done with a different animal, dish, or sample. Determines how many condition rows the design expands into and whether the sample size is worth flagging as low.",
     "field": "design.biologicalReplicates",
     "type": "number",
     "priority": 110,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "technicalReplicates",
-    "prompt": "How many technical replicates per biological replicate, if any?",
-    "why": "Technical replicates (repeat acquisitions of the same biological sample) get their own token in the filename, separate from biological replicates -- leave this blank if you didn't take any.",
+    "prompt": "How many technical replicates per biological replicate?",
+    "label": "Technical replicates",
+    "placeholder": "count, if any",
+    "why": "A technical replicate is a repeat measurement of the SAME biological sample, separate from biological replicates -- leave this blank if you don't have any.",
     "field": "design.technicalReplicates",
     "type": "number",
     "priority": 111,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
   },
   {
     "id": "notes",
     "prompt": "Anything else worth noting about this acquisition?",
+    "label": "Notes",
+    "placeholder": "optional",
     "why": "A free-text escape hatch for anything the other questions didn't capture -- entirely optional.",
     "field": "naming.fields.notes",
     "type": "text",
     "priority": 120,
-    "tag": "user"
+    "tag": "user",
+    "phase": "microscopy"
+  },
+  {
+    "id": "etaFixation",
+    "prompt": "How long does fixation and staining take?",
+    "label": "Fixation & staining",
+    "control": "duration",
+    "why": "From start to a sample ready for the scope. Bench-prep time is usually the first bottleneck in a session -- knowing it lets the schedule (and the .ics export) block out a realistic slot instead of assuming zero.",
+    "field": "timing.etaFixationMinutes",
+    "type": "number",
+    "priority": 200,
+    "tag": "user",
+    "phase": "timing"
+  },
+  {
+    "id": "etaMounting",
+    "prompt": "How long does mounting take, per sample?",
+    "label": "Mounting (per sample)",
+    "control": "duration",
+    "why": "Mounting time scales with your sample count, so this is multiplied by however many samples the design plans -- worth a real estimate, not a guess made once at the scope.",
+    "field": "timing.etaMountingMinutes",
+    "type": "number",
+    "priority": 201,
+    "tag": "user",
+    "phase": "timing"
+  },
+  {
+    "id": "etaAcquisitionPerSample",
+    "prompt": "How long does one acquisition take at the microscope, per sample?",
+    "label": "Acquisition (per sample)",
+    "control": "duration",
+    "why": "This is usually the largest block on the schedule and the one most worth booking shared-instrument time around.",
+    "field": "timing.etaAcquisitionMinutes",
+    "type": "number",
+    "priority": 202,
+    "tag": "user",
+    "phase": "timing"
+  },
+  {
+    "id": "etaAnalysis",
+    "prompt": "How long do you expect image analysis and processing to take, in total?",
+    "label": "Image analysis (total)",
+    "control": "duration",
+    "why": "Analysis time is easy to leave off a schedule entirely -- a rough estimate here is enough to stop the project from looking 'done' the moment acquisition finishes.",
+    "field": "timing.etaAnalysisMinutes",
+    "type": "number",
+    "priority": 203,
+    "tag": "user",
+    "phase": "timing"
   }
 ]

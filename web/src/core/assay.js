@@ -23,7 +23,7 @@
 // The v2 roots that move under each assay. `naming.fields` moves too but is
 // handled separately below (naming.template/plannedNames stay study-level,
 // so it isn't a whole top-level root).
-export const ASSAY_SCOPED_ROOTS = new Set(['specimen', 'design', 'panel', 'acquisition', 'controls']);
+export const ASSAY_SCOPED_ROOTS = new Set(['specimen', 'design', 'panel', 'acquisition', 'controls', 'timing']);
 
 // Scalar fields that live DIRECTLY on the assay object rather than inside one
 // of the container roots above -- 'label' (commit 2's rename), 'readout'/
@@ -92,6 +92,16 @@ export function emptyAssay(id) {
     },
     controls: { positive: [], negative: [], notes: '' },
     naming: { fields: {} },
+    // Bench/scope ETAs the timing interview (web/kb/questions.json,
+    // phase 'timing') collects, feeding engine/render/ics.js's schedule --
+    // minutes, per-sample where the field name says so, blank (null) means
+    // "not answered yet", never 0.
+    timing: {
+      etaFixationMinutes: null,
+      etaMountingMinutes: null,
+      etaAcquisitionMinutes: null,
+      etaAnalysisMinutes: null,
+    },
   };
 }
 
@@ -195,6 +205,7 @@ export function assayView(experiment, assayId) {
     panel: assay.panel,
     acquisition: assay.acquisition,
     controls: assay.controls,
+    timing: assay.timing,
     naming: { ...studyNaming, fields: assayNaming.fields || {} },
     provenance: projectProvenance(exp.provenance, assayId),
     derived: exp.derived,

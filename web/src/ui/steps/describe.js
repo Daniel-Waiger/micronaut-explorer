@@ -25,6 +25,7 @@ import { PROPOSAL_SYSTEM_PROMPT, renderQuestionLines, renderProposalRequestPromp
 import { extractJsonReply } from '../../engine/llmreply.js';
 import { CHAT_TARGETS, buildChatUrl } from '../../llm/chatTargets.js';
 import { copyToClipboard } from '../clipboard.js';
+import { buildQuestionControl, coerceAnswer } from '../questionControl.js';
 
 const INTERVIEW_LIMIT = 8;
 
@@ -36,101 +37,11 @@ function displayValue(value) {
   return value === undefined || value === null ? '' : String(value);
 }
 
-// Sentinel <option> value meaning "the user picked Other" -- internal only,
-// never written to the store (getValue() below always resolves it to the
-// free-text box's actual content, or '' if that box is still empty).
-const OTHER_OPTION_VALUE = '__other__';
-
-/**
- * Build the control for a question, pre-filled with `initialValue`. Returns
- * `{element, getValue()}` rather than a bare element: a choice question with
- * `allowOther` composes a <select> + a free-text fallback, and the two need
- * one seam a plain element's native `.value` can't express.
- *
- * Shared by the "ask" list and the "your answers" list so the two can never
- * drift apart -- an editable answer must offer exactly the same choices (and
- * the same Other escape hatch) the original question did, or editing
- * silently becomes a different question.
- */
-function buildQuestionControl(question, initialValue) {
-  if (question.type === 'choice' || question.type === 'multi') {
-    const select = document.createElement('select');
-    select.className = 'question-control';
-    const blank = document.createElement('option');
-    blank.value = '';
-    blank.textContent = '-- choose --';
-    select.appendChild(blank);
-    for (const option of question.options || []) {
-      const opt = document.createElement('option');
-      opt.value = option;
-      opt.textContent = option;
-      select.appendChild(opt);
-    }
-
-    if (!question.allowOther) {
-      if (initialValue !== undefined && initialValue !== null) select.value = initialValue;
-      return { element: select, getValue: () => select.value };
-    }
-
-    // allowOther: a generic escape hatch for ANY choice question, not
-    // special-cased to modality. Picking "Other..." reveals a free-text box;
-    // getValue() always resolves through it, never the sentinel itself, so a
-    // saved answer is the user's own text, indistinguishable from having
-    // typed it into a plain text question.
-    const otherOpt = document.createElement('option');
-    otherOpt.value = OTHER_OPTION_VALUE;
-    otherOpt.textContent = 'Other...';
-    select.appendChild(otherOpt);
-
-    const otherInput = document.createElement('input');
-    otherInput.type = 'text';
-    otherInput.className = 'question-control question-other-input';
-    otherInput.placeholder = 'Type it in';
-    otherInput.hidden = true;
-
-    function syncOtherVisibility() {
-      otherInput.hidden = select.value !== OTHER_OPTION_VALUE;
-    }
-    select.addEventListener('change', syncOtherVisibility);
-
-    // A previously-saved value that is NOT one of the curated options means
-    // the user already typed a custom answer -- reopen as Other with that
-    // text prefilled, rather than silently failing to preselect anything
-    // (a bare <select>.value = 'unknown option' just leaves it blank).
-    if (initialValue !== undefined && initialValue !== null) {
-      if ((question.options || []).includes(initialValue)) {
-        select.value = initialValue;
-      } else {
-        select.value = OTHER_OPTION_VALUE;
-        otherInput.value = initialValue;
-      }
-    }
-    syncOtherVisibility();
-
-    const wrapper = document.createElement('div');
-    wrapper.className = 'question-control-group';
-    wrapper.appendChild(select);
-    wrapper.appendChild(otherInput);
-
-    return {
-      element: wrapper,
-      getValue: () => (select.value === OTHER_OPTION_VALUE ? otherInput.value : select.value),
-    };
-  }
-
-  const input = document.createElement('input');
-  input.type = question.type === 'number' ? 'number' : 'text';
-  input.className = 'question-control';
-  if (initialValue !== undefined && initialValue !== null) {
-    input.value = initialValue;
-  }
-  return { element: input, getValue: () => input.value };
-}
-
-/** Coerce a control's raw string back to the question's declared type. */
-function coerceAnswer(question, raw) {
-  return question.type === 'number' ? Number(raw) : raw;
-}
+// buildQuestionControl/coerceAnswer moved to ../questionControl.js
+// (zen-planner Phase 1): naming.js needed them too, and importing them FROM
+// this file would have closed an import cycle since this file already
+// imports naming.js's NAMING_CONFIG/BASE_TEMPLATE -- see that module's own
+// header for the full reasoning.
 
 /**
  * The `readout` question (web/kb/questions.json) is the one question that
@@ -178,7 +89,12 @@ export function createDescribeStep(kb) {
 
   return {
     id: 'describe',
-    title: 'Describe',
+    // Retitled 'Project' (zen-planner Phase 1's reframe): this is the
+    // preliminary, project-level questioning -- the biological question,
+    // organism, hypothesis -- asked BEFORE any microscope is chosen. The id
+    // stays 'describe' (it addresses this step in the URL hash and every
+    // existing render() call site) -- only the user-facing label changed.
+    title: 'Project',
     render(main, store, { showToast, advisor } = {}) {
       main.textContent = '';
 
@@ -190,8 +106,14 @@ export function createDescribeStep(kb) {
 
       const heading = document.createElement('h1');
       heading.className = 'step-heading';
-      heading.textContent = 'Describe what you did';
+      heading.textContent = 'Describe your project';
       main.appendChild(heading);
+
+      const subheading = document.createElement('p');
+      subheading.className = 'proposals-empty';
+      subheading.textContent =
+        'Start with the experiment itself -- the question, the organism, why you’re running it -- before any microscope decision. Study & Groups and Microscopy come next.';
+      main.appendChild(subheading);
 
       const textarea = document.createElement('textarea');
       textarea.className = 'describe-textarea';
@@ -206,6 +128,25 @@ export function createDescribeStep(kb) {
       readButton.textContent = 'Read it';
       main.appendChild(readButton);
 
+      // Progressive disclosure (zen-planner Phase 1's declutter pass): every
+      // LLM-related control -- the two Ollama-specific buttons below, plus
+      // the chat-LLM round-trip section further down -- collapses behind
+      // ONE reveal instead of exploding across the page by default. Closed
+      // by default: nothing about the deterministic "Read it" scan above
+      // needs it, and a first-time visitor with no local model configured
+      // has no reason to see three LLM options before they've typed a
+      // sentence. `open` is never forced true by anything below -- once the
+      // user opens it, JS never closes it back (no code here sets
+      // aiHelpDetails.open), so their choice survives every re-render this
+      // function itself does NOT trigger a fresh mount for.
+      const aiHelpDetails = document.createElement('details');
+      aiHelpDetails.className = 'reveal';
+      const aiHelpSummary = document.createElement('summary');
+      aiHelpSummary.className = 'reveal-summary';
+      aiHelpSummary.textContent = 'Get AI help (optional)';
+      aiHelpDetails.appendChild(aiHelpSummary);
+      main.appendChild(aiHelpDetails);
+
       // Only offered when a local model is actually configured -- the draft
       // flow needs schema-constrained decoding, which the manual-paste
       // provider cannot do (a human pasting a reply back by hand has no
@@ -217,7 +158,7 @@ export function createDescribeStep(kb) {
       draftButton.textContent = 'Draft a study from this (new tab)';
       draftButton.title =
         'Sends this description to your local model and opens the drafted study in a NEW tab. This study is not touched.';
-      main.appendChild(draftButton);
+      aiHelpDetails.appendChild(draftButton);
 
       // Wave C: the same model, aimed at THIS study instead of a new one.
       // The two are different moments, not redundant buttons -- drafting is
@@ -229,7 +170,7 @@ export function createDescribeStep(kb) {
       suggestButton.textContent = 'Suggest answers for what is left';
       suggestButton.title =
         "Asks your local model to answer only the questions you haven't decided yet, as proposals you review one by one.";
-      main.appendChild(suggestButton);
+      aiHelpDetails.appendChild(suggestButton);
 
       // Both buttons above are Ollama-specific (they need schema-constrained
       // decoding -- see draftButton's title). Their visibility used to be
@@ -485,7 +426,7 @@ export function createDescribeStep(kb) {
         mergeProposals(proposals, { sourceLabel: 'an earlier suggestion' });
       });
 
-      main.appendChild(chatSection);
+      aiHelpDetails.appendChild(chatSection);
 
       // advisor may be undefined (a caller that hasn't wired it, or a KB
       // that failed to load) -- createAdvicePanel([], ...) is completely
@@ -530,14 +471,22 @@ export function createDescribeStep(kb) {
       interviewList.className = 'interview-list';
       main.appendChild(interviewList);
 
-      const answeredHeading = document.createElement('div');
-      answeredHeading.className = 'interview-heading';
-      answeredHeading.textContent = 'Your answers';
-      main.appendChild(answeredHeading);
+      // Collapsed by default, same reveal idiom as aiHelpDetails above: a
+      // review list of everything already answered is valuable once there
+      // is something to review, but is pure clutter above the fold on a
+      // step that has not been touched yet -- see the declutter comment on
+      // aiHelpDetails for the full rationale.
+      const answeredDetails = document.createElement('details');
+      answeredDetails.className = 'reveal';
+      const answeredSummary = document.createElement('summary');
+      answeredSummary.className = 'reveal-summary';
+      answeredSummary.textContent = 'Your answers';
+      answeredDetails.appendChild(answeredSummary);
+      main.appendChild(answeredDetails);
 
       const answeredList = document.createElement('div');
       answeredList.className = 'interview-list answered-list';
-      main.appendChild(answeredList);
+      answeredDetails.appendChild(answeredList);
 
       // Proposals are held here (not written to the store) until the user
       // explicitly Accepts one -- a proposal is a suggestion, never applied
@@ -703,7 +652,9 @@ export function createDescribeStep(kb) {
         // through unchanged (see core/assay.js's projectProvenance), so
         // nextQuestions' isSkipped check is unaffected by the assay scoping
         // below -- only the per-question field paths need it.
-        const askable = nextQuestions(questionBank, assayView(store.get(), assayId), INTERVIEW_LIMIT);
+        const askable = nextQuestions(questionBank, assayView(store.get(), assayId), INTERVIEW_LIMIT, {
+          phase: 'project',
+        });
         currentAskable = askable;
         if (askable.length === 0) {
           const done = document.createElement('p');
@@ -796,7 +747,9 @@ export function createDescribeStep(kb) {
       function renderAnswered() {
         updateAdvice(); // see the matching comment in renderInterview above
         answeredList.textContent = '';
-        const reviewable = answeredQuestions(questionBank, assayView(store.get(), assayId));
+        const reviewable = answeredQuestions(questionBank, assayView(store.get(), assayId), {
+          phase: 'project',
+        });
         if (reviewable.length === 0) {
           const empty = document.createElement('p');
           empty.className = 'interview-empty';

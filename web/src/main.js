@@ -5,13 +5,14 @@ import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
 import { clearAll, loadMostRecentRecoverable, saveExperiment, takeStashedDraft } from './core/persist.js';
 import { shapeAppKb } from './engine/kbpack.js';
-import { namingStep } from './ui/steps/naming.js';
+import { createNamingStep } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
 import { designStep } from './ui/steps/design.js';
 import { studyStep } from './ui/steps/study.js';
 import { createPanelStep } from './ui/steps/panel.js';
 import { createOverviewStep } from './ui/steps/overview.js';
 import { guideStep } from './ui/steps/guide.js';
+import { homeStep, loadWalkthroughSeen, saveWalkthroughSeen } from './ui/steps/home.js';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -68,22 +69,48 @@ function init() {
   const describeStep = createDescribeStep(kb);
   const panelStep = createPanelStep(kb);
   const overviewStep = createOverviewStep(kb);
-  // Study first: it is the study-level surface sitting above every assay,
-  // and the discoverability point for "this app can model more than one
-  // assay" -- the router lands on steps[0] by default, so this is also the
-  // new landing step. See docs/plans/planner-web-assay-tier.md, commit 2.
-  // Panel after Naming: it reads naming.fields.markers (Naming is where that
-  // field is entered), and is itself a pure read -- no new facts entered
-  // here either. See ui/steps/panel.js's module header and
+  const namingStep = createNamingStep(kb);
+  // Home FIRST (zen-planner Phase 1's reframe): the router lands on
+  // steps[0] by default, and Home is now the deliberate landing page --
+  // superseding Study's earlier claim to that spot (see the walkthrough
+  // redirect below main.js's step nav order also carries the reframe's
+  // "question before microscope" story: Describe ("Project") moves ahead of
+  // Study/Design so the project-level questioning happens before the study
+  // axes and the microscopy details, and Naming/Overview close out as
+  // Outputs.
+  // Panel ("Microscopy"): it reads naming.fields.markers (Naming is where
+  // that field is entered) plus its own phase-scoped acquisition interview.
+  // See ui/steps/panel.js's module header and
   // docs/plans/planner-web-color-panel.md, Decision 1.
   // Overview last: it is a pure READ over every other step's data (the
   // shareable diagram + deterministic walkthrough), never a place new facts
   // are entered -- see ui/steps/overview.js's module header.
-  // Guide LAST: it must not displace the deliberate Study landing page
-  // (router lands on steps[0]), but stays permanently in the nav so a
-  // first-time tester can find it. See ui/steps/guide.js's header.
-  const steps = [studyStep, describeStep, designStep, namingStep, panelStep, overviewStep, guideStep];
+  // Guide LAST: stays permanently in the nav so it is always reachable, even
+  // though Home's own "Take the walkthrough" card is now the more prominent
+  // entry point to the same content. See ui/steps/guide.js's header.
+  const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep];
   const router = createRouter(steps);
+
+  // First-visit walkthrough default (zen-planner Phase 1): a genuinely new
+  // session -- totalSaved === 0, meaning loadMostRecentRecoverable found NO
+  // prior autosave for this browser at all, the same signal loadInitialExperiment
+  // already computed above -- lands on the Guide step's walkthrough content
+  // instead of Home, once, before this tab's first paint. Marked seen
+  // immediately so a reload of the SAME session does not repeat the
+  // redirect (the seeded oregano example is not "no prior session" the
+  // second time around) -- see ui/steps/home.js's "Don't show again" control
+  // for the same flag, set explicitly instead of implicitly.
+  //
+  // !isDraft matters here: loadInitialExperiment's draft branch above
+  // hardcodes totalSaved: 0 UNCONDITIONALLY (it returns before ever calling
+  // loadMostRecentRecoverable) -- without this guard, an experienced user
+  // who just used "Draft a study from this" in another tab would get
+  // redirected away from their freshly-drafted study on this new tab, which
+  // is the opposite of a first-time visitor.
+  if (totalSaved === 0 && !isDraft && !loadWalkthroughSeen()) {
+    saveWalkthroughSeen();
+    router.navigate('guide');
+  }
 
   const root = document.getElementById('app');
   const { main, showToast } = renderShell(root, store, router, {

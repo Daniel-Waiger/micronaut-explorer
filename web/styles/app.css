@@ -5,6 +5,16 @@
    :root[data-theme="dark"|"light"] overrides so the in-app toggle always
    wins over the OS preference in both directions. */
 
+/* zen-planner Phase 1's "soft, calm, matte" pass: every hue below is
+   deliberately DE-saturated relative to the original palette (accent moved
+   from a bright cyan-teal to a quieter sage-teal, danger/warn/ok pulled a
+   step toward gray) so a page full of status colors reads as calm rather
+   than neon. Contrast is verified, not just eyeballed: --nav-icon-filter's
+   own brightness/contrast values are UNCHANGED from before this pass --
+   see commit d619676 in this repo's history, where a too-washed-out
+   brightness(1.35) on dark-theme nav icons was an actual reported defect.
+   "Matte" is about hue/saturation, never about giving up the contrast a
+   previous fix already had to earn. */
 :root {
   color-scheme: dark;
   --bg: #0d1117;
@@ -13,11 +23,11 @@
   --line: #2a313c;
   --ink: #e6edf3;
   --muted: #8b96a5;
-  --accent: #2dd4bf;
+  --accent: #4fb8a8;
   --accent-ink: #04302b;
-  --danger: #f87171;
-  --warn: #fbbf24;
-  --ok: #34d399;
+  --danger: #e17b7b;
+  --warn: #e0ac4b;
+  --ok: #5cb894;
   /* Desaturates the nav step emoji toward black/white (see .nav-step-icon) --
      brighter in dark mode, since a flat grayscale emoji reads too dark
      against this app's dark panel background otherwise. */
@@ -29,17 +39,17 @@
 @media (prefers-color-scheme: light) {
   :root {
     color-scheme: light;
-    --bg: #f7f9fa;
-    --panel: #ffffff;
-    --panel-2: #ffffff;
-    --line: #dfe4ea;
-    --ink: #1a2027;
-    --muted: #5b6572;
-    --accent: #0f9c8c;
+    --bg: #f6f5f2;
+    --panel: #fdfcfa;
+    --panel-2: #fdfcfa;
+    --line: #e2ded6;
+    --ink: #2a2721;
+    --muted: #6b665c;
+    --accent: #2f8a7d;
     --accent-ink: #ffffff;
-    --danger: #dc2626;
-    --warn: #b45309;
-    --ok: #059669;
+    --danger: #b8483f;
+    --warn: #9c6a1f;
+    --ok: #2f7d54;
     --nav-icon-filter: grayscale(1) brightness(0.85) contrast(1.15);
   }
 }
@@ -52,27 +62,27 @@
   --line: #2a313c;
   --ink: #e6edf3;
   --muted: #8b96a5;
-  --accent: #2dd4bf;
+  --accent: #4fb8a8;
   --accent-ink: #04302b;
-  --danger: #f87171;
-  --warn: #fbbf24;
-  --ok: #34d399;
+  --danger: #e17b7b;
+  --warn: #e0ac4b;
+  --ok: #5cb894;
   --nav-icon-filter: grayscale(1) brightness(1.05) contrast(1.2);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --bg: #f7f9fa;
-  --panel: #ffffff;
-  --panel-2: #ffffff;
-  --line: #dfe4ea;
-  --ink: #1a2027;
-  --muted: #5b6572;
-  --accent: #0f9c8c;
+  --bg: #f6f5f2;
+  --panel: #fdfcfa;
+  --panel-2: #fdfcfa;
+  --line: #e2ded6;
+  --ink: #2a2721;
+  --muted: #6b665c;
+  --accent: #2f8a7d;
   --accent-ink: #ffffff;
-  --danger: #dc2626;
-  --warn: #b45309;
-  --ok: #059669;
+  --danger: #b8483f;
+  --warn: #9c6a1f;
+  --ok: #2f7d54;
   --nav-icon-filter: grayscale(1) brightness(0.85) contrast(1.15);
 }
 
@@ -220,7 +230,11 @@ button:focus-visible {
 .nav-step-icon {
   display: none;
   flex: 0 0 auto;
-  font-size: 17px;
+  /* Bigger side icons: the collapsed rail is icon-only (see the comment
+     above), so this is the one place the icon is the ENTIRE visible
+     identity of a nav button -- sized up from 17px so it reads clearly at a
+     glance instead of as a small dot. */
+  font-size: 24px;
   line-height: 1;
   filter: var(--nav-icon-filter);
 }
@@ -236,7 +250,9 @@ button:focus-visible {
    the nav should make room for content, not just shrink an item inside a
    column that stays 200px regardless. */
 .shell-body.shell-nav-collapsed {
-  grid-template-columns: 60px 1fr;
+  /* Widened from 60px to fit the bigger 24px icons (above) with room to
+     breathe, rather than crowding them against the rail's edges. */
+  grid-template-columns: 72px 1fr;
 }
 
 .shell-body.shell-nav-collapsed .nav-toggle {
@@ -245,7 +261,7 @@ button:focus-visible {
 
 .shell-body.shell-nav-collapsed .nav-step {
   justify-content: center;
-  padding: 10px 4px;
+  padding: 12px 4px;
 }
 
 .shell-body.shell-nav-collapsed .nav-step-icon {
@@ -334,6 +350,79 @@ button:focus-visible {
 .field-input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* The name-builder-style field interview (ui/fieldInterview.js, zen-planner
+   Phase 1 feedback): a box plus a small ✓ to confirm it, replacing the
+   earlier full-sentence question + Answer/Skip button pair. The "why" text
+   moves to the box's native title tooltip -- no visible subtitle. */
+.field-commit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-commit-row > .field-input,
+.field-commit-row > .duration-control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.field-commit {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.field-commit:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.field-commit-confirmed {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.field-commit-confirmed:hover {
+  filter: brightness(1.05);
+}
+
+/* Duration control (hours + minutes, stored as total minutes) -- the
+   calendar/timing questions use real time units instead of an arbitrary
+   "number of minutes" box. */
+.duration-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.duration-part {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.duration-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.duration-unit {
+  flex: 0 0 auto;
+  font-size: 12.5px;
+  color: var(--muted);
 }
 
 /* The planned-names table. One row when there is no design (the standalone
@@ -1013,6 +1102,146 @@ button:focus-visible {
   color: var(--ink);
 }
 
+/* Progressive-disclosure reveal (zen-planner Phase 1's declutter pass):
+   ui/steps/describe.js's "Get AI help"/"Your answers" and ui/steps/panel.js's
+   "Your answers" all use this ONE idiom rather than three bespoke show/hide
+   toggles -- native <details>/<summary>, so open/closed state, keyboard
+   operability, and screen-reader semantics all come from the platform. */
+.reveal {
+  margin: 12px 0 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.reveal-summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  list-style: none;
+}
+
+/* Chrome/Safari render a default disclosure triangle via ::-webkit-details-
+   marker even with list-style:none on the <summary> itself; ::marker is the
+   standard-track way to remove it everywhere before drawing our own. */
+.reveal-summary::marker,
+.reveal-summary::-webkit-details-marker {
+  display: none;
+}
+
+.reveal-summary::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--muted);
+  transition: transform 120ms ease;
+}
+
+.reveal[open] > .reveal-summary::before {
+  transform: rotate(90deg);
+}
+
+.reveal-summary:hover {
+  color: var(--accent);
+}
+
+.reveal > *:not(.reveal-summary) {
+  padding: 0 14px 14px;
+}
+
+/* The child sections (.chatllm-section, .interview-list) already carry
+   their own margins meant for sitting directly in `main` -- reset the ones
+   that would otherwise double up with .reveal's own padding above. */
+.reveal > .chatllm-section {
+  margin: 0;
+  border: none;
+  padding: 0 14px 14px;
+  background: transparent;
+}
+
+.reveal > .interview-list.answered-list {
+  margin-bottom: 0;
+}
+
+.reveal > .draft-button:first-of-type {
+  margin-left: 0;
+}
+
+/* The Home step (ui/steps/home.js): big, low-text thumbnail cards -- "big
+   thumbnails on the landing page" per the zen redesign brief. Emoji glyphs
+   stand in for pictures, matching shell.js's NAV_STEP_ICONS idiom, so this
+   stays a zero-dependency, no-image-asset app. */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 24px 0 16px;
+}
+
+.home-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 22px 20px;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease;
+}
+
+.home-card:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.home-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.home-card-icon {
+  font-size: 34px;
+  line-height: 1;
+  filter: var(--nav-icon-filter);
+}
+
+.home-card-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.home-card-body {
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.home-skip-row {
+  margin: 4px 0 0;
+}
+
+.home-skip-link {
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+
+.home-skip-link:hover {
+  color: var(--ink);
+}
+
 .describe-textarea {
   width: 100%;
   min-height: 120px;
@@ -1431,7 +1660,120 @@ button:focus-visible {
   margin: 4px 0 16px;
 }
 
+/* Interactive walkthrough (ui/walkthrough.js, zen-planner Phase 5): a
+   spotlight-style coach-mark tour over the real nav. The backdrop dims the
+   page; the highlighted nav button is lifted above it with a glow ring
+   (z-index + box-shadow) rather than a cutout mask, which is far simpler to
+   get right across every browser and viewport size. */
+.walkthrough-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 55%);
+  z-index: 200;
+}
+
+.walkthrough-highlight {
+  position: relative;
+  z-index: 201;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 24px 4px color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 8px;
+}
+
+.walkthrough-tooltip {
+  position: fixed;
+  z-index: 202;
+  width: 300px;
+  max-width: calc(100vw - 24px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
+}
+
+.walkthrough-step-label {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.walkthrough-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.walkthrough-body {
+  font-size: 13.5px;
+  color: var(--ink);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+.walkthrough-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.walkthrough-skip {
+  font: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px 0;
+}
+
+.walkthrough-skip:hover {
+  color: var(--ink);
+}
+
+.walkthrough-back {
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.walkthrough-next {
+  font: inherit;
+  font-size: 13px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+}
+
 /* The Guide step (ui/steps/guide.js): a readable, max-width prose column. */
+.guide-tour-button {
+  margin-bottom: 16px;
+}
+
+.guide-search-row {
+  margin: 4px 0 20px;
+  max-width: 480px;
+}
+
+.guide-search-input {
+  width: 100%;
+}
+
+.guide-section {
+  margin-bottom: 4px;
+}
+
 .guide-heading {
   font-size: 17px;
   font-weight: 600;

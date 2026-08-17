@@ -4,8 +4,13 @@ import { editTagFor } from '../../core/provenance.js';
 import { formatReplicateToken } from '../../engine/conditions.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 import { createAdvicePanel } from '../advice.js';
-import { assayView, scopeWrite } from '../../core/assay.js';
+import { assayById, assayView, scopeWrite } from '../../core/assay.js';
 import { copyToClipboard } from '../clipboard.js';
+import { loadQuestions, phaseQuestions } from '../../engine/interview.js';
+import { coerceAnswer } from '../questionControl.js';
+import { renderFieldInterview } from '../fieldInterview.js';
+import { buildIcsSchedule, renderIcs } from '../../engine/render/ics.js';
+import { downloadTextFile } from '../../core/persist.js';
 
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
@@ -97,12 +102,12 @@ const FIELD_DEFS = [
     key: 'group',
     label: 'Group',
     placeholder: 'e.g. CTL, OPP -- set per-row by the Design step, or type one here',
-    hint: 'Which experimental group this file belongs to, such as your control or a treatment arm. Usually filled in for you from the Design page.',
+    hint: 'Which experimental group this file belongs to, such as your control group or a treatment group. Usually filled in for you from the Design page.',
   },
   {
     key: 'sample',
     label: 'Sample',
-    placeholder: 'e.g. E02',
+    placeholder: 'e.g. ABC01',
     hint: 'A unique ID for this specimen or animal, so two files from the same experiment never get mixed up.',
   },
   {
@@ -127,7 +132,18 @@ const FIELD_DEFS = [
   },
 ];
 
-export const namingStep = {
+// Factory, matching createDescribeStep/createPanelStep's convention
+// (zen-planner Phase 1): Naming needs kb.questions for the Schedule
+// section's timing interview (phase 'timing') below. main.js is the one
+// call site; every other importer of this module (design.js, describe.js)
+// only ever wanted the module-level NAMING_CONFIG/BASE_TEMPLATE constants
+// above, which are unaffected by this change.
+export function createNamingStep(kb) {
+  const { questions: questionBank, issues: questionIssues } = loadQuestions(kb.questions);
+  if (questionIssues.length > 0) {
+    console.error('Question bank issues:', questionIssues);
+  }
+  return {
   id: 'naming',
   title: 'Naming',
   render(main, store, { advisor } = {}) {
@@ -230,6 +246,79 @@ export const namingStep = {
     plannedList.className = 'planned-list';
     plannedBox.appendChild(plannedList);
     main.appendChild(plannedBox);
+
+    // --- Schedule (zen-planner Phase 1's timing interview + .ics export) --
+    // A short interview (phase 'timing') asking the user's own ETA per
+    // bench/microscope task, then a one-click .ics download built from
+    // those answers -- the file:// / offline path; a future Google
+    // Calendar sync (deferred) would build from the identical
+    // buildIcsSchedule() events. Lives here (Naming/Outputs), not on
+    // Overview: Overview's own header documents it as a pure READ over
+    // every other step's data, never a place new facts are entered.
+    const scheduleHeading = document.createElement('div');
+    scheduleHeading.className = 'design-subheading';
+    scheduleHeading.textContent = 'Schedule';
+    main.appendChild(scheduleHeading);
+
+    const scheduleHint = document.createElement('p');
+    scheduleHint.className = 'proposals-empty';
+    scheduleHint.textContent =
+      'Roughly how long each bench/microscope task takes for you -- used to build a downloadable schedule, scaled to the planned sample count above. Enter hours and minutes; leave blank to skip.';
+    main.appendChild(scheduleHint);
+
+    // Same name-builder field grid as the Microscopy step (ui/fieldInterview.js):
+    // a box per task with an hours+minutes duration control and a ✓ to
+    // confirm. Re-renders itself on commit; the .ics button below always
+    // reads fresh from the store, so it needs no coupling to this grid.
+    const timingContainer = document.createElement('div');
+    main.appendChild(timingContainer);
+
+    function renderTimingGrid() {
+      renderFieldInterview(timingContainer, {
+        questions: phaseQuestions(questionBank, assayView(store.get(), assayId), 'timing'),
+        onCommit: (question, raw) => {
+          const { path, slotKey } = scopeWrite(store.get(), question.field, assayId);
+          const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
+          const tag = existingTag ? editTagFor(existingTag) : question.tag || 'user';
+          store.setPath(path, coerceAnswer(question, raw), tag, { slotKey });
+          renderTimingGrid();
+        },
+      });
+    }
+
+    const downloadScheduleBtn = document.createElement('button');
+    downloadScheduleBtn.type = 'button';
+    downloadScheduleBtn.className = 'add-factor-button';
+    downloadScheduleBtn.textContent = 'Download schedule (.ics)';
+    downloadScheduleBtn.title =
+      'Downloads a bench schedule built from your timing answers above -- imports into Google Calendar, Outlook, or Apple Calendar with no login.';
+    downloadScheduleBtn.addEventListener('click', () => {
+      const view = currentExperimentView();
+      const sampleCount = planFilenames(view, NAMING_CONFIG).length;
+      const activeAssay = assayById(store.get(), assayId);
+      const events = buildIcsSchedule({
+        assayLabel: (activeAssay && activeAssay.label) || 'This assay',
+        timing: view.timing,
+        sampleCount,
+        // Tomorrow at 09:00 local -- a schedule dated "right now" would put
+        // its first block in the past for whichever calendar app renders
+        // it the moment the file is opened.
+        startDate: (() => {
+          const d = new Date();
+          d.setDate(d.getDate() + 1);
+          d.setHours(9, 0, 0, 0);
+          return d;
+        })(),
+      });
+      if (events.length === 0) {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Answer at least one timing question above first -- there is nothing to schedule yet.');
+        }
+        return;
+      }
+      downloadTextFile(renderIcs(events), 'micronaut-schedule.ics', 'text/calendar');
+    });
+    main.appendChild(downloadScheduleBtn);
 
     // advisor may be undefined (a caller that hasn't wired it, or a KB that
     // failed to load) -- createAdvicePanel([], ...) is a completely inert
@@ -340,5 +429,7 @@ export const namingStep = {
     }
 
     update();
+    renderTimingGrid();
   },
-};
+  };
+}

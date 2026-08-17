@@ -46,7 +46,7 @@ test('an ANSWERED-but-invalid field is an error that fails the gate', () => {
   // Plain-language message (engine/validation.js), not the internal profile
   // key name -- check the field it's about and that it names a valid
   // example, not the old 'sample_pattern' jargon a user wouldn't parse.
-  assert.ok(namingErrors.some((i) => i.severity === 'error' && i.field === 'sample' && /E01/.test(i.message)));
+  assert.ok(namingErrors.some((i) => i.severity === 'error' && i.field === 'sample' && /ABC01/.test(i.message)));
 });
 
 test('an UNANSWERED field is reported as incomplete (a warning), not as an invalid value -- and does not fail the gate', () => {

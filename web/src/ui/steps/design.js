@@ -89,43 +89,75 @@ export const designStep = {
       renderConditions();
     }
 
-    // The arm axis is ONE input (a comma-separated levels list, same
-    // convention as a factor's levels), not a repeated row -- there is
-    // nothing structural to add/remove, so unlike factors there is only ever
-    // one write path and no stale-closure risk from a sibling control.
+    // Every level here is one GROUP; a sample belongs to exactly one -- kept
+    // as a single {levels} write (same shape parseLevels/writeGroups always
+    // produced) so nothing downstream (conditions.js, plan.js, the arm-
+    // vocabulary "Apply to all assays" writer in study.js) has to change,
+    // even though the UI below now edits it one named row at a time instead
+    // of one comma-separated string.
     function writeGroups(levels) {
       const { path, slotKey } = scopeWrite(store.get(), 'design.groups', assayId);
       store.setPath(path, { levels }, 'user', { slotKey });
       renderConditions();
     }
 
+    // Two write paths, same reasoning as writeFactorsData/writeFactorsStructure
+    // below: typing in a group's own text box must not rebuild groupsList
+    // (that would drop focus/cursor position on every keystroke); only a
+    // structural change -- add/remove a row -- needs the list rebuilt.
+    function writeGroupsData(levels) {
+      writeGroups(levels);
+    }
+
+    function writeGroupsStructure(levels) {
+      writeGroups(levels);
+      renderGroups();
+    }
+
+    const organismRow = document.createElement('label');
+    organismRow.className = 'field-row';
+    const organismLabel = document.createElement('span');
+    organismLabel.className = 'field-label';
+    organismLabel.textContent = 'Organism / cell line';
+    organismRow.appendChild(organismLabel);
+    const organismInput = document.createElement('input');
+    organismInput.type = 'text';
+    organismInput.className = 'field-input';
+    organismInput.placeholder = 'e.g. Origanum vulgare, RAW 264.7 macrophages';
+    organismInput.title =
+      'What organism or cell line this assay uses -- groups it with others on the same model system when you search later.';
+    organismInput.addEventListener('input', () => {
+      const { path, slotKey } = scopeWrite(store.get(), 'specimen.organism', assayId);
+      const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
+      store.setPath(path, organismInput.value, existingTag ? 'user_edited' : 'user', { slotKey });
+    });
+    organismRow.appendChild(organismInput);
+    main.appendChild(organismRow);
+
     const groupsHeading = document.createElement('div');
     groupsHeading.className = 'design-subheading';
-    groupsHeading.textContent = 'Groups (arms)';
+    groupsHeading.textContent = 'Groups';
     main.appendChild(groupsHeading);
 
-    const groupsRow = document.createElement('label');
-    groupsRow.className = 'field-row';
-    const groupsLabel = document.createElement('span');
-    groupsLabel.className = 'field-label';
-    groupsLabel.textContent = 'Mutually exclusive arms, comma-separated';
-    groupsRow.appendChild(groupsLabel);
-    const groupsInput = document.createElement('input');
-    groupsInput.type = 'text';
-    groupsInput.className = 'field-input';
-    // Deliberately NOT "e.g. CT, NAM25MM, treatment": that phrasing is what
-    // caused 'CT' and 'NAM50MM' to be entered as two SEPARATE factors and
-    // crossed against each other in the first place. Every level here is one
-    // ARM; a sample belongs to exactly one.
-    groupsInput.placeholder = 'e.g. CTL, OPP -- a sample is exactly ONE of these';
-    // Native browser tooltip, on top of the placeholder example above.
-    groupsInput.title =
-      'Your experimental groups, such as control vs. treated. Every sample belongs to exactly one -- list them separated by commas.';
-    groupsInput.addEventListener('input', () => {
-      writeGroups(parseLevels(groupsInput.value));
+    const groupsHint = document.createElement('p');
+    groupsHint.className = 'proposals-empty';
+    groupsHint.textContent =
+      'Your experimental groups, such as a control group and one or more treatment groups. Every sample belongs to exactly ONE group.';
+    main.appendChild(groupsHint);
+
+    const groupsList = document.createElement('div');
+    groupsList.className = 'factors-list';
+    main.appendChild(groupsList);
+
+    const addGroupBtn = document.createElement('button');
+    addGroupBtn.type = 'button';
+    addGroupBtn.className = 'add-factor-button';
+    addGroupBtn.textContent = 'Add group';
+    addGroupBtn.addEventListener('click', () => {
+      const levels = currentDesign().groups?.levels || [];
+      writeGroupsStructure([...levels, '']);
     });
-    groupsRow.appendChild(groupsInput);
-    main.appendChild(groupsRow);
+    main.appendChild(addGroupBtn);
 
     const factorsHeading = document.createElement('div');
     factorsHeading.className = 'design-subheading';
@@ -198,7 +230,7 @@ export const designStep = {
     // and the arm plus each factor gets its own segment automatically --
     // replicates are NOT part of this label; they render through their own
     // {biorep}/{techrep} slots regardless of this override.
-    idSchemeInput.placeholder = 'Blank = one segment per arm/factor (e.g. CTL-OPP). Tokens: {group} {biorep} {techrep} + factor names';
+    idSchemeInput.placeholder = 'Blank = one segment per group/factor (e.g. CTL-OPP). Tokens: {group} {biorep} {techrep} + factor names';
     idSchemeInput.title = 'Advanced, optional: customize how your group name gets built into the filename. Most people can leave this blank.';
     idSchemeRow.appendChild(idSchemeInput);
     main.appendChild(idSchemeRow);
@@ -235,6 +267,58 @@ export const designStep = {
     const conditionsTable = document.createElement('div');
     conditionsTable.className = 'conditions-table';
     main.appendChild(conditionsTable);
+
+    function renderGroups() {
+      const levels = currentDesign().groups?.levels || [];
+      groupsList.textContent = '';
+
+      levels.forEach((level, index) => {
+        const row = document.createElement('div');
+        row.className = 'factor-row';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.className = 'field-input factor-levels';
+        // Same text-box idiom as the Name builder's fields (naming.js's
+        // FIELD_DEFS) -- the style testers specifically liked. First row
+        // reads as "Control group" (the common case), every later row as a
+        // treatment group, so the placeholder teaches the convention without
+        // forcing the user to type the word "control" themselves.
+        nameInput.placeholder = index === 0 ? 'e.g. Control group' : `e.g. Treatment group ${index}`;
+        nameInput.title =
+          'Every sample belongs to exactly ONE group -- give each one a short, distinct name.';
+        nameInput.value = level;
+        nameInput.addEventListener('input', () => {
+          // Read the CURRENT store state, not this render's snapshot -- same
+          // stale-closure hazard writeFactorsData's own comment documents
+          // (an edit on a sibling row uses writeGroupsData, which does not
+          // rebuild groupsList).
+          const latest = currentDesign().groups?.levels || [];
+          const next = latest.map((l, i) => (i === index ? nameInput.value : l));
+          writeGroupsData(next);
+        });
+        row.appendChild(nameInput);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'remove-factor-button';
+        removeBtn.textContent = 'Remove';
+        removeBtn.addEventListener('click', () => {
+          const latest = currentDesign().groups?.levels || [];
+          writeGroupsStructure(latest.filter((_, i) => i !== index));
+        });
+        row.appendChild(removeBtn);
+
+        groupsList.appendChild(row);
+      });
+
+      if (levels.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'proposals-empty';
+        empty.textContent = 'No groups yet -- add at least a control group to start.';
+        groupsList.appendChild(empty);
+      }
+    }
 
     function renderFactors() {
       const design = currentDesign();
@@ -398,10 +482,11 @@ export const designStep = {
 
     function renderAll() {
       const design = currentDesign();
-      groupsInput.value = (design.groups && design.groups.levels ? design.groups.levels : []).join(', ');
+      organismInput.value = assayView(store.get(), assayId).specimen?.organism || '';
       bioRepInput.value = design.biologicalReplicates ?? '';
       techRepInput.value = design.technicalReplicates ?? '';
       idSchemeInput.value = design.idScheme || '';
+      renderGroups();
       renderFactors();
       renderConditions();
     }

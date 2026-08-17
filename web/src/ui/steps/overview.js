@@ -121,7 +121,7 @@ function readoutLine(readout) {
 
 function designLine(design) {
   const parts = [];
-  if (design.arms.length > 0) parts.push(`arms: ${design.arms.join(', ')}`);
+  if (design.arms.length > 0) parts.push(`groups: ${design.arms.join(', ')}`);
   for (const factor of design.factors) parts.push(`${factor.name}: ${factor.levels.join(', ')}`);
   if (design.biologicalReplicates) parts.push(`${design.biologicalReplicates} bio rep(s)`);
   if (design.technicalReplicates) parts.push(`${design.technicalReplicates} tech rep(s)`);

@@ -32,6 +32,10 @@ import { kbMarker } from '../../core/kb.js';
 import { shortId } from '../../core/ids.js';
 import { flagPanelOverlaps, resolveMarkerToken, resolvePanel } from '../../engine/spectra.js';
 import { wavelengthToColor } from '../../engine/color.js';
+import { loadQuestions, phaseQuestions } from '../../engine/interview.js';
+import { editTagFor } from '../../core/provenance.js';
+import { coerceAnswer } from '../questionControl.js';
+import { renderFieldInterview } from '../fieldInterview.js';
 import {
   ANTIBODY_CONJUGATION_MODES,
   CONJUGATION_LABELS,
@@ -126,18 +130,66 @@ function summaryText(channels) {
   );
 }
 
+// Same question-bank load as ui/steps/describe.js's module-level constant --
+// one parse of web/kb/questions.json, shared by both step factories via the
+// same `kb` object main.js already passes each of them. See loadQuestions'
+// own docstring for the TOTAL/never-throws contract.
 export function createPanelStep(kb) {
+  const { questions: questionBank, issues: questionIssues } = loadQuestions(kb.questions);
+  if (questionIssues.length > 0) {
+    console.error('Question bank issues:', questionIssues);
+  }
   const fluorophoreOptions = panelFluorophoreOptions(kb.spectra);
   return {
     id: 'panel',
-    title: 'Color panel',
+    // Retitled 'Microscopy' (zen-planner Phase 1's reframe): this is where
+    // acquisition specifics -- modality, instrument, magnification, markers
+    // -- get decided, after Project and before Outputs. The id stays
+    // 'panel' (URL hash, every render() call site) -- label only.
+    title: 'Microscopy',
     render(main, store, { advisor } = {}) {
-      main.textContent = '';
+      // Commit 1 of the assay tier idiom (naming.js/design.js/describe.js
+      // all cache this identically): the active assay never changes for the
+      // lifetime of one render/paint -- shared by the interview AND the
+      // markers-driven panel content, so declared once out here.
+      const assayId = store.get().activeAssayId;
 
-      const heading = document.createElement('h1');
-      heading.className = 'step-heading';
-      heading.textContent = 'Color panel';
-      main.appendChild(heading);
+      // paint() is the whole step body, re-callable: committing a field-grid
+      // answer (notably `markers`) must refresh the color panel below it,
+      // and the simplest correct way is to re-render the whole step from the
+      // store rather than surgically poke the markers list + spectral view.
+      // Field commits are occasional (once per box), so the cost is fine;
+      // the structured-channel editor keeps its own granular re-render for
+      // per-keystroke channel edits, which never call paint().
+      function paint() {
+        main.textContent = '';
+
+        const heading = document.createElement('h1');
+        heading.className = 'step-heading';
+        heading.textContent = 'Microscopy';
+        main.appendChild(heading);
+
+        const interviewHeading = document.createElement('div');
+        interviewHeading.className = 'interview-heading';
+        interviewHeading.textContent = 'Acquisition';
+        main.appendChild(interviewHeading);
+
+        // Name-builder-style boxes (zen-planner Phase 1 feedback): fill a box
+        // and click its ✓ to confirm; leave it empty to skip. The "why" is a
+        // hover hint on the box, not a subtitle. onCommit writes STRONG and
+        // re-paints so the ✓ flips to confirmed and the panel below updates.
+        const interviewContainer = document.createElement('div');
+        main.appendChild(interviewContainer);
+        renderFieldInterview(interviewContainer, {
+          questions: phaseQuestions(questionBank, assayView(store.get(), assayId), 'microscopy'),
+          onCommit: (question, raw) => {
+            const { path, slotKey } = scopeWrite(store.get(), question.field, assayId);
+            const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
+            const tag = existingTag ? editTagFor(existingTag) : question.tag || 'user';
+            store.setPath(path, coerceAnswer(question, raw), tag, { slotKey });
+            paint();
+          },
+        });
 
       const explainer = document.createElement('p');
       explainer.className = 'proposals-empty';
@@ -151,11 +203,7 @@ export function createPanelStep(kb) {
         'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by a microscopy specialist -- treat exact peak numbers as approximate until reviewed.';
       main.appendChild(banner);
 
-      // Commit 1 of the assay tier: caching activeAssayId once here is only
-      // safe because the active assay never changes for the lifetime of one
-      // render -- see naming.js's identical comment; main.js's assay-switch
-      // handler forces a full re-render of whichever step is on screen.
-      const assayId = store.get().activeAssayId;
+      // assayId is already cached above (shared with the interview section).
       const view = assayView(store.get(), assayId);
       const markersText = (view.naming && view.naming.fields && view.naming.fields.markers) || '';
 
@@ -293,10 +341,28 @@ export function createPanelStep(kb) {
         const plotEntries =
           channels.length > 0
             ? channels.map(resolvedChannelEntry)
-            : entries.map((entry) => ({
-                ...entry,
-                color: entry.state === 'known' ? wavelengthToColor(entry.emissionPeakNm) : null,
-              }));
+            : entries.map((entry) => {
+                // A known fluorophore gets its filter band overlaid by
+                // DEFAULT, from its own emission peak -- the same suggestion
+                // defaultChannelFilterPair already computes for a structured
+                // channel row (see the "Filters, upfront by default" comment
+                // above). Before this, the free-text-only path (no channels
+                // built yet) never showed a filter band at all: a user had to
+                // open Panel assembly, add a channel, and let its filter
+                // inputs populate before any band appeared here -- exactly
+                // the "interact with the numbers to pop the filters"
+                // complaint this fixes. Read-only, like the color swatch
+                // beside it: there is no structured channel to persist an
+                // override onto from this free-text row.
+                const defaultFilter =
+                  entry.state === 'known' ? defaultChannelFilterPair(entry.emissionPeakNm) : null;
+                return {
+                  ...entry,
+                  color: entry.state === 'known' ? wavelengthToColor(entry.emissionPeakNm) : null,
+                  filterCenterNm: defaultFilter ? defaultFilter.filterCenterNm : null,
+                  filterBandwidthNm: defaultFilter ? defaultFilter.filterBandwidthNm : null,
+                };
+              });
         renderSpectralView(spectralHost, plotEntries, kb.overlapRules, spectralViewState);
       }
 
@@ -634,6 +700,9 @@ export function createPanelStep(kb) {
       const advicePanel = createAdvicePanel(advisor || [], 'panel');
       main.appendChild(advicePanel.element);
       advicePanel.update(view);
+      }
+
+      paint();
     },
   };
 }

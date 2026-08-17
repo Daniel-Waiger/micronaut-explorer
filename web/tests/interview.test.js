@@ -8,6 +8,7 @@ import {
   isSkipped,
   loadQuestions,
   nextQuestions,
+  phaseQuestions,
   recordAnswer,
   skipQuestion,
   answeredQuestions,
@@ -318,4 +319,83 @@ test('dropping an answered slot returns the question to the ask list', () => {
   delete experiment.provenance.slots['naming.fields.sample'];
   assert.ok(nextQuestions(questions, experiment, 10).some((q) => q.id === 'q1'));
   assert.ok(!answeredQuestions(questions, experiment).some((q) => q.id === 'q1'));
+});
+
+// --- phaseQuestions (zen-planner Phase 1's name-builder-style field grid) --
+
+function phaseSampleQuestions() {
+  return loadQuestions([
+    { id: 'q1', field: 'naming.fields.sample', type: 'text', priority: 1, tag: 'user', phase: 'microscopy' },
+    { id: 'q2', field: 'naming.fields.exptype', type: 'text', priority: 2, tag: 'user', phase: 'microscopy' },
+    { id: 'q3', field: 'specimen.organism', type: 'text', priority: 3, tag: 'user', phase: 'project' },
+    {
+      id: 'q4',
+      field: 'naming.fields.notes',
+      type: 'text',
+      priority: 4,
+      tag: 'user',
+      phase: 'microscopy',
+      askWhen: { eq: ['naming.fields.sample', 'E02'] },
+    },
+  ]).questions;
+}
+
+test('phaseQuestions returns only the requested phase, sorted by priority', () => {
+  const questions = phaseSampleQuestions();
+  const experiment = bareExperiment();
+  const microscopy = phaseQuestions(questions, experiment, 'microscopy');
+  assert.deepEqual(microscopy.map((q) => q.id), ['q1', 'q2']); // q4 gated by askWhen below
+  assert.ok(!microscopy.some((q) => q.id === 'q3'));
+
+  const project = phaseQuestions(questions, experiment, 'project');
+  assert.deepEqual(project.map((q) => q.id), ['q3']);
+});
+
+test('phaseQuestions still honors askWhen -- a gated question stays hidden until its condition holds', () => {
+  const questions = phaseSampleQuestions();
+  const unmet = phaseQuestions(questions, bareExperiment(), 'microscopy');
+  assert.ok(!unmet.some((q) => q.id === 'q4'));
+
+  const met = phaseQuestions(
+    questions,
+    withSlot(bareExperiment(), 'naming.fields.sample', 'user', 'E02'),
+    'microscopy'
+  );
+  assert.ok(met.some((q) => q.id === 'q4'));
+});
+
+test('phaseQuestions shows an ANSWERED question too, with confirmed:true and its currentValue -- unlike nextQuestions', () => {
+  const questions = phaseSampleQuestions();
+  const experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'user', 'ABC01');
+  const microscopy = phaseQuestions(questions, experiment, 'microscopy');
+  const q1 = microscopy.find((q) => q.id === 'q1');
+  assert.equal(q1.confirmed, true);
+  assert.equal(q1.currentValue, 'ABC01');
+  // nextQuestions, by contrast, DROPS a STRONG-tagged question entirely --
+  // the two functions serve different UIs on purpose (see phaseQuestions'
+  // own docstring).
+  assert.ok(!nextQuestions(questions, experiment, 10).some((q) => q.id === 'q1'));
+});
+
+test('phaseQuestions marks an UNANSWERED question confirmed:false with an undefined currentValue', () => {
+  const questions = phaseSampleQuestions();
+  const q1 = phaseQuestions(questions, bareExperiment(), 'microscopy').find((q) => q.id === 'q1');
+  assert.equal(q1.confirmed, false);
+  assert.equal(q1.currentValue, undefined);
+  assert.equal(q1.suggestedTag, null);
+});
+
+test('phaseQuestions surfaces a WEAK freetext prefill as suggestedTag, still unconfirmed', () => {
+  const questions = phaseSampleQuestions();
+  const experiment = withSlot(bareExperiment(), 'naming.fields.sample', 'freetext', 'ABC01');
+  const q1 = phaseQuestions(questions, experiment, 'microscopy').find((q) => q.id === 'q1');
+  assert.equal(q1.confirmed, false);
+  assert.equal(q1.currentValue, 'ABC01');
+  assert.equal(q1.suggestedTag, 'freetext');
+});
+
+test('phaseQuestions with no phase argument returns every question, gating still applied', () => {
+  const questions = phaseSampleQuestions();
+  const all = phaseQuestions(questions, bareExperiment(), undefined);
+  assert.deepEqual(all.map((q) => q.id).sort(), ['q1', 'q2', 'q3']); // q4 still gated out
 });
