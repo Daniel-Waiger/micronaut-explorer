@@ -627,6 +627,7 @@ button:focus-visible {
 
 .guidance-endpoint,
 .guidance-model,
+.guidance-token,
 .guidance-question {
   font: inherit;
   font-size: 13px;

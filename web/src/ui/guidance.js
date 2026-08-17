@@ -23,10 +23,22 @@ import { buildGuidanceMessages } from '../engine/render/llmprompt.js';
 import { loadLlmConfig, saveLlmConfig } from '../llm/config.js';
 import { copyToClipboard } from './clipboard.js';
 import { COLD_START_HINT, startElapsedLabel } from './llmStatus.js';
+import { recordOllamaRequest } from '../llm/rateLimit.js';
+import { rateLimitLabel } from './rateLimitLabel.js';
+
+// file:// has no notion of an authorized CORS origin, and offline has no
+// network at all -- either way a remote endpoint can never actually be
+// reached, so the remote path is hidden and manual-paste (which needs
+// nothing but the page itself) is the only option shown.
+export function remoteInferenceAvailable() {
+  const isFileOrigin = typeof location !== 'undefined' && location.protocol === 'file:';
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  return !isFileOrigin && !isOffline;
+}
 
 function buildProvider(config) {
-  if (config.enabled && config.endpoint && config.model) {
-    return createOllamaProvider({ endpoint: config.endpoint, model: config.model });
+  if (remoteInferenceAvailable() && config.enabled && config.endpoint && config.model) {
+    return createOllamaProvider({ endpoint: config.endpoint, model: config.model, token: config.token });
   }
   return createManualPasteProvider();
 }
@@ -92,7 +104,28 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
   modelInput.placeholder = 'model name, e.g. llama3.1:8b';
   settingsRow.appendChild(modelInput);
 
+  // Only needed for a gated gateway (the "unit server" case) sitting in
+  // front of Ollama; a bare LAN Ollama box takes no token. Blank means "send
+  // no Authorization header at all" (llm/ollama.js), not "send an empty
+  // Bearer".
+  const tokenInput = document.createElement('input');
+  tokenInput.type = 'password';
+  tokenInput.className = 'guidance-token';
+  tokenInput.placeholder = 'access token (unit server only, leave blank for a bare LAN Ollama)';
+  tokenInput.autocomplete = 'off';
+  settingsRow.appendChild(tokenInput);
+
   section.appendChild(settingsRow);
+
+  // Shown instead of the settings row on file:// or while offline, where a
+  // remote endpoint can never actually be reached (see
+  // remoteInferenceAvailable() above).
+  const remoteUnavailableNotice = document.createElement('p');
+  remoteUnavailableNotice.className = 'guidance-hint guidance-remote-unavailable';
+  remoteUnavailableNotice.textContent =
+    'Running from a downloaded file or offline: only copy-paste is available here.';
+  remoteUnavailableNotice.hidden = true;
+  section.appendChild(remoteUnavailableNotice);
 
   // Set once, shown/hidden with the rest of the local-model settings: this
   // is the one place the endpoint/model config lives, so it's also the one
@@ -104,26 +137,46 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
   coldStartHint.textContent = COLD_START_HINT;
   section.appendChild(coldStartHint);
 
+  // Soft client-side counter (llm/rateLimit.js) -- the server enforces the
+  // real limit, this just tells the user where they stand before they hit
+  // it. Shown/hidden alongside the rest of the enabled-and-reachable state.
+  const rateLimitHint = document.createElement('p');
+  rateLimitHint.className = 'guidance-hint guidance-rate-limit-hint';
+  section.appendChild(rateLimitHint);
+
   function syncSettingsVisibility() {
+    const remoteOk = remoteInferenceAvailable();
+    settingsRow.hidden = !remoteOk;
+    remoteUnavailableNotice.hidden = remoteOk;
     endpointInput.hidden = !enabledCheckbox.checked;
     modelInput.hidden = !enabledCheckbox.checked;
-    coldStartHint.hidden = !enabledCheckbox.checked;
+    tokenInput.hidden = !enabledCheckbox.checked;
+    coldStartHint.hidden = !remoteOk || !enabledCheckbox.checked;
+    rateLimitHint.hidden = !remoteOk || !enabledCheckbox.checked;
+    if (!rateLimitHint.hidden) rateLimitHint.textContent = rateLimitLabel().text;
   }
 
   const config = loadLlmConfig();
   enabledCheckbox.checked = config.enabled;
   endpointInput.value = config.endpoint;
   modelInput.value = config.model;
+  tokenInput.value = config.token;
   syncSettingsVisibility();
 
   function persistSettings() {
-    saveLlmConfig({ enabled: enabledCheckbox.checked, endpoint: endpointInput.value, model: modelInput.value });
+    saveLlmConfig({
+      enabled: enabledCheckbox.checked,
+      endpoint: endpointInput.value,
+      model: modelInput.value,
+      token: tokenInput.value,
+    });
     syncSettingsVisibility();
     if (typeof onConfigChange === 'function') onConfigChange();
   }
   enabledCheckbox.addEventListener('change', persistSettings);
   endpointInput.addEventListener('change', persistSettings);
   modelInput.addEventListener('change', persistSettings);
+  tokenInput.addEventListener('change', persistSettings);
 
   const questionInput = document.createElement('input');
   questionInput.type = 'text';
@@ -183,6 +236,13 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
   async function ask() {
     const cfg = loadLlmConfig();
     const provider = buildProvider(cfg);
+    // The soft counter only governs actual Ollama calls -- manual-paste
+    // never leaves the browser, so it's exempt (matches recordOllamaRequest
+    // only ever being called on the 'ollama' branch below).
+    if (provider.id === 'ollama' && rateLimitLabel().atLimit) {
+      showReply(rateLimitLabel().text);
+      return;
+    }
     const context = getContext() || {};
     const { system, user: contextBlock } = buildGuidanceMessages(context.doc, context.questions);
     const question = questionInput.value.trim();
@@ -195,6 +255,7 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
     const stopTicking = provider.id === 'ollama' ? startElapsedLabel(askButton, 'Asking') : null;
     if (!stopTicking) askButton.textContent = 'Asking...';
     try {
+      if (provider.id === 'ollama') recordOllamaRequest();
       const result = await provider.complete({ system, user });
       if (provider.id === 'manual-paste') {
         showPaste(result.text);
@@ -214,6 +275,7 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
       if (stopTicking) stopTicking();
       askButton.disabled = false;
       askButton.textContent = 'Ask';
+      syncSettingsVisibility();
     }
   }
 

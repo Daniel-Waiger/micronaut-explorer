@@ -62,6 +62,7 @@ if (typeof window !== 'undefined' && typeof window.addEventListener === 'functio
 export function createOllamaProvider({
   endpoint,
   model,
+  token,
   keepAlive = -1,
   numCtx = DEFAULT_NUM_CTX,
   timeoutMs = DEFAULT_TIMEOUT_MS,
@@ -112,9 +113,16 @@ export function createOllamaProvider({
           body.format = schema;
         }
 
+        const headers = { 'Content-Type': 'application/json' };
+        // Optional: unset for a bare LAN Ollama box, set when pointed at a
+        // gated gateway (the "unit server" preset) that requires a bearer
+        // token in front of it -- see the server contract in
+        // docs/plans/zen-planner-server-contract.md.
+        if (token) headers.Authorization = `Bearer ${token}`;
+
         const response = await doFetch(`${endpoint.replace(/\/+$/, '')}/api/chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(body),
           signal: controller.signal,
         });

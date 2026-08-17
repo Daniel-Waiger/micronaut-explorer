@@ -72,6 +72,21 @@ test('ollama provider posts to /api/chat with keep_alive and the format schema, 
   assert.equal(result.text, '{"proposals":[]}');
 });
 
+test('ollama provider sends no Authorization header when no token is given, and Bearer <token> when one is', async () => {
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push(init);
+    return { ok: true, status: 200, statusText: 'OK', json: async () => ({ message: { content: 'hi' } }) };
+  };
+  const bare = createOllamaProvider({ endpoint: 'http://s:11434', model: 'm', fetchImpl });
+  await bare.complete({ user: 'x' });
+  assert.equal('Authorization' in calls[0].headers, false);
+
+  const gated = createOllamaProvider({ endpoint: 'http://s:11434', model: 'm', token: 'abc123', fetchImpl });
+  await gated.complete({ user: 'x' });
+  assert.equal(calls[1].headers.Authorization, 'Bearer abc123');
+});
+
 test('ollama provider returns json:null (not a throw) when a schema was requested but the reply is not parseable', async () => {
   const fetchImpl = async () => ({
     ok: true,

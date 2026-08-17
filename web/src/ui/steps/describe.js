@@ -9,7 +9,7 @@ import {
 } from '../../engine/interview.js';
 import { editTagFor, isProvisional } from '../../core/provenance.js';
 import { createAdvicePanel } from '../advice.js';
-import { createGuidancePanel } from '../guidance.js';
+import { createGuidancePanel, remoteInferenceAvailable } from '../guidance.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
 import { resolveReadoutCanonical } from '../../engine/controls.js';
 import { buildStudyDocument } from '../../engine/studydoc.js';
@@ -21,6 +21,8 @@ import { createOllamaProvider } from '../../llm/ollama.js';
 import { loadLlmConfig, saveLlmConfig } from '../../llm/config.js';
 import { stashDraft } from '../../core/persist.js';
 import { startElapsedLabel } from '../llmStatus.js';
+import { recordOllamaRequest } from '../../llm/rateLimit.js';
+import { rateLimitLabel } from '../rateLimitLabel.js';
 import { PROPOSAL_SYSTEM_PROMPT, renderQuestionLines, renderProposalRequestPrompt } from '../../engine/render/llmdraftprompt.js';
 import { extractJsonReply } from '../../engine/llmreply.js';
 import { CHAT_TARGETS, buildChatUrl } from '../../llm/chatTargets.js';
@@ -181,7 +183,7 @@ export function createDescribeStep(kb) {
       // below, so it stays correct without a full re-render (which would
       // lose the narrative textarea's caret mid-typing).
       function syncLlmButtons() {
-        const enabled = loadLlmConfig().enabled;
+        const enabled = remoteInferenceAvailable() && loadLlmConfig().enabled;
         draftButton.hidden = !enabled;
         suggestButton.hidden = !enabled;
         // The empty-proposals message also branches on this flag (see
@@ -501,7 +503,7 @@ export function createDescribeStep(kb) {
           const empty = document.createElement('p');
           empty.className = 'proposals-empty';
           empty.textContent = textarea.value
-            ? loadLlmConfig().enabled
+            ? remoteInferenceAvailable() && loadLlmConfig().enabled
               ? 'Click "Read it" to scan the paragraph above, or "Suggest answers for what is left".'
               : 'Click "Read it" to scan the paragraph above.'
             : 'Nothing to scan yet.';
@@ -847,9 +849,14 @@ export function createDescribeStep(kb) {
       // value the user chose.
       draftButton.addEventListener('click', async () => {
         const cfg = loadLlmConfig();
-        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model });
+        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model, token: cfg.token });
         if (!provider.isAvailable()) {
           if (showToast) showToast('Set a local model endpoint and name first (in "Ask about this step").');
+          return;
+        }
+        const limitStatus = rateLimitLabel();
+        if (limitStatus.atLimit) {
+          if (showToast) showToast(limitStatus.text);
           return;
         }
         const text = textarea.value.trim();
@@ -861,6 +868,7 @@ export function createDescribeStep(kb) {
         draftButton.disabled = true;
         const stopTicking = startElapsedLabel(draftButton, 'Drafting');
         try {
+          recordOllamaRequest();
           const schema = buildProposalSchema(questionBank);
           const result = await provider.complete({
             system: OLLAMA_PROPOSAL_SYSTEM_PROMPT,
@@ -915,9 +923,14 @@ export function createDescribeStep(kb) {
       // replace, keeping Accept boring.
       suggestButton.addEventListener('click', async () => {
         const cfg = loadLlmConfig();
-        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model });
+        const provider = createOllamaProvider({ endpoint: cfg.endpoint, model: cfg.model, token: cfg.token });
         if (!provider.isAvailable()) {
           if (showToast) showToast('Set a local model endpoint and name first (in "Ask about this step").');
+          return;
+        }
+        const limitStatus = rateLimitLabel();
+        if (limitStatus.atLimit) {
+          if (showToast) showToast(limitStatus.text);
           return;
         }
         const text = textarea.value.trim();
@@ -933,6 +946,7 @@ export function createDescribeStep(kb) {
         suggestButton.disabled = true;
         const stopTicking = startElapsedLabel(suggestButton, 'Asking');
         try {
+          recordOllamaRequest();
           const schema = buildProposalSchema(currentAskable);
           const result = await provider.complete({
             system: OLLAMA_PROPOSAL_SYSTEM_PROMPT,

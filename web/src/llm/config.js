@@ -10,6 +10,11 @@
 const ENABLED_KEY = 'micronaut.llm.enabled';
 const ENDPOINT_KEY = 'micronaut.llm.endpoint';
 const MODEL_KEY = 'micronaut.llm.model';
+// Bearer token for a gated gateway (the "unit server" case -- a remote
+// Ollama box behind HTTPS + CORS + auth, see the server contract in
+// docs/plans/zen-planner-server-contract.md). Empty for a bare LAN Ollama
+// box, which needs no token. Never sent unless non-empty (llm/ollama.js).
+const TOKEN_KEY = 'micronaut.llm.token';
 // Separate from ENABLED_KEY on purpose: ENABLED_KEY governs the Ollama path,
 // where nothing leaves the user's own network by construction (LAN-only,
 // see llm/ollama.js's header). A chat-LLM link-out is different in kind --
@@ -45,13 +50,15 @@ export function loadLlmConfig() {
     enabled: readLS(ENABLED_KEY, '0') === '1',
     endpoint: readLS(ENDPOINT_KEY, DEFAULT_ENDPOINT),
     model: readLS(MODEL_KEY, DEFAULT_MODEL),
+    token: readLS(TOKEN_KEY, ''),
     linkOuts: readLS(LINK_OUTS_KEY, '0') === '1',
   };
 }
 
-export function saveLlmConfig({ enabled, endpoint, model, linkOuts }) {
+export function saveLlmConfig({ enabled, endpoint, model, token, linkOuts }) {
   if (typeof enabled === 'boolean') writeLS(ENABLED_KEY, enabled ? '1' : '0');
   if (typeof endpoint === 'string') writeLS(ENDPOINT_KEY, endpoint);
   if (typeof model === 'string') writeLS(MODEL_KEY, model);
+  if (typeof token === 'string') writeLS(TOKEN_KEY, token);
   if (typeof linkOuts === 'boolean') writeLS(LINK_OUTS_KEY, linkOuts ? '1' : '0');
 }
