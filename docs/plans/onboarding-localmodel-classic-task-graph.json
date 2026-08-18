@@ -1,0 +1,76 @@
+{
+  "run": "planner-onboarding-localmodel-classic",
+  "orchestrator": "Claude Opus",
+  "executor": "Claude Sonnet (medium)",
+  "note": "Batches are file-disjoint so agents in the same batch never touch the same file. depends_on enforces cross-batch ordering. update.py reads only id/title/batches.",
+  "batches": [
+    ["A1", "B1", "C1"],
+    ["A2", "B2", "C2"],
+    ["D1", "D2", "D3"]
+  ],
+  "tasks": [
+    {
+      "id": "A1",
+      "title": "Promote marker dictionary into web/ (markers.README.md)",
+      "depends_on": [],
+      "files": ["web/kb/markers.README.md (new)"],
+      "concern": "Capture the editorial class taxonomy + FAMILY_VARIANTS + hand-edit contract from tools/export_markers_kb.py into a web/kb/markers.README.md so the tracked markers.json becomes a self-documenting source of truth. Read-only of the Python tool; writes one new doc. Do NOT delete anything."
+    },
+    {
+      "id": "B1",
+      "title": "core/onboarding.js persistence + unit test",
+      "depends_on": [],
+      "files": ["web/src/core/onboarding.js (new)", "web/tests/onboarding.test.js (new)"],
+      "concern": "localStorage-backed onboarding state (stage, experience, completed) mirroring web/src/llm/config.js's try/catch idiom. Keys micronaut.onboarding.*. Pure module, no DOM."
+    },
+    {
+      "id": "C1",
+      "title": "llm/detect.js Ollama auto-detect + unit test",
+      "depends_on": [],
+      "files": ["web/src/llm/detect.js (new)", "web/tests/detect.test.js (new)"],
+      "concern": "GET {endpoint}/api/tags against the default localhost endpoint to detect a running Ollama and list installed model names. TOTAL/degrading: any failure => {available:false, models:[]}. fetchImpl injectable for tests. No study data sent."
+    },
+    {
+      "id": "A2",
+      "title": "Pack Micronaut Classic out of the repo",
+      "depends_on": ["A1"],
+      "files": ["_archive/ (tarball)", "src/**", "app_streamlit.py", "run_main.*", "*.bat", "profiles/**", "naming_scheme.json", "requirements.txt", "tools/export_markers_kb.py", "tests/** (Classic subset)", "pyproject.toml", ".github/workflows/ci.yml", "README.md", "ROADMAP.md"],
+      "concern": "Tarball the full Classic surface into _archive/, delete the live Classic sources, keep only the Planner's own Python tooling (build_single_file.py, serve_dir.py) + its 2 tests (test_single_file_build.py, test_kb_json_valid.py). Prune pyproject + ci.yml, rewrite README/ROADMAP single-product. Disjoint from web/src and web/kb."
+    },
+    {
+      "id": "B2",
+      "title": "First-run stage gate + main.js boot wiring",
+      "depends_on": ["B1"],
+      "files": ["web/src/ui/steps/onboarding.js (new)", "web/src/main.js"],
+      "concern": "Overlay gate (walkthrough.js idiom) asking project stage -> route to entry step; second prompt for experience level. Replace main.js:110-113 Guide-dump with the gate on genuine first run. Thread experience into the render ctx passed to steps. Only main.js + new onboarding.js."
+    },
+    {
+      "id": "C2",
+      "title": "One AI-assist surface + model picker",
+      "depends_on": ["C1"],
+      "files": ["web/src/ui/aiAssist.js (new)", "web/src/ui/guidance.js", "web/src/llm/config.js"],
+      "concern": "Shared AI-assist component that shows the detected model (from detect.js) and a <select> model picker sourced from /api/tags (fallback text input). config.js gains no breaking change. guidance.js refactors to mount inside/alongside aiAssist. Do NOT touch describe.js here (D1 owns that)."
+    },
+    {
+      "id": "D1",
+      "title": "Consolidate the six LLM entry points in describe.js",
+      "depends_on": ["C2", "B2"],
+      "files": ["web/src/ui/steps/describe.js"],
+      "concern": "Replace the scattered Draft/Suggest/chat-copy/link-out/guidance blocks with a single mount of the aiAssist surface (C2). Preserve existing proposal + link-out logic by importing it, not duplicating. describe.js only."
+    },
+    {
+      "id": "D2",
+      "title": "Home/Guide dedup; Home as the real landing",
+      "depends_on": ["B2"],
+      "files": ["web/src/ui/steps/home.js", "web/src/ui/steps/guide.js"],
+      "concern": "With the gate fixing first-run, make Home the landing and trim Guide's duplicated step-by-step enumeration to a cross-linked reference. home.js + guide.js only."
+    },
+    {
+      "id": "D3",
+      "title": "Experience-level verbosity + 'help me choose' expanders",
+      "depends_on": ["B2"],
+      "files": ["web/src/ui/steps/panel.js", "web/src/ui/questionControl.js", "web/src/ui/fieldInterview.js", "web/src/ui/advice.js"],
+      "concern": "Consume ctx.experience: novice => advisor panels default-expanded, long why-hints inline; frequent => terse. Add novice-gated 'not sure?' expanders on modality/smallestFeatureNm/instrument sourcing advisor.json. Does not touch main.js/describe.js/home.js/guide.js."
+    }
+  ]
+}

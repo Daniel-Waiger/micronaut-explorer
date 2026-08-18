@@ -9,7 +9,8 @@ import {
 } from '../../engine/interview.js';
 import { editTagFor, isProvisional } from '../../core/provenance.js';
 import { createAdvicePanel } from '../advice.js';
-import { createGuidancePanel, remoteInferenceAvailable } from '../guidance.js';
+import { remoteInferenceAvailable } from '../guidance.js';
+import { createAiAssistPanel } from '../aiAssist.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
 import { resolveReadoutCanonical } from '../../engine/controls.js';
 import { buildStudyDocument } from '../../engine/studydoc.js';
@@ -130,24 +131,31 @@ export function createDescribeStep(kb) {
       readButton.textContent = 'Read it';
       main.appendChild(readButton);
 
-      // Progressive disclosure (zen-planner Phase 1's declutter pass): every
-      // LLM-related control -- the two Ollama-specific buttons below, plus
-      // the chat-LLM round-trip section further down -- collapses behind
-      // ONE reveal instead of exploding across the page by default. Closed
-      // by default: nothing about the deterministic "Read it" scan above
-      // needs it, and a first-time visitor with no local model configured
-      // has no reason to see three LLM options before they've typed a
-      // sentence. `open` is never forced true by anything below -- once the
-      // user opens it, JS never closes it back (no code here sets
-      // aiHelpDetails.open), so their choice survives every re-render this
-      // function itself does NOT trigger a fresh mount for.
-      const aiHelpDetails = document.createElement('details');
-      aiHelpDetails.className = 'reveal';
-      const aiHelpSummary = document.createElement('summary');
-      aiHelpSummary.className = 'reveal-summary';
-      aiHelpSummary.textContent = 'Get AI help (optional)';
-      aiHelpDetails.appendChild(aiHelpSummary);
-      main.appendChild(aiHelpDetails);
+      // Progressive disclosure (zen-planner Phase 1's declutter pass, folded
+      // into the "one door" aiAssist.js consolidation for D1): every
+      // LLM-related control on this step -- the guidance panel's "ask about
+      // this step", the two Ollama-specific buttons below, and the chat-LLM
+      // round-trip section further down -- lives inside the ONE
+      // createAiAssistPanel shell instead of exploding across the page or
+      // duplicating its own separate reveal/guidance mount. Closed by
+      // default: nothing about the deterministic "Read it" scan above needs
+      // it, and a first-time visitor with no local model configured has no
+      // reason to see three LLM options before they've typed a sentence.
+      // `getGuidanceContext` mirrors the old standalone guidancePanel's
+      // getContext exactly (see currentAskable below, populated by
+      // renderInterview on every call) -- called fresh at Ask time, not
+      // captured once here. `onConfigChange` is still how ticking the
+      // enabled checkbox reveals draftButton/suggestButton without a full
+      // re-render (see syncLlmButtons below).
+      let currentAskable = [];
+      const aiAssistPanel = createAiAssistPanel({
+        getGuidanceContext: () => ({
+          doc: buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE),
+          questions: currentAskable,
+        }),
+        onConfigChange: () => syncLlmButtons(),
+      });
+      main.appendChild(aiAssistPanel.element);
 
       // Only offered when a local model is actually configured -- the draft
       // flow needs schema-constrained decoding, which the manual-paste
@@ -160,7 +168,7 @@ export function createDescribeStep(kb) {
       draftButton.textContent = 'Draft a study from this (new tab)';
       draftButton.title =
         'Sends this description to your local model and opens the drafted study in a NEW tab. This study is not touched.';
-      aiHelpDetails.appendChild(draftButton);
+      aiAssistPanel.actionsContainer.appendChild(draftButton);
 
       // Wave C: the same model, aimed at THIS study instead of a new one.
       // The two are different moments, not redundant buttons -- drafting is
@@ -172,16 +180,16 @@ export function createDescribeStep(kb) {
       suggestButton.textContent = 'Suggest answers for what is left';
       suggestButton.title =
         "Asks your local model to answer only the questions you haven't decided yet, as proposals you review one by one.";
-      aiHelpDetails.appendChild(suggestButton);
+      aiAssistPanel.actionsContainer.appendChild(suggestButton);
 
       // Both buttons above are Ollama-specific (they need schema-constrained
       // decoding -- see draftButton's title). Their visibility used to be
       // set ONCE here from loadLlmConfig().enabled at render() time, so
-      // ticking the checkbox in the guidance panel below did not reveal them
-      // until the step re-rendered -- a real, user-reported bug. This is
-      // called at initial render AND from guidancePanel's onConfigChange
-      // below, so it stays correct without a full re-render (which would
-      // lose the narrative textarea's caret mid-typing).
+      // ticking the checkbox in the aiAssistPanel's guidance panel did not
+      // reveal them until the step re-rendered -- a real, user-reported bug.
+      // This is called at initial render AND from aiAssistPanel's
+      // onConfigChange above, so it stays correct without a full re-render
+      // (which would lose the narrative textarea's caret mid-typing).
       function syncLlmButtons() {
         const enabled = remoteInferenceAvailable() && loadLlmConfig().enabled;
         draftButton.hidden = !enabled;
@@ -428,7 +436,7 @@ export function createDescribeStep(kb) {
         mergeProposals(proposals, { sourceLabel: 'an earlier suggestion' });
       });
 
-      aiHelpDetails.appendChild(chatSection);
+      aiAssistPanel.chatContainer.appendChild(chatSection);
 
       // advisor may be undefined (a caller that hasn't wired it, or a KB
       // that failed to load) -- createAdvicePanel([], ...) is completely
@@ -442,18 +450,10 @@ export function createDescribeStep(kb) {
       }
 
       // Guidance (local-llm-guidance): read-only, opt-in "ask about this
-      // step" panel. `currentAskable` is refreshed by renderInterview below
-      // on every call, so getContext() always reflects whatever the user is
-      // actually looking at, not a snapshot from when the panel mounted.
-      let currentAskable = [];
-      const guidancePanel = createGuidancePanel(
-        () => ({
-          doc: buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE),
-          questions: currentAskable,
-        }),
-        { onConfigChange: () => syncLlmButtons() }
-      );
-      main.appendChild(guidancePanel.element);
+      // step" panel, now owned by aiAssistPanel above (its `getGuidanceContext`
+      // uses this same `currentAskable`, refreshed by renderInterview below on
+      // every call, so the panel always reflects whatever the user is actually
+      // looking at, not a snapshot from when it mounted).
 
       const proposalsHeading = document.createElement('div');
       proposalsHeading.className = 'proposals-heading';
@@ -473,11 +473,11 @@ export function createDescribeStep(kb) {
       interviewList.className = 'interview-list';
       main.appendChild(interviewList);
 
-      // Collapsed by default, same reveal idiom as aiHelpDetails above: a
-      // review list of everything already answered is valuable once there
-      // is something to review, but is pure clutter above the fold on a
-      // step that has not been touched yet -- see the declutter comment on
-      // aiHelpDetails for the full rationale.
+      // Collapsed by default, same reveal idiom as aiAssistPanel's shell
+      // above: a review list of everything already answered is valuable
+      // once there is something to review, but is pure clutter above the
+      // fold on a step that has not been touched yet -- see the declutter
+      // comment on aiAssistPanel above for the full rationale.
       const answeredDetails = document.createElement('details');
       answeredDetails.className = 'reveal';
       const answeredSummary = document.createElement('summary');

@@ -19,6 +19,7 @@
 
 import { createManualPasteProvider } from '../llm/manualPaste.js';
 import { createOllamaProvider } from '../llm/ollama.js';
+import { detectOllama } from '../llm/detect.js';
 import { buildGuidanceMessages } from '../engine/render/llmprompt.js';
 import { loadLlmConfig, saveLlmConfig } from '../llm/config.js';
 import { copyToClipboard } from './clipboard.js';
@@ -104,6 +105,23 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
   modelInput.placeholder = 'model name, e.g. llama3.1:8b';
   settingsRow.appendChild(modelInput);
 
+  // Populated from detectOllama() when a local server answers at the
+  // currently-configured endpoint; hidden (and modelInput shown instead)
+  // whenever detection finds nothing -- no server, available:false, or a
+  // remote/non-default endpoint the probe can't reach. This keeps the panel
+  // usable via free text no matter what detection does, per this task's
+  // degrade-gracefully requirement.
+  const modelSelect = document.createElement('select');
+  modelSelect.className = 'guidance-model guidance-model-select';
+  modelSelect.hidden = true;
+  settingsRow.appendChild(modelSelect);
+
+  const modelDetectedHint = document.createElement('span');
+  modelDetectedHint.className = 'guidance-model-detected-hint';
+  modelDetectedHint.textContent = ' (detected)';
+  modelDetectedHint.hidden = true;
+  settingsRow.appendChild(modelDetectedHint);
+
   // Only needed for a gated gateway (the "unit server" case) sitting in
   // front of Ollama; a bare LAN Ollama box takes no token. Blank means "send
   // no Authorization header at all" (llm/ollama.js), not "send an empty
@@ -144,12 +162,25 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
   rateLimitHint.className = 'guidance-hint guidance-rate-limit-hint';
   section.appendChild(rateLimitHint);
 
+  // True once detectOllama() has found a reachable server WITH at least one
+  // model at the currently-configured endpoint; false any time detection is
+  // pending, failed, or found nothing (available:false, or a remote/
+  // non-default endpoint the probe can't reach) -- the text input is always
+  // the fallback, never a dead end.
+  let modelDetected = false;
+
+  function currentModelValue() {
+    return modelDetected ? modelSelect.value : modelInput.value;
+  }
+
   function syncSettingsVisibility() {
     const remoteOk = remoteInferenceAvailable();
     settingsRow.hidden = !remoteOk;
     remoteUnavailableNotice.hidden = remoteOk;
     endpointInput.hidden = !enabledCheckbox.checked;
-    modelInput.hidden = !enabledCheckbox.checked;
+    modelInput.hidden = !enabledCheckbox.checked || modelDetected;
+    modelSelect.hidden = !enabledCheckbox.checked || !modelDetected;
+    modelDetectedHint.hidden = !enabledCheckbox.checked || !modelDetected;
     tokenInput.hidden = !enabledCheckbox.checked;
     coldStartHint.hidden = !remoteOk || !enabledCheckbox.checked;
     rateLimitHint.hidden = !remoteOk || !enabledCheckbox.checked;
@@ -167,7 +198,7 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
     saveLlmConfig({
       enabled: enabledCheckbox.checked,
       endpoint: endpointInput.value,
-      model: modelInput.value,
+      model: currentModelValue(),
       token: tokenInput.value,
     });
     syncSettingsVisibility();
@@ -176,7 +207,48 @@ export function createGuidancePanel(getContext, { onConfigChange } = {}) {
   enabledCheckbox.addEventListener('change', persistSettings);
   endpointInput.addEventListener('change', persistSettings);
   modelInput.addEventListener('change', persistSettings);
+  modelSelect.addEventListener('change', persistSettings);
   tokenInput.addEventListener('change', persistSettings);
+
+  // Probe the currently-configured endpoint for a local Ollama server and,
+  // if one answers with at least one model, swap the free-text model input
+  // for a <select> listing them (pre-selecting the configured model when
+  // it's in the list). Runs on mount and again whenever the endpoint field
+  // changes (its own 'change' listener above already persists the new
+  // endpoint first). detectOllama() is TOTAL -- it never throws or hangs
+  // past its own timeout -- so this can never block the panel; on any
+  // non-detection outcome the text input is left exactly as it was.
+  let detectionToken = 0;
+  async function runDetection() {
+    const endpointAtStart = endpointInput.value;
+    const myToken = ++detectionToken;
+    const result = await detectOllama({ endpoint: endpointAtStart });
+    // Drop a stale response: either a newer detection superseded this one,
+    // or the endpoint field has since changed again.
+    if (myToken !== detectionToken || endpointInput.value !== endpointAtStart) return;
+
+    if (result.available && result.models.length > 0) {
+      const wanted = currentModelValue();
+      modelSelect.textContent = '';
+      for (const name of result.models) {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        modelSelect.appendChild(option);
+      }
+      modelSelect.value = result.models.includes(wanted) ? wanted : result.models[0];
+      modelDetected = true;
+    } else {
+      modelDetected = false;
+    }
+    persistSettings();
+  }
+  endpointInput.addEventListener('change', () => {
+    runDetection();
+  });
+  // Fire-and-forget on mount: intentionally not awaited so the panel is
+  // interactive immediately via the text input while detection runs.
+  runDetection();
 
   const questionInput = document.createElement('input');
   questionInput.type = 'text';

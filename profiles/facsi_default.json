@@ -1,9 +1,0 @@
-{
-  "name": "facsi_default",
-  "allowed_experiment_types": ["CT", "G1G2", "G1G2G3"],
-  "allowed_markers": ["ARL", "GFP", "DAPI", "SOX"],
-  "sample_pattern": "^E\\d{2}$",
-  "magnification_pattern": "^X\\d{2,3}$",
-  "notes_pattern": "^[A-Za-z0-9_-]+$",
-  "unknown_marker_policy": "warn"
-}

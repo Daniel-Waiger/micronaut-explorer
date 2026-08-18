@@ -153,58 +153,23 @@ export const guideStep = {
       section(main, 'The steps', (c) => {
         para(
           c,
-          'Use the steps in the left nav in any order — the app works outside-in, so you can ' +
-            'jump straight to whatever you want to fill in. A study can hold several assays; the ' +
-            'row of tabs at the top switches between them (and adds or removes them).'
+          'For a guided on-ramp, start at Home — it offers the walkthrough, starting from a ' +
+            'description, and the worked example. This list is a quick reference for what each ' +
+            'step in the left nav means. Use the steps in any order — the app works outside-in — ' +
+            'and note a study can hold several assays, switched with the tab row at the top.'
         );
         defList(c, [
-          [
-            'Home',
-            'The landing page: three doors in — start from a description, start from the worked ' +
-              'example, or take the guided tour. Also where "Take the walkthrough" lives if you ' +
-              'skipped it the first time.',
-          ],
-          [
-            'Project',
-            'Per assay: the question first — pick the readout you are actually measuring ' +
-              '(viability, cytoskeleton, ROS, migration, …), your organism/cell line, sample type, ' +
-              'and preparation, before any microscope decision. Optional AI help (off by default) ' +
-              'lives in a collapsed "Get AI help" section here.',
-          ],
-          [
-            'Study',
-            'The study-wide view: your research question, the group vocabulary shared across ' +
-              'assays (e.g. control vs. treatment), and the list of assays. Rename or add assays here.',
-          ],
-          [
-            'Design',
-            'Per assay: your control and treatment groups as individual named boxes, any crossing ' +
-              'factors, and biological/technical replicate counts.',
-          ],
+          ['Home', 'Landing page: walkthrough, description, or worked example.'],
+          ['Project', 'Per assay: readout, organism/cell line, sample type, preparation.'],
+          ['Study', 'Study-wide question, shared group vocabulary, and assay list.'],
+          ['Design', 'Per assay: control/treatment groups, crossing factors, replicate counts.'],
           [
             'Microscopy',
-            'Per assay: instrument, modality, magnification, and markers, asked as a grid of short ' +
-              'boxes — fill one in and click its ✓ to confirm; leave it blank to skip. Below that, ' +
-              'a qualitative spectral-spillover check across the markers you entered, with detection ' +
-              'filter bands overlaid automatically. An optional structured panel editor lets you name ' +
-              'each channel’s target and how its fluorophore is attached (direct antibody, indirect, ' +
-              'genetically encoded, a direct-binding probe, or a self-labeling tag) — more precise ' +
-              'than the markers field, and what tells Overview whether an antibody is actually involved.',
+            'Per assay: instrument, modality, magnification, markers, spectral-overlap check, ' +
+              'and an optional panel editor.',
           ],
-          [
-            'Naming',
-            'The filename template and the field values it fills — assembled from the design, so you ' +
-              'rarely type a filename by hand. Further down, a Schedule section: roughly how long each ' +
-              'bench/microscope task takes for you, and a one-click download of a bench schedule ' +
-              '(.ics) that imports into Google Calendar, Outlook, or Apple Calendar with no login.',
-          ],
-          [
-            'Overview',
-            'A read-only summary of the whole study: a visual study map, a conformance check (one ' +
-              'pass/fail verdict for the whole study), the recommended controls, a step-by-step ' +
-              '“how to run this project” ladder, and every planned filename. Nothing is entered ' +
-              'here — it reads from the other steps.',
-          ],
+          ['Naming', 'Filename template and fields, plus the bench-schedule (.ics) export.'],
+          ['Overview', 'Read-only summary: study map, conformance check, controls, filenames.'],
         ]);
       })
     );

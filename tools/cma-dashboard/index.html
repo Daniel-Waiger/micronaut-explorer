@@ -144,157 +144,220 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "zen-planner UX reframe",
+  "run": "planner-onboarding-localmodel-classic",
   "orchestrator": "Claude Opus",
-  "active_model": "Claude Sonnet 5",
-  "active_status": "idle",
-  "phase": "",
-  "state_note": "",
+  "active_model": "Claude Sonnet",
+  "active_status": "done",
+  "phase": "Complete",
+  "state_note": "9/9 tasks done. Opus verify pass: found + fixed 2 real defects (advice-panel collapse regression, orphaned USER_GUIDE.md/launch.json), live-verified the shipped built artifact end to end in-browser.",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "JS tests",
-      "v": "716 passed",
+      "k": "detect.test.js",
+      "v": "7 passed",
       "tone": "ok"
     },
     {
-      "k": "Build size",
-      "v": "744KB / 2MB gate",
+      "k": "onboarding.test.js",
+      "v": "8 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "markers.README.md",
+      "v": "6/6 set counts verified",
+      "tone": "ok"
+    },
+    {
+      "k": "web tests",
+      "v": "742 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "python tests",
+      "v": "34 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "classic-final tag",
+      "v": "b7acf74",
+      "tone": "ok"
+    },
+    {
+      "k": "tarball",
+      "v": "155256 bytes",
+      "tone": "ok"
+    },
+    {
+      "k": "Total tasks",
+      "v": "9/9 done",
+      "tone": "ok"
+    },
+    {
+      "k": "Final JS tests",
+      "v": "742 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Final Python tests",
+      "v": "34 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Live artifact check",
+      "v": "verified in browser",
       "tone": "ok"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "P0-1",
-      "phase": "Phase 0",
-      "title": "Relabel arms to groups (UI text)",
-      "status": "done",
-      "by": ""
-    },
-    {
-      "id": "P0-2",
-      "phase": "Phase 0",
-      "title": "Relax sample-ID pattern + fixtures",
-      "status": "done",
-      "by": ""
-    },
-    {
-      "id": "P1",
-      "phase": "Phase 1",
-      "title": "IA reframe: Home, phased interview, declutter, groups rows, panel pre-load, filters, zen CSS, timings+ics",
+      "id": "A1",
+      "phase": "Batch 1",
+      "title": "Promote marker dictionary into web/ (markers.README.md)",
       "status": "done",
       "by": "Sonnet"
     },
     {
-      "id": "P2",
-      "phase": "Phase 2",
-      "title": "Remote inference wiring + rate-limit UX + self-host recipe",
-      "status": "pending",
-      "by": ""
-    },
-    {
-      "id": "P3",
-      "phase": "Phase 3",
-      "title": "Doc upload -> advice (ephemeral)",
-      "status": "pending",
-      "by": ""
-    },
-    {
-      "id": "P4",
-      "phase": "Phase 4",
-      "title": "Google Calendar OAuth sync",
-      "status": "pending",
-      "by": ""
-    },
-    {
-      "id": "P5",
-      "phase": "Phase 5",
-      "title": "Walkthrough content, wiki, feedback, KB content",
+      "id": "B1",
+      "phase": "Batch 1",
+      "title": "core/onboarding.js persistence + unit test",
       "status": "done",
-      "by": ""
+      "by": "Sonnet"
+    },
+    {
+      "id": "C1",
+      "phase": "Batch 1",
+      "title": "llm/detect.js Ollama auto-detect + unit test",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "A2",
+      "phase": "Batch 2",
+      "title": "Pack Micronaut Classic out of the repo",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "B2",
+      "phase": "Batch 2",
+      "title": "First-run stage gate + main.js boot wiring",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "C2",
+      "phase": "Batch 2",
+      "title": "One AI-assist surface + model picker",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "D1",
+      "phase": "Batch 3",
+      "title": "Consolidate the six LLM entry points in describe.js",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "D2",
+      "phase": "Batch 3",
+      "title": "Home/Guide dedup; Home as the real landing",
+      "status": "done",
+      "by": "Sonnet"
+    },
+    {
+      "id": "D3",
+      "phase": "Batch 3",
+      "title": "Experience-level verbosity + 'help me choose' expanders",
+      "status": "done",
+      "by": "Sonnet"
     }
   ],
   "log": [
     {
-      "time": "15:32:30",
-      "msg": "Branch zen-planner created; starting Phase 0"
+      "time": "21:26:21",
+      "msg": "Run seeded: 9 tasks, 3 batches, Sonnet executors (medium)"
     },
     {
-      "time": "15:32:30",
-      "msg": "P0-1 done: arms relabeled to groups across design/study/naming/overview/guide"
+      "time": "21:27:02",
+      "msg": "Dispatched Batch 1: A1 markers-doc, B1 onboarding-persist, C1 ollama-detect"
     },
     {
-      "time": "15:32:30",
-      "msg": "P0-2 in progress: samplePattern relaxed in engine/validation.js"
+      "time": "21:30:25",
+      "msg": "C1 done: web/src/llm/detect.js + detect.test.js, 7/7 pass (needed one retry after a plan-mode/path mixup)"
     },
     {
-      "time": "15:35:33",
-      "msg": "P0-2 done: samplePattern relaxed to ^[A-Za-z]{3}\\d{2}$ (validation.js + regex fixture); Classic's facsi_default.json deliberately left untouched (never fed to the web Planner, per validation.js's own header)"
+      "time": "21:31:06",
+      "msg": "B1 done: web/src/core/onboarding.js + onboarding.test.js, 8/8 pass (needed one retry after a plan-mode/path mixup)"
     },
     {
-      "time": "15:35:33",
-      "msg": "Verified live against dist/ build: groups relabeled, E02 rejected with new message, ABC01 accepted -- 701/701 JS tests green, build 677KB"
+      "time": "21:31:45",
+      "msg": "A1 done: web/kb/markers.README.md, independently recounted 6/6 editorial sets match (34/15/16/3/3/2)"
     },
     {
-      "time": "15:35:33",
-      "msg": "Phase 0 complete. Next: Phase 1 (IA reframe)."
+      "time": "21:31:45",
+      "msg": "Batch 1 complete. Starting Batch 2."
     },
     {
-      "time": "15:37:16",
-      "msg": "Starting Phase 1"
+      "time": "21:31:57",
+      "msg": "Dispatched Batch 2: A2 pack-classic-out, B2 onboarding-gate, C2 ai-assist-surface"
     },
     {
-      "time": "15:44:21",
-      "msg": "P1 progress: phase-tagged questions.json + interview.js filtering; groups-as-rows + organism field in design.js; filter bands now auto-overlay from free-text markers alone (panel.js) -- verified live: 0 structured channels, 2 filter bands rendered"
+      "time": "21:36:12",
+      "msg": "C2 done: aiAssist.js shell + guidance.js model auto-detect wired, 742/0 full suite"
     },
     {
-      "time": "15:58:25",
-      "msg": "P1 shipped: Home landing + auto-walkthrough (first-visit redirect to Guide, waivable), nav reorder (Home/Project/Study/Design/Microscopy/Naming/Overview/Guide), phase-tagged interview (project/microscopy/timing) split across 3 steps, declutter via <details> reveals in Project, groups-as-rows + organism field in Design, panel filter bands now auto-overlay from free-text markers (no more manual number entry), matte/soft color palette + bigger nav icons, Schedule section in Naming (timing interview + .ics download) -- verified live end-to-end against dist/ build including real .ics content fetched from the download blob"
+      "time": "21:36:39",
+      "msg": "B2 done: onboarding gate overlay + main.js first-run wiring, 742/0"
     },
     {
-      "time": "15:58:25",
-      "msg": "Deferred, needs real content not just code: panel pre-load-from-study-design (no honest readout->marker KB mapping exists yet) and K-3 instrument/filter-set KB (the filter auto-overlay ships from emission-peak defaults instead, which resolves the immediate complaint)"
+      "time": "21:41:02",
+      "msg": "A2 done: Classic tarballed+archived (155KB), classic-final tag, pyproject/CI/README pruned. Orchestrator reconciled isolated worktree into main tree: 742 JS + 34 py tests green, build OK."
     },
     {
-      "time": "15:58:25",
-      "msg": "710/710 JS tests, build 725KB under 2MB gate, fixed an import cycle (naming.js<->describe.js) by extracting ui/questionControl.js as a shared leaf module"
+      "time": "21:41:02",
+      "msg": "Batch 2 complete. Starting Batch 3."
     },
     {
-      "time": "16:26:26",
-      "msg": "P1 follow-up (user feedback): Microscopy page redone as a name-builder-style field grid (ui/fieldInterview.js, shared with Naming's Schedule section) -- box+hover-hint+small check-mark-to-confirm, no more Answer/Skip buttons, empty box = skipped"
+      "time": "21:41:10",
+      "msg": "Dispatched Batch 3: D1 describe.js consolidation, D2 home/guide dedup, D3 experience verbosity"
     },
     {
-      "time": "16:26:26",
-      "msg": "Date field now a native date picker; the 4 timing questions now use hours+minutes duration controls (stored as total minutes, unchanged for ics.js). All question wording moved to present tense; sample-ID hint now gives a real example (ABC01/XYZ12)"
+      "time": "21:42:57",
+      "msg": "D2 done: guide.js trimmed to reference-only, home.js cross-links to Guide, 742/0"
     },
     {
-      "time": "16:26:26",
-      "msg": "New engine/interview.js phaseQuestions() (show every question in a phase, answered or not, with confirmed/currentValue/suggestedTag) -- 7 new unit tests. 716/716 JS tests, build 726KB, verified live: h+min duration correctly produces 1h15m -> 75min in the downloaded .ics"
+      "time": "21:43:30",
+      "msg": "D1 done: describe.js consolidated onto aiAssist.js shell, one AI-help door, no duplicate guidance mounts, 742/0"
     },
     {
-      "time": "17:13:42",
-      "msg": "P5 shipped: interactive walkthrough (ui/walkthrough.js) -- an 8-step spotlight/coach-mark tour over the REAL app nav (not a slideshow), launched from Home's 'Take the walkthrough' card and a new 'Start the tour' button on Guide"
+      "time": "21:46:55",
+      "msg": "D3 done: experience-driven verbosity + 3 novice chooser expanders, 742/0. Flagged own deviation: advice.js panels now default-collapsed globally, not just non-novice, since defaultExpanded defaults false."
     },
     {
-      "time": "17:13:42",
-      "msg": "Guide rewritten into a searchable wiki: live text-filter over real content, IA-accurate step descriptions (was stale since Phase 1's reorder -- still said 'Describe'/'Color panel'). Screenshots deliberately NOT embedded -- explained in guide.js's own header (zero-image-asset architecture + staleness risk on a still-changing UI); flagged for the user to override if real captures are wanted"
+      "time": "21:48:20",
+      "msg": "Fixed: createAdvicePanel default flipped true->preserves original always-open behavior for everyone except explicit experience='frequent'; panel.js updated to match. 742/742 re-verified."
     },
     {
-      "time": "17:13:42",
-      "msg": "'GitHub issue' header link upgraded from a static link to a button that opens a prefilled issue (same report as Copy feedback report, truncated with an honest note past 6000 chars) -- a working one-click feedback path with no new external service needed"
+      "time": "21:54:07",
+      "msg": "VERIFY: found+fixed real regression -- advice.js defaultExpanded flipped false->true default (D3's task prompt wrongly assumed panels already collapsed; they were always-open, so the false default silently hid guidance for the entire existing userbase). panel.js updated to collapse only on explicit experience=frequent."
     },
     {
-      "time": "17:13:42",
-      "msg": "Added spinning-disk confocal / two-photon / TIRF to the modality choices (well-established, uncontroversial additions); did NOT add new advisor-rule guidance for them or new readout/assay types -- would require specialist-reviewable domain content this pass shouldn't invent"
+      "time": "21:54:07",
+      "msg": "VERIFY: found+removed docs/USER_GUIDE.md (Classic's manual, left behind despite being tarballed) and a dead .claude/launch.json entry pointing at deleted app_streamlit.py."
     },
     {
-      "time": "17:13:42",
-      "msg": "716/716 JS tests, build 744KB under 2MB gate, verified live end-to-end: full 8-step tour navigates real pages with correct headings, search filters/resets correctly, GitHub issue URL correctly prefilled and truncated, new modality options present"
+      "time": "21:54:07",
+      "msg": "VERIFY: live-drove the actual built dist/index.html in-browser -- onboarding gate renders correctly, routes correctly (idea/designing/acquiring), experience level threads through, novice choosers appear (frequent hides them), advice panel opens by default, AI-assist consolidated to exactly 1 door on Project (0 elsewhere), Ollama auto-detect fires a real network probe and degrades cleanly on failure. Zero console errors throughout."
+    },
+    {
+      "time": "21:54:07",
+      "msg": "Run complete. Nothing committed -- working tree left for user review per standing no-auto-commit rule."
     }
   ],
-  "snapshot_at": "2026-08-16 17:13"
+  "snapshot_at": "2026-08-18 21:54"
 };
 /* CMA:EMBEDDED:END */
 

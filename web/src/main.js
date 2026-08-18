@@ -12,7 +12,9 @@ import { studyStep } from './ui/steps/study.js';
 import { createPanelStep } from './ui/steps/panel.js';
 import { createOverviewStep } from './ui/steps/overview.js';
 import { guideStep } from './ui/steps/guide.js';
-import { homeStep, loadWalkthroughSeen, saveWalkthroughSeen } from './ui/steps/home.js';
+import { homeStep } from './ui/steps/home.js';
+import { showOnboardingGate } from './ui/steps/onboarding.js';
+import { loadOnboarding } from './core/onboarding.js';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -91,25 +93,33 @@ function init() {
   const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep];
   const router = createRouter(steps);
 
-  // First-visit walkthrough default (zen-planner Phase 1): a genuinely new
-  // session -- totalSaved === 0, meaning loadMostRecentRecoverable found NO
-  // prior autosave for this browser at all, the same signal loadInitialExperiment
-  // already computed above -- lands on the Guide step's walkthrough content
-  // instead of Home, once, before this tab's first paint. Marked seen
-  // immediately so a reload of the SAME session does not repeat the
-  // redirect (the seeded oregano example is not "no prior session" the
-  // second time around) -- see ui/steps/home.js's "Don't show again" control
-  // for the same flag, set explicitly instead of implicitly.
+  // First-visit onboarding gate (zen-planner Phase B2, superseding Phase 1's
+  // Guide-page redirect): a genuinely new session -- totalSaved === 0,
+  // meaning loadMostRecentRecoverable found NO prior autosave for this
+  // browser at all, the same signal loadInitialExperiment already computed
+  // above -- sees a two-screen chooser (ui/steps/onboarding.js) instead of
+  // landing on Home or Guide, once. Gated on core/onboarding.js's own
+  // `completed` flag (NOT ui/steps/home.js's WALKTHROUGH_SEEN_KEY -- that is
+  // a separate, still-active flag home.js's own "Take the walkthrough" card
+  // uses to avoid a repeat auto-start; the two must not be conflated, see
+  // docs/cma-lessons.md lesson 50) so a reload of the SAME session, after
+  // the gate has been completed or skipped, does not repeat it.
   //
   // !isDraft matters here: loadInitialExperiment's draft branch above
   // hardcodes totalSaved: 0 UNCONDITIONALLY (it returns before ever calling
   // loadMostRecentRecoverable) -- without this guard, an experienced user
-  // who just used "Draft a study from this" in another tab would get
-  // redirected away from their freshly-drafted study on this new tab, which
+  // who just used "Draft a study from this" in another tab would get the
+  // onboarding gate over their freshly-drafted study on this new tab, which
   // is the opposite of a first-time visitor.
-  if (totalSaved === 0 && !isDraft && !loadWalkthroughSeen()) {
-    saveWalkthroughSeen();
-    router.navigate('guide');
+  //
+  // showOnboardingGate() renders straight to document.body (same idiom as
+  // ui/walkthrough.js), independent of router/renderShell's own timing --
+  // see that module's header for why an overlay was chosen over a router
+  // step. Called here, before renderShell, purely to keep this call next to
+  // the totalSaved/isDraft signal it depends on; the overlay does not touch
+  // `main` or require the shell to exist yet.
+  if (totalSaved === 0 && !isDraft && !loadOnboarding().completed) {
+    showOnboardingGate({ router });
   }
 
   const root = document.getElementById('app');
@@ -161,7 +171,13 @@ function init() {
 
   function renderActiveStep(id) {
     const step = steps.find((s) => s.id === id) || steps[0];
-    step.render(main, store, { showToast, advisor: kb.advisor, router });
+    // Read fresh on every render rather than caching loadOnboarding() once:
+    // the onboarding gate (idea path) can complete AFTER this closure is
+    // built but before the first render, and a later screen may still
+    // change the stored experience level -- see docs/cma-lessons.md
+    // lesson 46 (re-fetch current state inside handlers, not a stale
+    // closure).
+    step.render(main, store, { showToast, advisor: kb.advisor, router, experience: loadOnboarding().experience });
   }
 
   router.onChange(renderActiveStep);

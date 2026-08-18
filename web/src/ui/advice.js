@@ -116,6 +116,28 @@ function appendAdviceNote(list, note) {
  * rules themselves are surface-agnostic content; only the surface filter
  * applied at select time differs per panel.
  *
+ * `defaultExpanded` (default TRUE, zen-planner experience-verbosity slice):
+ * this panel previously had NO collapse mechanism of its own -- a plain
+ * <div>, always fully visible whenever it had notes (only `.hidden` toggled
+ * the whole section on/off, never an open/closed state for existing notes).
+ * Rather than invent a bespoke toggle, it now reuses the SAME native
+ * <details>/<summary> "reveal" idiom already shared by describe.js's/
+ * panel.js's "Get AI help"/"Your answers" sections (see app.css's `.reveal`
+ * comment) -- one progressive-disclosure mechanism app-wide, not two.
+ * `defaultExpanded` sets the details element's initial `open` state.
+ *
+ * Defaults to TRUE deliberately, not false: this is guidance content
+ * (pitfalls/tips, sometimes safety-relevant -- spectral spillover,
+ * photobleaching), and every caller that does not yet thread an experience
+ * level through (describe.js, design.js, naming.js -- only panel.js does,
+ * see below) must keep today's always-visible behavior unchanged, since
+ * `experience` reads `null` for the app's entire existing userbase (the
+ * onboarding gate only ever fires on a session with zero prior autosaves --
+ * see core/onboarding.js / main.js). A caller opts INTO collapsing, it is
+ * never the silent default -- panel.js is the one caller that does, and
+ * only for an explicit 'frequent' self-report, not for 'novice' or an
+ * absent/unset experience level.
+ *
  * Returns { element, update(experiment) }. Mount `element` once, at render
  * time, in the step's own DOM tree (main.textContent = '' wipes the whole
  * step on every navigation, so there is nothing to persist across renders --
@@ -125,13 +147,14 @@ function appendAdviceNote(list, note) {
  * could have changed -- there is no store subscription here (see the
  * module-header comment on caching).
  */
-export function createAdvicePanel(advisor, surface) {
-  const section = document.createElement('div');
-  section.className = 'advice-section';
+export function createAdvicePanel(advisor, surface, { defaultExpanded = true } = {}) {
+  const section = document.createElement('details');
+  section.className = 'advice-section reveal';
+  section.open = defaultExpanded;
   section.hidden = true; // no advice yet -- see update() below
 
-  const heading = document.createElement('div');
-  heading.className = 'advice-heading';
+  const heading = document.createElement('summary');
+  heading.className = 'advice-heading reveal-summary';
   heading.textContent = 'Guidance';
   section.appendChild(heading);
 

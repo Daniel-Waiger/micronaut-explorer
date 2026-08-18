@@ -3,26 +3,15 @@
 μicronaut — a static, zero-install **microscopy experiment planner**.
 (The µ is the micron symbol; the project name is pronounced "Micronaut.")
 
-The active project is the web **Planner**. The repository also contains
-**Micronaut Classic**, an earlier metadata-aware file **renamer** — now
-**parked** (see status below). They share a common data model (profiles, the
-marker/fluorophore dictionary, and the naming convention).
+The active project is the web **Planner** (`web/`).
 
 | Tool | What it is | Status |
 |------|------------|--------|
 | **Micronaut Planner** (`web/`) | A static, zero-install browser app that walks a researcher from design intent → assays, panel, controls, acquisition → a naming convention as a downstream artifact. No upload, no install, no server required — an optional, off-by-default panel can call a local LLM (e.g. Ollama) on your own network if you configure one. | **Active** |
-| **Micronaut Classic** (`src/`, `app_streamlit.py`) | A metadata-aware file **renamer**: reads microscopy files, builds standardized names, and applies batch renames with rollback. Python CLI (`mna`) + Streamlit UI. | **Parked** — not under active development in the near term |
 
-**Why the pivot?** Classic reverse-engineers naming fields *out of* files after
-acquisition — which is fragile, because the information often isn't in the file
-in a consistent, vendor-neutral form, and because reading vendor formats drags in
-a heavy stack (bioio, a JVM via Bio-Formats, dask, Streamlit). The Planner takes
-the opposite approach: you already know the design at planning time, so it captures
-intent up front and emits the filename convention from a finished design — no
-extraction, no install. That approach won out, and metadata extraction / renaming
-(the whole Classic side) is **not being carried forward in the near term**. Classic
-stays in the tree, documented and runnable, but new work is on the Planner. See
-[docs/plans/planner-web.md](docs/plans/planner-web.md) for the full rationale.
+Micronaut Classic, an earlier metadata-aware file renamer, was archived at tag
+`classic-final` and `_archive/micronaut-classic-2026-08-18.tar.gz` — see
+ROADMAP.md for why.
 
 ---
 
@@ -124,225 +113,6 @@ bare `node --test web/tests/` fails with `MODULE_NOT_FOUND` on Node 22.
 
 ---
 
-# Micronaut Classic (`src/`, `app_streamlit.py`)
-
-> **Parked — not under active development in the near term.** Classic works and is
-> fully documented here, but the metadata-extraction / renaming approach is not being
-> carried forward right now; active work is on the Planner above. The sections below
-> describe the tool as it stands.
-
-A metadata-aware file renamer with optional local LLM suggestions.
-
-- Extracts metadata from microscopy files using bioio, via native Python readers
-  first (OME-TIFF, CZI, LIF, ND2) with Bio-Formats (Java) as a fallback for other
-  formats.
-- Adds format-aware extraction heuristics for OME-TIFF, CZI, LIF, and ND2.
-- Builds standardized names from a configurable template.
-- Supports per-user or per-lab naming schemes via JSON config.
-- Validates generated names using profile rules (experiment codes, markers, sample pattern).
-- Optionally uses a local/free Ollama model to improve missing fields.
-- Includes a Streamlit UI with drag-and-drop preview and folder-based apply flow.
-
-Default naming template:
-
-    YYYY-MM-DD_EXPTYPE_SAMPLE_MAGNIFICATION_MARKERS_NOTES.tif
-
-See [docs/USER_GUIDE.md](docs/USER_GUIDE.md) for the full user manual (every field
-and setting explained, with screenshots).
-
-## Setup
-
-1. Create and activate a virtual environment.
-2. Install dependencies:
-
-       pip install -r requirements.txt
-
-3. Install this package in editable mode:
-
-       pip install -e .
-
-4. Install test dependencies (recommended for contributors):
-
-       pip install -e .[test]
-
-Note: OME-TIFF, CZI, LIF, and ND2 are read by native Python plugins (bioio-ome-tiff,
-bioio-tifffile, bioio-czi, bioio-lif, bioio-nd2) and do not need Java. A Java runtime is
-only required as a fallback for other/less-common formats, handled by bioio-bioformats.
-bioio-czi in particular needs a C++ build toolchain (CMake) to install from source on
-platforms without a prebuilt wheel; if it fails to install, `.czi` files still work via
-the Bio-Formats fallback (install it separately with `pip install bioio-czi` where a
-toolchain is available -- see the `czi` extra in pyproject.toml).
-
-## Optional local LLM (free tier)
-
-If you use Ollama locally:
-
-1. Start Ollama server:
-
-       ollama serve
-
-2. Pull a model (example):
-
-       ollama pull qwen3.5:14b
-
-3. Enable LLM in config (see below) and run commands with --llm.
-
-Notes:
-- No API key is required for local Ollama usage.
-- You can set `llm.model` to `auto` (default) to pick an installed local model automatically.
-
-The LLM sees both the original filename **and** the metadata read from the file,
-and is instructed to prefer the metadata when the two disagree. Naming stays
-deterministic-first: the base name is built by parsing metadata and filename
-keywords, and the model may only fill fields that are still missing — it never
-overwrites a value actually extracted from the file.
-
-You can also describe the experiment in plain language with `--describe` (or the
-"Experiment description" box in the UI). That text is treated as authoritative
-context, which is the way to name images whose files carry no usable metadata.
-
-## Seeing what was actually in your file
-
-When a field comes out as `UNKNOWN`, it helps to know whether the file never
-carried it or the extractor simply missed it:
-
-    mna suggest --input img.tif --show-metadata
-
-This prints everything the reader found — the same record Fiji shows under
-Image > Show Info — plus which reader was used. The Streamlit UI has the
-equivalent under "Metadata read from files".
-
-Worth knowing: an ImageJ/Fiji-exported TIFF usually keeps the original vendor
-metadata in the ImageJ `Info` block rather than in standard TIFF fields, so a
-file that looks "stripped" often still has its acquisition record. Micronaut
-reads that block, along with OME metadata, channel names, and per-scene metadata
-for multi-series containers (LIF/CZI/ND2).
-
-## Streamlit UI
-
-Run local UI:
-
-    streamlit run app_streamlit.py
-
-UI includes:
-
-- Folder mode: preview and apply renames in-place
-- Drag-and-drop mode: upload files to preview suggestions safely
-- Optional strict profile validation
-- "Metadata read from files": inspect the raw metadata behind each suggestion
-- "Experiment description": plain-language context handed to the LLM
-
-## Quick start
-
-1. Create default config:
-
-       mna init-config --output naming_scheme.json
-
-2. Create default profile:
-
-       mna init-profile --output profile.json
-
-3. Suggest a filename for one file:
-
-       mna suggest --input path/to/file.tif --config naming_scheme.json
-
-4. Suggest with profile validation (strict):
-
-       mna suggest --input path/to/file.tif --config naming_scheme.json --profile profiles/facsi_default.json --strict
-
-5. Batch preview (dry-run):
-
-       mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json
-
-6. Batch preview with validation profile:
-
-       mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json --profile profiles/facsi_default.json --strict
-
-7. Apply batch rename:
-
-       mna batch --input-dir path/to/folder --pattern "*.tif" --config naming_scheme.json --apply
-
-8. Use Ollama-assisted suggestions:
-
-       mna suggest --input path/to/file.tif --config naming_scheme.json --llm
-
-9. Choose a specific local model without editing JSON:
-
-       mna suggest --input path/to/file.tif --config naming_scheme.json --llm --llm-model llama3.1:8b
-
-## Config format
-
-The generated naming_scheme.json is user-tailorable. Important fields:
-
-- template: naming pattern
-- defaults: fallback values for missing metadata
-- uppercase_fields: fields to force uppercase
-- llm.enabled: true/false
-- llm.model: Ollama model name (or auto)
-- llm.preferred_models: priority order used when llm.model is auto
-- llm.endpoint: default http://localhost:11434/api/chat
-
-Field separators are defined entirely by the `template` field (there is no
-separate separator setting); multiple markers are always joined with `-`.
-
-Out of the box, `defaults` uses neutral placeholders (`UNKNOWN`, `UNSPECIFIED`)
-rather than lab-specific values — tailor them to your own naming scheme. Any
-field that falls back to a default is tagged with `provenance: default` (see
-`mna suggest --json` and the Streamlit review column), so an `UNKNOWN`/
-`UNSPECIFIED` token in a suggested name is easy to spot and fix before
-renaming.
-
-## Profile format
-
-Profile JSON controls validation policy for each user or lab:
-
-- allowed_experiment_types
-- allowed_markers
-- sample_pattern
-- magnification_pattern
-- notes_pattern
-- unknown_marker_policy (allow, warn, block)
-- filename_extraction_mask (optional)
-
-`filename_extraction_mask` describes a filename convention your existing files
-already follow, for images whose embedded metadata was stripped (e.g. ImageJ
-`.tif` exports). Write it with placeholders — `{date}_{exptype}_{sample}_{magnification}`
-— using any of `date`, `exptype`, `sample`, `magnification`, `markers`, `notes`.
-Each placeholder matches one segment (it will not swallow the separator), and the
-*whole* filename must match: a file that doesn't follow the convention is skipped
-rather than half-parsed into wrong fields. A mask takes precedence over values
-read from the file's own metadata, since it's an explicit statement about your
-naming. Leave it unset to rely on metadata plus keyword heuristics alone.
-
-`mna init-profile` writes a neutral, permissive starter profile: `allowed_experiment_types`
-and `allowed_markers` are empty, and an empty allow-list means "no restriction" rather than
-"reject everything" (the `sample`/`magnification`/`notes` patterns default to generic
-alphanumeric shapes). Tighten these to your own lab's codes, markers, and patterns as needed.
-
-profiles/facsi_default.json is a separate, explicitly-named EXAMPLE of a restrictive lab
-profile (fixed experiment codes like `CT`/`G1G2`, a fixed marker list, `E##`/`X##` patterns) —
-a demonstration to adapt, not the default any lab is expected to use as-is.
-
-Example LLM section:
-
-    {
-        "llm": {
-            "enabled": true,
-            "model": "auto",
-            "preferred_models": ["qwen3.5:14b", "gemma2:9b", "llama3.1:8b", "phi3:mini"],
-            "endpoint": "http://localhost:11434/api/chat",
-            "timeout_seconds": 30
-        }
-    }
-
-## Notes
-
-- The CLI is safe by default: batch mode is dry-run unless you add --apply.
-- If metadata readers are unavailable for a file, the tool falls back to timestamp and filename heuristics.
-- You can maintain multiple config files for different users, projects, or experiments.
-
----
-
 ## Repository layout
 
 ```
@@ -354,35 +124,15 @@ web/                         Micronaut Planner (static browser app)
   kb/                        knowledge pack (markers, stages, controls, advisor, spectra, …)
   tests/                     node --test suite (zero npm deps)
 
-src/microscopy_naming_assistant/   Micronaut Classic (Python package)
-  cli.py                     command-line interface (`mna`)
-  metadata.py                metadata extraction
-  naming.py                  sanitization and filename building
-  validation.py              validation engine
-  profiles.py / config.py    profile + per-user scheme configuration
-  service.py                 shared suggestion and batch logic
-  llm.py                     optional Ollama integration
-  markers.py                 curated marker/fluorophore dictionary (source of truth)
-app_streamlit.py             Classic desktop-style local UI
-profiles/facsi_default.json  example (restrictive) lab profile
-
 tools/build_single_file.py   Planner inliner → dist/index.html
 tools/serve_dir.py           static dev server (PORT-aware)
-tools/export_markers_kb.py   generate web/kb/markers.json from markers.py
-docs/                        USER_GUIDE, plans, images
+docs/                        plans, cma-lessons, images
 ```
 
-The two products **share data, never code**: `web/` does not import from `src/`.
-The marker dictionary is generated from the Python source of truth
-(`tools/export_markers_kb.py`), never retyped, so both sides stay in sync.
+The marker/fluorophore dictionary (`web/kb/markers.json`) is hand-edited and
+canonical — see [web/kb/markers.README.md](web/kb/markers.README.md).
 
 ## Run the tests
-
-Python (Classic) — the default run skips reader/Bio-Formats-dependent integration tests:
-
-```bash
-python -m pytest -q -m "not integration"
-```
 
 JavaScript (Planner):
 
@@ -390,8 +140,10 @@ JavaScript (Planner):
 node --test web/tests/*.test.js
 ```
 
-CI runs both suites plus lint (ruff), format check (black), and advisory mypy —
-see [.github/workflows/ci.yml](.github/workflows/ci.yml).
+CI runs the JS suite plus the Planner's own Python build-pipeline tests
+(`tests/test_single_file_build.py`, `tests/test_kb_json_valid.py`,
+`tests/test_regex_conformance.py`) — see
+[.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## License
 

@@ -134,5 +134,17 @@ export const homeStep = {
     });
     skipRow.appendChild(skipLink);
     main.appendChild(skipRow);
+
+    const guideRow = document.createElement('p');
+    guideRow.className = 'home-skip-row';
+    const guideLink = document.createElement('button');
+    guideLink.type = 'button';
+    guideLink.className = 'home-skip-link';
+    guideLink.textContent = 'Looking for a specific term or step? See the Guide.';
+    guideLink.addEventListener('click', () => {
+      if (router) router.navigate('guide');
+    });
+    guideRow.appendChild(guideLink);
+    main.appendChild(guideRow);
   },
 };

@@ -114,6 +114,9 @@ are the right register. The rules themselves in `web/kb/advisor.json` are the fu
 
 ## Parked: Micronaut Classic (not going forward in the near term)
 
+**Archived 2026-08-18:** this section is now historical record only. The code
+moved to `_archive/micronaut-classic-2026-08-18.tar.gz` (tag `classic-final`).
+
 Classic reached a complete, usable state: bounded metadata extraction with a
 heuristic fallback, structured OME / per-format extraction, an externalized
 marker/fluorophore dictionary, per-field provenance, profile validation, batch

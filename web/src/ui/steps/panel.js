@@ -147,7 +147,7 @@ export function createPanelStep(kb) {
     // -- get decided, after Project and before Outputs. The id stays
     // 'panel' (URL hash, every render() call site) -- label only.
     title: 'Microscopy',
-    render(main, store, { advisor } = {}) {
+    render(main, store, { advisor, experience } = {}) {
       // Commit 1 of the assay tier idiom (naming.js/design.js/describe.js
       // all cache this identically): the active assay never changes for the
       // lifetime of one render/paint -- shared by the interview AND the
@@ -182,6 +182,7 @@ export function createPanelStep(kb) {
         main.appendChild(interviewContainer);
         renderFieldInterview(interviewContainer, {
           questions: phaseQuestions(questionBank, assayView(store.get(), assayId), 'microscopy'),
+          experience,
           onCommit: (question, raw) => {
             const { path, slotKey } = scopeWrite(store.get(), question.field, assayId);
             const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
@@ -697,7 +698,13 @@ export function createPanelStep(kb) {
       renderChannelsList();
       refreshSpectralView();
 
-      const advicePanel = createAdvicePanel(advisor || [], 'panel');
+      // Collapse only on an EXPLICIT 'frequent' self-report -- an absent/
+      // unset experience (today's entire existing userbase; the onboarding
+      // gate never fires for a session with prior autosaves) or 'novice'/
+      // 'occasional' all keep this panel open, matching createAdvicePanel's
+      // own default and every other step's advice panel. See advice.js's
+      // createAdvicePanel docstring for why the default itself is `true`.
+      const advicePanel = createAdvicePanel(advisor || [], 'panel', { defaultExpanded: experience !== 'frequent' });
       main.appendChild(advicePanel.element);
       advicePanel.update(view);
       }
