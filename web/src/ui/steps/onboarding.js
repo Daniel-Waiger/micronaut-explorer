@@ -151,6 +151,16 @@ export function showOnboardingGate({ router, onDone } = {}) {
     if (typeof onDone === 'function') onDone();
   }
 
+  // The ONLY path that sets dontShowAgain -- completing the flow normally
+  // (completeWith below) or the plain Skip above both leave it false, so the
+  // gate pops again on the next page load. See core/onboarding.js's module
+  // header for why this is a separate flag from `completed`.
+  function dontShowAgain() {
+    saveOnboarding({ completed: true, dontShowAgain: true });
+    teardown();
+    if (typeof onDone === 'function') onDone();
+  }
+
   function onKeydown(event) {
     if (event.key === 'Escape') skip();
   }
@@ -261,9 +271,25 @@ export function showOnboardingGate({ router, onDone } = {}) {
     skipLink.type = 'button';
     skipLink.className = 'home-skip-link';
     skipLink.textContent = 'Skip for now';
+    skipLink.title = 'Dismiss for this visit -- this dialog will pop again the next time you open the app.';
     skipLink.addEventListener('click', skip);
     skipRow.appendChild(skipLink);
     dialog.appendChild(skipRow);
+
+    // Separate row/control from Skip above -- Skip is a per-visit dismissal
+    // (pops again next load), this is the one path that persists
+    // dontShowAgain:true and stops the gate from popping at all. Distinct
+    // wording so the two are never mistaken for each other.
+    const dontShowRow = document.createElement('p');
+    dontShowRow.className = 'home-skip-row';
+    const dontShowLink = document.createElement('button');
+    dontShowLink.type = 'button';
+    dontShowLink.className = 'home-skip-link';
+    dontShowLink.textContent = "Don't show this again";
+    dontShowLink.title = 'Stop this dialog from popping up on future visits.';
+    dontShowLink.addEventListener('click', dontShowAgain);
+    dontShowRow.appendChild(dontShowLink);
+    dialog.appendChild(dontShowRow);
   }
 
   backdrop.addEventListener('click', skip);

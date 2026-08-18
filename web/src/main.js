@@ -93,32 +93,32 @@ function init() {
   const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep];
   const router = createRouter(steps);
 
-  // First-visit onboarding gate (zen-planner Phase B2, superseding Phase 1's
-  // Guide-page redirect): a genuinely new session -- totalSaved === 0,
-  // meaning loadMostRecentRecoverable found NO prior autosave for this
-  // browser at all, the same signal loadInitialExperiment already computed
-  // above -- sees a two-screen chooser (ui/steps/onboarding.js) instead of
-  // landing on Home or Guide, once. Gated on core/onboarding.js's own
-  // `completed` flag (NOT ui/steps/home.js's WALKTHROUGH_SEEN_KEY -- that is
-  // a separate, still-active flag home.js's own "Take the walkthrough" card
-  // uses to avoid a repeat auto-start; the two must not be conflated, see
-  // docs/cma-lessons.md lesson 50) so a reload of the SAME session, after
-  // the gate has been completed or skipped, does not repeat it.
+  // Onboarding gate (zen-planner Phase B2, superseding Phase 1's Guide-page
+  // redirect): pops on EVERY page load -- not just a genuinely new session
+  // -- so a returning user can re-route or change their experience level
+  // each time they open the app, until they explicitly opt out. Gated
+  // SOLELY on core/onboarding.js's own `dontShowAgain` flag, a DIFFERENT
+  // flag from `completed` on purpose: finishing the two-screen flow does
+  // NOT suppress future pops by itself, only the dialog's own "Don't show
+  // this again" control does (ui/steps/onboarding.js). Also NOT
+  // ui/steps/home.js's WALKTHROUGH_SEEN_KEY -- that is a separate,
+  // still-active flag home.js's own "Take the walkthrough" card uses; the
+  // three flags must not be conflated, see docs/cma-lessons.md lesson 50.
   //
-  // !isDraft matters here: loadInitialExperiment's draft branch above
-  // hardcodes totalSaved: 0 UNCONDITIONALLY (it returns before ever calling
-  // loadMostRecentRecoverable) -- without this guard, an experienced user
-  // who just used "Draft a study from this" in another tab would get the
-  // onboarding gate over their freshly-drafted study on this new tab, which
-  // is the opposite of a first-time visitor.
+  // !isDraft matters here: a user who just used "Draft a study from this" in
+  // another tab should land straight on their freshly-drafted study on this
+  // new tab, not be interrupted by the gate -- the opposite of what the gate
+  // is for. totalSaved is NOT part of this condition (unlike the original
+  // first-run-only version): the gate no longer cares whether this browser
+  // has a prior autosave, only whether the user has opted out.
   //
   // showOnboardingGate() renders straight to document.body (same idiom as
   // ui/walkthrough.js), independent of router/renderShell's own timing --
   // see that module's header for why an overlay was chosen over a router
   // step. Called here, before renderShell, purely to keep this call next to
-  // the totalSaved/isDraft signal it depends on; the overlay does not touch
-  // `main` or require the shell to exist yet.
-  if (totalSaved === 0 && !isDraft && !loadOnboarding().completed) {
+  // the isDraft signal it depends on; the overlay does not touch `main` or
+  // require the shell to exist yet.
+  if (!isDraft && !loadOnboarding().dontShowAgain) {
     showOnboardingGate({ router });
   }
 
