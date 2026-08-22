@@ -1,0 +1,20 @@
+{
+  "run": "Contextual microscopy iconography",
+  "batches": [["ICON-1"], ["ICON-2"]],
+  "tasks": [
+    {
+      "id": "ICON-1",
+      "title": "Create a shared microscopy icon system",
+      "depends_on": [],
+      "scope": "Move thin-stroke SVG construction into a dependency-free UI helper. Define symbols that communicate Micronaut's real concepts—project description, study, experimental design, microscopy, naming, and study overview—rather than generic office or palette metaphors.",
+      "verification": "Every icon is decorative and retains an accessible labelled parent control; the single-file build accepts the new import graph."
+    },
+    {
+      "id": "ICON-2",
+      "title": "Apply contextual icons to shell and entry choices",
+      "depends_on": ["ICON-1"],
+      "scope": "Use the shared symbols for the logo, step navigation, Home entry cards, and onboarding project-stage choices. Remove their emoji icons without changing navigation or onboarding behavior.",
+      "verification": "Serve the built artifact and exercise Home, Project, Microscopy, and the onboarding gate. Confirm the logo is a microscope, no emoji entry-card glyph remains, route controls retain accessible names, and the test suite/build pass."
+    }
+  ]
+}
