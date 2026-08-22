@@ -144,220 +144,74 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "planner-onboarding-localmodel-classic",
-  "orchestrator": "Claude Opus",
-  "active_model": "Claude Sonnet",
+  "run": "Product-designer UI redesign",
+  "orchestrator": "Codex GPT-5.6",
+  "active_model": "Codex GPT-5.6",
   "active_status": "done",
-  "phase": "Complete",
-  "state_note": "9/9 tasks done. Opus verify pass: found + fixed 2 real defects (advice-panel collapse regression, orphaned USER_GUIDE.md/launch.json), live-verified the shipped built artifact end to end in-browser.",
+  "phase": "",
+  "state_note": "Built artifact, desktop and mobile paths verified.",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "detect.test.js",
-      "v": "7 passed",
+      "k": "JavaScript tests",
+      "v": "743 passed",
       "tone": "ok"
     },
     {
-      "k": "onboarding.test.js",
-      "v": "8 passed",
+      "k": "Build artifact",
+      "v": "792610 bytes",
       "tone": "ok"
     },
     {
-      "k": "markers.README.md",
-      "v": "6/6 set counts verified",
-      "tone": "ok"
-    },
-    {
-      "k": "web tests",
-      "v": "742 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "python tests",
-      "v": "34 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "classic-final tag",
-      "v": "b7acf74",
-      "tone": "ok"
-    },
-    {
-      "k": "tarball",
-      "v": "155256 bytes",
-      "tone": "ok"
-    },
-    {
-      "k": "Total tasks",
-      "v": "9/9 done",
-      "tone": "ok"
-    },
-    {
-      "k": "Final JS tests",
-      "v": "742 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Final Python tests",
-      "v": "34 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Live artifact check",
-      "v": "verified in browser",
+      "k": "Browser verification",
+      "v": "0 errors",
       "tone": "ok"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "A1",
+      "id": "UI-1",
       "phase": "Batch 1",
-      "title": "Promote marker dictionary into web/ (markers.README.md)",
-      "status": "done",
-      "by": "Sonnet"
+      "title": "Establish the Modern SaaS visual system",
+      "status": "resolved",
+      "by": "Codex GPT-5.6"
     },
     {
-      "id": "B1",
-      "phase": "Batch 1",
-      "title": "core/onboarding.js persistence + unit test",
-      "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "C1",
-      "phase": "Batch 1",
-      "title": "llm/detect.js Ollama auto-detect + unit test",
-      "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "A2",
+      "id": "UI-2",
       "phase": "Batch 2",
-      "title": "Pack Micronaut Classic out of the repo",
+      "title": "Rebuild the shell hierarchy and responsive surfaces",
       "status": "done",
-      "by": "Sonnet"
+      "by": "Codex GPT-5.6"
     },
     {
-      "id": "B2",
-      "phase": "Batch 2",
-      "title": "First-run stage gate + main.js boot wiring",
-      "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "C2",
-      "phase": "Batch 2",
-      "title": "One AI-assist surface + model picker",
-      "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "D1",
+      "id": "UI-3",
       "phase": "Batch 3",
-      "title": "Consolidate the six LLM entry points in describe.js",
+      "title": "Build and adversarially verify the shipped UI",
       "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "D2",
-      "phase": "Batch 3",
-      "title": "Home/Guide dedup; Home as the real landing",
-      "status": "done",
-      "by": "Sonnet"
-    },
-    {
-      "id": "D3",
-      "phase": "Batch 3",
-      "title": "Experience-level verbosity + 'help me choose' expanders",
-      "status": "done",
-      "by": "Sonnet"
+      "by": "Codex GPT-5.6"
     }
   ],
   "log": [
     {
-      "time": "21:26:21",
-      "msg": "Run seeded: 9 tasks, 3 batches, Sonnet executors (medium)"
+      "time": "00:39:06",
+      "msg": "Fixed a live SVG-attribute parsing fault caught in the built artifact."
     },
     {
-      "time": "21:27:02",
-      "msg": "Dispatched Batch 1: A1 markers-doc, B1 onboarding-persist, C1 ollama-detect"
+      "time": "00:39:06",
+      "msg": "Full JavaScript suite passed and shipped artifact inspected at desktop and 390px widths."
     },
     {
-      "time": "21:30:25",
-      "msg": "C1 done: web/src/llm/detect.js + detect.test.js, 7/7 pass (needed one retry after a plan-mode/path mixup)"
+      "time": "00:39:39",
+      "msg": "Adversarial verification completed: fresh built artifact has eight navigation icons, no console errors, and no 390px page overflow."
     },
     {
-      "time": "21:31:06",
-      "msg": "B1 done: web/src/core/onboarding.js + onboarding.test.js, 8/8 pass (needed one retry after a plan-mode/path mixup)"
-    },
-    {
-      "time": "21:31:45",
-      "msg": "A1 done: web/kb/markers.README.md, independently recounted 6/6 editorial sets match (34/15/16/3/3/2)"
-    },
-    {
-      "time": "21:31:45",
-      "msg": "Batch 1 complete. Starting Batch 2."
-    },
-    {
-      "time": "21:31:57",
-      "msg": "Dispatched Batch 2: A2 pack-classic-out, B2 onboarding-gate, C2 ai-assist-surface"
-    },
-    {
-      "time": "21:36:12",
-      "msg": "C2 done: aiAssist.js shell + guidance.js model auto-detect wired, 742/0 full suite"
-    },
-    {
-      "time": "21:36:39",
-      "msg": "B2 done: onboarding gate overlay + main.js first-run wiring, 742/0"
-    },
-    {
-      "time": "21:41:02",
-      "msg": "A2 done: Classic tarballed+archived (155KB), classic-final tag, pyproject/CI/README pruned. Orchestrator reconciled isolated worktree into main tree: 742 JS + 34 py tests green, build OK."
-    },
-    {
-      "time": "21:41:02",
-      "msg": "Batch 2 complete. Starting Batch 3."
-    },
-    {
-      "time": "21:41:10",
-      "msg": "Dispatched Batch 3: D1 describe.js consolidation, D2 home/guide dedup, D3 experience verbosity"
-    },
-    {
-      "time": "21:42:57",
-      "msg": "D2 done: guide.js trimmed to reference-only, home.js cross-links to Guide, 742/0"
-    },
-    {
-      "time": "21:43:30",
-      "msg": "D1 done: describe.js consolidated onto aiAssist.js shell, one AI-help door, no duplicate guidance mounts, 742/0"
-    },
-    {
-      "time": "21:46:55",
-      "msg": "D3 done: experience-driven verbosity + 3 novice chooser expanders, 742/0. Flagged own deviation: advice.js panels now default-collapsed globally, not just non-novice, since defaultExpanded defaults false."
-    },
-    {
-      "time": "21:48:20",
-      "msg": "Fixed: createAdvicePanel default flipped true->preserves original always-open behavior for everyone except explicit experience='frequent'; panel.js updated to match. 742/742 re-verified."
-    },
-    {
-      "time": "21:54:07",
-      "msg": "VERIFY: found+fixed real regression -- advice.js defaultExpanded flipped false->true default (D3's task prompt wrongly assumed panels already collapsed; they were always-open, so the false default silently hid guidance for the entire existing userbase). panel.js updated to collapse only on explicit experience=frequent."
-    },
-    {
-      "time": "21:54:07",
-      "msg": "VERIFY: found+removed docs/USER_GUIDE.md (Classic's manual, left behind despite being tarballed) and a dead .claude/launch.json entry pointing at deleted app_streamlit.py."
-    },
-    {
-      "time": "21:54:07",
-      "msg": "VERIFY: live-drove the actual built dist/index.html in-browser -- onboarding gate renders correctly, routes correctly (idea/designing/acquiring), experience level threads through, novice choosers appear (frequent hides them), advice panel opens by default, AI-assist consolidated to exactly 1 door on Project (0 elsewhere), Ollama auto-detect fires a real network probe and degrades cleanly on failure. Zero console errors throughout."
-    },
-    {
-      "time": "21:54:07",
-      "msg": "Run complete. Nothing committed -- working tree left for user review per standing no-auto-commit rule."
+      "time": "00:39:39",
+      "msg": "Run complete; unrelated spectra.json working-tree state preserved without a content diff."
     }
   ],
-  "snapshot_at": "2026-08-18 21:54"
+  "snapshot_at": "2026-08-23 00:39"
 };
 /* CMA:EMBEDDED:END */
 

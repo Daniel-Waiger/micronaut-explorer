@@ -1,0 +1,27 @@
+{
+  "run": "Product-designer UI redesign",
+  "batches": [["UI-1"], ["UI-2"], ["UI-3"]],
+  "tasks": [
+    {
+      "id": "UI-1",
+      "title": "Establish the Modern SaaS visual system",
+      "depends_on": [],
+      "scope": "Replace the existing theme tokens and shared component treatment in web/styles/app.css with a light-first slate, indigo, emerald, amber, and rose system. Preserve the existing semantic class names and all behavior. The app remains dependency-free; CSS is the project-native equivalent of the supplied Tailwind-oriented design brief.",
+      "verification": "Confirm all semantic feedback variables remain defined, desktop and mobile media rules still exist, and no JavaScript behavior or knowledge-base file is changed."
+    },
+    {
+      "id": "UI-2",
+      "title": "Rebuild the shell hierarchy and responsive surfaces",
+      "depends_on": ["UI-1"],
+      "scope": "Make the shell communicate a clear product hierarchy: brand area, utility actions, assay context, left navigation, and spacious main workspace. Replace emoji navigation with accessible inline Lucide-style SVG icons without introducing a dependency. Apply the shared system to cards, controls, tables, forms, and high-density panels using existing hooks.",
+      "verification": "Run the app and test desktop plus narrow viewport navigation, route switching, collapsed navigation, and a representative form interaction. Ensure controls retain accessible names and visible focus."
+    },
+    {
+      "id": "UI-3",
+      "title": "Build and adversarially verify the shipped UI",
+      "depends_on": ["UI-2"],
+      "scope": "Run the complete JavaScript suite and build the single-file artifact. Inspect the shipped artifact over HTTP at desktop and mobile widths, looking specifically for stale assets, horizontal overflow, unusable header actions, unreadable contrast, and broken navigation/icon semantics.",
+      "verification": "The node test suite and build gates pass; the built artifact serves and renders the redesigned shell; no unrelated working-tree modification is included in the redesign diff."
+    }
+  ]
+}
