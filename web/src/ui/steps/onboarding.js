@@ -24,6 +24,7 @@
 
 import { startWalkthrough } from '../walkthrough.js';
 import { saveOnboarding, ONBOARDING_LEVELS } from '../../core/onboarding.js';
+import { createIcon } from '../icons.js';
 
 // The fourth choice is deliberately NOT one of core/onboarding.js's
 // ONBOARDING_STAGES ('idea'/'designing'/'acquiring') -- it is a routing
@@ -34,26 +35,26 @@ import { saveOnboarding, ONBOARDING_LEVELS } from '../../core/onboarding.js';
 const STAGE_CHOICES = [
   {
     stage: 'idea',
-    icon: '\u{1F4A1}',
+    icon: 'lightbulb',
     title: 'Just an idea',
     body: 'Not sure where to start yet -- take an interactive tour of the app.',
   },
   {
     stage: 'designing',
-    icon: '\u{1F9EA}',
+    icon: 'study',
     title: 'Designing my study',
     body: 'I know roughly what I am testing and need to work out the design.',
   },
   {
     stage: 'acquiring',
-    icon: '\u{1F52C}',
+    icon: 'microscope',
     title: 'Ready to acquire images',
     body: 'The study design is set -- I need to plan the microscopy acquisition.',
   },
   {
     stage: null,
     routeId: 'naming',
-    icon: '\u{1F5C2}\u{FE0F}',
+    icon: 'folder',
     title: 'I already have images',
     body:
       'I need to name existing files. Note: this app does not read or extract metadata from image files -- it only helps you build a consistent naming convention by hand.',
@@ -81,11 +82,13 @@ function choiceCard(parent, { icon, title, body, onClick }) {
   button.className = 'home-card';
   button.addEventListener('click', onClick);
 
-  const iconSpan = document.createElement('span');
-  iconSpan.className = 'home-card-icon';
-  iconSpan.setAttribute('aria-hidden', 'true');
-  iconSpan.textContent = icon;
-  button.appendChild(iconSpan);
+  if (icon) {
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'home-card-icon';
+    iconSpan.setAttribute('aria-hidden', 'true');
+    iconSpan.appendChild(createIcon(icon, 'home-card-glyph'));
+    button.appendChild(iconSpan);
+  }
 
   const titleSpan = document.createElement('span');
   titleSpan.className = 'home-card-title';

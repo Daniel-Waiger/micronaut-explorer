@@ -20,6 +20,7 @@
 // step's own render() -- see that module's boot sequence.
 
 import { startWalkthrough } from '../walkthrough.js';
+import { createIcon } from '../icons.js';
 
 const WALKTHROUGH_SEEN_KEY = 'micronaut.walkthroughSeen';
 
@@ -42,10 +43,8 @@ export function saveWalkthroughSeen() {
 }
 
 // One big clickable tile: a title, a short line of what it does, and the
-// step it navigates to. "Thumbnail" here means a large, low-text target,
-// not a rendered image -- an emoji glyph (matching shell.js's NAV_STEP_ICONS
-// idiom) stands in for a picture without this zero-dependency app needing an
-// image asset pipeline.
+// step it navigates to. Its icon comes from the same thin-stroke SVG system
+// as the shell so the entry point describes the scientific workflow.
 function card(parent, { icon, title, body, onClick }) {
   const button = document.createElement('button');
   button.type = 'button';
@@ -55,7 +54,7 @@ function card(parent, { icon, title, body, onClick }) {
   const iconSpan = document.createElement('span');
   iconSpan.className = 'home-card-icon';
   iconSpan.setAttribute('aria-hidden', 'true');
-  iconSpan.textContent = icon;
+  iconSpan.appendChild(createIcon(icon, 'home-card-glyph'));
   button.appendChild(iconSpan);
 
   const titleSpan = document.createElement('span');
@@ -94,7 +93,7 @@ export const homeStep = {
     main.appendChild(grid);
 
     card(grid, {
-      icon: '🧭',
+      icon: 'walkthrough',
       title: 'Take the walkthrough',
       body: 'A guided tour of the app -- what each step is for and how they fit together.',
       onClick: () => {
@@ -104,7 +103,7 @@ export const homeStep = {
     });
 
     card(grid, {
-      icon: '📝',
+      icon: 'describe',
       title: 'Start from a description',
       body: 'Paste or type a paragraph about your experiment -- the app pulls out what it can and asks about the rest.',
       onClick: () => {
@@ -113,7 +112,7 @@ export const homeStep = {
     });
 
     card(grid, {
-      icon: '📋',
+      icon: 'template',
       title: 'Start from a template',
       body: 'This study already holds a fully worked example (an oregano wound-healing study) -- copy its pattern, or use "New study" in the header for a blank one.',
       onClick: () => {
