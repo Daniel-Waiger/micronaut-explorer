@@ -12,24 +12,47 @@ import { copyToClipboard } from './clipboard.js';
 const THEME_KEY = 'micronaut.theme';
 const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
 
-// One emoji per step -- real color glyphs (no custom SVG, no icon library:
-// web/ is deliberately zero-dependency), desaturated to black/white via the
-// CSS filter on .nav-step-icon in app.css rather than a monochrome Unicode
-// symbol set, since an emoji's own multicolor rendering can't be overridden
-// with `color`/currentColor the way a plain text glyph can. Purely
-// decorative: every nav button also carries an explicit aria-label (below),
-// so a screen reader never has to guess a name from the emoji.
+// Compact, Lucide-style paths kept inline so the planner remains a
+// dependency-free, single-file-capable app. They are decorative: every nav
+// control has its own explicit accessible label in renderNav().
 const NAV_STEP_ICONS = {
-  home: '🏠',
-  study: '📋',
-  describe: '📝',
-  design: '📐',
-  naming: '🏷️',
-  panel: '🎨',
-  overview: '📊',
-  guide: '📖',
+  home: [['path', 'M3 10.5 12 3l9 7.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z']],
+  study: [['rect', 'x=4,y=3,width=16,height=18,rx=2'], ['path', 'M8 8h8M8 12h8M8 16h5']],
+  describe: [['path', 'M5 4h10l4 4v12H5z'], ['path', 'M14 4v5h5M8 14h8M8 18h5']],
+  design: [['path', 'M4 20 20 4M6 6h5v5H6zM13 13h5v5h-5z'], ['path', 'M4 20h16']],
+  naming: [['path', 'M20 13 13 20 4 11V4h7z'], ['circle', 'cx=8.5,cy=8.5,r=1']],
+  panel: [['circle', 'cx=12,cy=12,r=8'], ['path', 'M12 4a8 8 0 0 0 0 16c1.2 0 2-.8 2-1.8 0-.6-.3-1.1-.7-1.5-.4-.4-.7-.9-.7-1.5 0-1.1.9-2 2-2h2.2A3.2 3.2 0 0 0 20 10a6 6 0 0 0-8-6z'], ['circle', 'cx=7.5,cy=11,r=.7'], ['circle', 'cx=10,cy=7.5,r=.7']],
+  overview: [['path', 'M4 20V10M10 20V4M16 20v-7M22 20H2'], ['path', 'M4 7h2M10 2h2M16 10h2']],
+  guide: [['path', 'M4 5.5A2.5 2.5 0 0 1 6.5 3H12v17H6.5A2.5 2.5 0 0 0 4 22z'], ['path', 'M20 5.5A2.5 2.5 0 0 0 17.5 3H12v17h5.5A2.5 2.5 0 0 1 20 22z']],
+  close: [['path', 'M6 6l12 12M18 6 6 18']],
 };
-const NAV_STEP_ICON_FALLBACK = '•';
+
+function parseIconAttributes(source) {
+  if (!source.includes('=')) return { d: source };
+  return Object.fromEntries(source.split(',').map((entry) => entry.split('=')));
+}
+
+function createIcon(name, className = 'nav-step-icon') {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.classList.add(className);
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const parts = NAV_STEP_ICONS[name] || [['circle', 'cx=12,cy=12,r=7']];
+  for (const [tag, source] of parts) {
+    const part = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [attribute, value] of Object.entries(parseIconAttributes(source))) {
+      part.setAttribute(attribute, value);
+    }
+    svg.appendChild(part);
+  }
+  return svg;
+}
 
 function loadNavCollapsed() {
   try {
@@ -95,10 +118,19 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
   const header = document.createElement('header');
   header.className = 'shell-header';
 
+  const brand = document.createElement('div');
+  brand.className = 'shell-brand';
+  brand.appendChild(createIcon('panel', 'brand-mark'));
+  const brandCopy = document.createElement('div');
   const title = document.createElement('div');
   title.className = 'shell-title';
   title.textContent = 'Micronaut Planner';
-  header.appendChild(title);
+  const subtitle = document.createElement('div');
+  subtitle.className = 'shell-subtitle';
+  subtitle.textContent = 'Experiment design workspace';
+  brandCopy.append(title, subtitle);
+  brand.appendChild(brandCopy);
+  header.appendChild(brand);
 
   const themeToggle = document.createElement('button');
   themeToggle.type = 'button';
@@ -137,7 +169,7 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
   if (onNewBlank) {
     const newBtn = document.createElement('button');
     newBtn.type = 'button';
-    newBtn.className = 'theme-toggle reset-button';
+    newBtn.className = 'theme-toggle reset-button primary-action';
     newBtn.textContent = 'New study';
     newBtn.title = 'Start a blank study of your own (clears the current one)';
     newBtn.addEventListener('click', () => {
@@ -259,8 +291,13 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
   switcherBar.setAttribute('role', 'tablist');
   switcherBar.setAttribute('aria-label', 'Assays');
 
+  const switcherLabel = document.createElement('span');
+  switcherLabel.className = 'assay-switcher-label';
+  switcherLabel.textContent = 'Active assay';
+  switcherBar.appendChild(switcherLabel);
+
   function renderSwitcher(experiment) {
-    switcherBar.textContent = '';
+    switcherBar.replaceChildren(switcherLabel);
     const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
 
     assays.forEach((assay, index) => {
@@ -291,8 +328,9 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'assay-pill-delete';
-        deleteBtn.textContent = '×';
+        deleteBtn.appendChild(createIcon('close', 'button-icon'));
         deleteBtn.title = `Delete ${assay.label || `Assay ${index + 1}`}`;
+        deleteBtn.setAttribute('aria-label', `Delete ${assay.label || `Assay ${index + 1}`}`);
         deleteBtn.addEventListener('click', (event) => {
           event.stopPropagation();
           const ok = window.confirm(
@@ -428,11 +466,7 @@ export function renderShell(root, store, router, { onReset, onNewBlank, kbIssueC
       // accessible name when collapsed hides the visible label text.
       btn.setAttribute('aria-label', label);
 
-      const icon = document.createElement('span');
-      icon.className = 'nav-step-icon';
-      icon.setAttribute('aria-hidden', 'true');
-      icon.textContent = NAV_STEP_ICONS[step.id] || NAV_STEP_ICON_FALLBACK;
-      btn.appendChild(icon);
+      btn.appendChild(createIcon(step.id));
 
       const labelSpan = document.createElement('span');
       labelSpan.className = 'nav-step-label';
