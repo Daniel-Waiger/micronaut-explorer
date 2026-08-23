@@ -22,6 +22,10 @@
 // same discipline as freetext.js's `index` parameter.
 
 const PROPOSAL_TAG = 'llm_freetext';
+// Must stay aligned with engine/llmschema.js's constrained-decoding cap.
+// This independent ingest check also protects the manual-paste path, which
+// does not receive the schema guarantee.
+const LLM_PROPOSAL_MAX_EVIDENCE_CHARS = 500;
 
 function proposalIssue(field, message) {
   return { field, message, severity: 'error' };
@@ -75,8 +79,13 @@ function coerceValue(question, value) {
  * Parse a model reply into { proposals, issues }.
  *
  * `reply` is the parsed JSON object a provider returned (llm/ollama.js's
- * `json`), expected to be `{ proposals: [{path, value, tag}, ...] }`.
+ * `json`), expected to be `{ proposals: [{path, value, evidence, tag}, ...] }`.
  * `questions` is engine/interview.js's loadQuestions(...).questions.
+ * `options.narrative`, when a string, is the exact Project narrative snapshot
+ * the model reviewed. In that mode every proposal must carry a non-empty,
+ * bounded evidence string that is a verbatim substring of that snapshot.
+ * Older callers that do not supply a snapshot retain their existing parsing
+ * behavior while they migrate to the Project review contract.
  *
  * TOTAL: never throws. A malformed reply, a descriptor addressing an unknown
  * path, or a value outside the question's vocabulary is DROPPED and reported
@@ -88,9 +97,10 @@ function coerceValue(question, value) {
  * model's, so the review list's ordering is a property of the app (stable,
  * reproducible) rather than of whatever order a model happened to emit.
  */
-export function parseLlmProposals(reply, questions) {
+export function parseLlmProposals(reply, questions, options = {}) {
   const issues = [];
   const questionByField = byField(questions);
+  const narrative = options && typeof options.narrative === 'string' ? options.narrative : null;
 
   const rawList = reply && typeof reply === 'object' && Array.isArray(reply.proposals) ? reply.proposals : null;
   if (!rawList) {
@@ -131,6 +141,25 @@ export function parseLlmProposals(reply, questions) {
       issues.push(proposalIssue(path, `'${String(entry.value)}' is not a number -- proposal dropped`));
       return;
     }
+    if (narrative !== null) {
+      if (typeof entry.evidence !== 'string' || entry.evidence.length === 0) {
+        issues.push(proposalIssue(path, 'proposal is missing a non-empty evidence quote -- proposal dropped'));
+        return;
+      }
+      if (entry.evidence.length > LLM_PROPOSAL_MAX_EVIDENCE_CHARS) {
+        issues.push(
+          proposalIssue(
+            path,
+            `proposal evidence exceeds ${LLM_PROPOSAL_MAX_EVIDENCE_CHARS} characters -- proposal dropped`
+          )
+        );
+        return;
+      }
+      if (!narrative.includes(entry.evidence)) {
+        issues.push(proposalIssue(path, 'proposal evidence is not a verbatim narrative quote -- proposal dropped'));
+        return;
+      }
+    }
     // A model that emits the same path twice is answering one question two
     // ways. Keeping the first and reporting the rest is the only choice that
     // does not silently pick a winner.
@@ -149,11 +178,10 @@ export function parseLlmProposals(reply, questions) {
       tag: PROPOSAL_TAG,
       questionId: question.id,
       prompt: question.prompt,
-      // Shaped like freetext.js's proposals so describe.js's row renderer
-      // needs no branch: `evidence` is what justified this value. The model
-      // reasoned over the user's own paragraph, so the honest evidence
-      // string is the question it answered, not a text span it never cited.
-      evidence: question.prompt,
+      // The caller-supplied, literal narrative quote is the sole evidence.
+      // Never manufacture a warrant from the question prompt: it was shown
+      // to the model, but says nothing about what the researcher wrote.
+      evidence: entry.evidence,
       confidence: 0.5,
     });
   });

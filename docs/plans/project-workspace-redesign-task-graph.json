@@ -1,0 +1,314 @@
+{
+  "run": "Project workspace redesign",
+  "objective": "Replace the fragmented Describe/Project journeys with one narrative, one Review description action, one session-persistent review area, and explicit user-approved structured writes.",
+  "orchestrator": "Opus or Fable planning and final adversarial verification",
+  "executor": "Warm-context direct execution or Sonnet per cma-run availability",
+  "protected_worktree_input": [
+    {
+      "file": "web/src/ui/steps/home.js",
+      "invariant": "Preserve the existing user-approved subheading copy byte-for-byte; this file is outside implementation scope."
+    },
+    {
+      "file": "web/src/ui/steps/describe.js",
+      "invariant": "Preserve the existing user-approved intro: Start with the experiment itself -- the question, the organism, why you’re running it -- before any microscope decision. Project design, then Microscopy."
+    }
+  ],
+  "global_invariants": [
+    "The full narrative is durable study-level user data; unaccepted exact/model/paste interpretations are session-only review data and never enter the experiment, autosave ring, or project export.",
+    "Review description is the only primary action. It never calls window.open and never creates or stashes another study.",
+    "Only explicit Accept suggestion, Replace current value, or field-grid Confirm/Update actions may write structured experiment fields.",
+    "Every model proposal is bound to an active assay id and narrative revision and carries a verbatim evidence span from that narrative.",
+    "Unsupported or rejected material remains narrative and is reported; it is never silently treated as structured or silently discarded.",
+    "All assay-scoped writes use scopeWrite and re-fetch current store state inside the handler; no handler trusts a render-time value or assay closure.",
+    "meta.origin draft remains accepted by schema migration for old saved projects even though the new-tab draft producer and handoff are removed.",
+    "No task stages, commits, pushes, opens a PR, or alters unrelated dirty files."
+  ],
+  "producer_consumer_traces": [
+    {
+      "producer": "web/src/engine/render/llmdraftprompt.js + web/src/engine/llmschema.js",
+      "consumer": "web/src/engine/llmproposals.js",
+      "proof": "Run a literal prompt/schema-shaped reply containing evidence, proposals, and asks through both parsers; falsify missing and non-occurring evidence."
+    },
+    {
+      "producer": "web/src/engine/freetext.js + web/src/engine/llmproposals.js",
+      "consumer": "web/src/engine/projectReview.js",
+      "proof": "Group agreeing candidates, preserve disagreeing candidates, retain source/evidence/issues/asks, and prove the pure model performs no store write."
+    },
+    {
+      "producer": "web/src/engine/projectReview.js",
+      "consumer": "web/src/ui/projectReview.js + web/src/ui/steps/describe.js",
+      "proof": "Render every state, then reject an Accept after the narrative revision or active assay changes."
+    },
+    {
+      "producer": "web/src/engine/interview.js phaseQuestions",
+      "consumer": "web/src/ui/fieldInterview.js via web/src/ui/steps/describe.js",
+      "proof": "Confirm two Project fields sequentially, unskip one, navigate away/back, and verify workflow progress sees the exact scoped provenance."
+    },
+    {
+      "producer": "web/src/ui/projectModelOptions.js",
+      "consumer": "web/src/ui/steps/describe.js local review branch",
+      "proof": "Change endpoint while detection is pending, prove the stale detection is ignored, and verify Review reads fresh enabled/endpoint/model/token state."
+    },
+    {
+      "producer": "web/src/core/persist.js draft handoff (removed)",
+      "consumer": "web/src/main.js draft boot branch (removed)",
+      "proof": "Build and grep the shipped source for stashDraft, takeStashedDraft, draftHandoff, and window.open in the Project flow; all are absent while schema still loads origin draft."
+    }
+  ],
+  "batch_labels": {
+    "1": "response producers",
+    "2": "ingest boundary",
+    "3": "review model",
+    "4": "UI components",
+    "5": "workspace wiring",
+    "6": "retired-path cleanup",
+    "7": "presentation and docs",
+    "8": "adversarial integration gate"
+  },
+  "batches": [
+    ["PWR-01", "PWR-02", "PWR-05"],
+    ["PWR-03"],
+    ["PWR-04"],
+    ["PWR-06", "PWR-07"],
+    ["PWR-08"],
+    ["PWR-09", "PWR-10", "PWR-11"],
+    ["PWR-12", "PWR-13"],
+    ["PWR-14"]
+  ],
+  "tasks": [
+    {
+      "id": "PWR-01",
+      "title": "Align the constrained response schema with evidence and asks",
+      "scope": "Change only the structured-decoding contract. Each proposal variant keeps its question-specific path/value/tag constraints and gains a bounded string evidence field required to quote the narrative. Add an optional bounded asks array whose items require topic and may include why; proposals remains the only decision-critical top-level required field, per CMA lesson 1. additionalProperties stays false at every object boundary. Producer→consumer contract: this schema must describe exactly the raw shape PWR-03 parses; do not add UI or store behavior here.",
+      "files": [
+        "web/src/engine/llmschema.js",
+        "web/tests/llmschema.test.js"
+      ],
+      "verification": "Run `node --test web/tests/llmschema.test.js`. Assert a choice enum is still byte-for-byte its question options, proposal required includes evidence, asks is present but not top-level-required, ask topic is required/why optional, item counts and text lengths are bounded, empty-question schemas forbid proposal items but still permit asks, and all existing path/tag/additionalProperties security assertions remain green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "batch": 1
+    },
+    {
+      "id": "PWR-02",
+      "title": "Make the review prompt narrative-grounded and symmetric",
+      "scope": "Rewrite the proposal prompt contract from 'filling in a plan' to proposing reviewable interpretations. Require an exact evidence quote copied from the supplied narrative for every proposal; prohibit a proposal without such a quote; state that omission is correct and unsupported content remains narrative. Keep paths/options generated from the real question producer and retain optional asks for genuine decisions or measurements. Update the worked response so it conforms literally to PWR-01. The local and copy/paste paths must consume this one prompt source; do not introduce a second prompt in UI code.",
+      "files": [
+        "web/src/engine/render/llmdraftprompt.js",
+        "web/tests/llmdraftprompt.test.js"
+      ],
+      "verification": "Run `node --test web/tests/llmdraftprompt.test.js`. Generate question fields/options from `realQuestions()` rather than hand-copying them. Prove the prompt requires verbatim evidence, permits asks, says unsupported prose remains narrative, never advertises Other, preserves the narrative byte-for-byte, is deterministic/total, and a literal worked reply round-trips through the current parser. The PWR-03 task will update the round-trip fixture if its new evidence guard has not landed yet; record that dependency rather than weakening the fixture.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "batch": 1
+    },
+    {
+      "id": "PWR-03",
+      "title": "Enforce narrative evidence at the model-ingest boundary",
+      "scope": "Extend parseLlmProposals with an options argument carrying the exact narrative snapshot. Preserve total parsing, question-order output, path/vocabulary checks, anti-provenance-laundering, duplicate handling, and partial-success behavior. For Project callers, reject and report proposals whose evidence is missing, over the cap, or not a verbatim substring of that snapshot; use the returned evidence as evidence instead of manufacturing the question prompt. Keep parseLlmAsks write-free and bounded. Producer→consumer: accept precisely PWR-01/PWR-02's shape and return the candidate/evidence/issues/asks shape PWR-04 consumes. Do not write to the store.",
+      "files": [
+        "web/src/engine/llmproposals.js",
+        "web/tests/llmproposals.test.js",
+        "web/tests/llmdraftprompt.test.js"
+      ],
+      "verification": "Run `node --test web/tests/llmproposals.test.js web/tests/llmdraftprompt.test.js`. Falsify the mechanism: the same plausible value must be rejected with non-occurring evidence and accepted with a literal narrative quote. Cover multiline/quotes, empty evidence, oversized evidence, unknown/prototype paths, wrong vocabulary, duplicate paths, malformed asks, caps, one-bad-entry/one-good-entry survival, and prove the parser returns no question-prompt-as-evidence fallback.",
+      "depends_on": [
+        "PWR-01",
+        "PWR-02"
+      ],
+      "parallel_safe": false,
+      "batch": 2
+    },
+    {
+      "id": "PWR-04",
+      "title": "Create the pure Project review state and conflict model",
+      "scope": "Add one pure, UI-neutral authority for Project review. It combines parseFreeText results, parsed model/paste proposals, asks, repairs, and issues; annotates each candidate with stable id, destination question/phase, source kind, evidence, narrative revision, and assay id; groups candidates by destination; coalesces identical values without losing warrants; preserves disagreeing values as an explicit conflict; compares against current values without deciding to write; and models idle/scanning/model-running/complete/fallback/stale/cancelled/error states. It must cap rendered-data inputs, keep exact results when model review fails, and make stale candidates non-actionable. No localStorage, DOM, provider, or experiment mutation. Producer→consumer: this is the sole merge/conflict authority consumed by PWR-07/PWR-08.",
+      "files": [
+        "web/src/engine/projectReview.js (new)",
+        "web/tests/projectReview.test.js (new)"
+      ],
+      "verification": "Run `node --test web/tests/projectReview.test.js`. Cover exact-only, local, pasted, agreeing sources, conflicting sources, same-as-confirmed, different-current-value, asks, repairs, rejected output, local failure retaining exact results, stale revision, wrong assay, cancellation, malformed/oversized inputs, deterministic output, and non-mutation of every input. Explicitly prove no candidate is actionable after either narrative revision or assay id changes.",
+      "depends_on": [
+        "PWR-03"
+      ],
+      "parallel_safe": false,
+      "batch": 3
+    },
+    {
+      "id": "PWR-05",
+      "title": "Extract environment availability from the retired guidance UI",
+      "scope": "Create a pure LLM availability leaf that reports local endpoint calls unavailable for file:// and offline contexts and available for an online HTTP(S) context. It must accept/infer runtime globals total-safely so Node tests do not need a DOM. Move the current guidance availability tests to this neutral module; do not retain a UI dependency merely to answer an environment question. Producer→consumer: PWR-06 and PWR-08 consume this boolean for settings visibility and fallback, never as proof an Ollama endpoint is reachable.",
+      "files": [
+        "web/src/llm/availability.js (new)",
+        "web/tests/availability.test.js (new)",
+        "web/tests/guidanceRemoteAvailability.test.js (delete)"
+      ],
+      "verification": "Run `node --test web/tests/availability.test.js`. Cover online https/http, file://, navigator offline, absent location/navigator, and restoration of Node globals after each case. Assert the function never probes the network and never throws.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "batch": 1
+    },
+    {
+      "id": "PWR-06",
+      "title": "Build progressively disclosed Project model options",
+      "scope": "Create a Project-specific native details component named Model options. It owns only the explicit Ollama opt-in plus endpoint, model picker/free-text fallback, token, cold-start text, rate-limit text, detection status, and a fresh config snapshot getter/change callback. It has no generic question input, Ask button, proposal action, chat link-out, or reply renderer. Detection starts only after the disclosure is opened or local review is enabled; tokenized detection drops a response from an earlier endpoint. On file:///offline, explain that local calls are unavailable while leaving copy/paste to the Review component. Producer→consumer: describe.js reads a fresh returned config at Review time; the component never sees or writes experiment data.",
+      "files": [
+        "web/src/ui/projectModelOptions.js (new)"
+      ],
+      "verification": "Build the app and exercise the component in the served artifact. With fetch spied, prove closed/off options do not probe; opening/enabling probes `/api/tags` without study data; detected models populate the select; no models/failure keeps free text usable; changing endpoint twice and resolving responses out of order leaves only the newest result; file:///offline hides unusable endpoint controls; every input is labelled and keyboard reachable. `rg` the new file to prove it imports no store/studydoc module.",
+      "depends_on": [
+        "PWR-05"
+      ],
+      "parallel_safe": true,
+      "batch": 4
+    },
+    {
+      "id": "PWR-07",
+      "title": "Build the always-present Review renderer",
+      "scope": "Create a DOM-only Review component that renders PWR-04's state verbatim: persistent live status, grouped Suggested fields, evidence/source/destination/current-value/conflict presentation, Needs your decision, Not converted, bounded repairs/issues, and a Planning notes mount. Include native Use copy and paste instead disclosure with labelled prompt/reply boxes and callbacks supplied by the caller. It returns callbacks/hosts but knows nothing about the store, scopeWrite, question parsing, providers, or acceptance policy. All dynamic text uses textContent. Candidate buttons have unique accessible names; stale/non-actionable state disables them. Partial updates preserve manual-paste input and focus.",
+      "files": [
+        "web/src/ui/projectReview.js (new)"
+      ],
+      "verification": "Serve a harness or the integrated built artifact and render every PWR-04 state, including long model/evidence/error strings. Verify exact contractual headings/status text, source labels are textual, conflict renders both candidates, stale disables all writes, issues are capped, prompt is selectable if clipboard fails, paste text survives unrelated status updates, focus order is logical, and no dynamic innerHTML/store import exists. At 320px the component has no horizontal overflow.",
+      "depends_on": [
+        "PWR-04"
+      ],
+      "parallel_safe": true,
+      "batch": 4
+    },
+    {
+      "id": "PWR-08",
+      "title": "Replace Describe with the unified Project workspace",
+      "scope": "Rewrite the Project step composition around three surfaces only: Project description, Review, and Project details for the active assay. Preserve the approved intro byte-for-byte. Keep narrative autosave explicit and caret-safe. Review description runs parseFreeText immediately, then optionally Ollama using all questions open at request time; disabled/unavailable/rate-limited/failed local review exposes PWR-07's in-place copy/paste continuation. Parse Ollama and pasted replies with the exact narrative snapshot, merge through PWR-04, and keep session results across route re-render while text/assay bindings remain valid. Use AbortController plus request/generation tokens for cancel, narrative edits, re-review, and assay switches. Reuse phaseQuestions + renderFieldInterview for the one Project details grid. Accept/Replace is the only proposal write: re-fetch current store/active assay, verify session binding, scopeWrite, apply user endorsement provenance, unskip the question, and preserve the readout canonical companion write. A refused write leaves the row and shows persistent error. Mount advisor output as Planning notes based only on accepted state. Remove all old Read/Draft/Suggest/Ask/chat/link-out DOM and imports. Preserve the home.js dirty edit by not touching that file.",
+      "files": [
+        "web/src/ui/steps/describe.js"
+      ],
+      "verification": "Run focused parser/review tests, the full JS suite, and a single-file build. In the HTTP-served artifact run adversarial traces 1–12 from the prose plan: whitespace focus, exact scan before model, byte-identical store before Accept, unsupported narrative, local success/asks/issues, missing evidence, conflict/current value, every fallback, malformed paste, edit/request race, assay/request race, sequential Project field commits, readout canonical/unskip, and absence of every retired UI string. Spy on window.open and store methods. Verify an old request cannot relabel/re-enable a newer run and the exact approved intro remains in `git diff`.",
+      "depends_on": [
+        "PWR-04",
+        "PWR-06",
+        "PWR-07"
+      ],
+      "parallel_safe": false,
+      "batch": 5
+    },
+    {
+      "id": "PWR-09",
+      "title": "Remove the new-tab draft handoff chain",
+      "scope": "After PWR-08 removes the last UI consumer, delete the separate-study draft builder/test, remove stashDraft/takeStashedDraft/draftHandoff from persistence, and remove main.js's draft-precedence boot branch, draft-only toast, and isDraft onboarding exception. Preserve normal autosave recovery, import/restore, example onboarding, and every supported schema origin including draft. Bundle this producer→consumer chain atomically because deleting only one end breaks boot/build. Do not clear users' storage or rewrite saved projects.",
+      "files": [
+        "web/src/core/draft.js (delete)",
+        "web/tests/draft.test.js (delete)",
+        "web/src/core/persist.js",
+        "web/src/main.js"
+      ],
+      "verification": "Run `node --test web/tests/persist.test.js web/tests/schema.test.js web/tests/onboarding.test.js` and the single-file build. `rg -n 'buildDraftExperiment|stashDraft|takeStashedDraft|draftHandoff|isDraft' web/src web/tests` returns no live code, while the schema test still accepts `meta.origin = 'draft'`. Reload autosaved, imported, restored, example, blank, and legacy-origin-draft studies to prove boot precedence outside the removed handoff is unchanged.",
+      "depends_on": [
+        "PWR-08"
+      ],
+      "parallel_safe": true,
+      "batch": 6
+    },
+    {
+      "id": "PWR-10",
+      "title": "Remove the retired generic guidance surface",
+      "scope": "Delete the old aiAssist shell and guidance DOM after Describe no longer imports them. Remove only buildGuidanceMessages and its guidance-specific prompt/tests from llmprompt.js; preserve Overview's renderLlmPrompt behavior byte-for-byte. Update comments in shared local-model status/rate-limit helpers only as needed so they name Project review rather than removed Ask/Draft/Suggest call sites. Replace the Guide's retired Ask explanation with the shipped evidence-backed Review description workflow. This removes the source of empty-question prose repetition without changing Overview's read-only final-plan export.",
+      "files": [
+        "web/src/ui/aiAssist.js (delete)",
+        "web/src/ui/guidance.js (delete)",
+        "web/src/engine/render/llmprompt.js",
+        "web/tests/llmprompt.test.js",
+        "web/src/ui/llmStatus.js",
+        "web/src/ui/rateLimitLabel.js",
+        "web/src/ui/steps/guide.js"
+      ],
+      "verification": "Run `node --test web/tests/llmprompt.test.js web/tests/rateLimit.test.js web/tests/rateLimitLabel.test.js`. Before editing, execute HEAD and working-tree `renderLlmPrompt(buildStudyDocument(createDefaultStudy(), ...))` against the same generated fixture and assert byte-identical output. `rg -n 'createGuidancePanel|createAiAssistPanel|buildGuidanceMessages|Ask about this step' web/src web/tests` returns no live code. Build and verify Overview's Copy for my LLM action still produces the existing final-plan prompt.",
+      "depends_on": [
+        "PWR-08"
+      ],
+      "parallel_safe": true,
+      "batch": 6
+    },
+    {
+      "id": "PWR-11",
+      "title": "Remove hosted-chat link-outs and their persisted option",
+      "scope": "Delete the Project-only ChatGPT/Claude target module and tests, and remove the unused linkOuts configuration key/property/write branch. Keep enabled/endpoint/model/token defaults and failure-total localStorage behavior unchanged. Do not delete a legacy localStorage key from user browsers; simply stop reading or writing it. Copy/paste remains implemented in the unified Review component, so no third-party URL or window.open is needed.",
+      "files": [
+        "web/src/llm/chatTargets.js (delete)",
+        "web/tests/chatTargets.test.js (delete)",
+        "web/src/llm/config.js",
+        "web/tests/llmconfig.test.js (new)"
+      ],
+      "verification": "Run `node --test web/tests/llmconfig.test.js`. With an injected/swapped fake localStorage, prove enabled/endpoint/model/token defaults and round-trip writes are unchanged, unavailable storage is total, and a pre-existing `micronaut.llm.linkouts` value is ignored but not removed. `rg -n 'CHAT_TARGETS|buildChatUrl|linkOuts|Open in ChatGPT|Open in Claude' web/src web/tests` returns no live code. Spy on window.open in the integrated Project trace and observe zero calls.",
+      "depends_on": [
+        "PWR-08"
+      ],
+      "parallel_safe": true,
+      "batch": 6
+    },
+    {
+      "id": "PWR-12",
+      "title": "Style the Project workspace across responsive and accessible states",
+      "scope": "As the sole CSS owner, add scoped Project workspace layout and state styles for the description card, Review, source/evidence/conflict/current-value rows, live/error/stale/cancelled states, Model options, manual fallback, Planning notes, and the Project field grid. Use two columns only where content remains usable, then collapse to narrative→Review→details. Preserve current tokens/themes/focus conventions; make source/status legible without colour; keep touch targets at least 44px; wrap long evidence/model/path/error text; retain visible focus and reduced-motion behavior. Remove obsolete Describe-only guidance/chat/draft selectors after confirming no remaining markup consumes them. Do not restyle unrelated steps.",
+      "files": [
+        "web/styles/app.css"
+      ],
+      "verification": "Build and serve the single-file artifact, confirm a new `.project-workspace` selector is present in shipped CSS, and inspect at 1200px, 900px, 760px, 430px, 375px, and 320px in light/dark plus 200% zoom. Exercise idle/loading/complete/conflict/fallback/stale/error states with long content; verify no horizontal overflow, clipped controls, colour-only state, hidden focus, or sticky-panel trapping. Run keyboard and touch-target checks and confirm obsolete guidance/chat/draft selectors have no live markup consumer.",
+      "depends_on": [
+        "PWR-08",
+        "PWR-10",
+        "PWR-11"
+      ],
+      "parallel_safe": false,
+      "batch": 7
+    },
+    {
+      "id": "PWR-13",
+      "title": "Document the single Project review contract",
+      "scope": "Update README's current-workflow and optional-LLM description so it names Project, Review description, exact-text parsing limits, optional local interpretation, in-place copy/paste fallback, evidence-backed proposals, explicit acceptance, and no new-tab draft/link-outs/generic Project Ask. Keep Overview's separate final-plan copy prompt accurately documented. Do not claim the LLM never writes at all; say it never applies a field without explicit review and acceptance. Preserve the user's approved Home copy by not editing home.js.",
+      "files": [
+        "README.md"
+      ],
+      "verification": "Read the rendered README against the built UI. `rg -n 'Draft a study|Suggest answers|Ask about this step|Open in ChatGPT|Open in Claude|proposal/write path.*not yet wired' README.md` returns no stale claims. Confirm deterministic limitations, local privacy/fallback, and explicit-accept trust boundary are stated without promising universal parsing.",
+      "depends_on": [
+        "PWR-09",
+        "PWR-10",
+        "PWR-11"
+      ],
+      "parallel_safe": true,
+      "batch": 7
+    },
+    {
+      "id": "PWR-14",
+      "title": "Adversarially verify the shipped Project workspace",
+      "scope": "Make no feature changes unless a concrete defect is found. Re-read this task graph, the prose plan, docs/cma-lessons.md, every prior diff, and every verifier problems entry. Run the complete test/build gate and all fourteen adversarial browser traces from the prose plan against the actual HTTP-served built artifact, plus the explicit real-browser file:// fallback smoke. Falsify evidence enforcement, no-silent-write, stale-request, assay-binding, refused-write, and removed-popup mechanisms rather than checking only labels. Confirm the shipped artifact is fresh and the protected worktree copy remains byte-for-byte present.",
+      "files": [
+        "web/src/engine/llmschema.js",
+        "web/src/engine/render/llmdraftprompt.js",
+        "web/src/engine/llmproposals.js",
+        "web/src/engine/projectReview.js",
+        "web/src/llm/availability.js",
+        "web/src/llm/config.js",
+        "web/src/ui/projectModelOptions.js",
+        "web/src/ui/projectReview.js",
+        "web/src/ui/steps/describe.js",
+        "web/src/core/persist.js",
+        "web/src/main.js",
+        "web/src/engine/render/llmprompt.js",
+        "web/styles/app.css",
+        "README.md",
+        "all focused tests created or updated by PWR-01 through PWR-13"
+      ],
+      "verification": "Run `node --test web/tests/*.test.js`; require a pass count at least the 777-test pre-change baseline plus all new tests. Run `python -m pytest -q tests/test_single_file_build.py tests/test_kb_json_valid.py tests/test_regex_conformance.py`, `python tools/build_single_file.py --web-dir web --out dist`, and serve with `python tools/serve_dir.py --dir dist --port 8124`. Record concrete results for traces 1–14, no console errors, no static imports in the artifact, and a freshness check for `.project-workspace`. Snapshot/diff store state for Review vs Accept, delay/resolve requests adversarially, switch assays, test every fallback and accessibility width/theme. Finally run `git status --short` and `git diff --check`; only planned implementation files plus the two pre-existing approved copy edits may be dirty, and the exact home.js/describe.js approved strings must remain. Do not stage, commit, or push.",
+      "depends_on": [
+        "PWR-09",
+        "PWR-10",
+        "PWR-11",
+        "PWR-12",
+        "PWR-13"
+      ],
+      "parallel_safe": false,
+      "batch": 8
+    }
+  ]
+}

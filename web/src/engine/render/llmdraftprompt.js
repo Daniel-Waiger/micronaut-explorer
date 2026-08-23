@@ -1,10 +1,7 @@
-// The copy-out prompt for the chat-LLM round trip (Phase 1): a user with no
-// local model copies this into ChatGPT/Claude/whatever, pastes the reply
-// back, and engine/llmproposals.js validates it exactly as it validates a
-// real Ollama reply. That symmetry is the entire point -- see
-// engine/llmreply.js's header for why a chat reply needs tolerant parsing on
-// the way in, and llmproposals.js:14 for why the vocabulary re-check exists
-// regardless of source.
+// The review prompt used for both local-model and copy/paste round trips.
+// Each proposed interpretation carries a literal quote from the supplied
+// narrative, so its warrant is visible for review instead of being presented
+// as an inferred fact. PWR-03 validates that evidence at the ingest boundary.
 //
 // Ollama's path gets its output structure enforced by the JSON Schema
 // engine/llmschema.js builds (constrained decoding: an out-of-vocabulary
@@ -25,19 +22,22 @@
 // Leaf module: imports nothing. `questions` is engine/interview.js's
 // loadQuestions(...).questions (or any array shaped the same way).
 
-// Moved out of ui/steps/describe.js (was DRAFT_SYSTEM_PROMPT) so the local
-// (Ollama) and chat-LLM paths state the SAME never-invent rules from one
-// place rather than two copies that can drift. The chat path appends its own
-// answer-format block (below) instead of DRAFT_SYSTEM_PROMPT's original
-// last line ("Return JSON matching the supplied schema") -- there is no
-// schema on this path, only this prompt.
+// Moved out of ui/steps/describe.js so the local-model and copy/paste paths
+// state one contract rather than two copies that can drift.
 export const PROPOSAL_SYSTEM_PROMPT = [
-  'You are filling in a microscopy experiment plan from the researcher’s own description.',
+  'You are proposing reviewable interpretations of a microscopy researcher’s supplied narrative.',
+  'A proposal is not a fact and does not fill in the experiment plan by itself.',
   '',
   'Rules:',
   '- Answer ONLY the questions supplied, using ONLY the options offered for each.',
-  '- Omit any question the description does not actually answer. An omission is',
-  '  correct and expected; a guess is not. Do not infer a value to be helpful.',
+  '- Every proposal MUST include a non-empty "evidence" quote copied verbatim',
+  '  from the supplied DESCRIPTION. Copy its characters exactly, including',
+  '  capitalization, whitespace, and punctuation. Do not summarize or paraphrase it.',
+  '- Never make a proposal without that exact narrative quote. The question text is',
+  '  not evidence, and neither is your explanation or outside knowledge.',
+  '- Omit any question the narrative does not actually answer. An omission is',
+  '  correct and expected; guessing is not. Unsupported prose remains saved narrative,',
+  '  not structured data.',
   '- Never invent a marker, filter, control, instrument setting, or option that is',
   '  not in the list you were given.',
   '- Separately from the questions: name anything a careful researcher would still',
@@ -94,6 +94,7 @@ const ANSWER_FORMAT_BLOCK = [
   '  "proposals": [',
   '    { "path": "<a path copied from the QUESTIONS list below>",',
   '      "value": "<your answer>",',
+  '      "evidence": "<a non-empty exact quote copied from DESCRIPTION>",',
   '      "tag": "llm_freetext" }',
   '  ],',
   '  "asks": [',
@@ -106,21 +107,26 @@ const ANSWER_FORMAT_BLOCK = [
   '  Any other path is discarded without being read.',
   '- "value" is a plain string -- or a plain number for a question marked (number).',
   '  Never an object, never an array, never null.',
+  '- "evidence" MUST be a non-empty, character-for-character substring of DESCRIPTION.',
+  '  It is the quote that supports this one proposed value; never use question text,',
+  '  a paraphrase, or a quote not found in DESCRIPTION.',
   '- "tag" is always the literal string "llm_freetext".',
   '- For a question with a CHOICES list, "value" MUST be one of those strings copied',
   '  character-for-character, including capitalisation, spaces and punctuation.',
   '  Anything else is discarded without being read.',
   '- One "proposals" entry per question you can actually answer from the description.',
   '  Omit every other question. "proposals": [] is a valid and correct reply.',
-  '- "asks" is for the things named in the rules above (research question, smallest',
+  '- "asks" is optional. When present, it is for the things named in the rules above (research question, smallest',
   '  feature, controls, spectral overlap) plus anything else you genuinely cannot',
   '  answer from the description. It never writes an answer -- it only tells the',
-  '  researcher what to go decide. "asks": [] is valid if nothing applies.',
+  '  researcher what to go decide. Omit it or use "asks": [] if nothing applies.',
   '- Add no other keys anywhere.',
   '',
-  'EXAMPLE OF A WELL-FORMED REPLY (the values are illustrative -- do not copy them):',
-  '{"proposals":[{"path":"acquisition.modality","value":"confocal","tag":"llm_freetext"},',
-  '{"path":"naming.fields.markers","value":"DAPI, Alexa 488","tag":"llm_freetext"}],',
+  'EXAMPLE ONLY: if a hypothetical DESCRIPTION said',
+  '"Confocal imaging will track scratch closure with DAPI and Alexa 488.",',
+  'then a well-formed reply would be (do not copy these illustrative values or quotes):',
+  '{"proposals":[{"path":"acquisition.modality","value":"confocal","evidence":"Confocal imaging","tag":"llm_freetext"},',
+  '{"path":"naming.fields.markers","value":"DAPI, Alexa 488","evidence":"DAPI and Alexa 488","tag":"llm_freetext"}],',
   '"asks":[{"topic":"smallest feature that must be resolved","why":"sets the pixel size',
   'needed -- not stated in the description"}]}',
 ].join('\n');
@@ -136,7 +142,9 @@ const ANSWER_FORMAT_BLOCK = [
  */
 export function renderProposalRequestPrompt(questions, narrative) {
   const questionLines = renderQuestionLines(questions);
-  const description = typeof narrative === 'string' && narrative.trim() ? narrative : '';
+  // Do not trim or otherwise normalize the supplied narrative: evidence is
+  // character-for-character, and reviewers must see the exact source text.
+  const description = typeof narrative === 'string' ? narrative : '';
 
   return [
     PROPOSAL_SYSTEM_PROMPT,

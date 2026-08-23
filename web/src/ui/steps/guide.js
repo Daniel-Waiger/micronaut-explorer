@@ -258,12 +258,10 @@ export const guideStep = {
             'Google Calendar, Outlook, or Apple Calendar with no login.',
           'A copy-paste prompt for your own LLM (Overview) — the study as JSON plus ground rules ' +
             'that keep the model from inventing a domain fact.',
-          'An optional "Ask about this step" panel (Project) — off by default. Left off, or if ' +
-            'no local model is configured, it works exactly like the copy-paste prompt above: you ' +
-            'get text to paste into whatever LLM you already use. If you opt in and point it at a ' +
-            'local Ollama server, the app calls that server directly over your own network — no ' +
-            'API key, nothing sent anywhere else. Either way it can only explain the current step; ' +
-            'it never writes an answer into your study for you.',
+          'Project review first finds exact supported text in your description. You can optionally ' +
+            'use a local Ollama model or copy and paste a model reply in place; every interpretation ' +
+            'shows quoted evidence from your description, and nothing becomes a structured field until ' +
+            'you explicitly accept it.',
         ]);
       })
     );

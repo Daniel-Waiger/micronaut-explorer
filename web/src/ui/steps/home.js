@@ -63,7 +63,7 @@ export const homeStep = {
     const subheading = document.createElement('p');
     subheading.className = 'proposals-empty';
     subheading.textContent =
-      'Start with the experiment, not the file name. Micronaut walks you from the research question through the study design and the microscopy details -- the naming convention falls out at the end, as one finished artifact.';
+      'Plan your microscopy study step by step. Describe the research question, groups, samples, imaging setup, and naming rules; Micronaut turns those choices into a checked study plan and ready-to-use file names.';
     main.appendChild(subheading);
 
     // This check deliberately reads the explicit origin marker rather than

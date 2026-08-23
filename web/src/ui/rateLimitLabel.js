@@ -1,6 +1,5 @@
-// Shared soft-rate-limit label text for every remote-model call site
-// (guidance.js's Ask, describe.js's Draft and Suggest) -- one copy of the
-// wording, matching llmStatus.js's COLD_START_HINT idiom.
+// Shared soft-rate-limit label text for Project review's optional local-model
+// calls -- one copy of the wording, matching llmStatus.js's COLD_START_HINT.
 
 import { DEFAULT_LIMIT, ollamaCooldownSeconds, ollamaRequestsRemaining } from '../llm/rateLimit.js';
 

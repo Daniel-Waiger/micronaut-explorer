@@ -13,7 +13,6 @@ import {
   markChanged,
   markExported,
   saveExperiment,
-  takeStashedDraft,
 } from './core/persist.js';
 import { shapeAppKb } from './engine/kbpack.js';
 import { checkConformance } from './engine/conformance.js';
@@ -67,21 +66,6 @@ function loadAppKb() {
  * corrupted) -- an existing in-progress study is never touched.
  */
 function loadInitialExperiment() {
-  // A model-drafted study opened in a new tab (core/draft.js) wins over the
-  // autosave, and is consumed one-shot so a later reload of THIS tab falls
-  // back to the normal autosave path rather than re-opening the draft
-  // forever. Deliberately ahead of loadMostRecentRecoverable: the draft was
-  // stashed by the other tab moments ago and is the reason this tab exists.
-  const draft = takeStashedDraft();
-  if (draft) {
-    return {
-      experiment: withOrigin(draft, 'draft'),
-      skippedCount: 0,
-      totalSaved: 0,
-      isDraft: true,
-      isPersisted: false,
-    };
-  }
   const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
     onUnreadable: (id, err) =>
       console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
@@ -90,7 +74,6 @@ function loadInitialExperiment() {
     experiment: experiment || createDefaultStudy(),
     skippedCount,
     totalSaved,
-    isDraft: false,
     // `totalSaved` can be non-zero when every slot was unreadable. Only an
     // experiment actually recovered from the ring justifies a saved claim.
     isPersisted: Boolean(experiment),
@@ -129,7 +112,7 @@ function recoveryEntries() {
 // top-level await since the released artifact is one classic (non-module,
 // non-async) IIFE.
 function init() {
-  const { experiment: initialExperiment, skippedCount, totalSaved, isDraft, isPersisted } = loadInitialExperiment();
+  const { experiment: initialExperiment, skippedCount, totalSaved, isPersisted } = loadInitialExperiment();
   const store = createStore(initialExperiment);
 
   const kb = loadAppKb();
@@ -281,7 +264,7 @@ function init() {
     if (exampleChooser || loadOnboarding().completed || store.get().meta?.origin !== 'example') return false;
     // A recovered autosave is returning work even if it began from the seed.
     // Only an explicit utility request may reopen the chooser in that case.
-    if (!explicit && (isDraft || isPersisted)) return false;
+    if (!explicit && isPersisted) return false;
     exampleChooser = showOnboardingGate({
       onWalkThrough: () => guidedController.start(),
       onExplore: () => {},
@@ -370,12 +353,6 @@ function init() {
         ? `Recovered your work -- skipped ${skippedCount} unreadable autosave(s) and used an older one instead.`
         : `Couldn't read any of your ${totalSaved} saved experiment(s) -- starting fresh. Nothing was deleted.`
     );
-  }
-
-  // Last, so it wins the single visible toast slot: a user who just landed
-  // in a drafted study most needs to know that nothing here is confirmed.
-  if (isDraft) {
-    showToast('This is a model-drafted study -- every value is a suggestion awaiting your review.');
   }
 
   function renderActiveStep(id) {

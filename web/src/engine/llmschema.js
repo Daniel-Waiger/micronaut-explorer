@@ -50,18 +50,24 @@ function descriptorSchemaFor(question) {
       path: { const: question.field },
       value: valueSchemaFor(question),
       tag: { const: 'llm_freetext' },
+      // The model must cite a literal, bounded span of the narrative for
+      // every proposal. PWR-03 verifies that the returned text is actually
+      // present in the exact narrative snapshot before it becomes a review
+      // candidate.
+      evidence: { type: 'string', minLength: 1, maxLength: 500 },
     },
-    required: ['path', 'value', 'tag'],
+    required: ['path', 'value', 'tag', 'evidence'],
     additionalProperties: false,
   };
 }
 
 /**
  * `questions` is loadQuestions(...).questions (or any array shaped the same
- * way). Returns a JSON Schema for `{ proposals: [descriptor, ...] }`, one
- * descriptor variant per question via `anyOf` -- so a proposal that claims
- * to answer question A can only carry question A's own options, never
- * question B's.
+ * way). Returns a JSON Schema for `{ proposals: [descriptor, ...], asks? }`,
+ * one descriptor variant per question via `anyOf` -- so a proposal that
+ * claims to answer question A can only carry question A's own options, never
+ * question B's. Proposals are the only decision-critical required top-level
+ * key: asks are advisory and never write a field.
  *
  * An empty `questions` array yields a schema whose `proposals` can only be
  * an empty array (`items: false`, meaning "no item shape is valid") --
@@ -77,6 +83,20 @@ export function buildProposalSchema(questions) {
       proposals: {
         type: 'array',
         items: variants.length > 0 ? { anyOf: variants } : false,
+        maxItems: variants.length,
+      },
+      asks: {
+        type: 'array',
+        maxItems: 12,
+        items: {
+          type: 'object',
+          properties: {
+            topic: { type: 'string', minLength: 1, maxLength: 300 },
+            why: { type: 'string', minLength: 1, maxLength: 300 },
+          },
+          required: ['topic'],
+          additionalProperties: false,
+        },
       },
     },
     required: ['proposals'],

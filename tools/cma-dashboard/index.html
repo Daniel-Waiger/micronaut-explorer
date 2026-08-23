@@ -144,91 +144,148 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "Sync all UX work",
-  "orchestrator": "Codex (warm context)",
-  "active_model": "Idle",
-  "active_status": "complete",
-  "phase": "Verified; syncing",
-  "state_note": "Final adversarial review passed. All verifier-found defects are resolved; Git sync is authorized and underway.",
+  "run": "Project workspace redesign verification and GitHub handoff",
+  "orchestrator": "Codex GPT-5",
+  "active_model": "Codex GPT-5",
+  "active_status": "verifying",
+  "phase": "",
+  "state_note": "",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "Target",
-      "v": "main + feature branch"
-    },
-    {
-      "k": "JS tests",
-      "v": "777 passed",
+      "k": "JavaScript tests",
+      "v": "786 passed",
       "tone": "ok"
     },
     {
-      "k": "Python tests",
+      "k": "Python checks",
       "v": "34 passed",
       "tone": "ok"
     },
     {
       "k": "Artifact",
-      "v": "867782 bytes",
+      "v": "Fresh HTTP smoke",
       "tone": "ok"
     },
     {
-      "k": "Verifier",
-      "v": "PASS",
-      "tone": "ok"
+      "k": "File fallback",
+      "v": "Blocked by browser URL policy",
+      "tone": "warn"
     }
   ],
-  "defects": [
+  "defects": [],
+  "tasks": [
     {
-      "id": "SYNC-D1",
-      "location": "web/src/engine/conformance.js",
-      "title": "Default date/sample placeholder filenames are not reported",
-      "body": "",
-      "repro": ""
+      "id": "PWR-01",
+      "phase": "Batch 1",
+      "title": "Align the constrained response schema with evidence and asks",
+      "status": "done",
+      "by": "Existing implementation verified"
     },
     {
-      "id": "SYNC-D2",
-      "location": "web/src/ui/steps/overview.js",
-      "title": "Print and Save as PDF bypasses final readiness gate",
-      "body": "",
-      "repro": ""
+      "id": "PWR-02",
+      "phase": "Batch 1",
+      "title": "Make the review prompt narrative-grounded and symmetric",
+      "status": "done",
+      "by": "Existing implementation verified"
     },
     {
-      "id": "SYNC-D3",
-      "location": "web/src/engine/workflowProgress.js",
-      "title": "Blank study incorrectly renders Study as Complete",
-      "body": "",
-      "repro": ""
+      "id": "PWR-03",
+      "phase": "Batch 2",
+      "title": "Enforce narrative evidence at the model-ingest boundary",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-04",
+      "phase": "Batch 3",
+      "title": "Create the pure Project review state and conflict model",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-05",
+      "phase": "Batch 1",
+      "title": "Extract environment availability from the retired guidance UI",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-06",
+      "phase": "Batch 4",
+      "title": "Build progressively disclosed Project model options",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-07",
+      "phase": "Batch 4",
+      "title": "Build the always-present Review renderer",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-08",
+      "phase": "Batch 5",
+      "title": "Replace Describe with the unified Project workspace",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-09",
+      "phase": "Batch 6",
+      "title": "Remove the new-tab draft handoff chain",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-10",
+      "phase": "Batch 6",
+      "title": "Remove the retired generic guidance surface",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-11",
+      "phase": "Batch 6",
+      "title": "Remove hosted-chat link-outs and their persisted option",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-12",
+      "phase": "Batch 7",
+      "title": "Style the Project workspace across responsive and accessible states",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-13",
+      "phase": "Batch 7",
+      "title": "Document the single Project review contract",
+      "status": "done",
+      "by": "Existing implementation verified"
+    },
+    {
+      "id": "PWR-14",
+      "phase": "Batch 8",
+      "title": "Adversarially verify the shipped Project workspace",
+      "status": "resolved",
+      "by": "Defect fixed and release gates verified"
     }
   ],
-  "tasks": [],
   "log": [
     {
-      "time": "09:54:05",
-      "msg": "User authorized syncing all accumulated work."
+      "time": "20:52:34",
+      "msg": "Release verification started against the existing working tree."
     },
     {
-      "time": "09:55:05",
-      "msg": "Dispatched final verifier and read-only Git sync preflight."
-    },
-    {
-      "time": "10:05:53",
-      "msg": "Final verifier failed the release gate on two user-reachable readiness defects; sync paused before staging."
-    },
-    {
-      "time": "10:10:12",
-      "msg": "Verifier falsified Study status on a brand-new blank study; sync remains paused."
-    },
-    {
-      "time": "10:13:28",
-      "msg": "Verifier found approved persistent-error UX missing for import and restore failures."
-    },
-    {
-      "time": "10:24:51",
-      "msg": "Final verifier PASS: 777 JS, 34 Python, deterministic 867782-byte artifact, live desktop/mobile/guided/persistence checks green."
+      "time": "20:56:53",
+      "msg": "Adversarial paste trace found rejected-output visibility gap; repaired, rebuilt, and verified. file:// trace could not run because Browser policy blocks local-file navigation."
     }
   ],
-  "snapshot_at": "2026-08-23 10:24"
+  "snapshot_at": "2026-08-23 20:56"
 };
 /* CMA:EMBEDDED:END */
 

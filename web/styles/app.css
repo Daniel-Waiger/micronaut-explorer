@@ -602,252 +602,6 @@ button:focus-visible {
   opacity: 0.7;
 }
 
-/* Guidance panel (local-llm-guidance): opt-in "ask about this step".
-   Deliberately its own visual vocabulary, one notch quieter than
-   .advice-section -- this is a tool the user reaches for, not something
-   that pushes itself in front of them the way advisor notes do. */
-.guidance-section {
-  margin-bottom: 20px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-2);
-}
-
-.guidance-heading {
-  font-size: 12.5px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 0 0 6px;
-}
-
-.guidance-hint {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin: 0 0 10px;
-  line-height: 1.4;
-}
-
-.guidance-settings {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.guidance-endpoint,
-.guidance-model,
-.guidance-token,
-.guidance-question {
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 10px;
-}
-
-.guidance-question {
-  width: 100%;
-  margin-bottom: 8px;
-}
-
-.guidance-ask,
-.guidance-copy {
-  font: inherit;
-  font-size: 13px;
-  color: var(--accent-ink);
-  background: var(--accent);
-  border: none;
-  border-radius: 6px;
-  padding: 6px 14px;
-  cursor: pointer;
-}
-
-.guidance-ask:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.guidance-reply {
-  margin-top: 10px;
-  font-size: 13.5px;
-  color: var(--ink);
-  line-height: 1.45;
-  white-space: pre-wrap;
-}
-
-.guidance-paste-label {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.guidance-paste-box {
-  width: 100%;
-  min-height: 140px;
-  margin-top: 4px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px;
-}
-
-.draft-button {
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 7px 14px;
-  margin-left: 8px;
-  cursor: pointer;
-}
-
-.draft-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-/* Phase 1 (chat-LLM round trip): same card idiom as .guidance-section, kept
-   as its own block rather than merged with it -- this is always visible
-   (unlike guidance-section's Ollama settings), and a shared class would
-   couple their visibility by accident. */
-.chatllm-section {
-  margin: 12px 0 20px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel-2);
-}
-
-.chatllm-heading {
-  font-size: 12.5px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin: 0 0 6px;
-}
-
-.chatllm-hint {
-  font-size: 12.5px;
-  color: var(--muted);
-  margin: 0 0 10px;
-  line-height: 1.4;
-}
-
-.chatllm-scope,
-.chatllm-copy,
-.chatllm-target,
-.chatllm-read-reply {
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-
-.chatllm-copy,
-.chatllm-target,
-.chatllm-read-reply {
-  color: var(--accent-ink);
-  background: var(--accent);
-  border: none;
-  padding: 6px 14px;
-  margin-right: 8px;
-}
-
-.chatllm-prompt-box,
-.chatllm-reply-box {
-  display: block;
-  width: 100%;
-  min-height: 100px;
-  margin-top: 10px;
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--ink);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px;
-}
-
-.chatllm-linkout-label {
-  display: block;
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* Deliberately NOT .issue-warning/var(--warn) -- see the .advice-section
-   comment above: --warn/--danger stay reserved for validation output, so a
-   privacy notice is never mistakable for "something is wrong with your
-   data" just because it's the same amber. This is a consequence a user
-   should notice, same category as .advice-pitfall, so it borrows THAT
-   vocabulary (an accent left-border) instead of inventing a third one. */
-.chatllm-linkout-warning {
-  margin: 6px 0 0;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  background: var(--panel-2);
-  color: var(--ink);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.chatllm-linkout-row {
-  margin-top: 8px;
-}
-
-.chatllm-reply-label {
-  margin-top: 10px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.chatllm-repairs,
-.chatllm-issues,
-.chatllm-asks {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12.5px;
-  line-height: 1.4;
-}
-
-.chatllm-repairs p {
-  margin: 0;
-  color: var(--muted);
-  font-style: italic;
-}
-
-/* Rows in .chatllm-issues carry .issue/.issue-error from ui/steps/
-   describe.js -- this IS validation output (a dropped proposal, a paste
-   that failed to parse), the exact category .issue-error already names, so
-   it reuses that vocabulary rather than a fourth "amber-ish" style. */
-
-.chatllm-asks p {
-  margin: 0;
-  padding: 6px 10px;
-  border-left: 3px solid var(--line);
-  color: var(--ink);
-}
-
 /* Which tier proposed a row. The deterministic scan matched literal text the
    user wrote; the model inferred from it. Same list, different warrant, so
    they must not read alike. */
@@ -1166,22 +920,8 @@ button:focus-visible {
   padding: 0 14px 14px;
 }
 
-/* The child sections (.chatllm-section, .interview-list) already carry
-   their own margins meant for sitting directly in `main` -- reset the ones
-   that would otherwise double up with .reveal's own padding above. */
-.reveal > .chatllm-section {
-  margin: 0;
-  border: none;
-  padding: 0 14px 14px;
-  background: transparent;
-}
-
 .reveal > .interview-list.answered-list {
   margin-bottom: 0;
-}
-
-.reveal > .draft-button:first-of-type {
-  margin-left: 0;
 }
 
 /* The Home step (ui/steps/home.js): big, low-text thumbnail cards -- "big
@@ -2354,7 +2094,6 @@ textarea {
 .theme-toggle,
 .copy-button,
 .read-button,
-.draft-button,
 .question-answer,
 .proposal-accept,
 .add-factor-button,
@@ -2375,7 +2114,6 @@ textarea {
 .theme-toggle:hover,
 .copy-button:hover,
 .read-button:hover,
-.draft-button:hover,
 .question-answer:hover,
 .proposal-accept:hover,
 .add-factor-button:hover,
@@ -2387,7 +2125,6 @@ textarea {
 
 .primary-action,
 .read-button,
-.draft-button,
 .question-answer,
 .proposal-accept {
   border-color: var(--accent);
@@ -2397,7 +2134,6 @@ textarea {
 
 .primary-action:hover,
 .read-button:hover,
-.draft-button:hover,
 .question-answer:hover,
 .proposal-accept:hover {
   border-color: var(--accent);
@@ -2573,10 +2309,6 @@ textarea:focus-visible {
 
 .field-input,
 .describe-textarea,
-.guidance-endpoint,
-.guidance-model,
-.guidance-token,
-.guidance-question,
 .guide-search-input,
 .panel-channel-main input.panel-row-text,
 .panel-channel-main select.panel-row-text,
@@ -2589,10 +2321,6 @@ textarea:focus-visible {
 
 .field-input:focus-visible,
 .describe-textarea:focus-visible,
-.guidance-endpoint:focus-visible,
-.guidance-model:focus-visible,
-.guidance-token:focus-visible,
-.guidance-question:focus-visible,
 .panel-channel-main input.panel-row-text:focus-visible,
 .panel-channel-main select.panel-row-text:focus-visible,
 .panel-filter-field input:focus-visible {
@@ -2604,8 +2332,6 @@ textarea:focus-visible {
 .home-card,
 .planned-box,
 .advice-section,
-.guidance-section,
-.chatllm-section,
 .proposal-row,
 .question-row,
 .factor-row,
@@ -2652,12 +2378,10 @@ textarea:focus-visible {
 }
 
 .home-card-title { color: var(--ink); font-size: 17px; font-weight: 720; }
-.home-card-body, .guidance-hint, .chatllm-hint, .guide-para { color: var(--muted); }
+.home-card-body, .guide-para { color: var(--muted); }
 
 .planned-box,
 .advice-section,
-.guidance-section,
-.chatllm-section,
 .spectral-view,
 .guide-section,
 .study-map,
@@ -2700,10 +2424,7 @@ textarea:focus-visible {
 
 .planned-name,
 .base-name-value,
-.condition-filename,
-.chatllm-prompt-box,
-.chatllm-reply-box,
-.guidance-paste-box {
+.condition-filename {
   border-color: var(--line);
   background: var(--surface-muted);
 }
@@ -2786,6 +2507,7 @@ td, th { border-color: var(--line); }
 
 .shell-utilities { position: relative; }
 
+.shell-new-study,
 .shell-utility-toggle,
 .shell-utility-action,
 .mobile-assay-select,
@@ -2801,9 +2523,110 @@ td, th { border-color: var(--line); }
   font-weight: 650;
 }
 
+.study-group-token-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  min-height: 48px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--panel);
+  cursor: text;
+}
+
+.study-group-token-field:focus-within {
+  border-color: var(--accent);
+  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.study-group-token-list {
+  display: contents;
+}
+
+.study-group-token {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 3px 4px 3px 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line));
+  border-radius: 999px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.study-group-token-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.study-group-token-remove {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: currentColor;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.study-group-token-remove:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.study-group-token-remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.study-group-token-input {
+  flex: 1 1 220px;
+  min-width: min(220px, 100%);
+  min-height: 32px;
+  padding: 4px 6px;
+  border: 0;
+  outline: 0;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+}
+
+.shell-new-study,
 .shell-utility-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   padding: 7px 12px;
   cursor: pointer;
+}
+
+.shell-new-study {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.shell-new-study:hover {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
 }
 
 .shell-utility-toggle:hover,
@@ -3664,5 +3487,536 @@ td, th { border-color: var(--line); }
   .shell-body.has-guided-aside,
   .shell-body.has-guided-aside.shell-nav-collapsed {
     display: block;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Project workspace: one responsive, reviewable description surface.
+   These rules are intentionally scoped so the Project redesign cannot
+   restyle the older step-specific cards and interview layouts.
+   ------------------------------------------------------------------------- */
+
+.project-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(16px, 2vw, 28px);
+  max-width: 1360px;
+  margin-inline: auto;
+}
+
+.project-description-card,
+.project-review,
+.project-details {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: clamp(18px, 2.4vw, 28px);
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+
+.project-description-card .step-heading {
+  margin-bottom: 10px;
+}
+
+.project-description-card > .proposals-empty {
+  margin: 0 0 20px;
+  padding: 0;
+  background: transparent;
+}
+
+.project-description-help,
+.project-description-save-state,
+.project-details-assay-binding,
+.project-review-fallback-hint,
+.project-model-options-status,
+.project-model-options-cold-start,
+.project-model-options-rate-limit {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.project-description-save-state {
+  margin: 8px 0 14px;
+}
+
+.project-review-button,
+.project-review-accept,
+.project-review-dismiss,
+.project-review-paste-submit,
+.project-review-cancel,
+.project-review-copy-prompt-button {
+  min-height: 44px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.project-review-button {
+  margin: 0;
+}
+
+.project-review-accept:hover,
+.project-review-dismiss:hover,
+.project-review-paste-submit:hover,
+.project-review-button:hover {
+  filter: brightness(1.05);
+}
+
+.project-review-cancel,
+.project-review-dismiss {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--panel-2);
+}
+
+.project-review-button:disabled,
+.project-review-accept:disabled,
+.project-review-dismiss:disabled,
+.project-review-paste-submit:disabled,
+.project-review-cancel:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+  filter: none;
+}
+
+.project-model-options,
+.project-review-fallback,
+.project-review-planning-notes,
+.project-review-technical-errors {
+  min-width: 0;
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.project-model-options > summary,
+.project-review-fallback > summary,
+.project-review-planning-notes > summary,
+.project-review-technical-errors > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 9px 13px;
+  color: var(--ink);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.project-model-options-body,
+.project-review-fallback > :not(summary),
+.project-review-planning-notes > :not(summary),
+.project-review-technical-errors > :not(summary) {
+  margin-inline: 13px;
+}
+
+/* These disclosures reuse the app-wide reveal chevron and interaction
+   language, but their content already owns its spacing. Neutralize the
+   generic `.reveal > *` padding so inputs and actions do not acquire a
+   second, button-like rectangular frame. */
+.project-model-options.reveal > :not(.reveal-summary),
+.project-review-fallback.reveal > :not(.reveal-summary),
+.project-review-planning-notes.reveal > :not(.reveal-summary),
+.project-review-technical-errors.reveal > :not(.reveal-summary) {
+  padding: 0;
+}
+
+.project-model-options-body {
+  padding-bottom: 14px;
+}
+
+.project-model-options-body > label,
+.project-model-options-fields > label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.project-model-options-enabled {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.project-model-options-unavailable {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--warn) 44%, var(--line));
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--warn-soft);
+  font-size: 13px;
+}
+
+.project-model-options-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.project-model-options-endpoint,
+.project-model-options-model,
+.project-model-options-model-select,
+.project-model-options-token,
+.project-review-copy-prompt,
+.project-review-pasted-reply {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--panel);
+  font: inherit;
+}
+
+.project-review-copy-prompt,
+.project-review-pasted-reply {
+  display: block;
+  min-height: 132px;
+  margin: 6px 0 14px;
+  resize: vertical;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.project-model-options-status {
+  min-height: 1.5em;
+  margin: 12px 0 0;
+}
+
+.project-model-options-cold-start,
+.project-model-options-rate-limit {
+  margin: 8px 0 0;
+}
+
+.project-review {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.project-review-heading,
+.project-details-heading {
+  margin: 0;
+  color: var(--ink);
+  font-size: 19px;
+  line-height: 1.25;
+}
+
+.project-review-status {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--surface-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.project-review-status[data-state="model-running"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: var(--accent-soft);
+}
+
+.project-review-status[data-state="complete"] {
+  border-color: color-mix(in srgb, var(--ok) 45%, var(--line));
+  background: var(--ok-soft);
+}
+
+.project-review-status[data-state="fallback"],
+.project-review-status[data-state="stale"],
+.project-review-status[data-state="cancelled"] {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+  background: var(--warn-soft);
+}
+
+.project-review-status[data-state="error"] {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  background: var(--danger-soft);
+}
+
+.project-review-progress {
+  display: grid;
+  gap: 7px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent-soft) 62%, var(--panel));
+}
+
+.project-review-progress[hidden] {
+  display: none;
+}
+
+.project-review-progress-bar {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  accent-color: var(--accent);
+}
+
+.project-review-progress-activity,
+.project-review-elapsed,
+.project-review-session-disclosure,
+.project-review-model-disclosure {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.project-review-progress-activity {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.project-review-session-disclosure,
+.project-review-model-disclosure {
+  padding-left: 11px;
+  border-left: 2px solid var(--line);
+}
+
+.project-review-suggestions,
+.project-review-decisions,
+.project-review-not-converted {
+  min-width: 0;
+}
+
+.project-review-section-heading,
+.project-review-subheading {
+  margin: 0 0 9px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.project-review-suggestions-body,
+.project-review-decisions-body,
+.project-review-not-converted-body {
+  display: grid;
+  gap: 10px;
+}
+
+.project-review-group,
+.project-review-asks,
+.project-review-repairs,
+.project-review-issues {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-review-group {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.project-review-destination-label,
+.project-review-value {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.project-review-destination,
+.project-review-phase,
+.project-review-sources,
+.project-review-current,
+.project-review-conflict,
+.project-review-empty,
+.project-review-noncoverage,
+.project-review-asks li,
+.project-review-repairs li,
+.project-review-issues li {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.project-review-candidate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 9px 14px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel);
+}
+
+.project-review-candidate > :not(.project-review-accept, .project-review-dismiss) {
+  grid-column: 1;
+}
+
+.project-review-candidate > .project-review-accept,
+.project-review-candidate > .project-review-dismiss {
+  grid-column: 2;
+  grid-row: 1 / span 5;
+  align-self: center;
+}
+
+.project-review-candidate > .project-review-dismiss {
+  grid-column: 3;
+}
+
+.project-review-warrants {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.project-review-warrants li,
+.project-review-technical-errors,
+.project-review-technical-errors * {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.project-review-conflict,
+.project-review-current.differs {
+  padding: 8px 10px;
+  border-left: 3px solid var(--warn);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--warn-soft);
+}
+
+.project-review-current.same {
+  color: var(--ok);
+  font-weight: 650;
+}
+
+.project-review-not-converted {
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.project-review-issues li {
+  padding: 8px 10px;
+  border-left: 3px solid var(--danger);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--danger-soft);
+}
+
+.project-review-repairs li {
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.project-details {
+  grid-column: 1 / -1;
+}
+
+.project-details-heading {
+  margin-bottom: 6px;
+}
+
+.project-details-assay-binding {
+  margin: 0 0 18px;
+}
+
+.project-details .naming-grid {
+  margin: 0;
+}
+
+.project-details .field-commit-row {
+  flex-wrap: wrap;
+}
+
+.project-details .field-commit {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+.project-workspace :is(button, input, select, textarea, summary):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  outline-offset: 2px;
+}
+
+@media (min-width: 1200px) {
+  .project-workspace {
+    grid-template-columns: minmax(360px, 0.9fr) minmax(440px, 1.1fr);
+    align-items: start;
+  }
+
+  .shell-body.has-guided-aside .project-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .project-description-card,
+  .project-review,
+  .project-details {
+    padding: 16px;
+  }
+
+  .project-model-options-fields,
+  .project-review-candidate {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-review-candidate > .project-review-accept,
+  .project-review-candidate > .project-review-dismiss {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+  }
+
+  .project-review-button,
+  .project-review-paste-submit,
+  .project-review-cancel,
+  .project-review-dismiss {
+    width: 100%;
+  }
+
+  .project-details .naming-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-workspace *,
+  .project-workspace *::before,
+  .project-workspace *::after {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

@@ -14,9 +14,7 @@
 // (engine/llmschema.js builds an `enum` per question straight from that
 // question's own options) PLUS provenance (a model's write lands tagged
 // `llm`/`llm_freetext`, PROVISIONAL, and core/provenance.js's canOverwrite
-// refuses to let it clobber anything the user actually set). The guidance
-// preamble below carries the same discipline as PREAMBLE: reason only over
-// supplied data, never invent, say when something is missing.
+// refuses to let it clobber anything the user actually set).
 //
 // The manual-paste path stays exactly as it was: opt-in, LAN-only when the
 // Ollama adapter is used instead, no API key stored, and nothing leaves the
@@ -80,64 +78,4 @@ export function renderLlmPrompt(doc) {
     '',
     'Answer the questions above, or whatever I ask next, under the ground rules.',
   ].join('\n');
-}
-
-// Guidance mode (local-llm-guidance): "explain this step" / "what do these
-// options mean", NOT study-building. The model here narrates -- it never
-// returns a descriptor, never gets a schema, and the caller must never feed
-// its reply back into a write path. Same discipline as PREAMBLE, restated
-// for a role that is answering ABOUT the app's own interview rather than
-// reviewing a finished plan.
-const GUIDANCE_PREAMBLE = [
-  'You are helping a user navigate Micronaut Planner, a microscopy experiment',
-  "planning tool. Below is the CURRENT STEP's question bank (each question's",
-  "id, prompt, and why it is asked) and the study drafted so far. The user is",
-  'asking what a step or option means, or what to do next -- not asking you to',
-  'design their experiment.',
-  '',
-  'Ground rules for your answer:',
-  '- Explain and orient. Do not invent an answer FOR the user or claim a field',
-  '  has been filled in when it has not.',
-  '- Reason ONLY over the question bank and study JSON supplied below. Do not',
-  '  invent a marker, filter set, instrument setting, control, or citation that',
-  "  is not already present in what you were given.",
-  '- If the user asks something the supplied data cannot answer, say so rather',
-  '  than guessing.',
-  '- This is a planning aid, not a validated instrument model. Real acquisition',
-  '  settings must be confirmed at the microscope.',
-].join('\n');
-
-/**
- * Build {system, user} messages for the guidance feature: explaining the
- * current step's questions (and why they're asked) in the context of the
- * study drafted so far. `questions` is the current step's slice of
- * engine/interview.js's loadQuestions output (or nextQuestions'/
- * answeredQuestions' output -- anything carrying {id, prompt, why,
- * options}). `doc` is buildStudyDocument's output, same as renderLlmPrompt.
- *
- * TOTAL: never throws. A missing/malformed `doc` or `questions` still
- * produces valid messages (an empty question list, a `null` JSON section).
- *
- * Returns text messages ONLY -- this is guidance's entire contract with the
- * rest of the app: nothing downstream may treat this reply as a write.
- */
-export function buildGuidanceMessages(doc, questions) {
-  const safeQuestions = Array.isArray(questions) ? questions : [];
-  const questionLines = safeQuestions.map((q) => {
-    const options = Array.isArray(q.options) && q.options.length > 0 ? ` [options: ${q.options.join(', ')}]` : '';
-    const why = q.why ? ` -- why: ${q.why}` : '';
-    return `- (${q.id}) ${q.prompt}${options}${why}`;
-  });
-
-  const user = [
-    '--- CURRENT STEP QUESTIONS ---',
-    questionLines.length > 0 ? questionLines.join('\n') : '(none right now)',
-    '',
-    '--- STUDY PLAN SO FAR (JSON) ---',
-    renderJson(doc),
-    '',
-    "Answer the user's question about this step, under the ground rules.",
-  ].join('\n');
-
-  return { system: GUIDANCE_PREAMBLE, user };
 }

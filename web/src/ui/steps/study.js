@@ -15,11 +15,10 @@
 import { assayView, removeAssay, scopeWrite } from '../../core/assay.js';
 import { effectiveNamingFields, MAX_STUDY_ROWS, studyNameIssues } from '../../engine/plan.js';
 import { finalizeFields, renderName } from '../../engine/naming.js';
-import { parseLevels } from './design.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
 /**
- * "N of M assays use LEVEL, LEVEL" -- how many assays' current group axis
+ * "N of M assays use this vocabulary" -- how many assays' current group axis
  * matches the study's vocabulary verbatim. Order-sensitive (JSON.stringify
  * on the array): a vocabulary and an assay that list the same groups in a
  * different order are NOT considered converged, since order is part of what
@@ -43,7 +42,24 @@ function groupDivergenceSummary(experiment) {
   }).length;
 
   const total = assays.length;
-  return `${matching} of ${total} assay${total === 1 ? '' : 's'} use ${vocabLevels.join(', ')}`;
+  return `${matching} of ${total} assay${total === 1 ? '' : 's'} use this group vocabulary.`;
+}
+
+function studyGroupTokens(value) {
+  return String(value)
+    .split(/[,\n]/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function uniqueStudyGroups(values) {
+  const seen = new Set();
+  return values.filter((value) => {
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /**
@@ -102,28 +118,97 @@ export const studyStep = {
     vocabHeading.textContent = 'Group vocabulary';
     main.appendChild(vocabHeading);
 
-    const vocabRow = document.createElement('label');
+    const vocabRow = document.createElement('div');
     vocabRow.className = 'field-row';
     const vocabLabel = document.createElement('span');
     vocabLabel.className = 'field-label';
-    vocabLabel.textContent = 'Default groups for new assays, comma-separated';
+    vocabLabel.id = 'study-group-vocabulary-label';
+    vocabLabel.textContent = 'Default groups for new assays';
     vocabRow.appendChild(vocabLabel);
+    const tokenField = document.createElement('div');
+    tokenField.className = 'study-group-token-field';
+    tokenField.setAttribute('role', 'group');
+    tokenField.setAttribute('aria-labelledby', vocabLabel.id);
+    vocabRow.appendChild(tokenField);
+    const tokenList = document.createElement('div');
+    tokenList.className = 'study-group-token-list';
+    tokenField.appendChild(tokenList);
     const vocabInput = document.createElement('input');
     vocabInput.type = 'text';
-    vocabInput.className = 'field-input';
-    vocabInput.placeholder = 'e.g. CTL, OPP';
+    vocabInput.className = 'study-group-token-input';
+    vocabInput.placeholder = 'Type a group, then press Enter';
+    vocabInput.setAttribute('aria-label', 'Add a group');
     vocabInput.title =
       'A TEMPLATE, not a shared axis -- each assay gets its own copy when created, and can diverge from it freely. Used to seed new assays and by "Apply to all assays" below.';
-    vocabInput.value = (store.get().groupVocabulary && store.get().groupVocabulary.levels || []).join(', ');
-    vocabInput.addEventListener('input', () => {
-      // Study-level, unscoped -- like researchQuestion above, nothing else
-      // ever writes this field, so scopeWrite would only pass it through
-      // unchanged; a direct setPath says that plainly instead of routing
-      // through a no-op.
-      store.setPath('groupVocabulary', { levels: parseLevels(vocabInput.value) }, 'user');
+    tokenField.appendChild(vocabInput);
+
+    function vocabularyLevels() {
+      const levels = store.get().groupVocabulary && store.get().groupVocabulary.levels;
+      return Array.isArray(levels) ? levels : [];
+    }
+
+    function saveVocabulary(levels) {
+      store.setPath('groupVocabulary', { levels }, 'user');
+      renderGroupTokens();
       renderDivergence();
+    }
+
+    function renderGroupTokens() {
+      tokenList.textContent = '';
+      vocabularyLevels().forEach((group, index) => {
+        const token = document.createElement('span');
+        token.className = 'study-group-token';
+        const text = document.createElement('span');
+        text.className = 'study-group-token-text';
+        text.textContent = group;
+        token.appendChild(text);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'study-group-token-remove';
+        remove.textContent = '×';
+        remove.setAttribute('aria-label', `Remove group ${group}`);
+        remove.addEventListener('pointerdown', (event) => {
+          // Keep pointer removal from blurring and committing the adjacent
+          // input before this same control receives its click.
+          event.preventDefault();
+        });
+        remove.addEventListener('click', () => {
+          saveVocabulary(vocabularyLevels().filter((_, itemIndex) => itemIndex !== index));
+          vocabInput.focus();
+        });
+        token.appendChild(remove);
+        tokenList.appendChild(token);
+      });
+    }
+
+    function commitPendingGroups(rawValue = vocabInput.value) {
+      const additions = studyGroupTokens(rawValue);
+      if (additions.length === 0) return false;
+      saveVocabulary(uniqueStudyGroups([...vocabularyLevels(), ...additions]));
+      vocabInput.value = '';
+      return true;
+    }
+
+    vocabInput.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ',') return;
+      event.preventDefault();
+      commitPendingGroups();
     });
-    vocabRow.appendChild(vocabInput);
+    vocabInput.addEventListener('blur', (event) => {
+      // Moving from the input to a token's Remove button must not rebuild
+      // the token list before that button receives its click.
+      if (event.relatedTarget && tokenField.contains(event.relatedTarget)) return;
+      commitPendingGroups();
+    });
+    vocabInput.addEventListener('paste', (event) => {
+      const pasted = event.clipboardData && event.clipboardData.getData('text');
+      if (!pasted || !/[,\n]/.test(pasted)) return;
+      event.preventDefault();
+      commitPendingGroups(`${vocabInput.value}${vocabInput.value ? ',' : ''}${pasted}`);
+    });
+    tokenField.addEventListener('click', (event) => {
+      if (event.target === tokenField || event.target === tokenList) vocabInput.focus();
+    });
     main.appendChild(vocabRow);
 
     const divergenceLine = document.createElement('p');
@@ -135,6 +220,8 @@ export const studyStep = {
       divergenceLine.textContent = summary || '';
       divergenceLine.hidden = !summary;
     }
+
+    renderGroupTokens();
 
     const applyBtn = document.createElement('button');
     applyBtn.type = 'button';

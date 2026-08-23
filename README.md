@@ -30,8 +30,11 @@ outside-in, no forced order):
   several assays that share only a research question and a test article, each with
   its own modality, panel, and specimen; the schema (v3, "the assay tier")
   represents that directly.
-- **Describe** — plain-language experiment description parsed deterministically
-  (keyword/alias matching from the marker dictionary) into structured slots.
+- **Project** — save a plain-language project description, then choose **Review
+  description**. Micronaut first extracts only deterministic exact-text matches:
+  marker aliases from the dictionary, biological-replicate counts, magnification,
+  and unambiguous ISO dates. Everything else remains saved narrative unless the
+  researcher explicitly reviews and accepts a suggestion.
 - **Design** — modality, panel, and per-assay readouts/controls, with
   modality-specific advice (STED / confocal / widefield / light-sheet / SEM-TEM /
   Raman) surfaced from a rules knowledge base (`web/kb/advisor.json`).
@@ -49,28 +52,39 @@ outside-in, no forced order):
   verdict composed from every validator the app already runs), a deterministic
   walkthrough, a staged progression ladder (idea → advanced modality), and
   downloads: Markdown, an SVG study map, a CSV file manifest, a raw-data JSON
-  dump, a per-assay print-oriented bench card, and a copy-paste prompt (+ the
-  study as JSON) for pasting into whatever LLM you already use.
+  dump, a per-assay print-oriented bench card, and a separate **Copy prompt for
+  your own LLM** action (+ the study as JSON) for discussing the finished plan
+  in whatever LLM you already use.
 - **Guide** — an in-app user guide, always in the step nav.
 
 A "Copy feedback report" button in the header copies the current step, browser,
 and full study as text — for reporting problems during the alpha.
 
-Everything works with the optional LLM **disabled** — the deterministic tier is
-always the floor. The LLM never originates a domain fact; it may only emit IDs
-from a vocabulary the app supplies.
+Everything works with the optional local model **disabled** — the deterministic
+exact-text review is always the floor, not a claim to understand every sentence
+of a scientific description. If the researcher explicitly enables a local
+Ollama endpoint in **Model options**, Micronaut may add bounded interpretations
+of the active Project fields. Choice values remain limited to the supplied
+vocabulary, and every model or pasted suggestion must carry a verbatim quote
+from the saved description as evidence. Unsupported prose remains narrative.
 
-There are two ways an LLM enters the picture, both opt-in: the copy-paste
-export above (Overview), and an "Ask about this step" guidance panel
-(Describe) that can call a local Ollama server directly if you configure one
-in its settings. The panel is off by default and falls back to the same
-copy-paste behavior when it's off, unconfigured, or the server is
-unreachable. When it is on, the app talks only to the endpoint you gave it —
-no API key is stored, and nothing is sent anywhere beyond that server. Either
-path is read-only with respect to your study: the model can explain the
-current step, but never writes into it. A separate, schema-constrained
-proposal/write path (`llm_freetext` provenance, `engine/llmschema.js`) exists
-in the codebase but is not yet wired into any step.
+Local interpretation is private to the endpoint the researcher configures.
+If local calls are disabled, unavailable from `file://` or offline, rate
+limited, fail, or return malformed output, the same Review area keeps the
+deterministic results and offers an in-place **Use copy and paste instead**
+continuation. The researcher can copy the constrained review prompt, paste a
+reply back, and inspect it under the same evidence and vocabulary checks.
+
+Review suggestions are never applied merely because a parser or model produced
+them. The Project workspace groups exact, local, and pasted candidates, shows
+their quoted warrants and any conflicts/current value, and requires an explicit
+**Accept suggestion** or **Replace current value** action before a field is
+written. The model can contribute reviewable proposals, but no field is applied
+without explicit review and acceptance.
+
+Project has no new-tab draft workflow, hosted-chat link-out, or generic Project
+Ask surface. The Overview **Copy prompt for your own LLM**
+action remains a separate, read-only export of the finished plan.
 
 ## Run it locally
 

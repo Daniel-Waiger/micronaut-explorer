@@ -19,19 +19,60 @@ function questions() {
 }
 
 test('a valid reply becomes proposals tagged llm_freetext (PROVISIONAL), carrying the question they answer', () => {
-  const reply = { proposals: [{ path: 'acquisition.modality', value: 'STED', tag: 'llm_freetext' }] };
-  const { proposals, issues } = parseLlmProposals(reply, questions());
+  const reply = { proposals: [{ path: 'acquisition.modality', value: 'STED', evidence: 'STED imaging', tag: 'llm_freetext' }] };
+  const { proposals, issues } = parseLlmProposals(reply, questions(), { narrative: 'STED imaging of a tissue section.' });
   assert.equal(issues.length, 0);
   assert.equal(proposals.length, 1);
   assert.equal(proposals[0].path, 'acquisition.modality');
   assert.equal(proposals[0].value, 'STED');
   assert.equal(proposals[0].tag, 'llm_freetext');
   assert.equal(proposals[0].questionId, 'q-modality');
+  assert.equal(proposals[0].evidence, 'STED imaging');
+  assert.notEqual(proposals[0].evidence, 'Modality?', 'the parser must never substitute question text as evidence');
+});
+
+test('the same plausible value is rejected without a literal narrative quote and accepted with one', () => {
+  const reply = { proposals: [{ path: 'acquisition.modality', value: 'STED', evidence: 'high-resolution imaging' }] };
+  const narrative = 'STED imaging of a tissue section.';
+
+  const rejected = parseLlmProposals(reply, questions(), { narrative });
+  assert.equal(rejected.proposals.length, 0);
+  assert.match(rejected.issues[0].message, /not a verbatim narrative quote/);
+
+  reply.proposals[0].evidence = 'STED imaging';
+  const accepted = parseLlmProposals(reply, questions(), { narrative });
+  assert.equal(accepted.issues.length, 0);
+  assert.equal(accepted.proposals.length, 1);
+  assert.equal(accepted.proposals[0].evidence, 'STED imaging');
+});
+
+test('evidence must be non-empty, bounded, and character-for-character -- including multiline quoted text', () => {
+  const narrative = 'Protocol note:\n"Use STED"\nfor the high-resolution image.';
+  const base = { path: 'acquisition.modality', value: 'STED' };
+
+  for (const [evidence, expectedIssue] of [
+    [undefined, /missing a non-empty evidence quote/],
+    ['', /missing a non-empty evidence quote/],
+    ['x'.repeat(501), /evidence exceeds 500 characters/],
+  ]) {
+    const { proposals, issues } = parseLlmProposals({ proposals: [{ ...base, evidence }] }, questions(), { narrative });
+    assert.equal(proposals.length, 0);
+    assert.equal(issues.length, 1);
+    assert.match(issues[0].message, expectedIssue);
+  }
+
+  const { proposals, issues } = parseLlmProposals(
+    { proposals: [{ ...base, evidence: '\n"Use STED"\n' }] },
+    questions(),
+    { narrative }
+  );
+  assert.equal(issues.length, 0);
+  assert.equal(proposals[0].evidence, '\n"Use STED"\n');
 });
 
 test('a value outside the question options is DROPPED and reported, even though the schema should have prevented it', () => {
-  const reply = { proposals: [{ path: 'acquisition.modality', value: 'Cryo-EM' }] };
-  const { proposals, issues } = parseLlmProposals(reply, questions());
+  const reply = { proposals: [{ path: 'acquisition.modality', value: 'Cryo-EM', evidence: 'Confocal imaging' }] };
+  const { proposals, issues } = parseLlmProposals(reply, questions(), { narrative: 'Confocal imaging is planned.' });
   assert.equal(proposals.length, 0);
   assert.equal(issues.length, 1);
   assert.match(issues[0].message, /not one of this question's options/);
@@ -52,8 +93,8 @@ test('a path no question writes to is dropped and reported', () => {
 });
 
 test('a model-supplied tag is never echoed -- a reply cannot claim STRONG provenance for itself', () => {
-  const reply = { proposals: [{ path: 'naming.fields.notes', value: 'ok', tag: 'user' }] };
-  const { proposals } = parseLlmProposals(reply, questions());
+  const reply = { proposals: [{ path: 'naming.fields.notes', value: 'ok', evidence: 'ok', tag: 'user' }] };
+  const { proposals } = parseLlmProposals(reply, questions(), { narrative: 'ok' });
   assert.equal(proposals[0].tag, 'llm_freetext');
 });
 
@@ -76,24 +117,25 @@ test('number questions coerce, and a non-numeric value is dropped rather than wr
 test('one bad proposal costs only itself -- the rest of the batch survives', () => {
   const reply = {
     proposals: [
-      { path: 'acquisition.modality', value: 'Cryo-EM' }, // dropped
-      { path: 'naming.fields.notes', value: 'kept' },
+      { path: 'acquisition.modality', value: 'STED', evidence: 'invented quote' }, // dropped
+      { path: 'naming.fields.notes', value: 'kept', evidence: 'literal note' },
     ],
   };
-  const { proposals, issues } = parseLlmProposals(reply, questions());
+  const { proposals, issues } = parseLlmProposals(reply, questions(), { narrative: 'A literal note is in this narrative.' });
   assert.equal(proposals.length, 1);
   assert.equal(proposals[0].value, 'kept');
   assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /not a verbatim narrative quote/);
 });
 
 test('a duplicated path keeps the first and reports the rest -- never silently picks a winner', () => {
   const reply = {
     proposals: [
-      { path: 'acquisition.modality', value: 'STED' },
-      { path: 'acquisition.modality', value: 'Confocal' },
+      { path: 'acquisition.modality', value: 'STED', evidence: 'STED' },
+      { path: 'acquisition.modality', value: 'Confocal', evidence: 'Confocal' },
     ],
   };
-  const { proposals, issues } = parseLlmProposals(reply, questions());
+  const { proposals, issues } = parseLlmProposals(reply, questions(), { narrative: 'Confocal and STED are both mentioned.' });
   assert.equal(proposals.length, 1);
   assert.equal(proposals[0].value, 'STED');
   assert.match(issues[0].message, /duplicate proposal/);
@@ -145,19 +187,19 @@ test('a non-object entry inside proposals is dropped and reported by index', () 
 // actual security boundary: a pasted reply cannot claim a write path or a
 // provenance tier it was never granted.
 test('a pasted reply claiming "tag":"user" still lands tagged llm_freetext -- provenance cannot be laundered through a paste', () => {
-  const reply = { proposals: [{ path: 'naming.fields.notes', value: 'ok', tag: 'user' }] };
-  const { proposals } = parseLlmProposals(reply, questions());
+  const reply = { proposals: [{ path: 'naming.fields.notes', value: 'ok', evidence: 'ok', tag: 'user' }] };
+  const { proposals } = parseLlmProposals(reply, questions(), { narrative: 'ok' });
   assert.equal(proposals[0].tag, 'llm_freetext');
 });
 
 test('__proto__ and constructor.prototype paths are dropped like any other unknown path, not specially trusted', () => {
   const reply = {
     proposals: [
-      { path: '__proto__.polluted', value: 'x' },
-      { path: 'constructor.prototype.x', value: 'y' },
+      { path: '__proto__.polluted', value: 'x', evidence: 'x' },
+      { path: 'constructor.prototype.x', value: 'y', evidence: 'y' },
     ],
   };
-  const { proposals, issues } = parseLlmProposals(reply, questions());
+  const { proposals, issues } = parseLlmProposals(reply, questions(), { narrative: 'x y' });
   assert.equal(proposals.length, 0);
   assert.equal(issues.length, 2);
   assert.match(issues[0].message, /no question writes to/);

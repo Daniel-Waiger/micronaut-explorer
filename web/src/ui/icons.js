@@ -46,6 +46,10 @@ const ICONS = {
     ['path', 'M4 5.5A2.5 2.5 0 0 1 6.5 3H12v17H6.5A2.5 2.5 0 0 0 4 22z'],
     ['path', 'M20 5.5A2.5 2.5 0 0 0 17.5 3H12v17h5.5A2.5 2.5 0 0 1 20 22z'],
   ],
+  add: [
+    ['circle', 'cx=12,cy=12,r=9'],
+    ['path', 'M12 8v8M8 12h8'],
+  ],
   close: [['path', 'M6 6l12 12M18 6 6 18']],
   walkthrough: [
     ['circle', 'cx=5,cy=5,r=2'],

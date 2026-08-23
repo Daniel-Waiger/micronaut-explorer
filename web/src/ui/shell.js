@@ -81,8 +81,8 @@ export function renderShell(root, store, router, options = {}) {
   if (onNewBlank) {
     const newStudy = document.createElement('button');
     newStudy.type = 'button';
-    newStudy.className = 'primary-action shell-new-study';
-    newStudy.textContent = 'New study';
+    newStudy.className = 'shell-new-study';
+    newStudy.append(createIcon('add', 'button-icon'), document.createTextNode('New study'));
     newStudy.title = 'Start a blank study. Previous versions remain available in Restore.';
     newStudy.addEventListener('click', () => {
       if (window.confirm('Start a blank study? Your current work remains available in Restore.')) onNewBlank();
