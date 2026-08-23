@@ -40,7 +40,7 @@ function clip(text, max) {
 function summarizeDesign(design) {
   const d = design || {};
   const parts = [];
-  if (Array.isArray(d.arms) && d.arms.length > 0) parts.push(`${d.arms.length} arm(s)`);
+  if (Array.isArray(d.groups) && d.groups.length > 0) parts.push(`${d.groups.length} group(s)`);
   for (const factor of Array.isArray(d.factors) ? d.factors : []) {
     parts.push(`${(factor && factor.name) || 'factor'} ×${(factor && factor.levels ? factor.levels.length : 0)}`);
   }

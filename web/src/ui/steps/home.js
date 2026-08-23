@@ -1,46 +1,9 @@
 // The Home step (zen-planner Phase 1's reframe): the app's landing page and
-// the discoverability point for "start here." Pure static content plus
-// navigation -- no store reads beyond what a card's own destination step
-// will read for itself, matching guide.js's posture of never disagreeing
-// with app state by depending on it.
+// the discoverability point for "start here." It reads only the explicit
+// study-origin marker to distinguish the shipped oregano example from the
+// user's own work; all lifecycle writes remain callbacks owned by main.js.
 //
-// The walkthrough is the DEFAULT entry experience for a first-time visitor
-// -- main.js auto-navigates a brand-new session to the Guide step once,
-// before this step is ever seen, and marks it seen so a reload does not
-// repeat the redirect (see main.js's WALKTHROUGH_SEEN_KEY). This step is
-// what a user who has already been through it, or who chose "Skip the
-// walkthrough" below, actually lands on. The "Take the walkthrough" card
-// below launches the real interactive tour (ui/walkthrough.js, zen-planner
-// Phase 5) -- the auto-redirect only ever lands on the Guide page itself,
-// which now also offers to start the same tour with its own button.
-//
-// Exported so main.js can call it directly (loadWalkthroughSeen/
-// saveWalkthroughSeen): the one-shot first-visit redirect decision has to be
-// made before the router's first render, which is main.js's job, not this
-// step's own render() -- see that module's boot sequence.
-
-import { startWalkthrough } from '../walkthrough.js';
 import { createIcon } from '../icons.js';
-
-const WALKTHROUGH_SEEN_KEY = 'micronaut.walkthroughSeen';
-
-export function loadWalkthroughSeen() {
-  try {
-    return localStorage.getItem(WALKTHROUGH_SEEN_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-export function saveWalkthroughSeen() {
-  try {
-    localStorage.setItem(WALKTHROUGH_SEEN_KEY, '1');
-  } catch {
-    // Persistence here is a convenience, matching every other localStorage
-    // write in this app (shell.js's THEME_KEY, etc.) -- a failed write only
-    // means the choice won't survive a reload, not worth surfacing.
-  }
-}
 
 // One big clickable tile: a title, a short line of what it does, and the
 // step it navigates to. Its icon comes from the same thin-stroke SVG system
@@ -71,10 +34,25 @@ function card(parent, { icon, title, body, onClick }) {
   return button;
 }
 
+function homeGuidedStatus(guidedStatus, getGuidedStatus) {
+  const status = typeof getGuidedStatus === 'function' ? getGuidedStatus() : guidedStatus;
+  return status && typeof status.status === 'string' ? status.status : 'not-started';
+}
+
 export const homeStep = {
   id: 'home',
   title: 'Home',
-  render(main, store, { router } = {}) {
+  render(main, store, {
+    router,
+    onAdoptExample,
+    onNewBlank,
+    guidedStatus,
+    getGuidedStatus,
+    onStartGuided,
+    onResumeGuided,
+    onRestartGuided,
+    onExplainGuided,
+  } = {}) {
     main.textContent = '';
 
     const heading = document.createElement('h1');
@@ -88,17 +66,85 @@ export const homeStep = {
       'Start with the experiment, not the file name. Micronaut walks you from the research question through the study design and the microscopy details -- the naming convention falls out at the end, as one finished artifact.';
     main.appendChild(subheading);
 
+    // This check deliberately reads the explicit origin marker rather than
+    // recognising words from the study text. Older saves with no marker are
+    // conservative user work, never a possibly-mislabelled shipped example.
+    const isExample = store.get().meta?.origin === 'example';
+    const ownership = document.createElement('section');
+    ownership.className = isExample ? 'home-study-ownership home-example-ownership' : 'home-study-ownership';
+    const ownershipTitle = document.createElement('h2');
+    ownershipTitle.className = 'home-study-ownership-title';
+    ownershipTitle.textContent = isExample ? 'Example study · Oregano wound-healing' : 'Your study';
+    ownership.appendChild(ownershipTitle);
+
+    const ownershipBody = document.createElement('p');
+    ownershipBody.className = 'home-study-ownership-body';
+    ownershipBody.textContent = isExample
+      ? 'This is a worked example with four assays. Use it as a template to keep and adapt its structure, or start from an empty study.'
+      : 'This is your workspace. Continue planning, adjust its assays, or use the utilities to back it up and recover earlier versions.';
+    ownership.appendChild(ownershipBody);
+
+    if (isExample) {
+      const actions = document.createElement('div');
+      actions.className = 'home-study-ownership-actions';
+
+      const adoptButton = document.createElement('button');
+      adoptButton.type = 'button';
+      adoptButton.className = 'copy-button';
+      adoptButton.textContent = 'Use as template';
+      adoptButton.title = 'Keep all four example assays and make this study your own.';
+      adoptButton.addEventListener('click', () => {
+        const adopted = typeof onAdoptExample === 'function' && onAdoptExample();
+        if (adopted && router) router.navigate('study');
+      });
+      actions.appendChild(adoptButton);
+
+      const blankButton = document.createElement('button');
+      blankButton.type = 'button';
+      blankButton.className = 'copy-button';
+      blankButton.textContent = 'Start blank study';
+      blankButton.title = 'Start with one empty assay instead of the oregano example.';
+      blankButton.addEventListener('click', () => {
+        if (typeof onNewBlank === 'function') onNewBlank();
+      });
+      actions.appendChild(blankButton);
+      ownership.appendChild(actions);
+    }
+    main.appendChild(ownership);
+
     const grid = document.createElement('div');
     grid.className = 'home-grid';
     main.appendChild(grid);
 
+    const guideStatus = homeGuidedStatus(guidedStatus, getGuidedStatus);
+    const guidedEntry = isExample && guideStatus === 'paused'
+      ? {
+          title: 'Resume example walkthrough',
+          body: 'Continue from the feature where you paused; the example study stays unchanged.',
+          onClick: onResumeGuided,
+        }
+      : isExample && guideStatus === 'completed'
+        ? {
+            title: 'Restart walkthrough',
+            body: 'Start the optional seven-step example walkthrough again from Home.',
+            onClick: onRestartGuided,
+          }
+        : isExample
+          ? {
+              title: 'Walk through example',
+              body: 'Explore the worked example with an optional explanation beside each of the seven workflow steps.',
+              onClick: onStartGuided,
+            }
+          : {
+              title: 'Explain the workflow',
+              body: 'Open a contextual explanation of this workflow without changing your study or guided progress.',
+              onClick: onExplainGuided,
+            };
     card(grid, {
       icon: 'walkthrough',
-      title: 'Take the walkthrough',
-      body: 'A guided tour of the app -- what each step is for and how they fit together.',
+      ...guidedEntry,
       onClick: () => {
-        saveWalkthroughSeen();
-        startWalkthrough({ router });
+        if (typeof guidedEntry.onClick === 'function') guidedEntry.onClick('home');
       },
     });
 
@@ -113,26 +159,14 @@ export const homeStep = {
 
     card(grid, {
       icon: 'template',
-      title: 'Start from a template',
-      body: 'This study already holds a fully worked example (an oregano wound-healing study) -- copy its pattern, or use "New study" in the header for a blank one.',
+      title: isExample ? 'Explore the example' : 'Study design',
+      body: isExample
+        ? 'Open the oregano study to inspect its four assays and see how its design is organised.'
+        : 'Open your study to define its assays, groups, and experimental conditions.',
       onClick: () => {
         if (router) router.navigate('study');
       },
     });
-
-    const skipRow = document.createElement('p');
-    skipRow.className = 'home-skip-row';
-    const skipLink = document.createElement('button');
-    skipLink.type = 'button';
-    skipLink.className = 'home-skip-link';
-    skipLink.textContent = "Don't show the walkthrough automatically again";
-    skipLink.hidden = loadWalkthroughSeen();
-    skipLink.addEventListener('click', () => {
-      saveWalkthroughSeen();
-      skipLink.hidden = true;
-    });
-    skipRow.appendChild(skipLink);
-    main.appendChild(skipRow);
 
     const guideRow = document.createElement('p');
     guideRow.className = 'home-skip-row';

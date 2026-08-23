@@ -121,7 +121,7 @@ function readoutLine(readout) {
 
 function designLine(design) {
   const parts = [];
-  if (design.arms.length > 0) parts.push(`groups: ${design.arms.join(', ')}`);
+  if (design.groups.length > 0) parts.push(`groups: ${design.groups.join(', ')}`);
   for (const factor of design.factors) parts.push(`${factor.name}: ${factor.levels.join(', ')}`);
   if (design.biologicalReplicates) parts.push(`${design.biologicalReplicates} bio rep(s)`);
   if (design.technicalReplicates) parts.push(`${design.technicalReplicates} tech rep(s)`);
@@ -135,6 +135,48 @@ function appendLabeledNode(parent, className, text) {
   node.textContent = text;
   parent.appendChild(node);
   return node;
+}
+
+const ISSUE_ROUTES = {
+  design: 'design',
+  naming: 'naming',
+  incomplete: 'naming',
+  path: 'naming',
+  panel: 'panel',
+  'cross-assay': 'naming',
+};
+
+const FIELD_LABELS = {
+  date: 'Acquisition date',
+  modality: 'Imaging modality',
+  exptype: 'Experiment type',
+  markers: 'Markers',
+  magnification: 'Magnification',
+  sample: 'Sample ID',
+  group: 'Experimental group',
+  biorep: 'Biological replicate',
+  techrep: 'Technical replicate',
+  biologicalReplicates: 'Biological replicates',
+  technicalReplicates: 'Technical replicates',
+};
+
+function readableField(field) {
+  const key = String(field || '').split('.').pop();
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+  if (!key) return 'Study';
+  return key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[-_]/g, ' ');
+}
+
+function issueText(issue) {
+  return `${readableField(issue.field)} — ${issue.message || 'Needs review.'}`;
+}
+
+function reportIssues(report) {
+  const assayIssues = (report.assays || []).flatMap((assay) =>
+    (assay.issues || []).map((issue) => ({ ...issue, assayLabel: assay.label }))
+  );
+  const crossAssay = (report.crossAssayIssues || []).map((issue) => ({ ...issue, assayLabel: 'Across assays' }));
+  return [...assayIssues, ...crossAssay];
 }
 
 /**
@@ -268,8 +310,13 @@ function renderStageNotesNode(parent, stageNotes) {
 }
 
 function renderAssayNode(parent, assay, onDownloadBenchCard) {
-  const box = document.createElement('div');
+  const box = document.createElement('details');
   box.className = 'overview-assay';
+
+  const summary = document.createElement('summary');
+  summary.className = 'overview-assay-summary';
+  summary.textContent = `Assay ${assay.index}: ${assay.label} · ${assay.filenames.length} planned filename${assay.filenames.length === 1 ? '' : 's'}`;
+  box.appendChild(summary);
 
   const headerRow = document.createElement('div');
   headerRow.className = 'overview-assay-header';
@@ -342,7 +389,7 @@ export function createOverviewStep(kb) {
   return {
     id: 'overview',
     title: 'Overview',
-    render(main, store, { showToast } = {}) {
+    render(main, store, { showToast, router } = {}) {
       main.textContent = '';
 
       const heading = document.createElement('h1');
@@ -356,48 +403,63 @@ export function createOverviewStep(kb) {
         'A deterministic summary of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
       main.appendChild(explainer);
 
-      const actions = document.createElement('div');
-      actions.className = 'overview-actions';
+      const doc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+      const conformance = checkConformance(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
 
-      // One button-wiring path for every export: build a fresh doc (never
-      // the one this render() closed over, since a download can fire long
-      // after typing continued to change the store), derive the filename
-      // from the study title, hand the text to downloadTextFile, toast.
-      // Four near-identical copies of this used to live inline here --
-      // each new export format (CSV, then JSON) meant copy-pasting an
-      // eleven-line block, so the title-sanitizing regex alone was
-      // duplicated four times over with three chances to fix it in only
-      // one place. `render` takes the fresh doc and returns the file text;
-      // everything format-specific (renderMarkdown, the SVG serialization,
-      // renderCsv, renderJson) stays a one-line argument.
+      // Every final artifact checks the current store at click time. This
+      // avoids exporting stale closure data after a user has changed a field
+      // and makes the report's single readiness value the only gate.
+      function permitFinalExport() {
+        const freshReport = checkConformance(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+        const issues = reportIssues(freshReport);
+        if (freshReport.readiness === 'blocked') {
+          if (showToast) showToast(`Export blocked: ${freshReport.counts.blocked} blocking issue(s) need correction first.`);
+          return false;
+        }
+        if (freshReport.readiness === 'needs-review') {
+          const examples = issues.slice(0, 4).map((issue) => `• ${issue.assayLabel}: ${issueText(issue)}`);
+          const remainder = issues.length > examples.length ? `\n• …and ${issues.length - examples.length} more item(s).` : '';
+          const message = `This study still needs review:\n${examples.join('\n')}${remainder}\n\nExport this final artifact anyway?`;
+          const canConfirm = typeof window !== 'undefined' && typeof window.confirm === 'function';
+          if (!canConfirm || !window.confirm(message)) {
+            if (showToast) showToast('Export cancelled. Review the listed items before sharing a final artifact.');
+            return false;
+          }
+        }
+        return true;
+      }
+
+      const exportMenu = document.createElement('details');
+      exportMenu.className = 'overview-export-menu';
+      const exportSummary = document.createElement('summary');
+      exportSummary.className = 'overview-export-summary';
+      exportSummary.textContent = 'Export study';
+      exportMenu.appendChild(exportSummary);
+      const exportActions = document.createElement('div');
+      exportActions.className = 'overview-export-actions';
+      exportMenu.appendChild(exportActions);
+
       function addDownloadButton({ label, fallbackName, ext, mime, render, toastMessage }) {
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.className = 'copy-button';
+        btn.className = 'copy-button overview-export-action';
         btn.textContent = label;
         btn.addEventListener('click', () => {
+          if (!permitFinalExport()) return;
           const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
           const filename = `${(freshDoc.study.title || fallbackName).replace(/[^A-Za-z0-9_-]+/g, '-')}.${ext}`;
           downloadTextFile(render(freshDoc), filename, mime);
           if (showToast) showToast(toastMessage);
         });
-        actions.appendChild(btn);
+        exportActions.appendChild(btn);
       }
 
       addDownloadButton({
-        label: 'Download Markdown (.md)',
-        fallbackName: 'study-overview',
-        ext: 'md',
-        mime: 'text/markdown',
-        render: renderMarkdown,
+        label: 'Markdown (.md)', fallbackName: 'study-overview', ext: 'md', mime: 'text/markdown', render: renderMarkdown,
         toastMessage: 'Downloaded the study overview as Markdown.',
       });
-
       addDownloadButton({
-        label: 'Download study map (.svg)',
-        fallbackName: 'study-map',
-        ext: 'svg',
-        mime: 'image/svg+xml',
+        label: 'Study map (.svg)', fallbackName: 'study-map', ext: 'svg', mime: 'image/svg+xml',
         render: (freshDoc) => {
           const svg = buildDiagramSvg(buildDiagramLayout(freshDoc));
           const serialized = new XMLSerializer().serializeToString(svg);
@@ -405,58 +467,39 @@ export function createOverviewStep(kb) {
         },
         toastMessage: 'Downloaded the study map as SVG.',
       });
-
       addDownloadButton({
-        label: 'Download file manifest (.csv)',
-        fallbackName: 'study-manifest',
-        ext: 'csv',
-        mime: 'text/csv',
-        render: renderCsv,
+        label: 'File manifest (.csv)', fallbackName: 'study-manifest', ext: 'csv', mime: 'text/csv', render: renderCsv,
         toastMessage: 'Downloaded the file manifest as CSV.',
       });
-
       addDownloadButton({
-        label: 'Download raw data (.json)',
-        fallbackName: 'study-overview',
-        ext: 'json',
-        mime: 'application/json',
-        render: renderJson,
+        label: 'Study data (.json)', fallbackName: 'study-overview', ext: 'json', mime: 'application/json', render: renderJson,
         toastMessage: 'Downloaded the study overview as JSON.',
       });
-
-      // "Export for your own LLM": a COPY button, not a download -- the
-      // whole point is pasting it straight into whatever model the user
-      // already has open (engine/render/llmprompt.js's header). A download
-      // button is offered alongside for anyone who wants the file.
+      const secondaryActions = document.createElement('div');
+      secondaryActions.className = 'overview-secondary-actions';
       const copyLlmBtn = document.createElement('button');
       copyLlmBtn.type = 'button';
       copyLlmBtn.className = 'copy-button';
       copyLlmBtn.textContent = 'Copy prompt for your own LLM';
       copyLlmBtn.title =
-        'Copies an instruction preamble + this study as JSON + suggested questions. Paste it into ChatGPT/Claude/whatever you use -- nothing is sent from this app.';
+        'Copies an instruction preamble + this study as JSON + suggested questions. Paste it into your own LLM -- nothing is sent from this app.';
       copyLlmBtn.addEventListener('click', async () => {
         const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
         const ok = await copyToClipboard(renderLlmPrompt(freshDoc));
-        if (showToast) {
-          showToast(
-            ok
-              ? 'Copied the prompt -- paste it into your own LLM. Nothing was sent from this app.'
-              : 'Could not copy automatically -- use "Download raw data (.json)" instead.'
-          );
-        }
+        if (showToast) showToast(ok
+          ? 'Copied the prompt -- paste it into your own LLM. Nothing was sent from this app.'
+          : 'Could not copy automatically -- use Export study → Study data (.json) instead.');
       });
-      actions.appendChild(copyLlmBtn);
-
+      secondaryActions.appendChild(copyLlmBtn);
       const printBtn = document.createElement('button');
       printBtn.type = 'button';
       printBtn.className = 'copy-button';
       printBtn.textContent = 'Print / Save as PDF';
-      printBtn.addEventListener('click', () => window.print());
-      actions.appendChild(printBtn);
-
-      main.appendChild(actions);
-
-      const doc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+      printBtn.addEventListener('click', () => {
+        if (!permitFinalExport()) return;
+        window.print();
+      });
+      secondaryActions.appendChild(printBtn);
 
       // The study map: the headline visual of this step, placed first. A
       // horizontal scroll container keeps a wide (many-assay) map from forcing
@@ -481,9 +524,8 @@ export function createOverviewStep(kb) {
       // from checks the individual steps already run (engine/conformance.js).
       // Placed above the per-assay tree so the answer is the first thing
       // read, not something to reconstruct by scrolling every assay.
-      const conformance = checkConformance(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
       const conformanceSection = document.createElement('section');
-      conformanceSection.className = 'conformance';
+      conformanceSection.className = `conformance conformance-${conformance.readiness}`;
 
       const conformanceHeading = document.createElement('h2');
       conformanceHeading.className = 'overview-node-title';
@@ -491,14 +533,15 @@ export function createOverviewStep(kb) {
       conformanceSection.appendChild(conformanceHeading);
 
       const verdict = document.createElement('div');
-      verdict.className = `conformance-verdict conformance-${conformance.pass ? 'pass' : 'fail'}`;
-      verdict.textContent = conformance.pass
-        ? `Passes: nothing blocking across ${conformance.assays.length} assay(s).`
-        : 'Does not pass yet: at least one blocking problem below.';
+      verdict.className = `conformance-verdict conformance-${conformance.readiness}`;
+      verdict.textContent = conformance.readiness === 'ready'
+        ? `Ready to acquire/export across ${conformance.assays.length} assay(s).`
+        : conformance.readiness === 'blocked'
+          ? `Blocked: ${conformance.counts.blocked} issue(s) need correction before final export.`
+          : `Needs review: ${conformance.counts.needsReview} incomplete or provisional item(s) remain.`;
       conformanceSection.appendChild(verdict);
 
-      const conformanceIssues = conformance.assays.flatMap((a) => a.issues.map((i) => ({ ...i, label: a.label })));
-      const allConformanceIssues = [...conformanceIssues, ...conformance.crossAssayIssues.map((i) => ({ ...i, label: 'Across assays' }))];
+      const allConformanceIssues = reportIssues(conformance);
       if (allConformanceIssues.length === 0) {
         const clean = document.createElement('p');
         clean.className = 'panel-empty';
@@ -510,24 +553,25 @@ export function createOverviewStep(kb) {
         for (const issue of allConformanceIssues) {
           const li = document.createElement('li');
           li.className = 'issue issue-' + issue.severity;
-          li.textContent = `[${issue.section}] ${issue.label}: ${issue.message}`;
+          const text = `${issue.assayLabel} · ${issueText(issue)}`;
+          const route = ISSUE_ROUTES[issue.section];
+          if (route && router) {
+            const link = document.createElement('button');
+            link.type = 'button';
+            link.className = 'conformance-issue-link';
+            link.textContent = text;
+            link.title = `Go to ${route === 'panel' ? 'Microscopy' : route === 'design' ? 'Design' : 'Naming'} to review this item`;
+            link.addEventListener('click', () => router.navigate(route));
+            li.appendChild(link);
+          } else {
+            li.textContent = text;
+          }
           list.appendChild(li);
         }
         conformanceSection.appendChild(list);
       }
       main.appendChild(conformanceSection);
-
-      if (doc.crossAssayIssues.length > 0) {
-        const issuesList = document.createElement('ul');
-        issuesList.className = 'issues-list';
-        for (const issue of doc.crossAssayIssues) {
-          const li = document.createElement('li');
-          li.className = 'issue issue-' + issue.severity;
-          li.textContent = `${issue.field}: ${issue.message}`;
-          issuesList.appendChild(li);
-        }
-        main.appendChild(issuesList);
-      }
+      main.append(exportMenu, secondaryActions);
 
       // Rendered ONCE for the whole study -- see engine/studydoc.js's
       // stageNotes comment for why this moved out of the per-assay loop.
@@ -537,9 +581,14 @@ export function createOverviewStep(kb) {
       tree.className = 'overview-tree';
       for (const assay of doc.assays) {
         renderAssayNode(tree, assay, (assayForCard) => {
-          const filename = `${(assayForCard.label || 'bench-card').replace(/[^A-Za-z0-9_-]+/g, '-')}-bench-card.md`;
-          downloadTextFile(renderBenchCard(assayForCard), filename, 'text/markdown');
-          if (showToast) showToast(`Downloaded the bench card for "${assayForCard.label}".`);
+          if (!permitFinalExport()) return;
+          // Rebuild the document after the gate, so a card cannot silently
+          // download a stale assay snapshot after an intervening edit.
+          const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+          const freshAssay = freshDoc.assays.find((candidate) => candidate.id === assayForCard.id) || assayForCard;
+          const filename = `${(freshAssay.label || 'bench-card').replace(/[^A-Za-z0-9_-]+/g, '-')}-bench-card.md`;
+          downloadTextFile(renderBenchCard(freshAssay), filename, 'text/markdown');
+          if (showToast) showToast(`Downloaded the bench card for "${freshAssay.label}".`);
         });
       }
       main.appendChild(tree);

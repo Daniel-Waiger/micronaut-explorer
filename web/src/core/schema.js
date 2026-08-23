@@ -1,6 +1,8 @@
 // Experiment data model: shape, defaults, and version migration.
 //
-// v3 introduces the ASSAY TIER: a study (still called Experiment, for
+// v3 introduced the ASSAY TIER; v4 completes the user-facing terminology
+// migration from the legacy treatment-axis wording to "groups" in the study vocabulary.
+// A study (still called Experiment, for
 // continuity with everything already written against that name) holds one
 // or more assays, each an almost-complete v2 slice
 // (specimen/design/panel/acquisition/controls/naming.fields). This exists
@@ -15,7 +17,15 @@
 import { emptyAssay, isAssayScopedPath } from './assay.js';
 import { shortId } from './ids.js';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
+
+// `origin` is intentionally descriptive rather than a permission or
+// provenance mechanism. It answers the UI's ownership question ("is this
+// still the shipped example?") without inferring that answer from mutable
+// study text. Unknown/missing values from saves made before this field existed
+// are normalized to `user`, the conservative choice: old work must never be
+// presented as an example just because it resembles one.
+export const STUDY_ORIGINS = new Set(['blank', 'example', 'imported', 'draft', 'template', 'user']);
 
 // Two-stage name.
 //
@@ -31,8 +41,8 @@ export const SCHEMA_VERSION = 3;
 // experiment with no technical replicates (common for SEM/TEM/Raman) omits the
 // token entirely rather than padding the name with a placeholder.
 //
-// {group} is the ARM axis (CTL | OPP) and is a SINGLE token: arms
-// are mutually exclusive, so they must never be crossed with each other. It is
+// {group} is the mutually exclusive group axis (CTL | OPP) and is a SINGLE
+// token: groups on this axis must never be crossed with each other. It is
 // separate from {sample}, the specimen identifier.
 //
 // With more than one assay, {exptype} is what keeps two assays' filenames
@@ -52,6 +62,7 @@ export function emptyExperiment() {
       createdAt: null,
       updatedAt: null,
       title: '',
+      origin: 'blank',
     },
     // What the whole study is trying to answer. Study-level: every assay
     // exists in service of one question, unlike the per-assay design.
@@ -61,11 +72,11 @@ export function emptyExperiment() {
       history: [],
     },
     // A SEEDING TEMPLATE for new assays' design.groups, not a live axis --
-    // see core/assay.js's module header on why arms live per-assay instead
+    // see core/assay.js's module header on why groups live per-assay instead
     // of being composed from a shared study-level axis (a composed axis
     // could never be MISSING from an assay, which would make "flag an
     // assay with no groups" uncomputable).
-    armVocabulary: { levels: [] },
+    groupVocabulary: { levels: [] },
     // INVARIANT: length is always >= 1. A study with zero assays is not a
     // study; every consumer (assayView, the UI) may assume at least one.
     assays: [emptyAssay(firstId)],
@@ -92,14 +103,14 @@ export function emptyExperiment() {
 }
 
 /**
- * v1 -> v2: the design gained a separate arm axis and split its single
+ * v1 -> v2: the design gained a separate group axis and split its single
  * replicate count into biological + technical.
  *
  * `design.replicates` becomes `biologicalReplicates` -- that is what it always
  * meant (the v1 UI labelled it "Biological replicates"). `factors` is left
- * ALONE and `groups.levels` starts empty: a v1 user who expressed their arms
+ * ALONE and `groups.levels` starts empty: a v1 user who expressed their groups
  * as a factor may well have meant it as a crossing factor, and silently
- * promoting factors[0] to the arm axis would reshape their design without
+ * promoting factors[0] to the group axis would reshape their design without
  * asking. Leaving it lets them move it deliberately.
  */
 function migrateV1toV2(obj) {
@@ -139,8 +150,8 @@ const V2_TO_V3_ASSAY_ID = 'assay1';
  * into assays[0] VERBATIM -- a relocation, not a reinterpretation. Nothing
  * is dropped, nothing invented.
  *
- * design.groups is NOT promoted to armVocabulary. The vocabulary is a
- * seeding template for FUTURE assays; the v2 user's arms are a fact about
+ * design.groups is NOT promoted to the study vocabulary. The vocabulary is a
+ * seeding template for FUTURE assays; the v2 user's groups are a fact about
  * the assay they actually ran, and copying them upward would assert that
  * every future assay shares them -- the same "reshape their design without
  * asking" mistake migrateV1toV2 already refused to make with `factors`.
@@ -176,7 +187,7 @@ function migrateV2toV3(obj) {
     ...rest,
     schemaVersion: 3,
     researchQuestion: typeof src.researchQuestion === 'string' ? src.researchQuestion : '',
-    armVocabulary: { levels: [] },
+    groupVocabulary: { levels: [] },
     assays: [assay],
     activeAssayId: id,
     naming: {
@@ -216,9 +227,46 @@ function rescopeProvenance(provenance, assayId) {
   };
 }
 
+/**
+ * v3 -> v4: replace the study-level `armVocabulary` field with the canonical
+ * `groupVocabulary` name. The per-assay design was already `design.groups`,
+ * so this is a terminology-only relocation and cannot change condition
+ * expansion. Move the matching provenance slot with it so a migrated value
+ * remains reviewable under the exact path the v4 UI writes.
+ */
+function migrateV3toV4(obj) {
+  const src = obj && typeof obj === 'object' ? obj : {};
+  const { armVocabulary, ...rest } = src;
+  const suppliedVocabulary =
+    src.groupVocabulary && typeof src.groupVocabulary === 'object'
+      ? src.groupVocabulary
+      : armVocabulary;
+  const vocabularyLevels =
+    suppliedVocabulary && Array.isArray(suppliedVocabulary.levels)
+      ? suppliedVocabulary.levels.slice()
+      : [];
+  const provenance = src.provenance && typeof src.provenance === 'object' ? src.provenance : {};
+  const sourceSlots = provenance.slots && typeof provenance.slots === 'object' ? provenance.slots : {};
+  const { armVocabulary: legacySlot, ...slotsWithoutLegacyName } = sourceSlots;
+  const slots = {
+    ...slotsWithoutLegacyName,
+    ...(slotsWithoutLegacyName.groupVocabulary === undefined && legacySlot !== undefined
+      ? { groupVocabulary: legacySlot }
+      : {}),
+  };
+
+  return {
+    ...rest,
+    schemaVersion: 4,
+    groupVocabulary: { levels: vocabularyLevels },
+    provenance: { ...provenance, slots },
+  };
+}
+
 const MIGRATIONS = {
   1: migrateV1toV2,
   2: migrateV2toV3,
+  3: migrateV3toV4,
 };
 
 export function migrate(obj) {
@@ -232,8 +280,8 @@ export function migrate(obj) {
     );
   }
 
-  // Apply migrations in sequence, so a v1 file still loads once v3 exists
-  // rather than needing a bespoke v1->v3 step for every future version.
+  // Apply migrations in sequence, so a v1 file still loads once v4 exists
+  // rather than needing a bespoke v1->v4 step for every future version.
   while (version < SCHEMA_VERSION) {
     const step = MIGRATIONS[version];
     if (!step) {
@@ -245,5 +293,12 @@ export function migrate(obj) {
     version = current.schemaVersion;
   }
 
-  return current;
+  // Saved studies from before the additive meta.origin field are still
+  // otherwise valid data, so version migration alone cannot normalize them. Do it
+  // at the boundary every persisted experiment crosses instead. This returns
+  // the original object when it already carries a supported origin, retaining
+  // the existing no-op identity contract for current saves.
+  const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
+  if (STUDY_ORIGINS.has(meta.origin)) return current;
+  return { ...current, meta: { ...meta, origin: 'user' } };
 }

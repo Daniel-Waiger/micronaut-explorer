@@ -59,8 +59,8 @@ export function effectiveNamingFields(experiment) {
  *
  * A design axis OVERRIDES the corresponding manually-typed naming field, but
  * only where the design actually has an opinion. That asymmetry is the whole
- * point: with a design, the arm/replicate columns come from the design and
- * vary per row; with NO design (zero arms, zero factors, no replicates),
+ * point: with a design, the group/replicate columns come from the design and
+ * vary per row; with NO design (zero groups, zero factors, no replicates),
  * expandConditions still yields exactly one row and every token falls through
  * to whatever the Name builder's own boxes hold. So the same function serves
  * both the full workflow and the standalone one-off name, with no separate

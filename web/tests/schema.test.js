@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SCHEMA_VERSION, emptyExperiment, migrate } from '../src/core/schema.js';
 
-test('emptyExperiment returns an object with all v3 top-level Study keys', () => {
+test('emptyExperiment returns an object with all v4 top-level Study keys', () => {
   const exp = emptyExperiment();
   const expectedKeys = [
     'schemaVersion',
     'meta',
     'researchQuestion',
     'narrative',
-    'armVocabulary',
+    'groupVocabulary',
     'assays',
     'activeAssayId',
     'naming',
@@ -39,6 +39,10 @@ test('emptyExperiment does NOT keep a vestigial copy of the per-assay roots at t
 test('emptyExperiment stamps the current schema version', () => {
   const exp = emptyExperiment();
   assert.equal(exp.schemaVersion, SCHEMA_VERSION);
+});
+
+test('emptyExperiment marks a genuinely new study as blank', () => {
+  assert.equal(emptyExperiment().meta.origin, 'blank');
 });
 
 test('emptyExperiment always has at least one assay, with activeAssayId pointing at it', () => {
@@ -101,6 +105,24 @@ test('migrate no-ops at the current schema version', () => {
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
 });
 
+test('migrate treats a legacy meta object with no origin as user work', () => {
+  const legacy = emptyExperiment();
+  delete legacy.meta.origin;
+
+  const migrated = migrate(legacy);
+  assert.notEqual(migrated, legacy);
+  assert.equal(migrated.meta.origin, 'user');
+  assert.equal(legacy.meta.origin, undefined, 'migration must not mutate the saved object');
+});
+
+test('migrate keeps each supported origin unchanged', () => {
+  for (const origin of ['blank', 'example', 'imported', 'draft', 'template', 'user']) {
+    const experiment = emptyExperiment();
+    experiment.meta.origin = origin;
+    assert.equal(migrate(experiment), experiment, origin);
+  }
+});
+
 test('migrate throws a clear error on a future schema version', () => {
   const future = emptyExperiment();
   future.schemaVersion = SCHEMA_VERSION + 1;
@@ -113,7 +135,7 @@ test('migrate throws when no migration path exists from an older version', () =>
   assert.throws(() => migrate(stale), /No migration path/);
 });
 
-// --- v1 -> v2 -> v3 fixtures -----------------------------------------------
+// --- v1 -> v2 -> v3 -> v4 fixtures -----------------------------------------
 // Without a real migration at each step, EVERY older autosave hard-fails on
 // load the moment SCHEMA_VERSION moves -- migrate() throws "No migration
 // path" for any version it doesn't recognize, so this is load-bearing, not
@@ -169,7 +191,7 @@ function v2Experiment(overrides = {}) {
   };
 }
 
-test('migrate chains v1 all the way to the current version (v3) in one call', () => {
+test('migrate chains v1 all the way to the current version (v4) in one call', () => {
   const migrated = migrate(v1Experiment());
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
   assert.equal(migrated.assays.length, 1);
@@ -189,14 +211,14 @@ test('migrate upgrades a v1 experiment to v2 semantics: replicates -> biological
   assert.ok(!('replicates' in design));
 });
 
-test('migrate v1->v2 leaves factors untouched rather than guessing which one was the arm axis', () => {
+test('migrate v1->v2 leaves factors untouched rather than guessing which one was the group axis', () => {
   const migrated = migrate(v1Experiment());
   const design = migrated.assays[0].design;
   assert.deepEqual(design.factors, [{ name: 'genotype', levels: ['WT', 'KO'] }]);
   assert.deepEqual(design.groups, { levels: [] });
 });
 
-test('migrate v1->v3 preserves study-level fields (meta, narrative) untouched', () => {
+test('migrate v1->v4 preserves study-level fields (meta, narrative) untouched', () => {
   const v1 = v1Experiment();
   v1.meta.title = 'my experiment';
   v1.narrative.text = 'a paragraph';
@@ -227,12 +249,12 @@ test('migrate v2->v3 hoists the whole per-assay slice into assays[0] verbatim', 
   assert.deepEqual(assay.naming.fields, { date: '2026-01-01', sample: 'E01' });
 });
 
-test('migrate v2->v3 does NOT promote design.groups to armVocabulary', () => {
+test('migrate v2 through v4 does NOT promote design.groups to groupVocabulary', () => {
   // The vocabulary is a seeding template for FUTURE assays; copying the v2
-  // user's actual arms upward would assert every future assay shares them.
+  // user's actual groups upward would assert every future assay shares them.
   const v2 = v2Experiment({ design: { groups: { levels: ['CT', 'OPP'] }, factors: [], biologicalReplicates: null, technicalReplicates: null, idScheme: '', conditions: [] } });
   const migrated = migrate(v2);
-  assert.deepEqual(migrated.armVocabulary, { levels: [] });
+  assert.deepEqual(migrated.groupVocabulary, { levels: [] });
 });
 
 test('migrate v2->v3 leaves NO vestigial root copy of the hoisted slices', () => {
@@ -285,4 +307,37 @@ test('migrate v2->v3 is TOTAL: malformed/missing sub-objects degrade rather than
   const migrated = migrate(bare);
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
   assert.equal(migrated.assays.length, 1);
+});
+
+test('migrate v3->v4 renames the vocabulary and its provenance without data loss', () => {
+  const current = emptyExperiment();
+  const { groupVocabulary: _currentVocabulary, ...v3 } = current;
+  v3.schemaVersion = 3;
+  v3.armVocabulary = { levels: ['CTL', 'OPP'] };
+  v3.provenance = {
+    ...v3.provenance,
+    slots: {
+      ...v3.provenance.slots,
+      armVocabulary: { tag: 'user', detail: 'legacy study' },
+    },
+  };
+
+  const migrated = migrate(v3);
+  assert.equal(migrated.schemaVersion, 4);
+  assert.deepEqual(migrated.groupVocabulary, { levels: ['CTL', 'OPP'] });
+  assert.deepEqual(migrated.provenance.slots.groupVocabulary, {
+    tag: 'user',
+    detail: 'legacy study',
+  });
+  assert.ok(!('armVocabulary' in migrated));
+  assert.ok(!('armVocabulary' in migrated.provenance.slots));
+  assert.deepEqual(v3.armVocabulary, { levels: ['CTL', 'OPP'] }, 'migration must not mutate v3 input');
+});
+
+test('migrate v3->v4 degrades a malformed vocabulary to an empty group vocabulary', () => {
+  const current = emptyExperiment();
+  const { groupVocabulary: _currentVocabulary, ...v3 } = current;
+  v3.schemaVersion = 3;
+  v3.armVocabulary = { levels: null };
+  assert.deepEqual(migrate(v3).groupVocabulary, { levels: [] });
 });

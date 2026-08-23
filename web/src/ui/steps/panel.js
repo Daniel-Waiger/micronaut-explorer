@@ -130,6 +130,20 @@ function summaryText(channels) {
   );
 }
 
+// Native disclosures keep the dense microscopy workflow scan-friendly while
+// preserving its complete, keyboard-operable content. All state lives in the
+// existing store/render paths below; these elements only group that content.
+function createMicroscopySection(title, initiallyOpen = false) {
+  const details = document.createElement('details');
+  details.className = 'microscopy-section';
+  details.open = initiallyOpen;
+  const summary = document.createElement('summary');
+  summary.className = 'microscopy-section-summary';
+  summary.textContent = title;
+  details.appendChild(summary);
+  return details;
+}
+
 // Same question-bank load as ui/steps/describe.js's module-level constant --
 // one parse of web/kb/questions.json, shared by both step factories via the
 // same `kb` object main.js already passes each of them. See loadQuestions'
@@ -169,17 +183,23 @@ export function createPanelStep(kb) {
         heading.textContent = 'Microscopy';
         main.appendChild(heading);
 
-        const interviewHeading = document.createElement('div');
-        interviewHeading.className = 'interview-heading';
-        interviewHeading.textContent = 'Acquisition';
-        main.appendChild(interviewHeading);
+        const acquisitionSection = createMicroscopySection('Acquisition', true);
+        const fluorophoresSection = createMicroscopySection('Fluorophores and spillover');
+        const spectralSection = createMicroscopySection('Spectral view');
+        const assemblySection = createMicroscopySection('Panel assembly');
+        const guidanceSection = createMicroscopySection('Guidance');
+        main.appendChild(acquisitionSection);
+        main.appendChild(fluorophoresSection);
+        main.appendChild(spectralSection);
+        main.appendChild(assemblySection);
+        main.appendChild(guidanceSection);
 
         // Name-builder-style boxes (zen-planner Phase 1 feedback): fill a box
-        // and click its ✓ to confirm; leave it empty to skip. The "why" is a
-        // hover hint on the box, not a subtitle. onCommit writes STRONG and
-        // re-paints so the ✓ flips to confirmed and the panel below updates.
+        // and use its explicit confirmation action; leave it empty to skip.
+        // The "why" is a hover hint on the box, not a subtitle. onCommit
+        // writes STRONG and re-paints the state label plus the panel below.
         const interviewContainer = document.createElement('div');
-        main.appendChild(interviewContainer);
+        acquisitionSection.appendChild(interviewContainer);
         renderFieldInterview(interviewContainer, {
           questions: phaseQuestions(questionBank, assayView(store.get(), assayId), 'microscopy'),
           experience,
@@ -196,13 +216,13 @@ export function createPanelStep(kb) {
       explainer.className = 'proposals-empty';
       explainer.textContent =
         'A qualitative check for spectral spillover across this assay’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
-      main.appendChild(explainer);
+      fluorophoresSection.appendChild(explainer);
 
       const banner = document.createElement('div');
       banner.className = 'panel-review-banner';
       banner.textContent =
         'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by a microscopy specialist -- treat exact peak numbers as approximate until reviewed.';
-      main.appendChild(banner);
+      fluorophoresSection.appendChild(banner);
 
       // assayId is already cached above (shared with the interview section).
       const view = assayView(store.get(), assayId);
@@ -214,7 +234,7 @@ export function createPanelStep(kb) {
         const empty = document.createElement('p');
         empty.className = 'panel-empty';
         empty.textContent = 'No markers entered yet -- fill in the markers field on the Naming step to see a color panel here.';
-        main.appendChild(empty);
+        fluorophoresSection.appendChild(empty);
       } else if (panelState === 'no-markers-declared') {
         // A DECLARATION ("NONE", "N/A", "unstained", ...), not a typo -- see
         // spectra.js's NO_MARKERS_SENTINELS. Its own sentence, distinct from
@@ -223,21 +243,21 @@ export function createPanelStep(kb) {
         const declared = document.createElement('p');
         declared.className = 'panel-empty';
         declared.textContent = 'This assay declares no markers/fluorophores -- nothing for a color panel to check here.';
-        main.appendChild(declared);
+        fluorophoresSection.appendChild(declared);
       } else {
         const list = document.createElement('div');
         list.className = 'panel-list';
         for (const entry of entries) {
           appendRow(list, entry);
         }
-        main.appendChild(list);
+        fluorophoresSection.appendChild(list);
 
         const flags = flagPanelOverlaps(entries, kb.overlapRules);
 
         const flagsHeading = document.createElement('div');
         flagsHeading.className = 'proposals-heading';
         flagsHeading.textContent = 'Spillover flags';
-        main.appendChild(flagsHeading);
+        fluorophoresSection.appendChild(flagsHeading);
 
         if (flags.length > 0) {
           const issuesList = document.createElement('ul');
@@ -248,7 +268,7 @@ export function createPanelStep(kb) {
             li.textContent = flag.message;
             issuesList.appendChild(li);
           }
-          main.appendChild(issuesList);
+          fluorophoresSection.appendChild(issuesList);
         } else {
           const knownCount = entries.filter((e) => e.state === 'known').length;
           const noFlags = document.createElement('p');
@@ -257,7 +277,7 @@ export function createPanelStep(kb) {
             knownCount > 0
               ? `No spectral-proximity conflicts among ${knownCount} recognized fluorophore(s).`
               : 'No recognized fluorophores with spectral data yet -- see the states above.';
-          main.appendChild(noFlags);
+          fluorophoresSection.appendChild(noFlags);
         }
       }
 
@@ -268,14 +288,9 @@ export function createPanelStep(kb) {
       const spectralHost = document.createElement('section');
       spectralHost.className = 'spectral-view-host';
       const spectralViewState = spectralViewCreateState();
-      main.appendChild(spectralHost);
+      spectralSection.appendChild(spectralHost);
 
       // --- Structured panel assembly (Wave 2A) --------------------------
-      const assemblyHeading = document.createElement('div');
-      assemblyHeading.className = 'proposals-heading';
-      assemblyHeading.textContent = 'Panel assembly (structured)';
-      main.appendChild(assemblyHeading);
-
       const assemblyExplainer = document.createElement('p');
       assemblyExplainer.className = 'panel-empty';
       assemblyExplainer.textContent =
@@ -284,7 +299,7 @@ export function createPanelStep(kb) {
         'actually involved, so it can recommend an isotype control only when one is warranted. Enter a detection ' +
         'filter as center/bandwidth nm to overlay it above. Drag channel handles or use the arrow buttons to reorder; ' +
         'ordering changes the saved channel list, never a fluorophore’s physical wavelength.';
-      main.appendChild(assemblyExplainer);
+      assemblySection.appendChild(assemblyExplainer);
 
       const channelsList = document.createElement('div');
       channelsList.className = 'panel-list';
@@ -692,9 +707,9 @@ export function createPanelStep(kb) {
         }
       }
 
-      main.appendChild(channelsList);
-      main.appendChild(summary);
-      main.appendChild(controlsRow);
+      assemblySection.appendChild(channelsList);
+      assemblySection.appendChild(summary);
+      assemblySection.appendChild(controlsRow);
       renderChannelsList();
       refreshSpectralView();
 
@@ -705,7 +720,7 @@ export function createPanelStep(kb) {
       // own default and every other step's advice panel. See advice.js's
       // createAdvicePanel docstring for why the default itself is `true`.
       const advicePanel = createAdvicePanel(advisor || [], 'panel', { defaultExpanded: experience !== 'frequent' });
-      main.appendChild(advicePanel.element);
+      guidanceSection.appendChild(advicePanel.element);
       advicePanel.update(view);
       }
 

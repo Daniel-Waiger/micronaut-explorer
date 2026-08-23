@@ -1675,102 +1675,6 @@ button:focus-visible {
   margin: 4px 0 16px;
 }
 
-/* Interactive walkthrough (ui/walkthrough.js, zen-planner Phase 5): a
-   spotlight-style coach-mark tour over the real nav. The backdrop dims the
-   page; the highlighted nav button is lifted above it with a glow ring
-   (z-index + box-shadow) rather than a cutout mask, which is far simpler to
-   get right across every browser and viewport size. */
-.walkthrough-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgb(0 0 0 / 55%);
-  z-index: 200;
-}
-
-.walkthrough-highlight {
-  position: relative;
-  z-index: 201;
-  box-shadow: 0 0 0 3px var(--accent), 0 0 24px 4px color-mix(in srgb, var(--accent) 55%, transparent);
-  border-radius: 8px;
-}
-
-.walkthrough-tooltip {
-  position: fixed;
-  z-index: 202;
-  width: 300px;
-  max-width: calc(100vw - 24px);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 16px;
-  box-shadow: 0 8px 28px rgb(0 0 0 / 35%);
-}
-
-.walkthrough-step-label {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-
-.walkthrough-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--ink);
-  margin-bottom: 6px;
-}
-
-.walkthrough-body {
-  font-size: 13.5px;
-  color: var(--ink);
-  line-height: 1.5;
-  margin-bottom: 14px;
-}
-
-.walkthrough-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.walkthrough-skip {
-  font: inherit;
-  font-size: 13px;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 6px 0;
-}
-
-.walkthrough-skip:hover {
-  color: var(--ink);
-}
-
-.walkthrough-back {
-  font: inherit;
-  font-size: 13px;
-  color: var(--ink);
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 6px 12px;
-  cursor: pointer;
-  margin-left: auto;
-}
-
-.walkthrough-next {
-  font: inherit;
-  font-size: 13px;
-  color: var(--accent-ink);
-  background: var(--accent);
-  border: none;
-  border-radius: 6px;
-  padding: 6px 14px;
-  cursor: pointer;
-}
-
 /* The Guide step (ui/steps/guide.js): a readable, max-width prose column. */
 .guide-tour-button {
   margin-bottom: 16px;
@@ -2714,8 +2618,7 @@ textarea:focus-visible {
 .study-map,
 .conformance,
 .overview-assay,
-.overview-node,
-.walkthrough-tooltip {
+.overview-node {
   border-color: var(--line);
   border-radius: 12px;
   background: var(--panel);
@@ -2837,4 +2740,929 @@ td, th { border-color: var(--line); }
   .home-card { min-height: 0; }
   .overview-actions { align-items: stretch; }
   .overview-actions .copy-button { width: 100%; }
+}
+
+/* -------------------------------------------------------------------------
+   UX completion: global progress, recovery, disclosures, and compact mobile
+   navigation. Markup is intentionally owned by the relevant UI modules;
+   this is the one visual contract shared between them.
+   ------------------------------------------------------------------------- */
+
+.shell-save-indicator {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  max-width: min(330px, 42vw);
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--ok) 30%, var(--line));
+  border-radius: 9px;
+  color: var(--ok);
+  background: var(--ok-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.shell-save-indicator.is-saving {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* A newly edited study is neither successfully saved nor failing: keep the
+   pending/unsaved state deliberately neutral until autosave starts. */
+.shell-save-indicator.is-unsaved {
+  border-color: var(--line);
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.shell-save-indicator.is-failed {
+  max-width: min(440px, 56vw);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.shell-utilities { position: relative; }
+
+.shell-utility-toggle,
+.shell-utility-action,
+.mobile-assay-select,
+.mobile-step-select,
+.workflow-back,
+.workflow-continue {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--ink);
+  background: var(--panel);
+  font: inherit;
+  font-weight: 650;
+}
+
+.shell-utility-toggle {
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.shell-utility-toggle:hover,
+.shell-utility-toggle[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.shell-utility-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  width: min(340px, calc(100vw - 28px));
+  max-height: min(72vh, 620px);
+  gap: 4px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 18px 40px rgb(15 23 42 / 22%);
+}
+
+.shell-utility-menu[hidden] { display: none; }
+
+.shell-utility-action {
+  width: 100%;
+  padding: 9px 10px;
+  border-color: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.shell-utility-action:hover {
+  border-color: var(--line);
+  background: var(--surface-muted);
+}
+
+.shell-utility-heading {
+  padding: 8px 10px 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.shell-restore-group {
+  margin: 4px 0;
+  padding-block: 3px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.shell-restore-list { display: grid; gap: 2px; }
+.shell-restore-action { font-size: 12.5px; }
+.shell-restore-empty {
+  margin: 0;
+  padding: 6px 10px 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workflow-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 10px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.workflow-summary {
+  flex: 0 0 auto;
+  padding-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.workflow-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.workflow-badge,
+.assay-progress-badge,
+.nav-step-badge {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  font-size: 10.5px;
+  font-weight: 750;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.workflow-badge.is-complete,
+.assay-progress-badge.is-complete,
+.nav-step-badge.is-complete { border-color: color-mix(in srgb, var(--ok) 42%, var(--line)); color: var(--ok); background: var(--ok-soft); }
+.workflow-badge.is-in-progress,
+.assay-progress-badge.is-in-progress,
+.nav-step-badge.is-in-progress { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); color: var(--accent); background: var(--accent-soft); }
+.workflow-badge.is-needs-attention,
+.assay-progress-badge.is-needs-attention,
+.nav-step-badge.is-needs-attention { border-color: color-mix(in srgb, var(--warn) 46%, var(--line)); color: var(--warn); background: var(--warn-soft); }
+.workflow-badge.is-not-started,
+.assay-progress-badge.is-not-started,
+.nav-step-badge.is-not-started { color: var(--muted); background: var(--surface-muted); }
+
+.assay-switcher-bar { align-items: center; }
+.assay-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 4px 3px 9px; }
+.assay-progress-badge { font-size: 9.5px; }
+
+.nav-step { min-width: 0; }
+.nav-step-badge {
+  margin-left: auto;
+  font-size: 9px;
+}
+
+/* In the collapsed desktop rail the badge has no readable width. Preserve
+   that exact state through the icon color and the button's title/aria-label
+   instead; expanded navigation keeps the textual badge above unchanged. */
+.shell-body.shell-nav-collapsed .nav-step-badge { display: none; }
+.shell-body.shell-nav-collapsed .nav-step.workflow-state-complete .nav-step-icon { color: var(--ok); }
+.shell-body.shell-nav-collapsed .nav-step.workflow-state-in-progress .nav-step-icon { color: var(--accent); }
+.shell-body.shell-nav-collapsed .nav-step.workflow-state-needs-attention .nav-step-icon { color: var(--warn); }
+.shell-body.shell-nav-collapsed .nav-step.workflow-state-not-started .nav-step-icon { color: var(--muted); }
+
+.workflow-footer {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 24px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: 0 -8px 20px rgb(15 23 42 / 6%);
+}
+
+.workflow-back,
+.workflow-continue { min-width: 104px; padding: 8px 13px; cursor: pointer; }
+.workflow-continue { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); }
+.workflow-back:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.workflow-continue:hover:not(:disabled) { filter: brightness(.95); }
+.workflow-back:disabled,
+.workflow-continue:disabled { opacity: .48; cursor: not-allowed; }
+.workflow-position { min-width: 96px; color: var(--muted); font-size: 12px; font-weight: 700; text-align: center; }
+
+.shell-mobile-controls { display: none; }
+
+.home-study-ownership {
+  max-width: 900px;
+  margin: -4px 0 22px;
+  padding: 17px 19px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.home-example-ownership {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+  background: linear-gradient(135deg, var(--accent-soft), var(--panel));
+}
+
+.home-study-ownership-title { margin: 0; color: var(--ink); font-size: 16px; font-weight: 760; }
+.home-study-ownership-body { margin: 6px 0 0; color: var(--muted); }
+.home-study-ownership-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+
+.field-confirmation-state {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  margin-top: -1px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 7px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  font-size: 10.5px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.field-confirmation-confirmed { border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); color: var(--ok); background: var(--ok-soft); }
+.field-confirmation-suggested { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); color: var(--warn); background: var(--warn-soft); }
+.field-confirmation-unconfirmed { color: var(--muted); background: var(--surface-muted); }
+
+.field-commit {
+  width: auto;
+  min-width: 94px;
+  min-height: 44px;
+  padding: 7px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.field-commit-confirmed { border-color: var(--ok); color: var(--accent-ink); background: var(--ok); }
+.field-commit-confirmed:hover { filter: brightness(.95); }
+
+.reveal.field-chooser-help { margin-top: 2px; }
+.reveal.field-chooser-help > .proposals-empty { margin: 8px 0 0; }
+
+.microscopy-section,
+.overview-assay,
+.overview-export-menu {
+  overflow: clip;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+
+.microscopy-section { margin: 12px 0; }
+.microscopy-section-summary,
+.overview-assay-summary,
+.overview-export-summary {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 12px 16px;
+  color: var(--ink);
+  font-weight: 730;
+  cursor: pointer;
+  list-style: none;
+}
+
+.microscopy-section-summary::-webkit-details-marker,
+.overview-assay-summary::-webkit-details-marker,
+.overview-export-summary::-webkit-details-marker { display: none; }
+.microscopy-section-summary::after,
+.overview-assay-summary::after,
+.overview-export-summary::after { margin-left: auto; color: var(--muted); content: '⌄'; font-size: 18px; transition: transform 140ms ease; }
+.microscopy-section[open] > .microscopy-section-summary::after,
+.overview-assay[open] > .overview-assay-summary::after,
+.overview-export-menu[open] > .overview-export-summary::after { transform: rotate(180deg); }
+.microscopy-section[open] > .microscopy-section-summary,
+.overview-assay[open] > .overview-assay-summary,
+.overview-export-menu[open] > .overview-export-summary { border-bottom: 1px solid var(--line); background: var(--panel-2); }
+
+.microscopy-section > :not(summary) { margin-inline: 16px; }
+.microscopy-section > .naming-grid,
+.microscopy-section > .panel-list,
+.microscopy-section > .spectral-view-host { margin-bottom: 16px; }
+
+.overview-export-menu { width: min(100%, 720px); margin: 0 0 14px; }
+.overview-export-summary { color: var(--accent-ink); background: var(--accent); }
+.overview-export-summary::after { color: inherit; }
+.overview-export-menu[open] > .overview-export-summary { border-bottom-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent); }
+.overview-export-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; }
+.overview-export-action { flex: 1 1 170px; min-height: 42px; }
+.overview-secondary-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+
+.overview-assay { margin: 12px 0; padding: 0; }
+.overview-assay-summary { padding: 0; }
+.overview-assay-header { width: 100%; padding: 12px 16px; }
+.overview-assay > :not(summary) { margin-inline: 18px; }
+.overview-assay > .issues-list,
+.overview-assay > .planned-list { margin-bottom: 16px; }
+
+.conformance-ready { border-color: color-mix(in srgb, var(--ok) 48%, var(--line)); background: var(--ok-soft); }
+.conformance-needs-review { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); background: var(--warn-soft); }
+.conformance-blocked { border-color: color-mix(in srgb, var(--danger) 50%, var(--line)); background: var(--danger-soft); }
+.conformance-verdict { display: inline-flex; margin: 2px 0 8px; border-radius: 8px; padding: 7px 9px; font-weight: 760; }
+.conformance-verdict.conformance-ready { color: var(--ok); }
+.conformance-verdict.conformance-needs-review { color: var(--warn); }
+.conformance-verdict.conformance-blocked { color: var(--danger); }
+.conformance-issue-link { color: inherit; font-weight: 700; text-decoration-thickness: 1.5px; text-underline-offset: 2px; }
+
+.microscopy-section-summary:focus-visible,
+.overview-assay-summary:focus-visible,
+.overview-export-summary:focus-visible,
+.shell-utility-action:focus-visible,
+.shell-utility-toggle:focus-visible,
+.workflow-back:focus-visible,
+.workflow-continue:focus-visible,
+.mobile-assay-select:focus-visible,
+.mobile-step-select:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .workflow-strip { padding-inline: 18px; }
+  .workflow-summary { display: none; }
+  .shell-save-indicator { max-width: none; }
+}
+
+/* 760px is the compact-navigation breakpoint. Desktop pill and rail
+   containers are removed rather than merely made scrollable, leaving one
+   assay select and one step select as the only navigation controls. */
+@media (max-width: 760px) {
+  .shell-header { padding: 12px 14px; }
+  .header-actions { width: 100%; justify-content: flex-start; }
+  .shell-save-indicator { flex: 1 1 160px; max-width: none; }
+  .shell-utility-menu { right: auto; left: 0; width: min(360px, calc(100vw - 28px)); }
+  .workflow-strip,
+  .assay-switcher-bar,
+  .shell-nav { display: none; }
+  .shell-body,
+  .shell-body.shell-nav-collapsed { display: block; }
+  .shell-mobile-controls {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  .shell-mobile-controls label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+  .mobile-assay-select,
+  .mobile-step-select { width: 100%; min-width: 0; padding: 7px 9px; }
+  .shell-main { padding-bottom: 36px; }
+  .workflow-footer { gap: 8px; padding: 9px 14px; }
+  .workflow-back,
+  .workflow-continue { min-width: 0; flex: 1 1 0; }
+  .workflow-position { min-width: 82px; font-size: 11px; }
+  .home-study-ownership { padding: 15px; }
+  .field-commit-row { align-items: stretch; }
+  .field-commit { min-width: 88px; }
+  .overview-export-actions { display: grid; grid-template-columns: 1fr; }
+  .overview-export-action { width: 100%; }
+}
+
+@media (max-width: 430px) {
+  .shell-brand { width: 100%; }
+  .header-actions { gap: 6px; }
+  .shell-save-indicator { order: 3; flex-basis: 100%; }
+  .shell-new-study,
+  .shell-utility-toggle { flex: 1 1 auto; }
+  .shell-mobile-controls { grid-template-columns: 1fr; gap: 3px; }
+  .shell-mobile-controls label { margin-top: 4px; }
+  .field-commit-row { flex-direction: column; }
+  .field-commit { width: 100%; }
+  .home-study-ownership-actions { display: grid; grid-template-columns: 1fr; }
+  .home-study-ownership-actions .copy-button { width: 100%; }
+  .workflow-position { display: none; }
+}
+
+@media print {
+  .shell-header,
+  .workflow-strip,
+  .shell-mobile-controls,
+  .assay-switcher-bar,
+  .shell-nav,
+  .workflow-footer,
+  .shell-status,
+  .shell-utilities,
+  .shell-new-study,
+  .overview-export-menu,
+  .overview-secondary-actions,
+  .overview-assay-benchcard-btn,
+  .home-study-ownership-actions { display: none !important; }
+  .shell-body { display: block; }
+  .shell-main { width: 100%; margin: 0; padding: 0; overflow: visible; }
+  .microscopy-section,
+  .overview-assay,
+  .conformance,
+  .study-map { break-inside: avoid; box-shadow: none; }
+  .microscopy-section:not([open]) > :not(summary),
+  .overview-assay:not([open]) > :not(summary) { display: block !important; }
+}
+
+/* -------------------------------------------------------------------------
+   Guided example: one non-modal contextual aside plus the one-time example
+   disclosure. The guide remains in the shell's normal layout; only the
+   first-entry chooser uses a backdrop.
+   ------------------------------------------------------------------------- */
+
+.guided-aside-host {
+  min-width: 0;
+  color: var(--ink);
+}
+
+.guided-aside-host[hidden] {
+  display: none;
+}
+
+.guided-walkthrough-panel {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--line));
+  border-top: 3px solid var(--accent);
+  border-radius: 14px;
+  padding: 20px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+
+.guided-walkthrough-panel p,
+.guided-walkthrough-panel li,
+.guided-walkthrough-panel h2,
+.guided-walkthrough-panel h3 {
+  overflow-wrap: anywhere;
+}
+
+.guided-walkthrough-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.guided-walkthrough-position {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .045em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.guided-walkthrough-close,
+.guided-walkthrough-back,
+.guided-walkthrough-pause,
+.guided-walkthrough-next,
+.guided-walkthrough-adopt,
+.guided-walkthrough-blank,
+.guided-walkthrough-keep,
+.workflow-explain {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 8px 12px;
+  color: var(--ink);
+  background: var(--panel);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  cursor: pointer;
+}
+
+.guided-walkthrough-close {
+  min-height: 36px;
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  color: var(--muted);
+  background: var(--surface-muted);
+}
+
+.guided-walkthrough-close:hover,
+.guided-walkthrough-back:hover:not(:disabled),
+.guided-walkthrough-pause:hover,
+.guided-walkthrough-blank:hover,
+.guided-walkthrough-keep:hover,
+.workflow-explain:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.guided-walkthrough-next,
+.guided-walkthrough-adopt {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.guided-walkthrough-next:hover,
+.guided-walkthrough-adopt:hover {
+  filter: brightness(.95);
+}
+
+.guided-walkthrough-back:disabled,
+.workflow-explain:disabled {
+  opacity: .46;
+  cursor: not-allowed;
+}
+
+.guided-walkthrough-close:focus-visible,
+.guided-walkthrough-back:focus-visible,
+.guided-walkthrough-pause:focus-visible,
+.guided-walkthrough-next:focus-visible,
+.guided-walkthrough-adopt:focus-visible,
+.guided-walkthrough-blank:focus-visible,
+.guided-walkthrough-keep:focus-visible,
+.guided-walkthrough-details > summary:focus-visible,
+.workflow-explain:focus-visible,
+.onboarding-choice:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  outline-offset: 3px;
+}
+
+.guided-walkthrough-title {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 780;
+  letter-spacing: -.025em;
+  line-height: 1.2;
+}
+
+.guided-walkthrough-outcome {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.guided-walkthrough-example,
+.guided-walkthrough-what,
+.guided-walkthrough-try {
+  margin: 14px 0;
+  border-radius: 11px;
+  padding: 14px;
+}
+
+.guided-walkthrough-example {
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  background: var(--accent-soft);
+}
+
+.guided-walkthrough-what {
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.guided-walkthrough-try {
+  border-left: 3px solid var(--accent);
+  background: var(--surface-muted);
+}
+
+.guided-walkthrough-example h3,
+.guided-walkthrough-what h3,
+.guided-walkthrough-try h3 {
+  margin: 0 0 5px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.guided-walkthrough-example p,
+.guided-walkthrough-what p,
+.guided-walkthrough-try p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.guided-walkthrough-example p {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.guided-walkthrough-details {
+  margin: 10px 0;
+  overflow: clip;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+}
+
+.guided-walkthrough-details > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+  list-style: none;
+}
+
+.guided-walkthrough-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.guided-walkthrough-details > summary::after {
+  margin-left: auto;
+  padding-left: 12px;
+  color: var(--muted);
+  content: '⌄';
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 140ms ease;
+}
+
+.guided-walkthrough-details[open] > summary {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-2);
+}
+
+.guided-walkthrough-details[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.guided-walkthrough-details > p,
+.guided-walkthrough-details > ul {
+  margin: 0;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.guided-walkthrough-details > p + p {
+  padding-top: 0;
+}
+
+.guided-walkthrough-outcomes {
+  padding-left: 30px !important;
+}
+
+.guided-walkthrough-outcomes li + li {
+  margin-top: 6px;
+}
+
+.guided-walkthrough-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.guided-walkthrough-next {
+  grid-column: 1 / -1;
+}
+
+.guided-walkthrough-complete .guided-walkthrough-actions {
+  grid-template-columns: 1fr;
+}
+
+.workflow-explain {
+  min-height: 40px;
+  min-width: 132px;
+  padding: 7px 12px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* At wide desktop widths the aside receives a real third track. Dense
+   Microscopy and Overview pages retain at least 640px before the guide is
+   allowed beside them. */
+@media (min-width: 1201px) {
+  .shell-body.has-guided-aside {
+    grid-template-areas: 'guided-nav guided-main guided-aside';
+    grid-template-columns: 244px minmax(640px, 1fr) minmax(300px, 360px);
+  }
+
+  .shell-body.has-guided-aside.shell-nav-collapsed {
+    grid-template-columns: 76px minmax(640px, 1fr) minmax(300px, 360px);
+  }
+
+  .shell-body.has-guided-aside > .shell-nav { grid-area: guided-nav; }
+  .shell-body.has-guided-aside > .shell-main {
+    grid-area: guided-main;
+    width: 100%;
+    margin: 0;
+    padding-inline: clamp(22px, 3vw, 48px);
+  }
+  .shell-body.has-guided-aside > .guided-aside-host {
+    position: sticky;
+    top: 16px;
+    grid-area: guided-aside;
+    align-self: start;
+    max-height: calc(100vh - 32px);
+    overflow: auto;
+    padding: 32px 24px 64px 0;
+    scrollbar-width: thin;
+  }
+}
+
+/* A tablet or compact desktop keeps the guide in a second row beneath the
+   current page. The nav spans both rows, so no empty or mismatched rail is
+   introduced while the panel is open. */
+@media (min-width: 901px) and (max-width: 1200px) {
+  .shell-body.has-guided-aside {
+    grid-template-areas:
+      'guided-nav guided-main'
+      'guided-nav guided-aside';
+    grid-template-columns: 244px minmax(0, 1fr);
+  }
+
+  .shell-body.has-guided-aside.shell-nav-collapsed {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .shell-body.has-guided-aside > .shell-nav { grid-area: guided-nav; }
+  .shell-body.has-guided-aside > .shell-main { grid-area: guided-main; padding-bottom: 28px; }
+  .shell-body.has-guided-aside > .guided-aside-host {
+    position: static;
+    grid-area: guided-aside;
+    width: 100%;
+    max-width: 820px;
+    padding: 0 clamp(22px, 4vw, 56px) 56px;
+  }
+}
+
+@media (max-width: 900px) {
+  .guided-aside-host {
+    position: static;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    padding: 0 18px 48px;
+  }
+
+  .guided-walkthrough-panel {
+    max-width: 760px;
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .guided-aside-host {
+    padding: 0 16px 38px;
+  }
+
+  .guided-walkthrough-panel {
+    padding: 17px;
+  }
+
+  .workflow-explain,
+  .workflow-back,
+  .workflow-continue {
+    min-width: 0;
+    flex: 1 1 0;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 520px) {
+  .workflow-position {
+    display: none;
+  }
+}
+
+@media (max-width: 390px) {
+  .guided-walkthrough-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .guided-walkthrough-next {
+    grid-column: auto;
+  }
+}
+
+.onboarding-choice-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  background: rgb(15 23 42 / 58%);
+  backdrop-filter: blur(3px);
+}
+
+.onboarding-choice-dialog {
+  position: fixed;
+  z-index: 41;
+  top: 50%;
+  left: 50%;
+  width: min(960px, calc(100vw - 40px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: clamp(22px, 4vw, 38px);
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgb(15 23 42 / 32%);
+}
+
+.onboarding-choice-dialog .step-heading {
+  margin-bottom: 8px;
+}
+
+.onboarding-choice-disclosure {
+  max-width: 720px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.onboarding-choice-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.onboarding-choice {
+  width: 100%;
+  min-height: 190px;
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+
+.onboarding-choice:hover {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+  background: var(--accent-soft);
+}
+
+@media (max-width: 760px) {
+  .onboarding-choice-dialog {
+    top: 14px;
+    left: 14px;
+    width: calc(100vw - 28px);
+    max-height: calc(100vh - 28px);
+    transform: none;
+    padding: 20px;
+  }
+
+  .onboarding-choice-list {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .onboarding-choice {
+    min-height: 0;
+    padding: 16px;
+  }
+}
+
+@media print {
+  .guided-aside-host,
+  .onboarding-choice-backdrop,
+  .onboarding-choice-dialog,
+  .workflow-explain {
+    display: none !important;
+  }
+
+  .shell-body.has-guided-aside,
+  .shell-body.has-guided-aside.shell-nav-collapsed {
+    display: block;
+  }
 }

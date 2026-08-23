@@ -162,7 +162,7 @@ test('the modality bridge reaches the planned filenames, not just the field obje
 // --- Consistency and robustness ------------------------------------------
 
 test("a row's groupLabel matches the token embedded in its own filename (lesson 49)", () => {
-  // Deliberately lower-case arms: the display label and the embedded token
+  // Deliberately lower-case groups: the display label and the embedded token
   // must not disagree about case for the identical value.
   const exp = experimentWith({
     design: { groups: { levels: ['ct', 'nam50mm'] } },

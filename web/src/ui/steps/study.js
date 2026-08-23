@@ -3,7 +3,7 @@
 // discoverability surface for "this app can model more than one assay,"
 // per docs/plans/planner-web-assay-tier.md's commit-2 sequencing.
 //
-// Rename, arm-vocabulary authoring, and the cross-assay collision check all
+// Rename, group-vocabulary authoring, and the cross-assay collision check all
 // live here rather than in the always-visible switcher (ui/shell.js), which
 // only owns switch/add/delete -- this step is where a user reviews and
 // corrects study SHAPE, not just navigates it.
@@ -19,19 +19,19 @@ import { parseLevels } from './design.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
 /**
- * "N of M assays use LEVEL, LEVEL" -- how many assays' current arm axis
+ * "N of M assays use LEVEL, LEVEL" -- how many assays' current group axis
  * matches the study's vocabulary verbatim. Order-sensitive (JSON.stringify
- * on the array): a vocabulary and an assay that list the same arms in a
+ * on the array): a vocabulary and an assay that list the same groups in a
  * different order are NOT considered converged, since order is part of what
  * "matches the template" means here, not incidental.
  *
  * Returns null when the vocabulary is empty -- there is nothing for an
- * assay's arms to converge TO yet, so there is nothing useful to report.
+ * assay's groups to converge TO yet, so there is nothing useful to report.
  */
-function armDivergenceSummary(experiment) {
+function groupDivergenceSummary(experiment) {
   const vocabLevels =
-    experiment.armVocabulary && Array.isArray(experiment.armVocabulary.levels)
-      ? experiment.armVocabulary.levels
+    experiment.groupVocabulary && Array.isArray(experiment.groupVocabulary.levels)
+      ? experiment.groupVocabulary.levels
       : [];
   if (vocabLevels.length === 0) return null;
 
@@ -114,13 +114,13 @@ export const studyStep = {
     vocabInput.placeholder = 'e.g. CTL, OPP';
     vocabInput.title =
       'A TEMPLATE, not a shared axis -- each assay gets its own copy when created, and can diverge from it freely. Used to seed new assays and by "Apply to all assays" below.';
-    vocabInput.value = (store.get().armVocabulary && store.get().armVocabulary.levels || []).join(', ');
+    vocabInput.value = (store.get().groupVocabulary && store.get().groupVocabulary.levels || []).join(', ');
     vocabInput.addEventListener('input', () => {
       // Study-level, unscoped -- like researchQuestion above, nothing else
       // ever writes this field, so scopeWrite would only pass it through
       // unchanged; a direct setPath says that plainly instead of routing
       // through a no-op.
-      store.setPath('armVocabulary', { levels: parseLevels(vocabInput.value) }, 'user');
+      store.setPath('groupVocabulary', { levels: parseLevels(vocabInput.value) }, 'user');
       renderDivergence();
     });
     vocabRow.appendChild(vocabInput);
@@ -131,7 +131,7 @@ export const studyStep = {
     main.appendChild(divergenceLine);
 
     function renderDivergence() {
-      const summary = armDivergenceSummary(store.get());
+      const summary = groupDivergenceSummary(store.get());
       divergenceLine.textContent = summary || '';
       divergenceLine.hidden = !summary;
     }
@@ -144,7 +144,7 @@ export const studyStep = {
       "Fills in this vocabulary's groups for every assay that hasn't customized its own -- an assay whose groups you already edited by hand is left alone.";
     applyBtn.addEventListener('click', () => {
       const experiment = store.get();
-      const levels = (experiment.armVocabulary && experiment.armVocabulary.levels) || [];
+      const levels = (experiment.groupVocabulary && experiment.groupVocabulary.levels) || [];
       const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
       let applied = 0;
       let skipped = 0;
@@ -152,7 +152,7 @@ export const studyStep = {
         const { path, slotKey } = scopeWrite(store.get(), 'design.groups', assay.id);
         // setPath refuses (returns false) when this assay's groups already
         // carry a STRONG ('user'/'user_edited') tag -- so this is naturally
-        // "fill in the assays that haven't customized their arms yet," never
+        // "fill in the assays that haven't customized their groups yet," never
         // a blind overwrite. See core/store.js's setValueAtPath docstring.
         const ok = store.setPath(path, { levels: [...levels] }, 'kb-default', { slotKey });
         if (ok) applied += 1;

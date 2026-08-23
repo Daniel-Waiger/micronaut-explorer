@@ -1,0 +1,86 @@
+{
+  "run": "Guided example walkthrough",
+  "branch": "codex/ux-completion",
+  "batches": [
+    ["GEW-01", "GEW-02"],
+    ["GEW-03", "GEW-04"],
+    ["GEW-05"],
+    ["GEW-06"],
+    ["GEW-07"],
+    ["GEW-08"]
+  ],
+  "tasks": [
+    {
+      "id": "GEW-01",
+      "title": "Create the versioned guided-progress state producer",
+      "scope": "Add a pure, storage-injectable guided-progress module. Persist status (`not-started`, `active`, `paused`, `completed`), currentStepId, ordered/de-duplicated completedStepIds, and completedAt under one versioned key. Every load/transition accepts the caller's real primary workflow IDs, filters stale values, and degrades corrupt/blocked storage to defaults. Provide explicit start, resume, pause, advance, complete, and restart transitions. Store presentation progress only—never experiment data or router state—and do not duplicate the primary step list in this module.",
+      "verification": "Add focused tests for first start, sequential advance, duplicate advance, pause/reload/resume, completion timestamp, restart, a removed/unknown saved step, corrupt JSON, and throwing storage. Generate valid step IDs from `PRIMARY_WORKFLOW` in the test rather than hand-copying them. Run `node --test web/tests/guidedProgress.test.js`.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": ["web/src/core/guidedProgress.js", "web/tests/guidedProgress.test.js"]
+    },
+    {
+      "id": "GEW-02",
+      "title": "Build contextual What / Why / When / How content from real study projections",
+      "scope": "Add a pure guided-example content producer for exactly the seven injected `PRIMARY_WORKFLOW` steps. Return title, outcome, What, Why, When, How, example label/summary, Try this, and next-step metadata. Build active-assay facts from `buildStudyDocument()` and study readiness from `checkConformance()` using injected KB/naming configuration; never recreate condition counts, filenames, controls, marker resolution, readiness, or workflow order. Content must be total for missing/malformed data and say `In this study now` outside explicit example/template origin.",
+      "verification": "Add tests that call `createDefaultStudy()`, `buildStudyDocument()`, and `checkConformance()` to generate the expected active-assay/study facts, then prove all seven complete content objects use those exact produced values. Switch active assay and prove Project/Design/Microscopy/Naming summaries change while Home/Study remain coherent; mutate a value and prove a fresh call reflects it; test malformed input is total. Run `node --test web/tests/guidedExample.test.js`.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": ["web/src/engine/guidedExample.js", "web/tests/guidedExample.test.js"]
+    },
+    {
+      "id": "GEW-03",
+      "title": "Add one contextual aside host and Explain-this-step entry point to the shell",
+      "scope": "Extend the shell layout with one initially hidden semantic aside beside `shell-main`, plus an `Explain this step` action in the existing workflow footer. Return the host and a narrow callback setter/view updater needed by main; the shell must not load walkthrough persistence, build content, or own progress transitions. The action is enabled only on primary routes and uses the existing workflow route mapping so `microscopy`/`panel` cannot diverge. Preserve current Back/Continue, mobile selects, progress badges, utility menu, and step rendering.",
+      "verification": "Build and verify the aside exists exactly once, begins hidden, and Explain this step calls the injected handler with the current canonical primary step. Test Home through Overview including the microscopy route alias; Guide disables the action. Prove Back/Continue and mobile step selection still navigate once each. Run the full JS suite and single-file build.",
+      "depends_on": ["GEW-01", "GEW-02"],
+      "parallel_safe": true,
+      "files": ["web/src/ui/shell.js"]
+    },
+    {
+      "id": "GEW-04",
+      "title": "Replace the spotlight overlay with the persistent contextual walkthrough panel",
+      "scope": "Refactor `ui/walkthrough.js` into a controller/renderer over an injected aside host, guided state transitions, router, and fresh content getter. Render one Step N of 7 card with Outcome, current example summary, concise What/Why/When/How using native disclosure, Try this, Why does this matter, Back, Pause, and Next feature. Route through real pages on Back/Next; refresh on route/assay/store changes; show the completion card with Use as template, Start my own, and Keep exploring example. Support explanation-only mode that opens current-step rationale without changing saved walkthrough progress. Remove legacy backdrop, highlight, tooltip positioning, resize listeners, and forced eight-step TOUR_STEPS duplication.",
+      "verification": "In a built-artifact harness, prove start, Back/Next, pause, resume, route sync, active-assay refresh, and the three completion callbacks. Open explanation-only mode and byte-compare saved progress before/after close. Verify malformed/missing content leaves a usable panel, only one panel can exist, no backdrop/highlight nodes appear, Escape/Close pauses rather than discards progress, and repeated opening does not duplicate listeners or callbacks.",
+      "depends_on": ["GEW-01", "GEW-02"],
+      "parallel_safe": true,
+      "files": ["web/src/ui/walkthrough.js"]
+    },
+    {
+      "id": "GEW-05",
+      "title": "Wire first-entry choices and guided lifecycle through main",
+      "scope": "Bundle the producer-consumer boundary between onboarding and main. Replace onboarding's project-stage cards/two-screen experience flow with one disclosed example chooser: Walk through example, Explore myself, Start blank. Every path marks onboarding complete; Escape/backdrop equals Explore. In `main.js`, show it only when onboarding is incomplete AND the loaded study has `meta.origin === 'example'` (never for draft/imported/restored/user work); create the guided controller after shell render; supply fresh content from the real KB/naming/conformance producers and canonical primary workflow; route/store changes refresh the controller. Reuse main's existing adopt-example and recoverable blank actions at completion. Retain previously stored experience values without re-prompting for them.",
+      "verification": "Drive each first-entry button: Walk changes no experiment bytes and opens Home guidance; Explore changes no experiment bytes and leaves no panel; Start blank uses the existing blank lifecycle and retains recovery. Reload a paused tour and prove it resumes at the saved cursor. Load imported, drafted, restored, and legacy user studies with incomplete onboarding and prove none receives the example chooser. Verify completion Use as template preserves four assays and Start my own creates the same blank shape as Home/header. Run onboarding/guided state/content tests plus the full JS suite.",
+      "depends_on": ["GEW-03", "GEW-04"],
+      "parallel_safe": false,
+      "files": ["web/src/main.js", "web/src/ui/steps/onboarding.js"]
+    },
+    {
+      "id": "GEW-06",
+      "title": "Make Home and Guide the durable start, resume, and reopen surfaces",
+      "scope": "Replace Home's legacy `Take the walkthrough`/walkthroughSeen behavior and Guide's direct legacy walkthrough import with callbacks supplied by main. On an example study Home shows Walk through example, Resume example walkthrough when paused, or Restart walkthrough after completion; on template/user/blank work it says Explain the workflow without implying current values are the shipped seed. Guide documents the guided example and offers Start/Resume/Explain without becoming an eighth guided step. Remove the independent `micronaut.walkthroughSeen` preference, update stale Guide text about overlay/header behavior, and keep Home's Explore example, Use as template, Start blank, and Start from description actions distinct. Neither surface may mutate progress merely by rendering or searching.",
+      "verification": "Render each guided status against example and non-example origins and assert the correct callbacks with no direct guided localStorage access. Pause on Design, visit Home and Guide (including Guide search), resume, and prove Design is restored rather than either surface resetting progress. From completed state open Explain workflow and prove completion remains. Verify Guide never displays Step 8 of 8 and existing Home ownership actions retain behavior.",
+      "depends_on": ["GEW-05"],
+      "parallel_safe": true,
+      "files": ["web/src/ui/steps/home.js", "web/src/ui/steps/guide.js"]
+    },
+    {
+      "id": "GEW-07",
+      "title": "Style the guided aside and first-entry choices without page obstruction",
+      "scope": "As the sole CSS owner, replace obsolete walkthrough backdrop/tooltip/highlight styles with the settled aside, content hierarchy, native disclosure, progress, action, and completion styles. Give desktop enough room for main plus aside without crushing dense Microscopy/Overview content; at tablet/mobile place the panel in normal document flow after main and before workflow footer, with no fixed overlay or horizontal overflow. Style the three onboarding entry choices equally, preserve focus rings/touch targets, and support light/dark/print modes.",
+      "verification": "Inspect the HTTP-served build at wide desktop, tablet, and 375px in both themes. Prove inputs remain clickable while the guide is open, there is no backdrop, panel content does not cover the mobile footer, long example values wrap, native details are keyboard operable, and print hides guide-only chrome. Search the shipped CSS/DOM and confirm legacy `.walkthrough-backdrop`, `.walkthrough-highlight`, and tooltip positioning behavior are gone.",
+      "depends_on": ["GEW-05", "GEW-06"],
+      "parallel_safe": false,
+      "files": ["web/styles/app.css"]
+    },
+    {
+      "id": "GEW-08",
+      "title": "Terra/high adversarial verification of the guided example",
+      "scope": "Act as the mandatory independent Terra/high verifier. Make no feature changes unless a concrete defect is found. Re-read `docs/cma-lessons.md`, the guided plan/graph, and every changed diff; then falsify the content/state/UI producer-consumer contracts against the HTTP-served single-file artifact. Look specifically for stale content after assay/value changes, duplicate step lists or route aliases, a guide that cannot resume, explanation-only mode mutating progress, first-entry choices affecting the wrong experiment, completion actions diverging from Home, obstructed mobile controls, and any surviving legacy overlay storm.",
+      "verification": "Run `node --test web/tests/*.test.js`, `python -m pytest -q tests/test_single_file_build.py tests/test_kb_json_valid.py tests/test_regex_conformance.py`, and `python tools/build_single_file.py --web-dir web --out dist`; serve `dist` over HTTP. Drive all three first-entry paths; all seven Next/Back pages; active-assay changes on Project/Design/Microscopy/Naming; pause/reload/resume; direct nav during a tour; Explain this step with before/after persisted-state comparison; all three completion actions; Guide/Home reopen paths; keyboard/Escape; and 375px layout. Pass requires seven—not eight—steps, real generated example values, exactly one non-modal panel, zero console errors, and no change attributed to the pre-existing dirty `web/kb/spectra.json`.",
+      "depends_on": ["GEW-07"],
+      "parallel_safe": false,
+      "files": ["web/src/core/guidedProgress.js", "web/src/engine/guidedExample.js", "web/src/ui/walkthrough.js", "web/src/ui/shell.js", "web/src/ui/steps/onboarding.js", "web/src/ui/steps/home.js", "web/src/ui/steps/guide.js", "web/src/main.js", "web/styles/app.css", "web/tests/guidedProgress.test.js", "web/tests/guidedExample.test.js"]
+    }
+  ]
+}

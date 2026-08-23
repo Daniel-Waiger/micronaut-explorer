@@ -3,9 +3,32 @@ import { emptyExperiment } from './core/schema.js';
 import { createStore } from './core/store.js';
 import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
-import { clearAll, loadMostRecentRecoverable, saveExperiment, takeStashedDraft } from './core/persist.js';
+import {
+  exportToFile,
+  importFromFile,
+  listSaved,
+  loadExperiment,
+  loadMostRecentRecoverable,
+  loadRecoverableSlot,
+  markChanged,
+  markExported,
+  saveExperiment,
+  takeStashedDraft,
+} from './core/persist.js';
 import { shapeAppKb } from './engine/kbpack.js';
-import { createNamingStep } from './ui/steps/naming.js';
+import { checkConformance } from './engine/conformance.js';
+import { buildGuidedExampleContent } from './engine/guidedExample.js';
+import { PRIMARY_WORKFLOW, deriveWorkflowProgress } from './engine/workflowProgress.js';
+import {
+  advanceGuidedProgress,
+  loadGuidedProgress,
+  pauseGuidedProgress,
+  restartGuidedProgress,
+  resumeGuidedProgress,
+  startGuidedProgress,
+} from './core/guidedProgress.js';
+import { createWalkthroughController } from './ui/walkthrough.js';
+import { BASE_TEMPLATE, createNamingStep, NAMING_CONFIG } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
 import { designStep } from './ui/steps/design.js';
 import { studyStep } from './ui/steps/study.js';
@@ -14,7 +37,7 @@ import { createOverviewStep } from './ui/steps/overview.js';
 import { guideStep } from './ui/steps/guide.js';
 import { homeStep } from './ui/steps/home.js';
 import { showOnboardingGate } from './ui/steps/onboarding.js';
-import { loadOnboarding } from './core/onboarding.js';
+import { loadOnboarding, resetOnboarding } from './core/onboarding.js';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -51,20 +74,62 @@ function loadInitialExperiment() {
   // stashed by the other tab moments ago and is the reason this tab exists.
   const draft = takeStashedDraft();
   if (draft) {
-    return { experiment: draft, skippedCount: 0, totalSaved: 0, isDraft: true };
+    return {
+      experiment: withOrigin(draft, 'draft'),
+      skippedCount: 0,
+      totalSaved: 0,
+      isDraft: true,
+      isPersisted: false,
+    };
   }
   const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
     onUnreadable: (id, err) =>
       console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
   });
-  return { experiment: experiment || createDefaultStudy(), skippedCount, totalSaved, isDraft: false };
+  return {
+    experiment: experiment || createDefaultStudy(),
+    skippedCount,
+    totalSaved,
+    isDraft: false,
+    // `totalSaved` can be non-zero when every slot was unreadable. Only an
+    // experiment actually recovered from the ring justifies a saved claim.
+    isPersisted: Boolean(experiment),
+  };
+}
+
+// A study's origin describes how it entered the workspace; it is not
+// provenance. Keep this immutable so imports/restores replace the entire
+// snapshot rather than leaking metadata from the study that was open before.
+function withOrigin(experiment, origin) {
+  return { ...experiment, meta: { ...(experiment.meta || {}), origin } };
+}
+
+function projectFilename(experiment) {
+  const title = String(experiment?.meta?.title || 'micronaut-study')
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${title || 'micronaut-study'}.micronaut.json`;
+}
+
+function recoveryEntries() {
+  // The shell receives display-only data, never a persistence backend. It
+  // therefore cannot accidentally load, mutate, or clear localStorage on its
+  // own; selected restores always come back through main's callback below.
+  return listSaved().map((id) => {
+    const raw = loadExperiment(id);
+    const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
+      ? raw.meta.title.trim()
+      : 'Untitled study';
+    return { id, title };
+  });
 }
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
 // top-level await since the released artifact is one classic (non-module,
 // non-async) IIFE.
 function init() {
-  const { experiment: initialExperiment, skippedCount, totalSaved, isDraft } = loadInitialExperiment();
+  const { experiment: initialExperiment, skippedCount, totalSaved, isDraft, isPersisted } = loadInitialExperiment();
   const store = createStore(initialExperiment);
 
   const kb = loadAppKb();
@@ -93,57 +158,201 @@ function init() {
   const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep];
   const router = createRouter(steps);
 
-  // Onboarding gate (zen-planner Phase B2, superseding Phase 1's Guide-page
-  // redirect): pops on EVERY page load -- not just a genuinely new session
-  // -- so a returning user can re-route or change their experience level
-  // each time they open the app, until they explicitly opt out. Gated
-  // SOLELY on core/onboarding.js's own `dontShowAgain` flag, a DIFFERENT
-  // flag from `completed` on purpose: finishing the two-screen flow does
-  // NOT suppress future pops by itself, only the dialog's own "Don't show
-  // this again" control does (ui/steps/onboarding.js). Also NOT
-  // ui/steps/home.js's WALKTHROUGH_SEEN_KEY -- that is a separate,
-  // still-active flag home.js's own "Take the walkthrough" card uses; the
-  // three flags must not be conflated, see docs/cma-lessons.md lesson 50.
-  //
-  // !isDraft matters here: a user who just used "Draft a study from this" in
-  // another tab should land straight on their freshly-drafted study on this
-  // new tab, not be interrupted by the gate -- the opposite of what the gate
-  // is for. totalSaved is NOT part of this condition (unlike the original
-  // first-run-only version): the gate no longer cares whether this browser
-  // has a prior autosave, only whether the user has opted out.
-  //
-  // showOnboardingGate() renders straight to document.body (same idiom as
-  // ui/walkthrough.js), independent of router/renderShell's own timing --
-  // see that module's header for why an overlay was chosen over a router
-  // step. Called here, before renderShell, purely to keep this call next to
-  // the isDraft signal it depends on; the overlay does not touch `main` or
-  // require the shell to exist yet.
-  if (!isDraft && !loadOnboarding().dontShowAgain) {
-    showOnboardingGate({ router });
+  const root = document.getElementById('app');
+  let saveState = { status: isPersisted ? 'saved' : 'unsaved', savedAt: null, error: null };
+  let shell = null;
+  function setSaveState(next) {
+    saveState = { ...saveState, ...next };
+    // UX-08 supplies this narrow view updater. The optional call keeps this
+    // coordinator compatible with the pre-refactor shell while ensuring a
+    // save result can persist visibly without rebuilding the whole shell.
+    if (shell && typeof shell.setSaveState === 'function') shell.setSaveState(saveState);
   }
 
-  const root = document.getElementById('app');
-  const { main, showToast } = renderShell(root, store, router, {
+  function reportStorageFailure() {
+    setSaveState({
+      status: 'failed',
+      error: 'Storage is full or unavailable. Export a project backup before closing this tab.',
+    });
+  }
+
+  function reportPersistentLifecycleFailure(message) {
+    // The shell's save indicator is the one persistent lifecycle-status
+    // surface. A toast alone vanishes after three seconds, leaving an import
+    // or recovery failure indistinguishable from a successful no-op.
+    setSaveState({ status: 'failed', error: message });
+    showToast(message);
+  }
+
+  function exportProjectBackup() {
+    exportToFile(store.get(), projectFilename(store.get()));
+    markExported({ onQuotaExceeded: reportStorageFailure });
+    showToast('Project backup downloaded.');
+  }
+
+  async function importProjectBackup(file) {
+    if (!file) return;
+    try {
+      const imported = await importFromFile(file);
+      store.replace(withOrigin(imported, 'imported'));
+      // replace() schedules the ordinary autosave subscriber. Clear any
+      // earlier lifecycle failure immediately; that subscriber will keep the
+      // status at saving, then replace it with saved or a storage failure.
+      setSaveState({ status: 'saving', error: null });
+      showToast('Project imported. It is now the study being autosaved.');
+    } catch (err) {
+      reportPersistentLifecycleFailure(
+        `Could not import that project: ${err && err.message ? err.message : 'invalid file'}`
+      );
+    }
+  }
+
+  function restoreRecoverySlot(id) {
+    const { experiment, error } = loadRecoverableSlot(id, {
+      onUnreadable: (slotId, err) => console.error(`Could not restore autosave ${slotId}:`, err),
+    });
+    if (!experiment) {
+      reportPersistentLifecycleFailure(
+        `Could not restore that version: ${error ? error.message : 'it is unavailable'}`
+      );
+      return false;
+    }
+    store.replace(experiment);
+    setSaveState({ status: 'saving', error: null });
+    showToast('Restored the selected previous version.');
+    return true;
+  }
+
+  function resetToExample() {
+    store.replace(createDefaultStudy());
+    showToast('Restored the oregano example. Your previous versions remain available in Restore.');
+  }
+
+  function startBlankStudy() {
+    store.replace(emptyExperiment());
+    showToast('Started a blank study. Your previous versions remain available in Restore.');
+  }
+
+  function adoptExampleTemplate() {
+    if (store.get().meta?.origin !== 'example') return false;
+    store.patch((state) => ({ meta: { ...state.meta, origin: 'template' } }));
+    return true;
+  }
+
+  // One exact producer chain for the shell: use the same shaped KB and
+  // naming constants as Overview, derive conformance once, then hand that
+  // report unchanged to workflow progress. The shell only consumes this
+  // model; it never reclassifies placeholders or warning severities.
+  function currentWorkflowProgress() {
+    const experiment = store.get();
+    const conformance = checkConformance(experiment, kb, NAMING_CONFIG, BASE_TEMPLATE);
+    return deriveWorkflowProgress(experiment, conformance, kb.questions);
+  }
+
+  function guidedRouteIdForStep(stepId) {
+    return stepId === 'microscopy' ? 'panel' : stepId;
+  }
+
+  function guidedStepIdForRoute(routeId) {
+    return routeId === 'panel' ? 'microscopy' : routeId;
+  }
+
+  function reportGuidedStorageFailure(error) {
+    console.error('Could not persist guided walkthrough progress:', error);
+  }
+
+  let guidedProgressState = loadGuidedProgress(PRIMARY_WORKFLOW, {
+    onError: reportGuidedStorageFailure,
+  });
+
+  function applyGuidedTransition(transition, options = {}) {
+    guidedProgressState = transition(PRIMARY_WORKFLOW, {
+      ...options,
+      state: guidedProgressState,
+      onError: reportGuidedStorageFailure,
+    });
+    return guidedProgressState;
+  }
+
+  let exampleChooser = null;
+  let guidedController = null;
+
+  function showExampleChooser({ explicit = false } = {}) {
+    if (exampleChooser || loadOnboarding().completed || store.get().meta?.origin !== 'example') return false;
+    // A recovered autosave is returning work even if it began from the seed.
+    // Only an explicit utility request may reopen the chooser in that case.
+    if (!explicit && (isDraft || isPersisted)) return false;
+    exampleChooser = showOnboardingGate({
+      onWalkThrough: () => guidedController.start(),
+      onExplore: () => {},
+      onStartBlank: startBlankStudy,
+      onDone: () => { exampleChooser = null; },
+    });
+    return true;
+  }
+
+  shell = renderShell(root, store, router, {
     kbIssueCount: kb.issues.length,
-    // Clear persisted state BEFORE reloading. Resetting the in-memory store
-    // instead would immediately trip the autosave subscription below and write
-    // the empty experiment back as a NEW ring entry, leaving the old slots in
-    // place for listSaved() to resurrect on the next load.
-    onReset: () => {
-      clearAll();
-      window.location.reload();
-    },
-    // "New study": start from a genuinely blank experiment, not the oregano
-    // example. Clear the autosave ring, persist the blank as the newest entry
-    // so the reload restores IT (loadInitialExperiment would otherwise fall
-    // straight back to createDefaultStudy when it finds no save), then reload
-    // through the same clean path onReset uses.
-    onNewBlank: () => {
-      clearAll();
-      saveExperiment(emptyExperiment());
-      window.location.reload();
+    saveState,
+    recoveryEntries: recoveryEntries(),
+    workflowProgress: currentWorkflowProgress(),
+    // These lifecycle actions replace the in-memory root and deliberately
+    // leave the five prior recovery slots intact. That makes a mistaken reset
+    // recoverable instead of making a "start over" action a data-loss trap.
+    onReset: resetToExample,
+    onNewBlank: startBlankStudy,
+    onAdoptExample: adoptExampleTemplate,
+    onExportProject: exportProjectBackup,
+    onImportProject: importProjectBackup,
+    onRestoreRecovery: restoreRecoverySlot,
+    onResetOnboarding: () => {
+      resetOnboarding();
+      showExampleChooser({ explicit: true });
     },
   });
+  const { main, showToast } = shell;
+
+  // Main is the sole lifecycle coordinator: the shell supplies one stable
+  // host, while this controller receives the canonical workflow, fresh
+  // projections, routing aliases, durable transitions, and lifecycle
+  // callbacks exactly once after renderShell has created the host.
+  guidedController = createWalkthroughController({
+    host: shell.guidedAsideHost,
+    primaryWorkflow: PRIMARY_WORKFLOW,
+    router,
+    getContent: () => buildGuidedExampleContent(store.get(), {
+      primaryWorkflow: PRIMARY_WORKFLOW,
+      kb,
+      namingConfig: NAMING_CONFIG,
+      baseTemplate: BASE_TEMPLATE,
+    }),
+    getProgress: () => guidedProgressState,
+    transitions: {
+      start: () => applyGuidedTransition(startGuidedProgress),
+      resume: () => applyGuidedTransition(resumeGuidedProgress),
+      pause: () => applyGuidedTransition(pauseGuidedProgress),
+      advance: (stepId) => applyGuidedTransition(advanceGuidedProgress, { fromStepId: stepId }),
+      restart: () => applyGuidedTransition(restartGuidedProgress),
+    },
+    routeForStep: guidedRouteIdForStep,
+    stepForRoute: guidedStepIdForRoute,
+    subscribe: (listener) => store.subscribe(listener),
+    onAdoptExample: adoptExampleTemplate,
+    onNewBlank: startBlankStudy,
+    onKeepExploringExample: () => {},
+    onVisibilityChange: shell.setGuidedAsideVisible,
+  });
+  shell.setExplainStepHandler((stepId) => guidedController.explain(stepId));
+
+  function explainGuided(stepId) {
+    const routeStepId = guidedStepIdForRoute(router.current());
+    const requestedStepId = PRIMARY_WORKFLOW.some((step) => step.id === stepId)
+      ? stepId
+      : PRIMARY_WORKFLOW.some((step) => step.id === routeStepId)
+        ? routeStepId
+        : PRIMARY_WORKFLOW[0]?.id;
+    guidedController.explain(requestedStepId);
+  }
 
   if (kb.issues.length > 0) {
     showToast(
@@ -177,7 +386,20 @@ function init() {
     // change the stored experience level -- see docs/cma-lessons.md
     // lesson 46 (re-fetch current state inside handlers, not a stale
     // closure).
-    step.render(main, store, { showToast, advisor: kb.advisor, router, experience: loadOnboarding().experience });
+    step.render(main, store, {
+      showToast,
+      advisor: kb.advisor,
+      router,
+      experience: loadOnboarding().experience,
+      onNewBlank: startBlankStudy,
+      onAdoptExample: adoptExampleTemplate,
+      guidedStatus: guidedProgressState,
+      getGuidedStatus: () => guidedProgressState,
+      onStartGuided: () => guidedController.start(),
+      onResumeGuided: () => guidedController.resume(),
+      onRestartGuided: () => guidedController.restart(),
+      onExplainGuided: explainGuided,
+    });
   }
 
   router.onChange(renderActiveStep);
@@ -224,15 +446,29 @@ function init() {
   // preserve as history.
   let saveTimer = null;
   store.subscribe(() => {
+    if (shell && typeof shell.setWorkflowProgress === 'function') {
+      shell.setWorkflowProgress(currentWorkflowProgress());
+    }
+    setSaveState({ status: 'saving', error: null });
+    // Run after the state transition: if this bookkeeping write fails, its
+    // visible failed state must not be overwritten immediately by "saving".
+    markChanged({ onQuotaExceeded: reportStorageFailure });
     if (saveTimer) window.clearTimeout(saveTimer);
     saveTimer = window.setTimeout(() => {
-      saveExperiment(store.get(), {
-        onQuotaExceeded: () => {
-          showToast('Storage is full -- changes are not being saved automatically. Export to a file.');
-        },
-      });
+      const savedId = saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+      if (savedId) {
+        setSaveState({ status: 'saved', savedAt: new Date().toISOString(), error: null });
+        if (shell && typeof shell.setRecoveryEntries === 'function') {
+          shell.setRecoveryEntries(recoveryEntries());
+        }
+      } else {
+        reportStorageFailure();
+      }
     }, AUTOSAVE_DEBOUNCE_MS);
   });
+
+  const chooserShown = showExampleChooser();
+  if (!chooserShown && guidedProgressState.status === 'active') guidedController.resume();
 }
 
 init();

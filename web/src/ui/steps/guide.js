@@ -21,13 +21,9 @@
 // spectral data. If real screenshots are wanted later, they need a
 // deliberate capture-and-refresh process, not a one-time embed here.
 //
-// Deliberately describes the workflow and concepts, not a click-by-click
-// script: the app is usable outside-in (jump to any step), so a rigid
-// numbered tutorial would misrepresent it. ui/walkthrough.js's interactive
-// tour (reachable from the button below, and from Home) is the click-by-
-// click version, over the REAL running app rather than a description of it.
-
-import { startWalkthrough } from '../walkthrough.js';
+// Deliberately describes the workflow and concepts, not a numbered tutorial:
+// the app is usable outside-in. The optional guided example is a separate
+// seven-step aid; Guide remains reference material, not an eighth step.
 
 /**
  * A titled, searchable section: an <h2> plus whatever nodes `build(container)`
@@ -80,10 +76,21 @@ function bullets(parent, items) {
   parent.appendChild(ul);
 }
 
+function guideGuidedStatus(guidedStatus, getGuidedStatus) {
+  const status = typeof getGuidedStatus === 'function' ? getGuidedStatus() : guidedStatus;
+  return status && typeof status.status === 'string' ? status.status : 'not-started';
+}
+
 export const guideStep = {
   id: 'guide',
   title: 'Guide',
-  render(main, store, { router } = {}) {
+  render(main, store, {
+    guidedStatus,
+    getGuidedStatus,
+    onStartGuided,
+    onResumeGuided,
+    onExplainGuided,
+  } = {}) {
     main.textContent = '';
 
     const heading = document.createElement('h1');
@@ -91,21 +98,32 @@ export const guideStep = {
     heading.textContent = 'Guide';
     main.appendChild(heading);
 
-    const tourBtn = document.createElement('button');
-    tourBtn.type = 'button';
-    tourBtn.className = 'copy-button guide-tour-button';
-    tourBtn.textContent = 'Start the tour';
-    tourBtn.title = 'A short guided tour over the real app -- click-by-click, not just a description.';
-    tourBtn.addEventListener('click', () => startWalkthrough({ router }));
-    main.appendChild(tourBtn);
+    const isExample = store.get().meta?.origin === 'example';
+    const guideStatus = guideGuidedStatus(guidedStatus, getGuidedStatus);
+    const guideAction = isExample && guideStatus === 'paused'
+      ? { label: 'Resume example walkthrough', callback: onResumeGuided }
+      : isExample && guideStatus === 'not-started'
+        ? { label: 'Start example walkthrough', callback: onStartGuided }
+        : { label: 'Explain the workflow', callback: onExplainGuided };
+    const guideButton = document.createElement('button');
+    guideButton.type = 'button';
+    guideButton.className = 'copy-button guide-tour-button';
+    guideButton.textContent = guideAction.label;
+    guideButton.title = isExample
+      ? 'Open the optional seven-step example walkthrough without changing this study.'
+      : 'Open a contextual explanation without changing your study or walkthrough progress.';
+    guideButton.addEventListener('click', () => {
+      if (typeof guideAction.callback === 'function') guideAction.callback('guide');
+    });
+    main.appendChild(guideButton);
 
     para(
       main,
       'Micronaut Planner helps you design a microscopy experiment before you acquire ' +
         'anything: you describe what you are measuring, and it works out the groups and ' +
         'controls you need, flags common pitfalls for your modality, and produces a ' +
-        'consistent file-naming convention as a by-product of the finished design. ' +
-        'Everything runs in your browser — no upload, no install, no account.'
+      'consistent file-naming convention as a by-product of the finished design. ' +
+        'Everything runs in your browser — no upload, no install, no account. The optional guided example covers Home through Overview; this Guide is reference material, not another guided step.'
     );
 
     // --- Search (zen-planner Phase 5's "searchable wiki") -----------------
@@ -153,13 +171,13 @@ export const guideStep = {
       section(main, 'The steps', (c) => {
         para(
           c,
-          'For a guided on-ramp, start at Home — it offers the walkthrough, starting from a ' +
-            'description, and the worked example. This list is a quick reference for what each ' +
+          'For a guided example, start at Home — it can open, resume, or restart the optional ' +
+            'seven-step walkthrough. This list is a quick reference for what each ' +
             'step in the left nav means. Use the steps in any order — the app works outside-in — ' +
             'and note a study can hold several assays, switched with the tab row at the top.'
         );
         defList(c, [
-          ['Home', 'Landing page: walkthrough, description, or worked example.'],
+          ['Home', 'Landing page: optional guided example, description, or worked example.'],
           ['Project', 'Per assay: readout, organism/cell line, sample type, preparation.'],
           ['Study', 'Study-wide question, shared group vocabulary, and assay list.'],
           ['Design', 'Per assay: control/treatment groups, crossing factors, replicate counts.'],

@@ -10,13 +10,13 @@
 // nested location. If a change to this design ever needs a file under
 // web/src/engine/ to learn the word "assay", the abstraction has failed.
 //
-// Why not compose reads from a shared study-level axis (e.g. arms) into
+// Why not compose reads from a shared study-level group axis into
 // each assay? Tried and rejected -- see docs/plans (Advisor... the assay
 // tier plan), Decision 1. A composed axis can never be MISSING from an
 // assay, which makes "flag an assay with no groups" uncomputable. Per-assay
 // data, seeded from a study-level VOCABULARY at creation time as a real,
 // weak-tagged write, keeps that check possible while still making the
-// common case (every assay uses the same arms) a one-click "apply to all".
+// common case (every assay uses the same groups) a one-click "apply to all".
 //
 // Pure module: no DOM, no store, no imports at all -- a true leaf.
 
@@ -247,13 +247,13 @@ export function scopeWrite(experiment, path, assayId) {
 }
 
 /**
- * Build a fresh assay whose arm axis is seeded from the study's vocabulary,
+ * Build a fresh assay whose group axis is seeded from the study's vocabulary,
  * tagged 'kb-default' (WEAK) -- see the module header, Decision 1: a
  * composed/shared axis was rejected because it can never be MISSING; a
  * per-assay axis SEEDED from a vocabulary keeps "flag an assay with no
  * groups" computable while still making the common case (every assay uses
- * the same arms) a one-write copy. WEAK is what lets a later real user edit
- * to this assay's arms always win over the seed, never the reverse.
+ * the same groups) a one-write copy. WEAK is what lets a later real user edit
+ * to this assay's groups always win over the seed, never the reverse.
  *
  * Pure: returns the assay plus the ONE provenance entry the caller must
  * also record (this module never touches a store -- see the header). The
@@ -263,10 +263,10 @@ export function scopeWrite(experiment, path, assayId) {
  * be silently misjudged as overwriting nothing when it is actually
  * overwriting an untagged seed.
  */
-export function seedAssayFromVocabulary(armVocabulary, id) {
+export function seedAssayFromVocabulary(groupVocabulary, id) {
   const assay = emptyAssay(id);
   const levels =
-    armVocabulary && Array.isArray(armVocabulary.levels) ? [...armVocabulary.levels] : [];
+    groupVocabulary && Array.isArray(groupVocabulary.levels) ? [...groupVocabulary.levels] : [];
   assay.design = { ...assay.design, groups: { levels } };
   return {
     assay,

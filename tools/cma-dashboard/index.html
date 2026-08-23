@@ -144,63 +144,91 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "Contextual microscopy iconography",
-  "orchestrator": "Codex GPT-5.6",
-  "active_model": "Codex GPT-5.6",
-  "active_status": "done",
-  "phase": "",
-  "state_note": "Contextual microscopy iconography verified.",
+  "run": "Sync all UX work",
+  "orchestrator": "Codex (warm context)",
+  "active_model": "Idle",
+  "active_status": "complete",
+  "phase": "Verified; syncing",
+  "state_note": "Final adversarial review passed. All verifier-found defects are resolved; Git sync is authorized and underway.",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "JavaScript tests",
-      "v": "743 passed",
+      "k": "Target",
+      "v": "main + feature branch"
+    },
+    {
+      "k": "JS tests",
+      "v": "777 passed",
       "tone": "ok"
     },
     {
-      "k": "Build artifact",
-      "v": "793714 bytes",
+      "k": "Python tests",
+      "v": "34 passed",
       "tone": "ok"
     },
     {
-      "k": "Browser verification",
-      "v": "0 errors",
+      "k": "Artifact",
+      "v": "867782 bytes",
+      "tone": "ok"
+    },
+    {
+      "k": "Verifier",
+      "v": "PASS",
       "tone": "ok"
     }
   ],
-  "defects": [],
-  "tasks": [
+  "defects": [
     {
-      "id": "ICON-1",
-      "phase": "Batch 1",
-      "title": "Create a shared microscopy icon system",
-      "status": "done",
-      "by": "Codex GPT-5.6"
+      "id": "SYNC-D1",
+      "location": "web/src/engine/conformance.js",
+      "title": "Default date/sample placeholder filenames are not reported",
+      "body": "",
+      "repro": ""
     },
     {
-      "id": "ICON-2",
-      "phase": "Batch 2",
-      "title": "Apply contextual icons to shell and entry choices",
-      "status": "done",
-      "by": "Codex GPT-5.6"
+      "id": "SYNC-D2",
+      "location": "web/src/ui/steps/overview.js",
+      "title": "Print and Save as PDF bypasses final readiness gate",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "SYNC-D3",
+      "location": "web/src/engine/workflowProgress.js",
+      "title": "Blank study incorrectly renders Study as Complete",
+      "body": "",
+      "repro": ""
     }
   ],
+  "tasks": [],
   "log": [
     {
-      "time": "00:46:59",
-      "msg": "Started isolated contextual-iconography pass from current main."
+      "time": "09:54:05",
+      "msg": "User authorized syncing all accumulated work."
     },
     {
-      "time": "00:47:44",
-      "msg": "Built iconography inspected: microscope brand, scientific shell icons, and emoji-free entry cards all render cleanly."
+      "time": "09:55:05",
+      "msg": "Dispatched final verifier and read-only Git sync preflight."
     },
     {
-      "time": "00:48:21",
-      "msg": "Completed fresh-artifact route check: Project and Microscopy work, all eight sidebar icons render, and browser errors remain at zero."
+      "time": "10:05:53",
+      "msg": "Final verifier failed the release gate on two user-reachable readiness defects; sync paused before staging."
+    },
+    {
+      "time": "10:10:12",
+      "msg": "Verifier falsified Study status on a brand-new blank study; sync remains paused."
+    },
+    {
+      "time": "10:13:28",
+      "msg": "Verifier found approved persistent-error UX missing for import and restore failures."
+    },
+    {
+      "time": "10:24:51",
+      "msg": "Final verifier PASS: 777 JS, 34 Python, deterministic 867782-byte artifact, live desktop/mobile/guided/persistence checks green."
     }
   ],
-  "snapshot_at": "2026-08-23 00:48"
+  "snapshot_at": "2026-08-23 10:24"
 };
 /* CMA:EMBEDDED:END */
 

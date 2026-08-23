@@ -23,7 +23,7 @@ import { downloadTextFile } from '../../core/persist.js';
 // -- see BASE_TEMPLATE below for the split point the Design step uses.
 //
 // {group}/{biorep}/{techrep}/{notes} are OPTIONAL: an experiment with no
-// arms, or no technical replicates (common for SEM/TEM/Raman), omits that
+// groups, or no technical replicates (common for SEM/TEM/Raman), omits that
 // token entirely rather than padding the name with a placeholder -- see
 // engine/naming.js's optionalFields handling.
 export const NAMING_CONFIG = {
@@ -146,7 +146,7 @@ export function createNamingStep(kb) {
   return {
   id: 'naming',
   title: 'Naming',
-  render(main, store, { advisor } = {}) {
+  render(main, store, { advisor, experience } = {}) {
     main.textContent = '';
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
@@ -267,8 +267,8 @@ export function createNamingStep(kb) {
     main.appendChild(scheduleHint);
 
     // Same name-builder field grid as the Microscopy step (ui/fieldInterview.js):
-    // a box per task with an hours+minutes duration control and a ✓ to
-    // confirm. Re-renders itself on commit; the .ics button below always
+    // a box per task with an hours+minutes duration control and an explicit
+    // confirmation action. Re-renders itself on commit; the .ics button below always
     // reads fresh from the store, so it needs no coupling to this grid.
     const timingContainer = document.createElement('div');
     main.appendChild(timingContainer);
@@ -276,6 +276,7 @@ export function createNamingStep(kb) {
     function renderTimingGrid() {
       renderFieldInterview(timingContainer, {
         questions: phaseQuestions(questionBank, assayView(store.get(), assayId), 'timing'),
+        experience,
         onCommit: (question, raw) => {
           const { path, slotKey } = scopeWrite(store.get(), question.field, assayId);
           const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;

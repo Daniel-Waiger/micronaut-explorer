@@ -1,24 +1,18 @@
 // Persisted onboarding state: which walkthrough stage the user is on, their
-// self-reported microscopy experience level, whether onboarding has ever
-// been completed, and whether the user has explicitly opted out of seeing
-// the gate again. Same idiom as llm/config.js's loadLlmConfig/saveLlmConfig
+// self-reported microscopy experience level, and whether onboarding has
+// been completed. Same idiom as llm/config.js's loadLlmConfig/saveLlmConfig
 // -- localStorage read/written through a try/catch so a disabled/unavailable
 // localStorage degrades to defaults (unset) rather than throwing.
 //
-// `completed` and `dontShowAgain` are deliberately SEPARATE flags, not one
-// flag doing both jobs: the gate is meant to pop on every page load (main.js)
-// so a returning user can re-route or change their experience level, and
-// only an EXPLICIT "don't show this again" click (ui/steps/onboarding.js)
-// should suppress that -- finishing the two-screen flow normally does not.
-// `completed` on its own no longer gates anything; it is kept as a plain
-// "has this browser ever been through the flow at least once" fact.
+// `completed` is the gate contract: a normal completion or dismissal means
+// the visitor should not be interrupted again on later loads. The utility
+// menu can intentionally reopen the gate through resetOnboarding().
 //
 // Core module: pure logic only, no DOM, no engine/ui imports, no network.
 
 const STAGE_KEY = 'micronaut.onboarding.stage';
 const EXPERIENCE_KEY = 'micronaut.onboarding.experience';
 const COMPLETED_KEY = 'micronaut.onboarding.completed';
-const DONT_SHOW_AGAIN_KEY = 'micronaut.onboarding.dontShowAgain';
 
 export const ONBOARDING_STAGES = ['idea', 'designing', 'acquiring'];
 export const ONBOARDING_LEVELS = ['novice', 'occasional', 'frequent'];
@@ -48,11 +42,10 @@ export function loadOnboarding() {
     stage: ONBOARDING_STAGES.includes(storedStage) ? storedStage : null,
     experience: ONBOARDING_LEVELS.includes(storedExperience) ? storedExperience : null,
     completed: onboardingReadLS(COMPLETED_KEY, '0') === '1',
-    dontShowAgain: onboardingReadLS(DONT_SHOW_AGAIN_KEY, '0') === '1',
   };
 }
 
-export function saveOnboarding({ stage, experience, completed, dontShowAgain } = {}) {
+export function saveOnboarding({ stage, experience, completed } = {}) {
   if (typeof stage === 'string' && ONBOARDING_STAGES.includes(stage)) {
     onboardingWriteLS(STAGE_KEY, stage);
   }
@@ -62,7 +55,13 @@ export function saveOnboarding({ stage, experience, completed, dontShowAgain } =
   if (typeof completed === 'boolean') {
     onboardingWriteLS(COMPLETED_KEY, completed ? '1' : '0');
   }
-  if (typeof dontShowAgain === 'boolean') {
-    onboardingWriteLS(DONT_SHOW_AGAIN_KEY, dontShowAgain ? '1' : '0');
-  }
+}
+
+/**
+ * Intentionally make the gate eligible to appear again while preserving the
+ * visitor's prior stage and experience choices. This is used only by the
+ * explicit "Show onboarding again" utility action.
+ */
+export function resetOnboarding() {
+  onboardingWriteLS(COMPLETED_KEY, '0');
 }

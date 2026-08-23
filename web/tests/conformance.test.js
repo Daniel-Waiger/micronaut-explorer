@@ -11,15 +11,18 @@ import { createDefaultStudy } from '../src/core/defaultStudy.js';
 import { emptyExperiment } from '../src/core/schema.js';
 import { NAMING_CONFIG, BASE_TEMPLATE, realKb } from './fixtures.js';
 
-test('the real oregano default study PASSES conformance -- the shipped example must not fail its own gate', () => {
+test('the real oregano default study needs review instead of falsely claiming export readiness', () => {
   const report = checkConformance(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.equal(report.pass, true, JSON.stringify(report.assays.flatMap((a) => a.issues), null, 2));
+  assert.equal(report.readiness, 'needs-review');
+  assert.equal(report.counts.blocked, 0);
+  assert.ok(report.counts.needsReview > 0);
   assert.equal(report.assays.length, 4);
 });
 
 test('every issue carries a section naming which check produced it', () => {
   const study = createDefaultStudy();
-  // Two arms with the same level produce identical name segments -- a real
+  // Two groups with the same level produce identical name segments -- a real
   // conditionIssues error, not a placeholder.
   study.assays[0].design = { ...study.assays[0].design, groups: { levels: ['CTL', 'CTL'] } };
   const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
@@ -34,6 +37,8 @@ test('an error-severity issue anywhere fails the gate; the report still lists ev
   study.assays[0].design = { ...study.assays[0].design, groups: { levels: ['CTL', 'CTL'] } };
   const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.equal(report.pass, false);
+  assert.equal(report.readiness, 'blocked');
+  assert.ok(report.counts.blocked > 0);
   assert.equal(report.assays.length, 4);
 });
 
@@ -49,15 +54,20 @@ test('an ANSWERED-but-invalid field is an error that fails the gate', () => {
   assert.ok(namingErrors.some((i) => i.severity === 'error' && i.field === 'sample' && /ABC01/.test(i.message)));
 });
 
-test('an UNANSWERED field is reported as incomplete (a warning), not as an invalid value -- and does not fail the gate', () => {
-  // The default study never answers `sample`, so finalizeFields fills the
-  // config placeholder 'UNKNOWN'. That is "not filled in yet", not "you
-  // typed something wrong" -- it must be surfaced, but must not fail.
+test('the default study reports its visible date/sample placeholders for every assay', () => {
+  // finalizeFields intentionally leaves previewable filenames in place with
+  // 1970-01-01 and UNKNOWN defaults. Both must remain visible, but neither
+  // may silently count as an answered required field.
   const report = checkConformance(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.equal(report.pass, true);
+  assert.equal(report.readiness, 'needs-review');
   const incomplete = report.assays.flatMap((a) => a.issues).filter((i) => i.section === 'incomplete');
-  assert.ok(incomplete.length > 0, 'the unanswered sample field should still be REPORTED, never silently dropped');
   assert.ok(incomplete.every((i) => i.severity === 'warning'));
+  for (const assay of report.assays) {
+    const fields = assay.issues.filter((i) => i.section === 'incomplete').map((i) => i.field);
+    assert.ok(fields.includes('date'), `${assay.label} must report its 1970-01-01 date placeholder`);
+    assert.ok(fields.includes('sample'), `${assay.label} must report its UNKNOWN sample placeholder`);
+  }
   assert.ok(incomplete.some((i) => /not answered yet/.test(i.message)));
 });
 
@@ -65,21 +75,48 @@ test('issueCount counts every issue across assays plus cross-assay issues', () =
   const report = checkConformance(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const manual = report.assays.reduce((sum, a) => sum + a.issues.length, 0) + report.crossAssayIssues.length;
   assert.equal(report.issueCount, manual);
+  assert.equal(report.counts.total, manual);
 });
 
-test('TOTAL: a malformed/empty experiment yields a passing zero-assay report, never a throw', () => {
+test('TOTAL: a malformed/empty experiment yields a ready zero-assay report, never a throw', () => {
   for (const bad of [undefined, null, {}, { assays: 'not-an-array' }, 'nope']) {
     assert.doesNotThrow(() => checkConformance(bad, realKb(), NAMING_CONFIG, BASE_TEMPLATE), String(bad));
     const report = checkConformance(bad, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
     assert.deepEqual(report.assays, []);
     assert.equal(report.pass, true);
+    assert.equal(report.readiness, 'ready');
+    assert.deepEqual(report.counts, { blocked: 0, needsReview: 0, total: 0 });
   }
 });
 
-test('emptyExperiment() (one blank assay) does not fail conformance -- a blank slate is not a broken study', () => {
+test('emptyExperiment() is needs-review rather than blocked', () => {
   const report = checkConformance(emptyExperiment(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.equal(report.assays.length, 1);
   assert.equal(report.pass, true);
+  assert.equal(report.readiness, 'needs-review');
+});
+
+test('filling valid date/sample values and scratch magnification clears default-study readiness warnings', () => {
+  const study = createDefaultStudy();
+  for (const [index, assay] of study.assays.entries()) {
+    assay.naming = {
+      fields: {
+        ...assay.naming.fields,
+        date: '2026-08-23',
+        sample: `ORA${String(index + 1).padStart(2, '0')}`,
+        ...(assay.label === 'Scratch / migration' ? { magnification: 'X10' } : {}),
+      },
+    };
+  }
+
+  const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  assert.equal(report.readiness, 'ready', JSON.stringify(report, null, 2));
+  assert.deepEqual(report.counts, { blocked: 0, needsReview: 0, total: 0 });
+  assert.equal(report.pass, true, 'pass remains the compatibility alias for not-blocked');
+  assert.ok(
+    !report.assays.flatMap((assay) => assay.issues).some((issue) => issue.field === 'date' || issue.field === 'sample'),
+    'genuinely valid date/sample values must not be classified as placeholders'
+  );
 });
 
 test('deterministic: same study in, deep-equal report out', () => {

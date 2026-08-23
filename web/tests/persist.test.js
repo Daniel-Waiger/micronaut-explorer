@@ -4,9 +4,11 @@ import {
   changesSinceExport,
   deleteExperiment,
   deserializeExperiment,
+  parseAndMigrateExperiment,
   listSaved,
   loadExperiment,
   loadMostRecentRecoverable,
+  loadRecoverableSlot,
   markChanged,
   markExported,
   saveExperiment,
@@ -14,7 +16,7 @@ import {
   clearAll,
   STORAGE_PREFIX,
 } from '../src/core/persist.js';
-import { emptyExperiment } from '../src/core/schema.js';
+import { SCHEMA_VERSION, emptyExperiment } from '../src/core/schema.js';
 
 function makeFakeStorage() {
   const map = new Map();
@@ -117,6 +119,32 @@ test('serializeExperiment/deserializeExperiment round-trip to a deeply-equal obj
   assert.deepEqual(roundTripped, experiment);
 });
 
+test('parseAndMigrateExperiment accepts current and older project backups without storage side effects', () => {
+  const current = emptyExperiment();
+  current.meta.title = 'Current backup';
+  const migratedCurrent = parseAndMigrateExperiment(serializeExperiment(current));
+  assert.deepEqual(migratedCurrent, current);
+
+  const v1 = {
+    schemaVersion: 1, meta: {}, narrative: {}, specimen: {},
+    design: { factors: [], replicates: 2, idScheme: '', conditions: [] },
+    panel: {}, acquisition: {}, controls: {},
+    naming: { template: 't', fields: {}, plannedNames: [] },
+    provenance: { slots: {}, unanswered: [], skipped: [] }, derived: {}, interview: {}, conformance: {},
+  };
+  const migratedV1 = parseAndMigrateExperiment(JSON.stringify(v1));
+  assert.equal(migratedV1.schemaVersion, SCHEMA_VERSION);
+  assert.equal(migratedV1.assays[0].design.biologicalReplicates, 2);
+});
+
+test('parseAndMigrateExperiment rejects invalid JSON and unsupported future schemas', () => {
+  assert.throws(() => parseAndMigrateExperiment('{not JSON'), SyntaxError);
+  assert.throws(
+    () => parseAndMigrateExperiment(JSON.stringify({ schemaVersion: 999 })),
+    /newer than this app supports/
+  );
+});
+
 test('changesSinceExport increments on markChanged and resets on markExported', () => {
   const storage = makeFakeStorage();
   assert.equal(changesSinceExport({ storage }), 0);
@@ -201,7 +229,7 @@ test('loadMostRecentRecoverable returns the newest slot MIGRATED, when it is rea
   assert.equal(skippedCount, 0);
   assert.equal(totalSaved, 1);
   // Migrated all the way from v1 to the current version, not merely loaded raw.
-  assert.equal(experiment.schemaVersion, 3);
+  assert.equal(experiment.schemaVersion, SCHEMA_VERSION);
   assert.equal(experiment.assays[0].design.biologicalReplicates, 2);
 });
 
@@ -219,7 +247,7 @@ test('loadMostRecentRecoverable skips a newest slot that fails to MIGRATE and fa
   assert.equal(skippedCount, 1);
   assert.equal(totalSaved, 2);
   assert.ok(experiment, 'must have recovered the older slot');
-  assert.equal(experiment.schemaVersion, 3);
+  assert.equal(experiment.schemaVersion, SCHEMA_VERSION);
   assert.equal(seen.length, 1);
   assert.match(seen[0].message, /newer than this app supports/);
 });
@@ -269,4 +297,40 @@ test('loadMostRecentRecoverable works with no onUnreadable callback at all', () 
   const storage = makeFakeStorage();
   saveExperiment({ schemaVersion: 999 }, { storage });
   assert.doesNotThrow(() => loadMostRecentRecoverable({ storage }));
+});
+
+test('loadRecoverableSlot loads a user-selected older slot and migrates it', () => {
+  const storage = makeFakeStorage();
+  const olderId = saveExperiment({
+    schemaVersion: 1, meta: {}, narrative: {}, specimen: {},
+    design: { factors: [], replicates: 3, idScheme: '', conditions: [] },
+    panel: {}, acquisition: {}, controls: {},
+    naming: { template: 't', fields: {}, plannedNames: [] },
+    provenance: { slots: {}, unanswered: [], skipped: [] }, derived: {}, interview: {}, conformance: {},
+  }, { storage });
+  saveExperiment(emptyExperiment(), { storage });
+
+  const result = loadRecoverableSlot(olderId, { storage });
+
+  assert.equal(result.id, olderId);
+  assert.equal(result.error, null);
+  assert.equal(result.experiment.schemaVersion, SCHEMA_VERSION);
+  assert.equal(result.experiment.assays[0].design.biologicalReplicates, 3);
+});
+
+test('loadRecoverableSlot reports missing or unmigrateable selections without throwing', () => {
+  const storage = makeFakeStorage();
+  const missing = loadRecoverableSlot('gone', { storage });
+  assert.equal(missing.experiment, null);
+  assert.match(missing.error.message, /no longer available/);
+
+  const badId = saveExperiment({ schemaVersion: 999 }, { storage });
+  let reported = null;
+  const unreadable = loadRecoverableSlot(badId, {
+    storage,
+    onUnreadable: (id, error) => { reported = { id, error }; },
+  });
+  assert.equal(unreadable.experiment, null);
+  assert.match(unreadable.error.message, /newer than this app supports/);
+  assert.equal(reported.id, badId);
 });

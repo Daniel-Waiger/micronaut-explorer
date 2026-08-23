@@ -22,6 +22,14 @@ function slotKey(id) {
   return STORAGE_PREFIX + 'slot.' + id;
 }
 
+function readRing(storage) {
+  const ids = readJSON(storage, RING_INDEX_KEY, []);
+  // Corrupt or hand-edited storage must not turn routine saving/recovery
+  // into a TypeError. Unknown values are treated as an empty recoverable
+  // history, while valid id strings retain their existing order.
+  return Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : [];
+}
+
 function defaultBackend() {
   return typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined;
 }
@@ -70,23 +78,49 @@ export function saveExperiment(experiment, { storage = defaultBackend(), onQuota
   const ok = writeJSON(storage, slotKey(id), experiment, onQuotaExceeded);
   if (!ok) return null;
 
-  const ids = readJSON(storage, RING_INDEX_KEY, []);
+  const ids = readRing(storage);
   ids.push(id);
+  const evicted = [];
   while (ids.length > RING_SIZE) {
-    const evicted = ids.shift();
-    removeKey(storage, slotKey(evicted), onQuotaExceeded);
+    evicted.push(ids.shift());
   }
-  writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded);
+  if (!writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded)) {
+    // A slot without a ring entry is unusable, so report this save as failed
+    // rather than claiming recovery succeeded. Best-effort cleanup is itself
+    // total and reports any storage failure through the same callback.
+    removeKey(storage, slotKey(id), onQuotaExceeded);
+    return null;
+  }
+  for (const oldId of evicted) removeKey(storage, slotKey(oldId), onQuotaExceeded);
   return id;
 }
 
 /** Most-recently-saved id first. */
 export function listSaved({ storage = defaultBackend() } = {}) {
-  return readJSON(storage, RING_INDEX_KEY, []).slice().reverse();
+  return readRing(storage).reverse();
 }
 
 export function loadExperiment(id, { storage = defaultBackend() } = {}) {
   return readJSON(storage, slotKey(id), null);
+}
+
+/**
+ * Load one user-selected recovery slot as a migrated experiment. Unlike the
+ * boot-time scanner, a selected slot is not allowed to silently fall through
+ * to a different snapshot: callers receive its recoverable experiment or a
+ * concrete error and can keep the current in-memory study intact.
+ */
+export function loadRecoverableSlot(id, { storage = defaultBackend(), onUnreadable } = {}) {
+  const raw = typeof id === 'string' && id ? loadExperiment(id, { storage }) : null;
+  if (raw === null) {
+    return { id, experiment: null, error: new Error('That saved version is no longer available.') };
+  }
+  try {
+    return { id, experiment: migrate(raw), error: null };
+  } catch (err) {
+    if (onUnreadable) onUnreadable(id, err);
+    return { id, experiment: null, error: err };
+  }
 }
 
 /**
@@ -134,7 +168,7 @@ export function loadMostRecentRecoverable({ storage = defaultBackend(), onUnread
 
 export function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceeded } = {}) {
   removeKey(storage, slotKey(id), onQuotaExceeded);
-  const ids = readJSON(storage, RING_INDEX_KEY, []).filter((existingId) => existingId !== id);
+  const ids = readRing(storage).filter((existingId) => existingId !== id);
   writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded);
 }
 
@@ -212,6 +246,16 @@ export function deserializeExperiment(text) {
 }
 
 /**
+ * Parse a portable project backup and migrate it to the current schema.
+ * This function deliberately has no storage side effects: main owns the
+ * replace/autosave lifecycle, so an invalid or future-schema import cannot
+ * partially overwrite either the current study or the recovery ring.
+ */
+export function parseAndMigrateExperiment(text) {
+  return migrate(deserializeExperiment(text));
+}
+
+/**
  * Trigger a real `<a download>` click for arbitrary `text`. Works under
  * file:// (no fetch, no server, no permission prompt) -- the general form
  * exportToFile below already relied on; extracted so ui/steps/overview.js's
@@ -244,7 +288,7 @@ export function importFromFile(file) {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        resolve(deserializeExperiment(String(reader.result)));
+        resolve(parseAndMigrateExperiment(String(reader.result)));
       } catch (err) {
         reject(err);
       }

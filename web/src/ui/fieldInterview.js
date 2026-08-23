@@ -1,9 +1,9 @@
 // The name-builder-style interview: renders a set of questions as a grid of
-// labeled boxes, each with a short label, an appropriate input, a hover
-// hint (the question's "why"), and a small ✓ button at the right end to
-// confirm. Built for microscopy-novice users (zen-planner Phase 1 feedback):
-// no full-sentence prompts, no visible subtitle, no Answer/Skip buttons --
-// leaving a box empty IS skipping it, and the ✓ replaces "Answer".
+// labeled boxes, each with a short label, an appropriate input, a visible
+// provenance-derived confirmation state, and a labelled confirmation button.
+// Built for microscopy-novice users (zen-planner Phase 1 feedback): no
+// full-sentence prompts or Answer/Skip buttons -- leaving a box empty IS
+// skipping it, while the explicit button is the only action that writes.
 //
 // Shared by the Microscopy step (ui/steps/panel.js) and the Schedule section
 // of the Naming step (ui/steps/naming.js), the same
@@ -112,14 +112,33 @@ export function renderFieldInterview(container, { questions, onCommit, experienc
   grid.className = 'naming-grid';
   container.appendChild(grid);
 
-  for (const question of list) {
+  for (const [index, question] of list.entries()) {
     const cell = document.createElement('div');
     cell.className = 'field-row';
 
-    const labelText = document.createElement('span');
+    const questionLabel = question.label || question.prompt || question.id || `Question ${index + 1}`;
+    const labelText = document.createElement('label');
     labelText.className = 'field-label';
-    labelText.textContent = question.label || question.prompt || question.id;
+    labelText.textContent = questionLabel;
     cell.appendChild(labelText);
+
+    // This is deliberately derived from phaseQuestions' supplied provenance
+    // flags rather than inferred from the current input text: a filled weak
+    // suggestion still needs review, while a user-confirmed answer is safe
+    // to revisit and reconfirm.
+    const state = document.createElement('span');
+    state.className = 'field-confirmation-state';
+    if (question.confirmed) {
+      state.classList.add('field-confirmation-confirmed');
+      state.textContent = 'Confirmed';
+    } else if (question.suggestedTag) {
+      state.classList.add('field-confirmation-suggested');
+      state.textContent = 'Suggested — review required';
+    } else {
+      state.classList.add('field-confirmation-unconfirmed');
+      state.textContent = 'Unconfirmed';
+    }
+    cell.appendChild(state);
 
     const commitRow = document.createElement('div');
     commitRow.className = 'field-commit-row';
@@ -128,6 +147,13 @@ export function renderFieldInterview(container, { questions, onCommit, experienc
       className: 'field-input',
       placeholder: question.placeholder,
     });
+    const primaryInput = control.element.matches && control.element.matches('input, select')
+      ? control.element
+      : control.element.querySelector && control.element.querySelector('input, select');
+    if (primaryInput) {
+      primaryInput.id = `field-interview-${question.id || question.field || index}`.replace(/[^A-Za-z0-9_-]/g, '-');
+      labelText.htmlFor = primaryInput.id;
+    }
     // The hover hint (the question's "why") lives on the input itself, as
     // the box's native tooltip -- replacing the old always-visible subtitle.
     // A composite control (duration's h+min, or a choice's select+Other
@@ -143,9 +169,17 @@ export function renderFieldInterview(container, { questions, onCommit, experienc
     const commitBtn = document.createElement('button');
     commitBtn.type = 'button';
     commitBtn.className = 'field-commit' + (question.confirmed ? ' field-commit-confirmed' : '');
-    commitBtn.textContent = '✓';
-    commitBtn.title = question.confirmed ? 'Confirmed — click to update' : 'Confirm this answer';
-    commitBtn.setAttribute('aria-label', commitBtn.title);
+    const commitLabel = question.confirmed
+      ? `Update and reconfirm ${questionLabel}`
+      : question.suggestedTag
+        ? `Confirm suggested ${questionLabel}`
+        : `Confirm ${questionLabel}`;
+    // Visible action wording makes a previously-confirmed value's behaviour
+    // clear; the full label gives every repeated button a unique accessible
+    // name for screen-reader and keyboard users.
+    commitBtn.textContent = question.confirmed ? 'Update & reconfirm' : 'Confirm';
+    commitBtn.title = commitLabel;
+    commitBtn.setAttribute('aria-label', commitLabel);
     commitBtn.addEventListener('click', () => {
       const raw = control.getValue();
       // Empty = skipped, never a committed blank. Number 0 (a real 0-minute

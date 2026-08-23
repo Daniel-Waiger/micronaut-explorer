@@ -33,6 +33,25 @@ test('patch accepts an updater function receiving current state', () => {
   assert.equal(store.get().meta.title, 'Updated');
 });
 
+test('replace swaps the whole root, removes obsolete top-level data, and notifies subscribers', async () => {
+  const initial = emptyExperiment();
+  initial.obsoleteImportedRoot = { shouldNotSurvive: true };
+  const replacement = emptyExperiment();
+  replacement.meta.title = 'Restored study';
+  const store = createStore(initial);
+  const seen = [];
+  store.subscribe((state) => seen.push(state));
+
+  const returned = store.replace(replacement);
+
+  assert.equal(returned, replacement);
+  assert.equal(store.get(), replacement);
+  assert.equal(store.get().obsoleteImportedRoot, undefined);
+  assert.equal(seen.length, 0, 'notifications stay batched like patch/setPath');
+  await flushMicrotasks();
+  assert.deepEqual(seen, [replacement]);
+});
+
 test('setPath writes the value and tags the slot on first write', () => {
   const store = createStore(emptyExperiment());
   const ok = store.setPath('naming.fields.sample', 'E02', 'user');

@@ -30,6 +30,22 @@ test('renderMarkdown and renderMermaid are deterministic on the same document', 
   assert.equal(renderMermaid(doc), renderMermaid(doc));
 });
 
+test('study document and text renderers use group terminology exclusively', () => {
+  const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const serialized = JSON.stringify(doc);
+  const markdown = renderMarkdown(doc);
+  const mermaid = renderMermaid(doc);
+
+  assert.deepEqual(doc.study.groupVocabulary, ['CTL', 'OPP']);
+  assert.deepEqual(doc.assays[0].design.groups, ['CTL', 'OPP']);
+  assert.match(markdown, /Study-wide group vocabulary/);
+  assert.match(markdown, /Groups \(mutually exclusive\)/);
+  assert.match(mermaid, /group\(s\)/);
+  for (const output of [serialized, markdown, mermaid]) {
+    assert.doesNotMatch(output, /\barms?\b/i);
+  }
+});
+
 // --- Totality --------------------------------------------------------------
 
 test('buildStudyDocument on an empty/malformed experiment never throws and yields a usable empty-ish document', () => {
@@ -63,10 +79,10 @@ test('the real oregano default study yields all 4 assays with correct labels', (
   );
 });
 
-test('every default-study assay has correct arms/factors and a non-zero condition count', () => {
+test('every default-study assay has correct groups/factors and a non-zero condition count', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   for (const assay of doc.assays) {
-    assert.deepEqual(assay.design.arms, ['CTL', 'OPP']);
+    assert.deepEqual(assay.design.groups, ['CTL', 'OPP']);
     assert.ok(assay.design.conditionCount > 0, `assay '${assay.label}' has zero condition rows`);
   }
   // Bacterial viability has the extra 'species' crossing factor (2 levels).

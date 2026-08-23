@@ -34,17 +34,18 @@ const NAMING_CONFIG = {
 };
 const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
 
-test('createDefaultStudy returns a v3 study with 4 assays', () => {
+test('createDefaultStudy returns a v4 study with 4 assays', () => {
   const study = createDefaultStudy();
-  assert.equal(study.schemaVersion, 3);
+  assert.equal(study.schemaVersion, 4);
   assert.equal(study.assays.length, 4);
+  assert.equal(study.meta.origin, 'example');
 });
 
-test('the research question and arm vocabulary are the real oregano-study values', () => {
+test('the research question and group vocabulary are the real oregano-study values', () => {
   const study = createDefaultStudy();
   assert.match(study.researchQuestion, /RF-PECVD/);
   assert.match(study.researchQuestion, /oregano/);
-  assert.deepEqual(study.armVocabulary.levels, ['CTL', 'OPP']);
+  assert.deepEqual(study.groupVocabulary.levels, ['CTL', 'OPP']);
 });
 
 test('activeAssayId resolves to a real entry in assays (the first one)', () => {
@@ -60,7 +61,7 @@ test('the 4 assays carry the expected labels, in order', () => {
   );
 });
 
-test('every assay gets the CTL/OPP arm axis', () => {
+test('every assay gets the CTL/OPP group axis', () => {
   const study = createDefaultStudy();
   for (const assay of study.assays) {
     assert.deepEqual(assay.design.groups.levels, ['CTL', 'OPP']);
@@ -115,10 +116,10 @@ test('every seeded assay field has a matching provenance slot at assay:<id>.<pat
   }
 });
 
-test('researchQuestion and armVocabulary have their own study-level provenance slots', () => {
+test('researchQuestion and groupVocabulary have their own study-level provenance slots', () => {
   const study = createDefaultStudy();
   assert.equal(study.provenance.slots.researchQuestion.tag, 'kb-default');
-  assert.equal(study.provenance.slots.armVocabulary.tag, 'kb-default');
+  assert.equal(study.provenance.slots.groupVocabulary.tag, 'kb-default');
 });
 
 test('two calls to createDefaultStudy produce independent assay ids and object identity', () => {

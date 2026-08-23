@@ -1,217 +1,352 @@
-// Interactive walkthrough (zen-planner Phase 5): a short spotlight-style
-// coach-mark tour over the REAL app nav, not a slideshow describing it. Each
-// tour step navigates the router to a real page and highlights that page's
-// nav button with a short tooltip, so a first-time user sees the actual app
-// working. ui/steps/home.js's "Take the walkthrough" card and ui/steps/
-// guide.js's own "Start the tour" button both call startWalkthrough() --
-// see main.js's boot sequence for the auto-start-on-first-visit framework
-// this content plugs into (zen-planner Phase 1).
-//
-// Deliberately NOT a generic "attach to any element" tour engine: this app
-// has exactly one thing worth touring (the step nav), so a general-purpose
-// targeting/positioning framework would solve a problem this app does not
-// have. Generalize only if a second tour ever appears.
-//
-// Content is intentionally terse (one sentence per step) -- this is a
-// tooltip, not ui/steps/guide.js's own longer-form prose; the two are
-// different media for the same facts, not a duplicate to keep in sync by
-// hand (see design.js's parseLevels export for this codebase's general
-// stance on NOT duplicating logic, which does not extend to two
-// deliberately different-length renderings of the same plain fact).
-export const TOUR_STEPS = [
-  {
-    stepId: 'home',
-    title: 'Home',
-    body: 'Start here. Three doors in: a guided description, a worked template, or this tour.',
-  },
-  {
-    stepId: 'describe',
-    title: 'Project',
-    body: 'The question first -- what you are measuring, on what organism, and why -- before any microscope decision.',
-  },
-  {
-    stepId: 'study',
-    title: 'Study',
-    body: 'The study-wide view: your research question, the groups shared across assays, and the list of assays.',
-  },
-  {
-    stepId: 'design',
-    title: 'Design',
-    body: 'Per assay: your control and treatment groups, any crossing factors, and replicate counts.',
-  },
-  {
-    stepId: 'panel',
-    title: 'Microscopy',
-    body: 'Acquisition details -- instrument, modality, markers -- plus a spectral-spillover check across your fluorophores.',
-  },
-  {
-    stepId: 'naming',
-    title: 'Naming',
-    body: 'The filename convention assembled from your design, plus a downloadable bench schedule further down the page.',
-  },
-  {
-    stepId: 'overview',
-    title: 'Overview',
-    body: 'A read-only summary: the study map, a conformance check, recommended controls, and every planned filename.',
-  },
-  {
-    stepId: 'guide',
-    title: 'Guide',
-    body: 'Come back here any time -- a searchable reference for every step and concept in the app.',
-  },
-];
+// Persistent, non-modal contextual walkthrough renderer. The shell owns the
+// host; main owns persistence and lifecycle. This module only renders an
+// injected current projection and asks injected transitions to make changes.
+
+function safeWorkflow(primaryWorkflow) {
+  return (Array.isArray(primaryWorkflow) ? primaryWorkflow : [])
+    .filter((step) => step && typeof step.id === 'string' && step.id)
+    .map((step) => ({ id: step.id, label: typeof step.label === 'string' && step.label ? step.label : step.id }));
+}
+
+function fallbackProgress(primaryWorkflow) {
+  return {
+    status: 'not-started',
+    currentStepId: primaryWorkflow[0]?.id || null,
+    completedStepIds: [],
+    completedAt: null,
+  };
+}
+
+function element(doc, tag, className, text) {
+  const node = doc.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function button(doc, className, text, onClick) {
+  const node = element(doc, 'button', className, text);
+  node.type = 'button';
+  node.addEventListener('click', onClick);
+  return node;
+}
+
+function completeStep(step, fallbackId) {
+  const value = step && typeof step === 'object' ? step : {};
+  return {
+    stepId: typeof value.stepId === 'string' && value.stepId ? value.stepId : fallbackId,
+    title: typeof value.title === 'string' && value.title ? value.title : fallbackId,
+    outcome: typeof value.outcome === 'string' && value.outcome ? value.outcome : 'Review the current workflow step.',
+    what: typeof value.what === 'string' && value.what ? value.what : 'This step contributes to the current study plan.',
+    why: typeof value.why === 'string' && value.why ? value.why : 'Each step keeps one part of the plan reviewable.',
+    when: typeof value.when === 'string' && value.when ? value.when : 'Use this step whenever this part of the plan needs attention.',
+    how: typeof value.how === 'string' && value.how ? value.how : 'Review the current values and continue when they fit the plan.',
+    exampleLabel: typeof value.exampleLabel === 'string' && value.exampleLabel ? value.exampleLabel : 'In this study now',
+    exampleSummary: typeof value.exampleSummary === 'string' && value.exampleSummary ? value.exampleSummary : 'Current study values are unavailable.',
+    tryThis: typeof value.tryThis === 'string' && value.tryThis ? value.tryThis : 'Compare the current values with the plan you intend to run.',
+    nextStepId: typeof value.nextStepId === 'string' ? value.nextStepId : null,
+    nextTitle: typeof value.nextTitle === 'string' ? value.nextTitle : null,
+  };
+}
 
 /**
- * Start the tour. `router` drives real navigation between steps;
- * `onFinish()` (optional) fires once, when the tour ends by any path (Skip,
- * Finish, Escape, or clicking the backdrop) -- ui/steps/home.js uses it to
- * mark the walkthrough seen so it does not auto-start again.
+ * Create the one persistent guided-panel controller.
  *
- * Returns nothing: the tour manages its own DOM (appended to `document.body`,
- * removed on finish) and its own teardown. Calling this a second time before
- * the first tour finishes is not supported -- both callers (Home's card,
- * Guide's button) are single, deliberate user clicks, never programmatic.
+ * Required injections:
+ * - `host`: the shell's one `<aside>` host.
+ * - `primaryWorkflow`: canonical ordered primary workflow metadata.
+ * - `router`: the real app router.
+ * - `getContent()`: returns fresh `buildGuidedExampleContent()` output.
+ * - `getProgress()` and `transitions`: persistence/state ownership supplied
+ *   by main. Transition methods may return the new state; otherwise this
+ *   controller re-reads `getProgress()`.
+ * - `routeForStep()` / `stepForRoute()`: the shell/main routing authority;
+ *   the controller deliberately has no microscopy-route alias of its own.
+ *
+ * `subscribe(listener)` is optional and is normally `store.subscribe`; it
+ * refreshes values such as an active assay without changing guide progress.
+ * `onVisibilityChange(visible)` is an optional shell presentation hook; it
+ * fires only when this controller actually opens or closes the aside.
  */
-export function startWalkthrough({ router, onFinish } = {}) {
-  let index = 0;
+export function createWalkthroughController({
+  host,
+  primaryWorkflow,
+  router,
+  getContent,
+  getProgress,
+  transitions = {},
+  routeForStep,
+  stepForRoute,
+  subscribe,
+  onAdoptExample,
+  onNewBlank,
+  onKeepExploringExample,
+  onVisibilityChange,
+} = {}) {
+  if (!host || !host.ownerDocument) {
+    throw new Error('createWalkthroughController requires the shell walkthrough host.');
+  }
 
-  const backdrop = document.createElement('div');
-  backdrop.className = 'walkthrough-backdrop';
+  const doc = host.ownerDocument;
+  const win = doc.defaultView;
+  const workflow = safeWorkflow(primaryWorkflow);
+  const ids = new Set(workflow.map((step) => step.id));
+  let visible = false;
+  let mode = 'walkthrough';
+  let viewStepId = null;
+  let lastProgress = fallbackProgress(workflow);
+  let destroyed = false;
+  let completionActionTaken = false;
 
-  const tooltip = document.createElement('div');
-  tooltip.className = 'walkthrough-tooltip';
-  tooltip.setAttribute('role', 'dialog');
-  tooltip.setAttribute('aria-label', 'Walkthrough');
+  function readProgress() {
+    try {
+      const value = typeof getProgress === 'function' ? getProgress() : null;
+      lastProgress = value && typeof value === 'object' ? value : fallbackProgress(workflow);
+    } catch {
+      lastProgress = fallbackProgress(workflow);
+    }
+    return lastProgress;
+  }
 
-  const stepLabel = document.createElement('div');
-  stepLabel.className = 'walkthrough-step-label';
-  const titleEl = document.createElement('div');
-  titleEl.className = 'walkthrough-title';
-  const bodyEl = document.createElement('div');
-  bodyEl.className = 'walkthrough-body';
+  function currentStepId() {
+    const progress = readProgress();
+    return ids.has(progress.currentStepId) ? progress.currentStepId : workflow[0]?.id || null;
+  }
 
-  const actions = document.createElement('div');
-  actions.className = 'walkthrough-actions';
+  function routeFor(id) {
+    return typeof routeForStep === 'function' ? routeForStep(id) : id;
+  }
 
-  const skipBtn = document.createElement('button');
-  skipBtn.type = 'button';
-  skipBtn.className = 'walkthrough-skip';
-  skipBtn.textContent = 'Skip';
+  function workflowIdForRoute(routeId) {
+    const candidate = typeof stepForRoute === 'function' ? stepForRoute(routeId) : routeId;
+    return ids.has(candidate) ? candidate : null;
+  }
 
-  const backBtn = document.createElement('button');
-  backBtn.type = 'button';
-  backBtn.className = 'walkthrough-back';
-  backBtn.textContent = 'Back';
-
-  const nextBtn = document.createElement('button');
-  nextBtn.type = 'button';
-  nextBtn.className = 'walkthrough-next';
-
-  actions.appendChild(skipBtn);
-  actions.appendChild(backBtn);
-  actions.appendChild(nextBtn);
-
-  tooltip.appendChild(stepLabel);
-  tooltip.appendChild(titleEl);
-  tooltip.appendChild(bodyEl);
-  tooltip.appendChild(actions);
-
-  let highlighted = null;
-
-  function clearHighlight() {
-    if (highlighted) {
-      highlighted.classList.remove('walkthrough-highlight');
-      highlighted = null;
+  function currentRouteStepId() {
+    try {
+      return workflowIdForRoute(router && typeof router.current === 'function' ? router.current() : null);
+    } catch {
+      return null;
     }
   }
 
-  /**
-   * Position `tooltip` beside `target`'s bounding rect, preferring the
-   * right side (where the nav-step buttons have the most open room) and
-   * falling back below when the tooltip would run off the right edge of a
-   * narrow viewport (e.g. the collapsed icon-only rail on a small window).
-   */
-  function positionTooltip(target) {
-    const rect = target.getBoundingClientRect();
-    const tooltipWidth = 300; // matches app.css's .walkthrough-tooltip width
-    const margin = 12;
-    const fitsRight = rect.right + margin + tooltipWidth <= window.innerWidth;
-    if (fitsRight) {
-      tooltip.style.left = `${rect.right + margin}px`;
-      tooltip.style.top = `${Math.max(margin, rect.top)}px`;
-    } else {
-      tooltip.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - tooltipWidth - margin))}px`;
-      tooltip.style.top = `${rect.bottom + margin}px`;
+  function contentFor(stepId) {
+    let content;
+    try {
+      content = typeof getContent === 'function' ? getContent() : null;
+    } catch {
+      content = null;
     }
+    const steps = Array.isArray(content) ? content : content && Array.isArray(content.steps) ? content.steps : [];
+    return completeStep(steps.find((step) => step && step.stepId === stepId), stepId || workflow[0]?.id || 'step');
+  }
+
+  function navigate(stepId) {
+    if (!stepId || !router || typeof router.navigate !== 'function') return false;
+    return router.navigate(routeFor(stepId));
+  }
+
+  function invokeTransition(name, ...args) {
+    const transition = transitions && transitions[name];
+    if (typeof transition !== 'function') return readProgress();
+    try {
+      const result = transition(...args);
+      lastProgress = result && typeof result === 'object' ? result : readProgress();
+    } catch {
+      lastProgress = readProgress();
+    }
+    return lastProgress;
+  }
+
+  function setVisible(nextVisible) {
+    const next = Boolean(nextVisible);
+    if (visible === next) return;
+    visible = next;
+    host.hidden = !next;
+    if (typeof onVisibilityChange === 'function') {
+      try { onVisibilityChange(next); } catch { /* shell presentation must not break the guide */ }
+    }
+  }
+
+  function hide() {
+    setVisible(false);
+    host.replaceChildren();
+  }
+
+  function close() {
+    if (mode === 'walkthrough' && readProgress().status === 'active') invokeTransition('pause');
+    hide();
+  }
+
+  function renderCompletion() {
+    const card = element(doc, 'section', 'guided-walkthrough-panel guided-walkthrough-complete');
+    card.setAttribute('aria-label', 'Example walkthrough complete');
+    const heading = element(doc, 'h2', 'guided-walkthrough-title', 'Example walkthrough complete');
+    const summary = element(doc, 'p', 'guided-walkthrough-outcome', `You have reviewed ${workflow.length} workflow steps.`);
+    const outcomes = element(doc, 'details', 'guided-walkthrough-details');
+    outcomes.appendChild(element(doc, 'summary', '', 'What you reviewed'));
+    const list = element(doc, 'ul', 'guided-walkthrough-outcomes');
+    workflow.forEach((workflowStep) => list.appendChild(element(doc, 'li', '', `${workflowStep.label}: ${contentFor(workflowStep.id).outcome}`)));
+    outcomes.appendChild(list);
+    const actions = element(doc, 'div', 'guided-walkthrough-actions');
+
+    function completionAction(callback) {
+      if (completionActionTaken) return;
+      completionActionTaken = true;
+      if (typeof callback === 'function') callback();
+      hide();
+    }
+
+    actions.append(
+      button(doc, 'guided-walkthrough-adopt', 'Use as template', () => completionAction(onAdoptExample)),
+      button(doc, 'guided-walkthrough-blank', 'Start my own', () => completionAction(onNewBlank)),
+      button(doc, 'guided-walkthrough-keep', 'Keep exploring example', () => completionAction(onKeepExploringExample || (() => {})))
+    );
+    card.append(heading, summary, outcomes, actions);
+    host.replaceChildren(card);
   }
 
   function renderStep() {
-    const step = TOUR_STEPS[index];
-    if (!step) return finish();
+    const progress = readProgress();
+    if (mode === 'walkthrough' && progress.status === 'completed') {
+      renderCompletion();
+      return;
+    }
+    const requestedId = mode === 'explanation' ? (viewStepId || currentRouteStepId()) : (viewStepId || currentStepId());
+    const stepId = ids.has(requestedId) ? requestedId : workflow[0]?.id || null;
+    const index = workflow.findIndex((step) => step.id === stepId);
+    const context = contentFor(stepId);
+    const card = element(doc, 'section', 'guided-walkthrough-panel');
+    card.setAttribute('aria-label', mode === 'explanation' ? `Explanation: ${context.title}` : 'Example walkthrough');
 
-    if (router) router.navigate(step.stepId);
-    clearHighlight();
+    const top = element(doc, 'div', 'guided-walkthrough-topline');
+    top.appendChild(element(doc, 'p', 'guided-walkthrough-position', mode === 'explanation'
+      ? `Explain this step · ${context.title}`
+      : `Example walkthrough · Step ${Math.max(index + 1, 1)} of ${workflow.length}`));
+    top.appendChild(button(doc, 'guided-walkthrough-close', 'Close', close));
 
-    const target = document.querySelector(`[data-step-id="${step.stepId}"]`);
-    if (target) {
-      target.classList.add('walkthrough-highlight');
-      highlighted = target;
-      if (typeof target.scrollIntoView === 'function') {
-        target.scrollIntoView({ block: 'nearest' });
-      }
-      tooltip.style.transform = '';
-      positionTooltip(target);
-    } else {
-      // TOTAL: a missing nav button (a step removed from the array without
-      // updating TOUR_STEPS, or a render race) must not strand the tour --
-      // center the tooltip instead of throwing or freezing on a blank
-      // highlight.
-      tooltip.style.left = '50%';
-      tooltip.style.top = '80px';
-      tooltip.style.transform = 'translateX(-50%)';
+    const heading = element(doc, 'h2', 'guided-walkthrough-title', context.title);
+    const outcome = element(doc, 'p', 'guided-walkthrough-outcome', context.outcome);
+    const example = element(doc, 'section', 'guided-walkthrough-example');
+    example.append(element(doc, 'h3', 'guided-walkthrough-example-label', context.exampleLabel), element(doc, 'p', 'guided-walkthrough-example-summary', context.exampleSummary));
+    const what = element(doc, 'section', 'guided-walkthrough-what');
+    what.append(element(doc, 'h3', '', 'What'), element(doc, 'p', '', context.what));
+    const rationale = element(doc, 'details', 'guided-walkthrough-details');
+    rationale.append(element(doc, 'summary', '', 'Why does this matter?'), element(doc, 'p', '', context.why));
+    const timing = element(doc, 'details', 'guided-walkthrough-details');
+    timing.append(element(doc, 'summary', '', 'When and how'), element(doc, 'p', '', context.when), element(doc, 'p', '', context.how));
+    const tryThis = element(doc, 'section', 'guided-walkthrough-try');
+    tryThis.append(element(doc, 'h3', '', 'Try this'), element(doc, 'p', '', context.tryThis));
+    const actions = element(doc, 'div', 'guided-walkthrough-actions');
+
+    if (mode === 'walkthrough') {
+      const previous = index > 0 ? workflow[index - 1] : null;
+      const cursor = currentStepId();
+      const isViewingCursor = stepId === cursor;
+      const back = button(doc, 'guided-walkthrough-back', 'Back', () => {
+        if (!previous) return;
+        viewStepId = previous.id;
+        navigate(viewStepId);
+        refresh();
+      });
+      back.disabled = !previous;
+      const pause = button(doc, 'guided-walkthrough-pause', 'Pause', close);
+      const nextLabel = isViewingCursor
+        ? (context.nextTitle ? `Next feature: ${context.nextTitle}` : 'Finish walkthrough')
+        : `Continue walkthrough: ${workflow.find((step) => step.id === cursor)?.label || 'current step'}`;
+      const next = button(doc, 'guided-walkthrough-next', nextLabel, () => {
+        if (!isViewingCursor) {
+          viewStepId = cursor;
+          navigate(cursor);
+          refresh();
+          return;
+        }
+        const after = invokeTransition('advance', stepId);
+        if (after.status === 'completed') {
+          refresh();
+          return;
+        }
+        viewStepId = ids.has(after.currentStepId) ? after.currentStepId : currentStepId();
+        navigate(viewStepId);
+        refresh();
+      });
+      actions.append(back, pause, next);
     }
 
-    stepLabel.textContent = `Step ${index + 1} of ${TOUR_STEPS.length}`;
-    titleEl.textContent = step.title;
-    bodyEl.textContent = step.body;
-    backBtn.hidden = index === 0;
-    nextBtn.textContent = index === TOUR_STEPS.length - 1 ? 'Finish' : 'Next';
+    card.append(top, heading, outcome, example, what, rationale, timing, tryThis, actions);
+    host.replaceChildren(card);
   }
 
-  function finish() {
-    clearHighlight();
-    window.removeEventListener('resize', onResize);
-    window.removeEventListener('keydown', onKeydown);
-    backdrop.remove();
-    tooltip.remove();
-    if (typeof onFinish === 'function') onFinish();
+  function refresh({ fromRoute = false } = {}) {
+    if (destroyed || !visible) return;
+    if (fromRoute) {
+      const routed = currentRouteStepId();
+      if (routed) viewStepId = routed;
+    }
+    renderStep();
   }
 
-  function onResize() {
-    const step = TOUR_STEPS[index];
-    const target = step && document.querySelector(`[data-step-id="${step.stepId}"]`);
-    if (target) positionTooltip(target);
+  function openWalkthrough({ restart = false } = {}) {
+    completionActionTaken = false;
+    mode = 'walkthrough';
+    const before = readProgress();
+    if (restart) invokeTransition('restart');
+    else if (before.status === 'paused') invokeTransition('resume');
+    else if (before.status === 'not-started') invokeTransition('start');
+    setVisible(true);
+    viewStepId = currentStepId();
+    navigate(viewStepId);
+    refresh();
+  }
+
+  function openExplanation(stepId = currentRouteStepId()) {
+    mode = 'explanation';
+    setVisible(true);
+    viewStepId = ids.has(stepId) ? stepId : currentStepId();
+    refresh();
   }
 
   function onKeydown(event) {
-    if (event.key === 'Escape') finish();
+    if (event.key === 'Escape' && visible) {
+      event.preventDefault();
+      close();
+    }
   }
 
-  nextBtn.addEventListener('click', () => {
-    index += 1;
-    renderStep();
-  });
-  backBtn.addEventListener('click', () => {
-    index = Math.max(0, index - 1);
-    renderStep();
-  });
-  skipBtn.addEventListener('click', finish);
-  backdrop.addEventListener('click', finish);
+  const unsubscribeRoute = router && typeof router.onChange === 'function' ? router.onChange(() => refresh({ fromRoute: true })) : null;
+  const unsubscribeStore = typeof subscribe === 'function' ? subscribe(refresh) : null;
+  if (win) win.addEventListener('keydown', onKeydown);
+  hide();
 
-  window.addEventListener('resize', onResize);
-  window.addEventListener('keydown', onKeydown);
+  return {
+    openWalkthrough,
+    start: openWalkthrough,
+    resume: openWalkthrough,
+    restart() { openWalkthrough({ restart: true }); },
+    openExplanation,
+    explain: openExplanation,
+    close,
+    refresh,
+    isOpen() { return visible; },
+    mode() { return visible ? mode : null; },
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      if (typeof unsubscribeRoute === 'function') unsubscribeRoute();
+      if (typeof unsubscribeStore === 'function') unsubscribeStore();
+      if (win) win.removeEventListener('keydown', onKeydown);
+      hide();
+    },
+  };
+}
 
-  document.body.appendChild(backdrop);
-  document.body.appendChild(tooltip);
-  renderStep();
+// Transitional export for callers updated in later guided-example tasks. It
+// never creates a second host or a modal surface; main should create and
+// retain the controller above after the shell renders.
+export function startWalkthrough(options = {}) {
+  const host = options.host || (typeof document !== 'undefined' && document.querySelector('[data-guided-walkthrough-host]'));
+  if (!host) return null;
+  const controller = createWalkthroughController({ ...options, host });
+  controller.start();
+  return controller;
 }

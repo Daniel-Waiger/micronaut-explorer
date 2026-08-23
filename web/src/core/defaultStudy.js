@@ -32,8 +32,8 @@ const RESEARCH_QUESTION =
   'inflammatory responses?';
 
 // CTL (bare/uncoated) vs OPP (oregano plasma polymer coated) -- the paper's own
-// two arms, confirmed exact terminology.
-const ARM_VOCABULARY = { levels: ['CTL', 'OPP'] };
+// two mutually exclusive groups, using the paper's exact labels.
+const GROUP_VOCABULARY = { levels: ['CTL', 'OPP'] };
 
 // One entry per assay. `fields` uses the same bare v2-shaped paths
 // assayView/scopeWrite already operate on -- applied directly to the assay
@@ -115,7 +115,7 @@ export function createDefaultStudy() {
   const assays = ASSAY_SEEDS.map((seed) => {
     const id = shortId();
     const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(
-      ARM_VOCABULARY,
+      GROUP_VOCABULARY,
       id
     );
     provenanceSlots[provenanceSlotKey] = provenanceEntry;
@@ -131,8 +131,9 @@ export function createDefaultStudy() {
 
   return {
     ...study,
+    meta: { ...study.meta, origin: 'example' },
     researchQuestion: RESEARCH_QUESTION,
-    armVocabulary: { levels: [...ARM_VOCABULARY.levels] },
+    groupVocabulary: { levels: [...GROUP_VOCABULARY.levels] },
     assays,
     activeAssayId: assays[0].id,
     provenance: {
@@ -140,7 +141,7 @@ export function createDefaultStudy() {
       slots: {
         ...study.provenance.slots,
         researchQuestion: { tag: 'kb-default', detail: null },
-        armVocabulary: { tag: 'kb-default', detail: null },
+        groupVocabulary: { tag: 'kb-default', detail: null },
         ...provenanceSlots,
       },
     },

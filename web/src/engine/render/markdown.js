@@ -32,7 +32,7 @@ function readoutSection(readout) {
 function designSection(design) {
   const lines = [];
   lines.push(`**Design:** ${design.conditionCount} planned condition row(s).`);
-  if (design.arms.length > 0) lines.push(`- Arm (mutually exclusive): ${design.arms.join(', ')}`);
+  if (design.groups.length > 0) lines.push(`- Groups (mutually exclusive): ${design.groups.join(', ')}`);
   for (const factor of design.factors) {
     lines.push(`- Crossing factor "${factor.name}": ${factor.levels.join(', ')}`);
   }
@@ -108,8 +108,8 @@ export function renderMarkdown(doc) {
     sections.push(heading(2, 'Research question'));
     sections.push(doc.study.researchQuestion);
   }
-  if (doc.study.armVocabulary.length > 0) {
-    sections.push(`**Study-wide arm vocabulary:** ${doc.study.armVocabulary.join(', ')}`);
+  if (doc.study.groupVocabulary.length > 0) {
+    sections.push(`**Study-wide group vocabulary:** ${doc.study.groupVocabulary.join(', ')}`);
   }
 
   sections.push(heading(2, 'Study diagram'));

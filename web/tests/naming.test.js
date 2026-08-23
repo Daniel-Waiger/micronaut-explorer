@@ -217,7 +217,7 @@ test('renderName does not repair non-reserved stems', () => {
 });
 
 // --- Optional fields: a token that disappears rather than defaulting -----
-// New capability (planner-web arm-axis + filename restructure): an axis an
+// New capability (planner-web group-axis + filename restructure): an axis an
 // experiment does not use (e.g. no technical replicates, common for
 // SEM/TEM/Raman) must omit its token entirely, not render a placeholder like
 // every other field does. defaultConfig() above is left untouched -- it is a

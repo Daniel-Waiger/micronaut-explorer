@@ -232,7 +232,7 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
         preparation: (view.specimen && view.specimen.preparation) || '',
       },
       design: {
-        arms: (design.groups && Array.isArray(design.groups.levels) ? design.groups.levels : []).slice(),
+        groups: (design.groups && Array.isArray(design.groups.levels) ? design.groups.levels : []).slice(),
         factors: (Array.isArray(design.factors) ? design.factors : []).map((f) => ({
           name: (f && f.name) || '',
           levels: (f && Array.isArray(f.levels) ? f.levels : []).slice(),
@@ -268,7 +268,7 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
     study: {
       title: (exp.meta && exp.meta.title) || '',
       researchQuestion: exp.researchQuestion || '',
-      armVocabulary: (exp.armVocabulary && Array.isArray(exp.armVocabulary.levels) ? exp.armVocabulary.levels : []).slice(),
+      groupVocabulary: (exp.groupVocabulary && Array.isArray(exp.groupVocabulary.levels) ? exp.groupVocabulary.levels : []).slice(),
     },
     // The fixed 5-stage "how to run this project" backbone, ONCE for the
     // whole study -- see the stageNotes comment above for why this is

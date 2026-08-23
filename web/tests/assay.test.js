@@ -21,11 +21,11 @@ import {
 
 function studyWith(overrides = {}) {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     meta: { id: null, createdAt: null, updatedAt: null, title: '' },
     researchQuestion: '',
     narrative: { text: '', history: [] },
-    armVocabulary: { levels: [] },
+    groupVocabulary: { levels: [] },
     assays: [emptyAssay('a1'), emptyAssay('a2')],
     activeAssayId: 'a1',
     naming: { template: '{date}{ext}', plannedNames: [] },
@@ -252,7 +252,7 @@ test('seedAssayFromVocabulary copies the vocabulary levels into a fresh assay, t
   assert.deepEqual(provenanceEntry, { tag: 'kb-default', detail: null });
 });
 
-test('seedAssayFromVocabulary degrades to empty arms for a missing/malformed vocabulary, never throws', () => {
+test('seedAssayFromVocabulary degrades to empty groups for a missing/malformed vocabulary, never throws', () => {
   assert.deepEqual(seedAssayFromVocabulary(undefined, 'x').assay.design.groups.levels, []);
   assert.deepEqual(seedAssayFromVocabulary({}, 'x').assay.design.groups.levels, []);
   assert.deepEqual(seedAssayFromVocabulary({ levels: null }, 'x').assay.design.groups.levels, []);

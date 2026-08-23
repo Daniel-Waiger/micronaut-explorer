@@ -36,7 +36,7 @@ function truncate(text, max) {
 
 function designSummary(design) {
   const parts = [];
-  if (design.arms.length > 0) parts.push(`${design.arms.length} arm(s)`);
+  if (design.groups.length > 0) parts.push(`${design.groups.length} group(s)`);
   for (const factor of design.factors) {
     parts.push(`${factor.name || 'factor'} × ${factor.levels.length}`);
   }

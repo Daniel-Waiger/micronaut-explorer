@@ -1,13 +1,13 @@
-// Tests for the condition matrix engine: arms x factors x replicates ->
+// Tests for the condition matrix engine: groups x factors x replicates ->
 // condition rows -> group labels. Row order is a CONTRACT (see the module
 // header in conditions.js), so the primary test pins the exact sequence with
 // a full deepEqual against a literal expected array.
 //
-// The central thing under test throughout this file: design.groups (the ARM
+// The central thing under test throughout this file: design.groups (the GROUP
 // axis) is SINGULAR and must never self-cross, even though it DOES cross with
 // genuine factors[] axes. That distinction is what fixes the 'CT-NAM50MM'
-// defect (a sample that was somehow both the control and the 50 mM arm,
-// because arms were modeled as two factors and crossed against each other).
+// defect (a sample that was somehow both the control and the 50 mM group,
+// because groups were modeled as two factors and crossed against each other).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,11 +46,11 @@ test('expandConditions pins the exact row sequence: group outermost, then factor
   assert.deepEqual(expandConditions(design), expected);
 });
 
-test('the arm axis never self-crosses -- CT and NAM50MM never appear on the same row (the CT-NAM50MM regression)', () => {
+test('the group axis never self-crosses -- CT and NAM50MM never appear on the same row (the CT-NAM50MM regression)', () => {
   const design = { groups: { levels: ['CT', 'NAM25MM', 'NAM50MM'] }, factors: [] };
   const rows = expandConditions(design);
 
-  assert.equal(rows.length, 3, `expected exactly 3 rows (one per arm), got ${rows.length}`);
+  assert.equal(rows.length, 3, `expected exactly 3 rows (one per group), got ${rows.length}`);
   // Each row carries exactly ONE group value -- there is no way to construct a
   // row carrying more than one, because `group` is a single field, not an array.
   for (const row of rows) {
@@ -59,7 +59,7 @@ test('the arm axis never self-crosses -- CT and NAM50MM never appear on the same
   assert.deepEqual(rows.map((r) => r.group).sort(), ['CT', 'NAM25MM', 'NAM50MM']);
 });
 
-test('the arm axis DOES cross with genuine factors (WT/KO x CT/drug is a legitimate 2x2)', () => {
+test('the group axis DOES cross with genuine factors (WT/KO x CT/drug is a legitimate 2x2)', () => {
   const design = {
     groups: { levels: ['CT', 'drug'] },
     factors: [{ name: 'genotype', levels: ['WT', 'KO'] }],
@@ -70,7 +70,7 @@ test('the arm axis DOES cross with genuine factors (WT/KO x CT/drug is a legitim
   assert.deepEqual(combos, ['CT:KO', 'CT:WT', 'drug:KO', 'drug:WT']);
 });
 
-test('no arm levels defined is legal and omits the axis (group: null on every row)', () => {
+test('no group levels defined is legal and omits the axis (group: null on every row)', () => {
   const design = { groups: { levels: [] }, factors: [{ name: 'genotype', levels: ['WT', 'KO'] }] };
   const rows = expandConditions(design);
   assert.equal(rows.length, 2);
@@ -105,7 +105,7 @@ test('a factor with zero levels yields zero rows AND an issue', () => {
   );
 });
 
-test('a group with an undefined/null level is flagged, but an empty groups.levels is NOT (that means "no arms")', () => {
+test('a group with an undefined/null level is flagged, but an empty groups.levels is NOT (that means "no groups")', () => {
   const design = { groups: { levels: [undefined, 'CT'] }, factors: [] };
   const issues = conditionIssues(design);
   assert.ok(
@@ -184,11 +184,11 @@ test('a factor named "group", "biorep", or "techrep" is flagged as reserved', ()
   }
 });
 
-test('a factor named "group" collides for real once an arm axis is also in use', () => {
+test('a factor named "group" collides for real once a primary group axis is also in use', () => {
   // The shadow: buildSampleId seeds `fields` from factorLevels first, then
-  // OVERWRITES fields.group with the row's actual arm value if one exists --
+  // OVERWRITES fields.group with the row's actual primary-group value if one exists --
   // so a factor also named 'group' gets silently shadowed the moment this
-  // design defines real arms, producing identical ids for distinct rows.
+  // design defines real groups, producing identical ids for distinct rows.
   const design = {
     groups: { levels: ['X'] },
     factors: [{ name: 'group', levels: ['A', 'B'] }],
@@ -258,7 +258,7 @@ test('conditionIssues flags an unknown token in the id scheme', () => {
 });
 
 test('a reserved token is "known" for scheme validation ONLY when its axis is actually in use', () => {
-  // No arm levels and no technical replicates on this design -- {group} and
+  // No group levels and no technical replicates on this design -- {group} and
   // {techrep} must be reported as unknown, not silently accepted only to
   // throw "Unknown token" at render time on every row.
   const design = {
@@ -347,7 +347,7 @@ test('conditionIssues returns no issues for a well-formed design', () => {
 
 test('the uniqueness gate fires when a custom scheme omits a factor that actually varies', () => {
   // A realistic authoring mistake: the scheme only encodes genotype, but
-  // treatment also varies -- two distinct arms collapse to the same id.
+  // treatment also varies -- two distinct groups collapse to the same id.
   const design = {
     factors: [
       { name: 'genotype', levels: ['WT'] },
@@ -389,12 +389,12 @@ test('the uniqueness gate does not double-report a scheme already flagged as hav
 });
 
 // --- Two-stage naming: group segments (stage 2) -------------------------
-// The defect these pin: a single-token id scheme welds adjacent arms into one
+// The defect these pin: a single-token id scheme welds adjacent groups into one
 // indistinguishable blob ('{control}{treatment}' -> 'CTNAM50MM'), so a reader
 // cannot tell which control group and which treatment group a file belongs to.
 // Segments are sanitized individually and joined afterwards, so they can't merge.
 
-test('buildGroupSegments puts the arm first, then one segment per factor -- replicate is NOT included', () => {
+test('buildGroupSegments puts the primary group first, then one segment per factor -- replicate is NOT included', () => {
   const design = {
     groups: { levels: ['CT'] },
     factors: [{ name: 'treatment', levels: ['NAM 50mM'] }],
@@ -420,7 +420,7 @@ test('a group segment never contains the field separator "_"', () => {
   }
 });
 
-test('buildGroupLabel never merges the arm and a factor into one indistinguishable token (the CTNAM50MM defect)', () => {
+test('buildGroupLabel never merges the primary group and a factor into one indistinguishable token (the CTNAM50MM defect)', () => {
   const design = {
     groups: { levels: ['CT'] },
     factors: [{ name: 'treatment', levels: ['NAM 50mM'] }],
@@ -430,9 +430,9 @@ test('buildGroupLabel never merges the arm and a factor into one indistinguishab
 
   assert.ok(
     label.includes(GROUP_SEGMENT_SEPARATOR),
-    `expected a separator between the arm and the factor, got '${label}'`
+    `expected a separator between the primary group and the factor, got '${label}'`
   );
-  assert.ok(!label.includes('CTNAM'), `arm and factor merged into one token: '${label}'`);
+  assert.ok(!label.includes('CTNAM'), `group and factor merged into one token: '${label}'`);
   assert.equal(label.split(GROUP_SEGMENT_SEPARATOR)[0], 'CT');
 });
 
@@ -461,7 +461,7 @@ test('buildGroupSegments omits a factor the row carries no level for', () => {
   assert.deepEqual(buildGroupSegments(row, design), ['WT']);
 });
 
-test('buildGroupSegments on a design with no arms and no factors yields an empty array', () => {
+test('buildGroupSegments on a design with no groups and no factors yields an empty array', () => {
   const rows = expandConditions({ groups: { levels: [] }, factors: [] });
   assert.deepEqual(buildGroupSegments(rows[0], { groups: { levels: [] }, factors: [] }), []);
 });

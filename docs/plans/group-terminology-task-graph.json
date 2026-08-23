@@ -1,0 +1,37 @@
+{
+  "objective": "Replace treatment-arm terminology with group terminology throughout the application while preserving legacy saved studies.",
+  "batches": [
+    ["TERM-01"],
+    ["TERM-02"],
+    ["TERM-03"]
+  ],
+  "tasks": [
+    {
+      "id": "TERM-01",
+      "title": "Migrate persisted study vocabulary to group terminology",
+      "scope": "Raise the schema version and migrate v3 armVocabulary plus its provenance slot to groupVocabulary. Update new/default studies and all runtime consumers. Preserve v1-v3 import compatibility and never rename design.groups.",
+      "verification": "Exercise v1, v2, v3, v4, malformed, and future-version migration paths; prove v3 values and provenance survive under groupVocabulary and new studies contain no armVocabulary key.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "files": ["web/src/core/schema.js", "web/src/core/defaultStudy.js", "web/src/core/assay.js", "web/src/ui/shell.js", "web/src/ui/steps/study.js", "web/tests/schema.test.js", "web/tests/defaultStudy.test.js", "web/tests/assay.test.js"]
+    },
+    {
+      "id": "TERM-02",
+      "title": "Replace generated and visible arm terminology with group",
+      "scope": "Rename the derived StudyDocument design.arms and study.armVocabulary projections to groups and groupVocabulary, update every renderer and guided-example sentence, and update tests. Remove standalone arm/arms language from application source without changing scientific behavior.",
+      "verification": "Search source and built output for standalone arm/arms terms, run renderer/studydoc/guided tests, and inspect generated Markdown, Mermaid, SVG, Overview, Study, and walkthrough copy for group terminology.",
+      "depends_on": ["TERM-01"],
+      "parallel_safe": false,
+      "files": ["web/src/engine/studydoc.js", "web/src/engine/guidedExample.js", "web/src/engine/render/markdown.js", "web/src/engine/render/mermaid.js", "web/src/engine/render/svgDiagram.js", "web/src/ui/steps/overview.js", "web/tests/studydoc.test.js", "web/tests/svgDiagram.test.js", "web/tests/guidedExample.test.js"]
+    },
+    {
+      "id": "TERM-03",
+      "title": "Adversarial regression and shipped-artifact verification",
+      "scope": "Verify legacy-import compatibility, new-save terminology, all UI and generated artifacts, single-file assembly, and unchanged condition-matrix semantics.",
+      "verification": "Run all JavaScript and Python tests, build the shipped artifact, diff-check, source/dist terminology searches, and live browser checks of Study, walkthrough, Overview, and generated report copy.",
+      "depends_on": ["TERM-02"],
+      "parallel_safe": false,
+      "files": []
+    }
+  ]
+}

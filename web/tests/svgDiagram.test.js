@@ -15,7 +15,7 @@ function assay(overrides = {}) {
     label: 'Bacterial viability',
     readout: { state: 'known', label: 'Bacterial viability', text: 'viability' },
     modality: 'confocal',
-    design: { arms: ['CTL', 'OPP'], factors: [{ name: 'species', levels: ['A', 'B'] }] },
+    design: { groups: ['CTL', 'OPP'], factors: [{ name: 'species', levels: ['A', 'B'] }] },
     controls: { panel: [{ id: 'p1' }], readout: [{ id: 'r1' }, { id: 'r2' }] },
     filenames: [{ filename: 'a' }, { filename: 'b' }, { filename: 'c' }, { filename: 'd' }],
     ...overrides,
@@ -44,7 +44,7 @@ test('node captions and values carry the real content', () => {
   assert.equal(studyNode.value, 'Oregano study');
   assert.equal(assayNode.value, 'Bacterial viability');
   assert.equal(readoutNode.value, 'Bacterial viability');
-  assert.match(designNode.value, /arm/);
+  assert.match(designNode.value, /group/);
   assert.equal(controlsNode.value, '3 control(s)'); // 1 panel + 2 readout
   assert.equal(filesNode.value, '4 planned');
 });

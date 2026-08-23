@@ -1,5 +1,5 @@
 // Tests for core/onboarding.js -- persisted onboarding stage/experience/
-// completed/dontShowAgain flags, degrading to defaults when localStorage is
+// completed flag, degrading to defaults when localStorage is
 // unavailable.
 
 import { test } from 'node:test';
@@ -8,6 +8,7 @@ import {
   ONBOARDING_STAGES,
   ONBOARDING_LEVELS,
   loadOnboarding,
+  resetOnboarding,
   saveOnboarding,
 } from '../src/core/onboarding.js';
 
@@ -38,7 +39,7 @@ function installThrowingLocalStorage() {
 
 test('defaults when nothing stored', () => {
   installFakeLocalStorage();
-  assert.deepEqual(loadOnboarding(), { stage: null, experience: null, completed: false, dontShowAgain: false });
+  assert.deepEqual(loadOnboarding(), { stage: null, experience: null, completed: false });
 });
 
 test('round-trip save/load of stage', () => {
@@ -65,15 +66,11 @@ test('round-trip save/load of completed', () => {
   assert.equal(loadOnboarding().completed, false);
 });
 
-test('round-trip save/load of dontShowAgain, independent of completed', () => {
+test('reset makes a completed onboarding session eligible to show again without losing choices', () => {
   installFakeLocalStorage();
-  saveOnboarding({ completed: true });
-  assert.equal(loadOnboarding().dontShowAgain, false);
-  saveOnboarding({ dontShowAgain: true });
-  assert.equal(loadOnboarding().completed, true, 'setting dontShowAgain must not disturb completed');
-  assert.equal(loadOnboarding().dontShowAgain, true);
-  saveOnboarding({ dontShowAgain: false });
-  assert.equal(loadOnboarding().dontShowAgain, false);
+  saveOnboarding({ stage: 'designing', experience: 'frequent', completed: true });
+  resetOnboarding();
+  assert.deepEqual(loadOnboarding(), { stage: 'designing', experience: 'frequent', completed: false });
 });
 
 test('invalid stored strings read back as null, not leaked through', () => {
@@ -96,18 +93,34 @@ test('save ignores invalid enum values (does not persist them)', () => {
 
 test('save ignores wrong-typed fields', () => {
   installFakeLocalStorage();
-  saveOnboarding({ stage: 42, experience: null, completed: 'yes', dontShowAgain: 'yes' });
-  assert.deepEqual(loadOnboarding(), { stage: null, experience: null, completed: false, dontShowAgain: false });
+  saveOnboarding({ stage: 42, experience: null, completed: 'yes' });
+  assert.deepEqual(loadOnboarding(), { stage: null, experience: null, completed: false });
 });
 
 test('degrades to defaults when localStorage throws on read/write', () => {
   installThrowingLocalStorage();
   assert.doesNotThrow(() =>
-    saveOnboarding({ stage: 'idea', experience: 'frequent', completed: true, dontShowAgain: true })
+    saveOnboarding({ stage: 'idea', experience: 'frequent', completed: true })
   );
   let loaded;
   assert.doesNotThrow(() => {
     loaded = loadOnboarding();
   });
-  assert.deepEqual(loaded, { stage: null, experience: null, completed: false, dontShowAgain: false });
+  assert.deepEqual(loaded, { stage: null, experience: null, completed: false });
+  assert.doesNotThrow(() => resetOnboarding());
+});
+
+test('every normal completion and dismissal state persists completed', () => {
+  installFakeLocalStorage();
+  for (const completion of [
+    { completed: true },
+    { stage: 'idea', experience: 'novice', completed: true },
+    { stage: 'designing', experience: 'occasional', completed: true },
+    { stage: 'acquiring', experience: 'frequent', completed: true },
+  ]) {
+    saveOnboarding(completion);
+    assert.equal(loadOnboarding().completed, true);
+    resetOnboarding();
+    assert.equal(loadOnboarding().completed, false);
+  }
 });

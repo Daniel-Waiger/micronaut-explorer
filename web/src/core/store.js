@@ -38,6 +38,21 @@ export function createStore(initialExperiment) {
   }
 
   /**
+   * Replace the entire experiment root.
+   *
+   * This is intentionally distinct from patch(): project-file imports and
+   * recovery restores are authoritative snapshots, so merging them would
+   * retain top-level data that is absent from the recovered study. Keeping
+   * replacement here also means the normal subscriber/render path observes
+   * exactly the state that the next autosave will persist.
+   */
+  function replace(nextExperiment) {
+    state = nextExperiment;
+    scheduleNotify();
+    return state;
+  }
+
+  /**
    * Write `value` at `path`, tagged with the given provenance `tag`.
    * Refuses (returns false, leaves state unchanged) when the slot at
    * `slotKey` already carries a STRONG tag and `tag` is not itself STRONG.
@@ -88,6 +103,7 @@ export function createStore(initialExperiment) {
     get,
     getPath: getAtPath,
     patch,
+    replace,
     setPath: setValueAtPath,
     subscribe,
   };

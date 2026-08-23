@@ -1,22 +1,22 @@
-// Condition matrix: arms x factors x replicates -> concrete condition rows
+// Condition matrix: groups x factors x replicates -> concrete condition rows
 // -> group labels. Pure module: no DOM, no store, no globals.
 //
 // TWO KINDS OF AXIS, and the difference is the whole point of this module:
 //
-//   design.groups.levels -- the ARM axis. Mutually exclusive alternatives
+//   design.groups.levels -- the GROUP axis. Mutually exclusive alternatives
 //     (CT | NAM25MM | NAM50MM). A sample is exactly ONE of these. Singular by
 //     construction, so it can never be crossed with itself.
 //   design.factors[]     -- genuinely CROSSING axes (genotype, timepoint).
 //     A sample really is both WT *and* 24h, so these do form a product.
 //
-// Arms DO cross with factors (WT/KO x CT/drug is a legitimate 2x2); they just
-// never cross with each other. Expressing arms as two factors is what produced
+// Groups DO cross with factors (WT/KO x CT/drug is a legitimate 2x2); they just
+// never cross with each other. Expressing groups as two factors is what produced
 // the nonsense 'CT-NAM50MM' -- a file that was somehow both the control and the
-// 50 mM arm. Keeping the arm axis singular makes that unrepresentable rather
+// 50 mM group. Keeping the group axis singular makes that unrepresentable rather
 // than merely discouraged.
 //
 // ROW ORDER IS A CONTRACT. Downstream filename generation depends on the exact
-// sequence produced by expandConditions: arm outermost (slowest-varying), then
+// sequence produced by expandConditions: group outermost (slowest-varying), then
 // factors in declared order, then biological replicate, then technical
 // replicate innermost (fastest-varying). Reordering this for "nicer" iteration
 // silently reshuffles every filename downstream.
@@ -83,7 +83,7 @@ function effectiveReplicateCount(raw) {
 function plannedRowCount(design) {
   const factors = factorsOf(design);
   const groupLevels = groupLevelsOf(design);
-  let total = Math.max(groupLevels.length, 1); // 0 group levels -> a design with no arms defined yet
+  let total = Math.max(groupLevels.length, 1); // 0 group levels -> a design with no groups defined yet
   for (const factor of factors) {
     total *= levelsOf(factor).length;
   }
@@ -107,9 +107,9 @@ function templateTokens(template) {
  * the two-kinds-of-axis distinction and the row-order contract.
  *
  * Guardrails (never throws):
- *  - no arm levels defined -> the arm axis is simply omitted (group: null),
+ *  - no group levels defined -> the group axis is simply omitted (group: null),
  *    same as zero factors -> one unconditioned sample.
- *  - zero factors -> the arm axis (if any) still expands on its own.
+ *  - zero factors -> the group axis (if any) still expands on its own.
  *  - any factor with zero levels -> the product is mathematically zero, so
  *    this returns [] (conditionIssues separately reports why).
  *  - a design whose planned size exceeds MAX_CONDITION_ROWS returns []
@@ -126,9 +126,9 @@ export function expandConditions(design) {
   const bioCount = effectiveReplicateCount(design && design.biologicalReplicates);
   const techCount = effectiveReplicateCount(design && design.technicalReplicates);
 
-  // Arm is OUTERMOST and, critically, its own single axis -- never crossed
+  // Group is OUTERMOST and, critically, its own single axis -- never crossed
   // with itself the way two `factors` entries would be. An empty group axis
-  // (no arms in use) is one pass with group: null, mirroring "zero factors"
+  // (no groups in use) is one pass with group: null, mirroring "zero factors"
   // below.
   let combos = (groupLevels.length > 0 ? groupLevels : [null]).map((group) => ({
     group,
@@ -187,7 +187,7 @@ function makeConditionIssue(field, message, severity = 'error') {
  * factors, etc.) degrades to "as many issues as can be determined", not a
  * crash.
  */
-// Token names reserved by the engine itself (the arm axis and the two
+// Token names reserved by the engine itself (the group axis and the two
 // replicate axes). A factor sharing one of these names would silently shadow
 // (or be shadowed by) the reserved value when a custom id scheme or the
 // uniqueness check renders it -- see buildSampleId's fields map below.
@@ -272,9 +272,9 @@ export function conditionIssues(design) {
     });
   }
 
-  // Arm levels get the same non-empty-value check factor levels do, but NOT
+  // Group levels get the same non-empty-value check factor levels do, but NOT
   // the zero-levels check: an empty groups.levels means "this design has no
-  // arms", which is legal (mirrors zero factors), not an authoring mistake.
+  // groups", which is legal (mirrors zero factors), not an authoring mistake.
   groupLevels.forEach((level, index) => {
     if (!isUsableLevel(level)) {
       issues.push(
@@ -375,22 +375,22 @@ export function formatReplicateToken(prefix, value) {
 }
 
 /**
- * Split a condition row into its ordered GROUP SEGMENTS: the row's single ARM
+ * Split a condition row into its ordered GROUP SEGMENTS: the row's primary GROUP
  * level (if this design uses one), followed by one segment per CROSSING
  * factor in the design's declared order.
  *
  * This is stage 2 of the two-stage name. Stage 1 (the base name) says what the
  * whole experiment is and is identical for every file; these segments say
- * which arm x factor combination this particular file belongs to.
+ * which group x factor combination this particular file belongs to.
  *
  * Each segment is sanitized INDIVIDUALLY and returned as its own array
  * element. That is the whole point: joining unsanitized "CT" and "NAM 50mM"
  * with no separator produced 'CTNAM50MM', where the boundary between the
- * control arm and the treatment arm is simply gone. Segments cannot merge,
+ * control group and the treatment group is simply gone. Segments cannot merge,
  * because the separator is applied by the joiner AFTER each part has been
- * sanitized on its own -- and because the arm is a SINGLE value (design.groups
- * is singular, not a second factors[] entry), there is exactly one arm segment
- * per row, never two arm segments crossed against each other.
+ * sanitized on its own -- and because the group is a SINGLE value (design.groups
+ * is singular, not a second factors[] entry), there is exactly one primary group
+ * segment per row, never two group segments crossed against each other.
  *
  * Replicate numbers are NOT included here -- they render through their own
  * {biorep}/{techrep} template tokens (see formatReplicateToken), not as part

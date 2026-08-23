@@ -6,8 +6,8 @@ import { createAdvicePanel } from '../advice.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
-// Exported so ui/steps/study.js's arm-vocabulary input parses its
-// comma-separated levels list with the identical rule this step's own arm
+// Exported so ui/steps/study.js's group-vocabulary input parses its
+// comma-separated levels list with the identical rule this step's own group
 // input uses -- one implementation, not a second copy that could quietly
 // diverge on trimming/empty-filtering behavior.
 export function parseLevels(text) {
@@ -91,7 +91,7 @@ export const designStep = {
 
     // Every level here is one GROUP; a sample belongs to exactly one -- kept
     // as a single {levels} write (same shape parseLevels/writeGroups always
-    // produced) so nothing downstream (conditions.js, plan.js, the arm-
+    // produced) so nothing downstream (conditions.js, plan.js, the group-
     // vocabulary "Apply to all assays" writer in study.js) has to change,
     // even though the UI below now edits it one named row at a time instead
     // of one comma-separated string.
@@ -227,7 +227,7 @@ export const designStep = {
     idSchemeInput.className = 'field-input';
     // The old placeholder ('{genotype}R{replicate}') actively TAUGHT the
     // merge: adjacent tokens with no separator between them. Leave this blank
-    // and the arm plus each factor gets its own segment automatically --
+    // and the group plus each factor gets its own segment automatically --
     // replicates are NOT part of this label; they render through their own
     // {biorep}/{techrep} slots regardless of this override.
     idSchemeInput.placeholder = 'Blank = one segment per group/factor (e.g. CTL-OPP). Tokens: {group} {biorep} {techrep} + factor names';
@@ -390,7 +390,7 @@ export const designStep = {
       const issues = conditionIssues(design);
 
       // renderConditions() is the verified funnel EVERY write path in this
-      // step actually calls -- factor edits, arm/replicate edits, the id
+      // step actually calls -- factor edits, group/replicate edits, the id
       // scheme input, and mount via renderAll() (which itself calls this).
       // renderAll() is called exactly once, at mount, so hooking the advice
       // panel there instead would render it once and silently never update
@@ -415,10 +415,10 @@ export const designStep = {
       // steps cannot drift: one implementation, two views of it.
       const planned = planFilenames(assayView(store.get(), assayId), NAMING_CONFIG);
       if (planned.length === 0) {
-        // With zero factors AND zero arm levels this design still expands to
+        // With zero factors AND zero group levels this design still expands to
         // exactly one unconditioned row (see conditions.js), so an empty
         // TABLE here always means a real issue is already listed above (a
-        // factor/arm with zero usable levels, or the row cap) -- there is no
+        // factor/group with zero usable levels, or the row cap) -- there is no
         // separate "you haven't added anything yet" case to explain.
         const empty = document.createElement('p');
         empty.className = 'conditions-empty';

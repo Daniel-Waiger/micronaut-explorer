@@ -1,0 +1,122 @@
+{
+  "run": "Approved UX completion",
+  "branch": "codex/ux-completion",
+  "batches": [
+    ["UX-01", "UX-02", "UX-03", "UX-04"],
+    ["UX-05", "UX-06", "UX-07"],
+    ["UX-08"],
+    ["UX-09", "UX-10"],
+    ["UX-11"],
+    ["UX-12"]
+  ],
+  "tasks": [
+    {
+      "id": "UX-01",
+      "title": "Make normal onboarding completion and dismissal one-time",
+      "scope": "Change the persisted onboarding contract so `completed`, not a separate opt-out, controls normal boot visibility. Preserve stage/experience persistence. Normal stage completion, the idea walkthrough handoff, Skip for now, backdrop dismissal, and Escape must mark onboarding completed; provide an explicit reset helper for the future utility action. Update main's gate to suppress completed onboarding while retaining the existing draft-handoff exclusion. Do not replace the walkthrough entry points on Home/Guide.",
+      "verification": "Update `web/tests/onboarding.test.js` to prove defaults, every completion/dismissal state, reset, and unavailable localStorage behavior. Use a focused boot-level/manual trace to prove a completed or skipped session does not reopen after reload while an explicit reset does. Run `node --test web/tests/onboarding.test.js`.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": ["web/src/core/onboarding.js", "web/src/ui/steps/onboarding.js", "web/src/main.js", "web/tests/onboarding.test.js"]
+    },
+    {
+      "id": "UX-02",
+      "title": "Establish replaceable state and safe project-file persistence",
+      "scope": "Add an explicit store-root replacement API so imported or restored experiments cannot retain stale top-level fields. Extend the persistence contract with a tested parse-and-migrate import path and a recoverable-slot loader suitable for restoring a selected older save. Keep the five-slot ring, raw JSON backup export, and all storage errors total; neither import nor restore may write directly to localStorage from UI code.",
+      "verification": "Add focused store and persistence tests: replacing root removes an obsolete field and notifies; a valid current/older-schema import is migrated; invalid JSON and unsupported future schemas reject without mutating state; an older saved slot loads/migrates; storage callbacks still receive quota errors. Run `node --test web/tests/store.test.js web/tests/persist.test.js`.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": ["web/src/core/store.js", "web/src/core/persist.js", "web/tests/store.test.js", "web/tests/persist.test.js"]
+    },
+    {
+      "id": "UX-03",
+      "title": "Produce tri-state readiness and workflow progress",
+      "scope": "Extend the pure conformance report with a deterministic `readiness` (`ready`, `needs-review`, `blocked`) and counts grouped by actionable class. Errors/fatals block; incomplete placeholders and warnings require review; only no issues is ready. Retain `pass` only as a documented compatibility alias for not-blocked while consumers migrate. Add a new pure workflow-progress module that derives study and per-assay step states from existing fields, phase confirmations, condition validation, and this conformance report; it must not duplicate placeholder or severity logic. Define the ordered primary workflow separately from optional Guide.",
+      "verification": "Update conformance tests to prove the default example is `needs-review`, fully complete valid data is `ready`, errors are `blocked`, and malformed input remains total. Add workflow-progress tests for not-started, in-progress, complete, and needs-attention across at least two assays, including an invalid one. Verify output is deterministic and that progress consumes conformance readiness rather than reclassifying issues. Run `node --test web/tests/conformance.test.js web/tests/workflowProgress.test.js`.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": ["web/src/engine/conformance.js", "web/src/engine/workflowProgress.js", "web/tests/conformance.test.js", "web/tests/workflowProgress.test.js"]
+    },
+    {
+      "id": "UX-04",
+      "title": "Mark fresh seed and blank studies with truthful origin",
+      "scope": "Add the additive `meta.origin` model needed to distinguish a fresh oregano seed from a blank, imported, drafted, or adopted-template study. New blank studies must start `blank`; `createDefaultStudy()` must start `example`; old saved studies without a marker must remain loadable and be treated conservatively as user work. Do not use brittle text matching on the research question and do not alter seeded research data or provenance values.",
+      "verification": "Update schema/default-study tests to prove origin values for new blank/default data, migration compatibility for legacy meta objects, and that the four seeded assays remain unchanged. Run `node --test web/tests/schema.test.js web/tests/defaultStudy.test.js`.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": ["web/src/core/schema.js", "web/src/core/defaultStudy.js", "web/tests/schema.test.js", "web/tests/defaultStudy.test.js"]
+    },
+    {
+      "id": "UX-05",
+      "title": "Wire autosave, import, restore, origin adoption, and onboarding through boot",
+      "scope": "Make `main.js` the sole lifecycle coordinator. Feed explicit save states (saving, saved with timestamp, failed) to the shell after the existing debounce; mark changes and successful project backups consistently. Supply callbacks for export-project, import-project, restoring an older recovery slot, reset-to-example, start-blank, adopt-example-template, and reset-onboarding. Import/restore must call the new migrated persistence helpers and `store.replace`; errors must remain visible. Preserve draft precedence, hash routing, and the active-assay/full-render invariants.",
+      "verification": "Add a small pure helper extraction only if required to test boot decisions; otherwise verify by built-artifact trace. Exercise save success and quota failure, valid import, invalid import, restore of an older slot, blank creation, example adoption, and draft launch. Confirm importing/restoring changes the store that subsequent autosaves export, rather than only the visible DOM. Run the focused persistence/store suites plus the full JS suite.",
+      "depends_on": ["UX-01", "UX-02", "UX-04"],
+      "parallel_safe": true,
+      "files": ["web/src/main.js"]
+    },
+    {
+      "id": "UX-06",
+      "title": "Expose explicit field confirmation states",
+      "scope": "Replace the anonymous checkmark-only interaction in the shared field interview with labelled, accessible confirmation controls and visible provenance-derived state: unconfirmed, suggested/review required, or confirmed. Keep the existing contract that typing does not persist and confirming a nonempty answer writes through the caller. Make an already confirmed field's action clearly mean update/reconfirm; do not conflate the naming step's autosaved text inputs with this interview model. Thread the existing experience argument through Naming's schedule interview so both shared consumers render identically.",
+      "verification": "Build and manually test a suggested field, an untouched blank field, a confirmed field, and sequential edits to two Microscopy fields. Assert an empty confirm is a no-op, each button has a unique accessible name, and the state shown after rerender matches phaseQuestions' provenance output. Run `node --test web/tests/interview.test.js` and a single-file build.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": ["web/src/ui/fieldInterview.js", "web/src/ui/steps/naming.js"]
+    },
+    {
+      "id": "UX-07",
+      "title": "Make example-study ownership explicit on Home",
+      "scope": "Make Home read fresh `meta.origin` and render an always-visible example label for the oregano seed, with separate **Use as template** and **Start blank study** actions. The former calls main's adoption callback then routes into the study; the latter calls the existing blank-study lifecycle callback. Once adopted/imported/blank, describe it as the user's study and do not show the seed label. Keep the walkthrough and description cards reachable.",
+      "verification": "In the built artifact, open the seeded study and verify the exact example label and both actions. Adopt it and verify all four assays remain while the label changes; create blank and reload to prove the example does not resurrect. Confirm a legacy study with no origin is not falsely branded an example.",
+      "depends_on": ["UX-04", "UX-05"],
+      "parallel_safe": true,
+      "files": ["web/src/ui/steps/home.js"]
+    },
+    {
+      "id": "UX-08",
+      "title": "Rebuild shell as the progress, recovery, and responsive navigation owner",
+      "scope": "Refactor the shell markup only: retain New study as the sole primary header action; add a durable local-save indicator; move reset/example, backup export/import, restore previous version, onboarding reset, feedback, GitHub issue, and appearance into an accessible utility menu. Render workflow progress/badges from the injected pure model, active-assay progress, and a persistent Back/Continue footer for the ordered primary steps. Add semantic narrow-screen assay and step selects, including `Step N of 7`; keep desktop pill/rail behavior and ensure the mobile alternate controls mutate the same router/store state. The shell receives callbacks/status from main and must not own persistence or readiness logic.",
+      "verification": "Build and exercise utility menu keyboard behavior (open, Escape/click action closes, focusable items), backup import input, restore list, save-state text, sidebar issue badges, Back/Continue boundaries, and active-assay progress. At narrow width, switch assay and workflow step with selects then widen and prove desktop controls remain synchronized. Confirm utility actions call injected callbacks exactly once and that no independent localStorage access was introduced for project data.",
+      "depends_on": ["UX-02", "UX-03", "UX-05"],
+      "parallel_safe": false,
+      "files": ["web/src/ui/shell.js"]
+    },
+    {
+      "id": "UX-09",
+      "title": "Progressively disclose Microscopy without losing acquisition flow",
+      "scope": "Restructure only the Microscopy step into native labelled sections: Acquisition (initially open), Fluorophores and spillover, Spectral view, Panel assembly, and Guidance. Preserve the present data sources, channel-editor live updates, spectral refresh behavior, advice default expansion, and confirmation renderer contract. Do not add a second source of markers or move data writes out of existing scopeWrite paths.",
+      "verification": "Use a built artifact with free-text-only and structured-channel assays. Confirm each section can be opened by keyboard; committing markers refreshes spillover and spectral content; editing target then fluorophore/filter in one channel preserves both edits; adding/reordering/removing channels still updates the view. Run the affected panel/spectral JS tests and the single-file build.",
+      "depends_on": ["UX-06"],
+      "parallel_safe": true,
+      "files": ["web/src/ui/steps/panel.js"]
+    },
+    {
+      "id": "UX-10",
+      "title": "Make Overview truthful, compact, and export-safe",
+      "scope": "Consume tri-state conformance readiness in the Overview. Render Ready to acquire/export, Needs review, or Blocked with readable missing/placeholder labels and routeable issue links where the router has an owning step. Replace the broad row of individual artifact downloads with one primary Export study control/menu plus secondary print/LLM actions. Gate every final study artifact and bench-card download with a fresh readiness report: block errors, require explicit review confirmation for provisional/incomplete content, and never gate raw project backup. Render study-level summary/map first and each assay as a collapsed native details card with filenames/details available on demand.",
+      "verification": "With the oregano example, prove Overview says Needs review and names missing values rather than declaring a pass; confirm an attempted final export prompts for review. Make an invalid name and prove the final export is blocked. Fill required fields validly and prove ready export proceeds. Confirm Markdown/SVG/CSV/JSON, bench-card, LLM copy, and print remain reachable; expand every assay card and compare filenames to the preexisting document renderer. Run `node --test web/tests/conformance.test.js web/tests/studydoc.test.js web/tests/plan.test.js` and serve the built artifact.",
+      "depends_on": ["UX-02", "UX-03", "UX-08"],
+      "parallel_safe": true,
+      "files": ["web/src/ui/steps/overview.js"]
+    },
+    {
+      "id": "UX-11",
+      "title": "Apply coherent desktop and mobile UX styling",
+      "scope": "As the sole CSS owner, style the settled shell utility menu/save/progress/footer, example ownership card, field state labels, readiness variants, native disclosure sections, compact export menu, and mobile select controls. At the mobile breakpoint hide desktop pill/rail controls and remove their horizontal-scroll affordances; ensure touch targets, contrast, focus rings, long labels, print behavior, and dark/light themes remain usable. Do not change behavior or selectors outside the markup contracts created by prior tasks.",
+      "verification": "Inspect desktop, tablet, and 375px-wide built pages in both themes. Prove no horizontal scrollbars exist for navigation at mobile width, selected state remains visible, focus indicators are visible for details/menu/select/buttons, and expanded disclosures do not clip. Run the build and inspect generated CSS selectors for the shipped artifact.",
+      "depends_on": ["UX-06", "UX-07", "UX-08", "UX-09", "UX-10"],
+      "parallel_safe": false,
+      "files": ["web/styles/app.css"]
+    },
+    {
+      "id": "UX-12",
+      "title": "Adversarially verify the integrated UX completion",
+      "scope": "Make no feature changes unless a concrete defect is found. Review all prior diffs against this task graph and run the cross-module traces in the plan against the HTTP-served single-file artifact. In particular falsify onboarding suppression, readiness/export gating, save failure visibility, import/restore state replacement, example origin transition, sequential field edits, and mobile selector synchronization. Check every producer→consumer pair listed in the plan and search for duplicated readiness/placeholder classification.",
+      "verification": "Run `node --test web/tests/*.test.js`, the named Python build tests, and `python tools/build_single_file.py --web-dir web --out dist`. Serve `dist` over HTTP and record the concrete result of every required adversarial trace. A pass requires no console errors, successful artifact boot, and no unrelated change to the pre-existing dirty `web/kb/spectra.json`.",
+      "depends_on": ["UX-11"],
+      "parallel_safe": false,
+      "files": ["web/src/main.js", "web/src/core/onboarding.js", "web/src/core/persist.js", "web/src/core/store.js", "web/src/core/schema.js", "web/src/core/defaultStudy.js", "web/src/engine/conformance.js", "web/src/engine/workflowProgress.js", "web/src/ui/shell.js", "web/src/ui/fieldInterview.js", "web/src/ui/steps/home.js", "web/src/ui/steps/panel.js", "web/src/ui/steps/overview.js", "web/src/ui/steps/onboarding.js", "web/src/ui/steps/naming.js", "web/styles/app.css"]
+    }
+  ]
+}

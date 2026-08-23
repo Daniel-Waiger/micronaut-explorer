@@ -1,0 +1,24 @@
+{
+  "objective": "Replace truncated collapsed-nav status badges with status-colored icons and hover status text.",
+  "batches": [["NAV-01"], ["NAV-02"]],
+  "tasks": [
+    {
+      "id": "NAV-01",
+      "title": "Render collapsed navigation status through icons",
+      "scope": "Attach each workflow state to its nav button, hide status badges only in collapsed desktop mode, tint the icon using existing semantic state colors, and expose label plus status through title and aria-label. Preserve expanded badges, active state, Guide behavior, and mobile navigation.",
+      "verification": "Inspect all four workflow states in expanded and collapsed modes; prove badges remain expanded, disappear collapsed, icons inherit the correct semantic color, hover title and aria-label retain status, Guide stays neutral, and no text truncates or overflows.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "files": ["web/src/ui/shell.js", "web/styles/app.css"]
+    },
+    {
+      "id": "NAV-02",
+      "title": "Verify shipped collapsed navigation",
+      "scope": "Run regressions and inspect the rebuilt HTTP-served artifact in expanded/collapsed, light/dark, active/inactive, desktop/mobile and hover/focus states.",
+      "verification": "Run full JavaScript/Python/build/diff gates and browser DOM/computed-style checks with no console errors.",
+      "depends_on": ["NAV-01"],
+      "parallel_safe": false,
+      "files": []
+    }
+  ]
+}
