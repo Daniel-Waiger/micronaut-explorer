@@ -144,7 +144,7 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "Utilities audit and GitHub release",
+  "run": "Guided walkthrough repair",
   "orchestrator": "Codex",
   "active_model": "Codex",
   "active_status": "complete",
@@ -155,51 +155,42 @@ const EMBEDDED = {
   "stats": [
     {
       "k": "Scope",
-      "v": "Utilities audit + approved release"
+      "v": "Guided walkthrough repair"
     },
     {
       "k": "Verification",
-      "v": "811 JS + 34 Python + live Utilities pass",
-      "tone": "ok"
-    },
-    {
-      "k": "Release",
-      "v": "e95e911 pushed to origin/main",
-      "tone": "ok"
+      "v": "813 JS tests + 34 Python tests + live compact/wide walkthrough",
+      "tone": " passed"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "UTIL-01",
+      "id": "GUIDE-01",
       "phase": "1",
-      "title": "Audit Utilities menu and repair confirmed behavior",
+      "title": "Reproduce guided walkthrough entry and repair its hand-off",
       "status": "done",
       "by": "Codex"
     },
     {
-      "id": "REL-01",
+      "id": "VERIFY-GUIDE",
       "phase": "2",
-      "title": "Build, verify, commit, and push approved changes",
+      "title": "Build and verify guided walkthrough interactions",
       "status": "done",
       "by": "Codex"
     }
   ],
   "log": [
     {
-      "time": "13:13:11",
-      "msg": "Started live Utilities audit; release will follow verified repair."
+      "time": "13:42:08",
+      "msg": "Started live walkthrough reproduction."
     },
     {
-      "time": "13:20:33",
-      "msg": "Repaired onboarding for every study origin, added explicit color modes, and guarded restore; release verification passed."
-    },
-    {
-      "time": "13:21:00",
-      "msg": "Verified production build and live Utilities behavior; committed and pushed e95e911 to origin/main."
+      "time": "13:47:13",
+      "msg": "Guided walkthrough now scrolls and focuses after the route settles on compact layouts; verified live through Step 3 with no console errors."
     }
   ],
-  "snapshot_at": "2026-08-24 13:21"
+  "snapshot_at": "2026-08-24 13:47"
 };
 /* CMA:EMBEDDED:END */
 

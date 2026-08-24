@@ -173,6 +173,43 @@ export function createWalkthroughController({
     host.replaceChildren();
   }
 
+  // Opening the guide must have an immediately perceivable effect. On a
+  // compact layout the aside is deliberately placed after the workspace, so
+  // simply rendering it can look as though the launch button did nothing.
+  // Move the reader to the new panel and give its heading a logical keyboard
+  // focus target; wide layouts keep the panel beside the workspace and do
+  // not need a page scroll.
+  function revealPanel() {
+    const heading = host.querySelector('.guided-walkthrough-title');
+    if (!heading) return;
+    heading.tabIndex = -1;
+    const compactLayout = Boolean(win && typeof win.matchMedia === 'function' && win.matchMedia('(max-width: 1200px)').matches);
+    if (compactLayout) {
+      const reducedMotion = Boolean(win.matchMedia && win.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      const top = Math.max(0, win.scrollY + host.getBoundingClientRect().top - 16);
+      if (typeof win.scrollTo === 'function') {
+        win.scrollTo({ top, behavior: reducedMotion ? 'auto' : 'smooth' });
+      } else if (typeof host.scrollIntoView === 'function') {
+        host.scrollIntoView({ block: 'start', behavior: reducedMotion ? 'auto' : 'smooth' });
+      }
+    }
+    // Allow focus to bring the heading into view as a final safeguard. Some
+    // embedded browsers defer smooth scrolling while the hash route settles.
+    if (typeof heading.focus === 'function') heading.focus();
+  }
+
+  function revealPanelAfterRoute() {
+    // Hash navigation notifies the router after the current call stack. Two
+    // animation frames let that render settle before measuring/scrolling the
+    // panel; otherwise a taller destination workspace can push the guide
+    // below the position we just scrolled to.
+    if (win && typeof win.requestAnimationFrame === 'function') {
+      win.requestAnimationFrame(() => win.requestAnimationFrame(revealPanel));
+      return;
+    }
+    revealPanel();
+  }
+
   function close() {
     if (mode === 'walkthrough' && readProgress().status === 'active') invokeTransition('pause');
     hide();
@@ -297,6 +334,7 @@ export function createWalkthroughController({
     viewStepId = currentStepId();
     navigate(viewStepId);
     refresh();
+    revealPanelAfterRoute();
   }
 
   function openExplanation(stepId = currentRouteStepId()) {
@@ -304,6 +342,7 @@ export function createWalkthroughController({
     setVisible(true);
     viewStepId = ids.has(stepId) ? stepId : currentStepId();
     refresh();
+    revealPanelAfterRoute();
   }
 
   function onKeydown(event) {

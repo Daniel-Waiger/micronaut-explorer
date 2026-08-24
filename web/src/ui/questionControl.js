@@ -17,6 +17,18 @@
 const OTHER_OPTION_VALUE = '__other__';
 
 /**
+ * Return a local-calendar value suitable for a native <input type="date">.
+ * Date#toISOString() uses UTC and can therefore select yesterday or tomorrow
+ * for researchers near a timezone boundary; the picker must start on the
+ * calendar day the person actually sees locally.
+ */
+export function localDateInputValue(now = new Date()) {
+  if (!(now instanceof Date) || Number.isNaN(now.getTime())) return '';
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+/**
  * Build the control for a question, pre-filled with `initialValue`. Returns
  * `{element, getValue()}` rather than a bare element: a choice question with
  * `allowOther` composes a <select> + a free-text fallback, and a 'duration'
@@ -92,7 +104,12 @@ export function buildQuestionControl(question, initialValue, options = {}) {
     const input = document.createElement('input');
     input.type = 'date';
     input.className = inputClass;
-    if (initialValue !== undefined && initialValue !== null) input.value = initialValue;
+    // New studies start on today's local calendar day, but a stored date is
+    // always authoritative -- revisiting an existing study must never replace
+    // the date the researcher already selected.
+    input.value = initialValue === undefined || initialValue === null || initialValue === ''
+      ? localDateInputValue()
+      : initialValue;
     return { element: input, getValue: () => input.value };
   }
 

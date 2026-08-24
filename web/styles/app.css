@@ -382,6 +382,28 @@ button:focus-visible {
   min-width: 0;
 }
 
+/* An "Other…" choice is a select plus a conditional free-text box. It is
+   taller than the one-line fields beside it, so keeping its confirmation
+   button in the same narrow grid track lets that button spill into the next
+   field. Give the composite control its own line and keep the action below
+   it; ordinary one-line interview fields retain their compact side-by-side
+   layout. */
+.field-commit-row:has(> .question-control-group) {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.field-commit-row > .question-control-group {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.field-commit-row > .question-control-group .field-input,
+.field-commit-row > .question-control-group .question-other-input {
+  width: 100%;
+  min-width: 0;
+}
+
 .field-commit {
   flex: 0 0 auto;
   width: 40px;

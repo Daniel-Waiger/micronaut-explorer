@@ -7,7 +7,7 @@ import { createAdvicePanel } from '../advice.js';
 import { assayById, assayView, scopeWrite } from '../../core/assay.js';
 import { copyToClipboard } from '../clipboard.js';
 import { loadQuestions, phaseQuestions } from '../../engine/interview.js';
-import { coerceAnswer } from '../questionControl.js';
+import { coerceAnswer, localDateInputValue } from '../questionControl.js';
 import { renderFieldInterview } from '../fieldInterview.js';
 import { buildIcsSchedule, renderIcs } from '../../engine/render/ics.js';
 import { downloadTextFile } from '../../core/persist.js';
@@ -71,7 +71,7 @@ const FIELD_DEFS = [
   {
     key: 'date',
     label: 'Date',
-    placeholder: 'YYYY-MM-DD',
+    type: 'date',
     hint: 'The date you acquired these images. Keeps your files sorted in the order you took them.',
   },
   {
@@ -203,7 +203,11 @@ export function createNamingStep(kb) {
       // example above -- shows on hover regardless of whether the field is
       // filled in yet.
       if (field.hint) input.title = field.hint;
-      input.value = prefill[field.key] ?? '';
+      // A new naming plan starts with today's local calendar day, but a
+      // stored/acquired date always wins when reopening existing work.
+      input.value = field.key === 'date' && !prefill[field.key]
+        ? localDateInputValue()
+        : prefill[field.key] ?? '';
       input.addEventListener('input', () => {
         // scopeWrite translates the flat v2-shaped path into this assay's
         // real (index-addressed) object path plus its stable (id-addressed)
