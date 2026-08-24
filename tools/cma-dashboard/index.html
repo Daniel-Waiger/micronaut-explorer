@@ -147,13 +147,10 @@ const EMBEDDED = {
   "run": "Utilities audit and GitHub release",
   "orchestrator": "Codex",
   "active_model": "Codex",
-  "active_status": "running",
+  "active_status": "complete",
   "phase": "",
   "state_note": "",
-  "current_task": {
-    "id": "REL-01",
-    "title": "Build, verify, commit, and push approved changes"
-  },
+  "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
@@ -163,6 +160,11 @@ const EMBEDDED = {
     {
       "k": "Verification",
       "v": "811 JS + 34 Python + live Utilities pass",
+      "tone": "ok"
+    },
+    {
+      "k": "Release",
+      "v": "e95e911 pushed to origin/main",
       "tone": "ok"
     }
   ],
@@ -179,7 +181,7 @@ const EMBEDDED = {
       "id": "REL-01",
       "phase": "2",
       "title": "Build, verify, commit, and push approved changes",
-      "status": "running",
+      "status": "done",
       "by": "Codex"
     }
   ],
@@ -191,9 +193,13 @@ const EMBEDDED = {
     {
       "time": "13:20:33",
       "msg": "Repaired onboarding for every study origin, added explicit color modes, and guarded restore; release verification passed."
+    },
+    {
+      "time": "13:21:00",
+      "msg": "Verified production build and live Utilities behavior; committed and pushed e95e911 to origin/main."
     }
   ],
-  "snapshot_at": "2026-08-24 13:20"
+  "snapshot_at": "2026-08-24 13:21"
 };
 /* CMA:EMBEDDED:END */
 
