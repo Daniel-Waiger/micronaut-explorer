@@ -13,7 +13,7 @@ test('renders modality, specimen, readout, a channel table, controls with reason
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const viability = doc.assays.find((a) => a.label === 'Bacterial viability');
   const card = renderBenchCard(viability);
-  assert.match(card, /# Bench card -- Bacterial viability/);
+  assert.match(card, /# Measurement bench card -- Bacterial viability/);
   assert.match(card, /\*\*Modality:\*\* confocal/);
   assert.match(card, /\*\*Readout:\*\* Bacterial viability/);
   assert.match(card, /\| SYTO9 \|/);
@@ -96,7 +96,7 @@ test('never throws on a missing/malformed assay, and says so plainly', () => {
   assert.doesNotThrow(() => renderBenchCard(undefined));
   assert.doesNotThrow(() => renderBenchCard(null));
   assert.doesNotThrow(() => renderBenchCard('not an object'));
-  assert.match(renderBenchCard(undefined), /No such assay/);
+  assert.match(renderBenchCard(undefined), /No such measurement/);
 });
 
 test('an assay with zero channels/controls/filenames states each gap explicitly, never a blank section', () => {

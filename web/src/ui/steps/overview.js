@@ -24,10 +24,13 @@ import { renderCsv } from '../../engine/render/csv.js';
 import { renderJson } from '../../engine/render/json.js';
 import { renderBenchCard } from '../../engine/render/benchcard.js';
 import { checkConformance } from '../../engine/conformance.js';
+import { buildExperimentMap } from '../../engine/experimentMap.js';
+import { decisionTriage } from '../../engine/decisionTriage.js';
 import { renderLlmPrompt } from '../../engine/render/llmprompt.js';
 import { copyToClipboard } from '../clipboard.js';
 import { buildDiagramLayout } from '../../engine/render/svgDiagram.js';
 import { downloadTextFile } from '../../core/persist.js';
+import { assayById } from '../../core/assay.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -47,7 +50,7 @@ function buildDiagramSvg(layout) {
   svg.setAttribute('height', String(layout.height));
   svg.setAttribute('class', 'study-map-svg');
   svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', 'Study map: the study branching to each assay and its readout, modality, design, controls, and planned filenames.');
+  svg.setAttribute('aria-label', 'Study map: the study branching to each measurement and its readout, modality, design, controls, and planned filenames.');
 
   // One arrowhead marker, referenced by every edge.
   const defs = document.createElementNS(SVG_NS, 'defs');
@@ -137,14 +140,137 @@ function appendLabeledNode(parent, className, text) {
   return node;
 }
 
-const ISSUE_ROUTES = {
-  design: 'design',
-  naming: 'naming',
-  incomplete: 'naming',
-  path: 'naming',
-  panel: 'panel',
-  'cross-assay': 'naming',
-};
+const REVIEW_DECISION_GROUP_HEADINGS = Object.freeze({
+  'study-shape': 'Study-shape decisions',
+  'measurement-design': 'Measurement-design decisions',
+  'before-acquisition': 'Before acquisition',
+  later: 'Can be assigned later',
+});
+
+// The fixed execution ladder comes from a specialist-authored KB whose
+// historic prose says "assay".  Review is a presentation surface, so adapt
+// that one visible term here without rewriting the KB, document shape, or
+// persisted `assays` contract.
+function reviewLadderText(value) {
+  return typeof value === 'string' ? value.replace(/\bassay\b/gi, 'measurement') : '';
+}
+
+function reviewMeasurementLabel(label, index) {
+  const text = typeof label === 'string' ? label.trim() : '';
+  const generated = text.match(/^assay\s+(\d+)$/i);
+  if (generated) return `Measurement ${generated[1]}`;
+  return text || `Measurement ${index}`;
+}
+
+function reviewMapValue(value, fallback = 'Not decided') {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function reviewComparisonSummary(comparison) {
+  if (comparison?.mode === 'observational') return 'Observational study';
+  if (comparison?.mode === 'groups') {
+    const groups = Array.isArray(comparison.groups) ? comparison.groups.filter(Boolean) : [];
+    return groups.length > 0 ? `Groups: ${groups.join(', ')}` : 'Groups not decided';
+  }
+  return 'Not decided';
+}
+
+function reviewDecisionMeasurementId(decision) {
+  const candidate = decision?.measurementId ?? decision?.assayId;
+  return typeof candidate === 'string' && candidate ? candidate : null;
+}
+
+// The review is a map consumer, not a second map editor or priority engine.
+// This intentionally displays values from buildExperimentMap() verbatim and
+// makes no state writes while rendering the shared study shape.
+function renderReviewExperimentMapSummary(parent, map) {
+  const section = document.createElement('section');
+  section.className = 'study-map';
+  const heading = document.createElement('h2');
+  heading.className = 'overview-node-title';
+  heading.textContent = 'Study map';
+  section.appendChild(heading);
+
+  appendLabeledNode(section, 'overview-node', `Research question: ${reviewMapValue(map.question?.value)}`);
+  appendLabeledNode(section, 'overview-node', `System or material: ${reviewMapValue(map.system?.value)}`);
+  appendLabeledNode(section, 'overview-node', `Comparison: ${reviewComparisonSummary(map.comparison)}`);
+  appendLabeledNode(section, 'overview-node', `Experimental unit: ${reviewMapValue(map.experimentalUnit?.value)}`);
+
+  const measurements = Array.isArray(map.measurements) ? map.measurements : [];
+  const list = document.createElement('ul');
+  list.className = 'overview-controls-list';
+  for (const [index, measurement] of measurements.entries()) {
+    const item = document.createElement('li');
+    const label = reviewMeasurementLabel(measurement?.label, index + 1);
+    const readout = reviewMapValue(measurement?.readout, 'Not decided');
+    item.textContent = `${label}: ${readout}`;
+    list.appendChild(item);
+  }
+  if (measurements.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'panel-empty';
+    empty.textContent = 'No measurements are defined yet.';
+    section.appendChild(empty);
+  } else {
+    section.appendChild(list);
+  }
+  parent.appendChild(section);
+}
+
+function reviewDecisionText(item) {
+  if (item?.source === 'map') {
+    const label = reviewMapValue(item.label, 'Review this decision');
+    const reason = reviewMapValue(item.reason, 'Needs review.');
+    return `${label} — ${reason}`;
+  }
+  return issueText(item);
+}
+
+function renderReviewDecisionGroups(parent, triage, navigateDecision) {
+  const section = document.createElement('section');
+  section.className = 'conformance';
+  const heading = document.createElement('h2');
+  heading.className = 'overview-node-title';
+  heading.textContent = 'Decisions';
+  section.appendChild(heading);
+
+  for (const group of triage.groups) {
+    const groupHeading = document.createElement('h3');
+    groupHeading.className = 'overview-node-title';
+    groupHeading.textContent = REVIEW_DECISION_GROUP_HEADINGS[group.tier];
+    section.appendChild(groupHeading);
+
+    if (group.items.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'panel-empty';
+      empty.textContent = 'No decisions in this group.';
+      section.appendChild(empty);
+      continue;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'issues-list';
+    for (const item of group.items) {
+      const li = document.createElement('li');
+      li.className = 'issue issue-' + (item.severity || 'warning');
+      const text = reviewDecisionText(item);
+      if (item.routeId && typeof navigateDecision === 'function') {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'conformance-issue-link';
+        link.textContent = text;
+        link.title = `Go to the workspace that owns this decision.`;
+        link.addEventListener('click', () => navigateDecision(item));
+        li.appendChild(link);
+      } else {
+        li.textContent = text;
+      }
+      list.appendChild(li);
+    }
+    section.appendChild(list);
+  }
+  parent.appendChild(section);
+}
 
 const FIELD_LABELS = {
   date: 'Acquisition date',
@@ -172,10 +298,10 @@ function issueText(issue) {
 }
 
 function reportIssues(report) {
-  const assayIssues = (report.assays || []).flatMap((assay) =>
-    (assay.issues || []).map((issue) => ({ ...issue, assayLabel: assay.label }))
+  const assayIssues = (report.assays || []).flatMap((assay, index) =>
+    (assay.issues || []).map((issue) => ({ ...issue, assayLabel: reviewMeasurementLabel(assay.label, index + 1) }))
   );
-  const crossAssay = (report.crossAssayIssues || []).map((issue) => ({ ...issue, assayLabel: 'Across assays' }));
+  const crossAssay = (report.crossAssayIssues || []).map((issue) => ({ ...issue, assayLabel: 'Across measurements' }));
   return [...assayIssues, ...crossAssay];
 }
 
@@ -257,7 +383,7 @@ function renderLadderNode(parent, ladder) {
 
   const heading = document.createElement('div');
   heading.className = 'overview-node-title';
-  heading.textContent = 'How to run this project';
+  heading.textContent = 'How to run this study';
   box.appendChild(heading);
 
   const ol = document.createElement('ol');
@@ -266,12 +392,12 @@ function renderLadderNode(parent, ladder) {
     const li = document.createElement('li');
     const title = document.createElement('div');
     title.className = 'overview-ladder-title';
-    title.textContent = stage.title;
+    title.textContent = reviewLadderText(stage.title);
     li.appendChild(title);
 
     const body = document.createElement('p');
     body.className = 'overview-ladder-body';
-    body.textContent = stage.body;
+    body.textContent = reviewLadderText(stage.body);
     li.appendChild(body);
 
     ol.appendChild(li);
@@ -288,7 +414,7 @@ function renderStageNotesNode(parent, stageNotes) {
 
   const heading = document.createElement('div');
   heading.className = 'overview-node-title';
-  heading.textContent = 'Notes for this assay';
+  heading.textContent = 'Notes for this measurement';
   box.appendChild(heading);
 
   for (const stage of stageNotes) {
@@ -312,10 +438,11 @@ function renderStageNotesNode(parent, stageNotes) {
 function renderAssayNode(parent, assay, onDownloadBenchCard) {
   const box = document.createElement('details');
   box.className = 'overview-assay';
+  const label = reviewMeasurementLabel(assay.label, assay.index);
 
   const summary = document.createElement('summary');
   summary.className = 'overview-assay-summary';
-  summary.textContent = `Assay ${assay.index}: ${assay.label} · ${assay.filenames.length} planned filename${assay.filenames.length === 1 ? '' : 's'}`;
+  summary.textContent = `Measurement ${assay.index}: ${label} · ${assay.filenames.length} planned filename${assay.filenames.length === 1 ? '' : 's'}`;
   box.appendChild(summary);
 
   const headerRow = document.createElement('div');
@@ -323,7 +450,7 @@ function renderAssayNode(parent, assay, onDownloadBenchCard) {
 
   const heading = document.createElement('div');
   heading.className = 'overview-assay-title';
-  heading.textContent = `Assay ${assay.index}: ${assay.label}`;
+  heading.textContent = `Measurement ${assay.index}: ${label}`;
   headerRow.appendChild(heading);
 
   // Per-assay, not a single study-wide button -- a bench card is a
@@ -371,7 +498,7 @@ function renderAssayNode(parent, assay, onDownloadBenchCard) {
   if (assay.filenames.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'planned-empty';
-    empty.textContent = 'No names to show -- see the issues in the Design step.';
+    empty.textContent = 'No names to show -- see the issues in Samples & design.';
     filesList.appendChild(empty);
   }
   for (const entry of assay.filenames) {
@@ -388,23 +515,37 @@ function renderAssayNode(parent, assay, onDownloadBenchCard) {
 export function createOverviewStep(kb) {
   return {
     id: 'overview',
-    title: 'Overview',
+    title: 'Review',
     render(main, store, { showToast, router } = {}) {
       main.textContent = '';
 
       const heading = document.createElement('h1');
       heading.className = 'step-heading';
-      heading.textContent = 'Study overview';
+      heading.textContent = 'Review';
       main.appendChild(heading);
 
       const explainer = document.createElement('p');
       explainer.className = 'proposals-empty';
       explainer.textContent =
-        'A deterministic summary of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
+        'A deterministic review of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
       main.appendChild(explainer);
 
       const doc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
       const conformance = checkConformance(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+      const experimentMap = buildExperimentMap(store.get(), { conformance });
+      const triage = decisionTriage(experimentMap, conformance);
+
+      function navigateDecision(decision) {
+        if (!decision || !decision.routeId || !router || typeof router.navigate !== 'function') return false;
+        const measurementId = reviewDecisionMeasurementId(decision);
+        if (measurementId) {
+          // Decisions contain stable measurement ids, never array indices. A
+          // deleted measurement makes an older Review projection inert.
+          if (!assayById(store.get(), measurementId)) return false;
+          store.patch({ activeAssayId: measurementId });
+        }
+        return router.navigate(decision.routeId);
+      }
 
       // Every final artifact checks the current store at click time. This
       // avoids exporting stale closure data after a user has changed a field
@@ -501,14 +642,20 @@ export function createOverviewStep(kb) {
       });
       secondaryActions.appendChild(printBtn);
 
-      // The study map: the headline visual of this step, placed first. A
+      // The orientation map and the consequence groups are intentionally
+      // first: map ordering and tier assignment come from their pure owners,
+      // not from this Review surface.
+      renderReviewExperimentMapSummary(main, experimentMap);
+      renderReviewDecisionGroups(main, triage, navigateDecision);
+
+      // The study diagram: retained alongside the textual Study-map summary.
       // horizontal scroll container keeps a wide (many-assay) map from forcing
       // the whole page to scroll sideways.
       const mapSection = document.createElement('section');
       mapSection.className = 'study-map';
       const mapHeading = document.createElement('h2');
       mapHeading.className = 'overview-node-title';
-      mapHeading.textContent = 'Study map';
+      mapHeading.textContent = 'Study diagram';
       mapSection.appendChild(mapHeading);
       const mapScroll = document.createElement('div');
       mapScroll.className = 'study-map-scroll';
@@ -529,17 +676,22 @@ export function createOverviewStep(kb) {
 
       const conformanceHeading = document.createElement('h2');
       conformanceHeading.className = 'overview-node-title';
-      conformanceHeading.textContent = 'Conformance check';
+      conformanceHeading.textContent = 'Planner checks';
       conformanceSection.appendChild(conformanceHeading);
 
       const verdict = document.createElement('div');
       verdict.className = `conformance-verdict conformance-${conformance.readiness}`;
       verdict.textContent = conformance.readiness === 'ready'
-        ? `Ready to acquire/export across ${conformance.assays.length} assay(s).`
+        ? 'All planner checks complete'
         : conformance.readiness === 'blocked'
           ? `Blocked: ${conformance.counts.blocked} issue(s) need correction before final export.`
           : `Needs review: ${conformance.counts.needsReview} incomplete or provisional item(s) remain.`;
       conformanceSection.appendChild(verdict);
+
+      const disclaimer = document.createElement('p');
+      disclaimer.className = 'panel-empty';
+      disclaimer.textContent = 'Planner checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability.';
+      conformanceSection.appendChild(disclaimer);
 
       const allConformanceIssues = reportIssues(conformance);
       if (allConformanceIssues.length === 0) {
@@ -547,28 +699,6 @@ export function createOverviewStep(kb) {
         clean.className = 'panel-empty';
         clean.textContent = 'No issues found at all -- every check this app runs came back clean.';
         conformanceSection.appendChild(clean);
-      } else {
-        const list = document.createElement('ul');
-        list.className = 'issues-list';
-        for (const issue of allConformanceIssues) {
-          const li = document.createElement('li');
-          li.className = 'issue issue-' + issue.severity;
-          const text = `${issue.assayLabel} · ${issueText(issue)}`;
-          const route = ISSUE_ROUTES[issue.section];
-          if (route && router) {
-            const link = document.createElement('button');
-            link.type = 'button';
-            link.className = 'conformance-issue-link';
-            link.textContent = text;
-            link.title = `Go to ${route === 'panel' ? 'Microscopy' : route === 'design' ? 'Design' : 'Naming'} to review this item`;
-            link.addEventListener('click', () => router.navigate(route));
-            li.appendChild(link);
-          } else {
-            li.textContent = text;
-          }
-          list.appendChild(li);
-        }
-        conformanceSection.appendChild(list);
       }
       main.appendChild(conformanceSection);
       main.append(exportMenu, secondaryActions);

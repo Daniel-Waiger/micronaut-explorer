@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { emptyExperiment } from '../src/core/schema.js';
 import { createDefaultStudy } from '../src/core/defaultStudy.js';
 import { checkConformance } from '../src/engine/conformance.js';
+import { buildExperimentMap } from '../src/engine/experimentMap.js';
 import { deriveWorkflowProgress, OPTIONAL_WORKFLOW, PRIMARY_WORKFLOW } from '../src/engine/workflowProgress.js';
 import { BASE_TEMPLATE, NAMING_CONFIG, realKb } from './fixtures.js';
 
@@ -19,17 +20,59 @@ function progress(experiment) {
   );
 }
 
-test('defines the seven ordered primary stages separately from optional Guide', () => {
-  assert.deepEqual(PRIMARY_WORKFLOW.map((step) => step.id), [
-    'home', 'describe', 'study', 'design', 'microscopy', 'naming', 'overview',
+function primaryStep(result, id) {
+  return result.primary.find((step) => step.id === id);
+}
+
+function orient(study, comparisonMode = 'groups') {
+  study.researchQuestion = 'How does water availability affect root architecture?';
+  study.studyContext = {
+    system: 'tomato seedlings in soil',
+    experimentalUnit: 'one independently grown seedling',
+    comparisonMode,
+  };
+  study.groupVocabulary.levels = comparisonMode === 'groups' ? ['well-watered', 'drought'] : [];
+  study.assays[0].label = 'Root architecture';
+  study.assays[0].readout = 'root-architecture';
+  study.assays[0].readoutText = 'Root architecture';
+  study.assays[0].design.groups.levels = comparisonMode === 'groups' ? ['well-watered', 'drought'] : [];
+  return study;
+}
+
+function readyDefaultStudy() {
+  const study = createDefaultStudy();
+  for (const [index, assay] of study.assays.entries()) {
+    assay.naming = {
+      fields: {
+        ...assay.naming.fields,
+        date: '2026-08-23',
+        sample: `ORA${String(index + 1).padStart(2, '0')}`,
+        ...(assay.label === 'Scratch / migration' ? { magnification: 'X10' } : {}),
+      },
+    };
+  }
+  return study;
+}
+
+test('defines the seven labelled routes separately from the excluded Guide route', () => {
+  assert.deepEqual(PRIMARY_WORKFLOW.map(({ id, label }) => ({ id, label })), [
+    { id: 'home', label: 'Study map' },
+    { id: 'describe', label: 'Research brief' },
+    { id: 'study', label: 'Measurements' },
+    { id: 'design', label: 'Samples & design' },
+    { id: 'microscopy', label: 'Acquisition' },
+    { id: 'naming', label: 'Data plan' },
+    { id: 'overview', label: 'Review' },
   ]);
   assert.deepEqual(OPTIONAL_WORKFLOW.map((step) => step.id), ['guide']);
+  assert.equal(PRIMARY_WORKFLOW[4].id, 'microscopy', 'the panel/microscopy router alias remains stable');
   assert.equal(deriveWorkflowProgress({}, { readiness: 'ready', assays: [] }).summary.total, 7);
 });
 
-test('a blank study is not started, while its incomplete readiness is routed through conformance', () => {
+test('an empty Study map is not started, while its incomplete readiness is routed through conformance', () => {
   const result = progress(emptyExperiment());
   const assay = result.assays[0];
+  assert.equal(primaryStep(result, 'home').state, 'not-started');
   assert.equal(result.primary.find((step) => step.id === 'study').state, 'not-started');
   assert.equal(assay.steps.project.state, 'not-started');
   assert.equal(assay.steps.design.state, 'not-started');
@@ -38,25 +81,48 @@ test('a blank study is not started, while its incomplete readiness is routed thr
   assert.equal(result.primary.find((step) => step.id === 'overview').readiness, 'needs-review');
 });
 
-test('Study becomes in-progress for partial study shape, then complete once it has a question, groups, and assay content', () => {
+test('Study-map progress follows orientation transitions, including observational studies', () => {
+  const study = emptyExperiment();
+  assert.equal(primaryStep(progress(study), 'home').state, 'not-started');
+
+  study.researchQuestion = 'Does the coating reduce bacterial load?';
+  assert.equal(primaryStep(progress(study), 'home').state, 'in-progress');
+
+  const observational = orient(emptyExperiment(), 'observational');
+  const completed = progress(observational);
+  assert.equal(completed.map.comparison.mode, 'observational');
+  assert.equal(completed.map.comparison.state, 'answered');
+  assert.equal(primaryStep(completed, 'home').state, 'complete');
+  assert.deepEqual(completed, progress(observational), 'Study-map progress must remain deterministic for the same completed data');
+});
+
+test('Measurements progress keeps its existing study-wide content and cross-assay conformance behavior', () => {
   const study = emptyExperiment();
   study.researchQuestion = 'Does the coating reduce bacterial load?';
-  assert.equal(progress(study).primary.find((step) => step.id === 'study').state, 'in-progress');
+  assert.equal(primaryStep(progress(study), 'study').state, 'in-progress');
 
   study.groupVocabulary.levels = ['CTL', 'OPP'];
   study.assays[0].label = 'Bacterial viability';
-  const completed = progress(study);
-  assert.equal(completed.primary.find((step) => step.id === 'study').state, 'complete');
-  assert.deepEqual(completed, progress(study), 'Study progress must remain deterministic for the same completed data');
+  assert.equal(primaryStep(progress(study), 'study').state, 'complete');
 });
 
-test('Study consumes cross-assay conformance issues as needs-attention without recreating that validator', () => {
+test('Measurements consumes cross-assay conformance issues as needs-attention without recreating that validator', () => {
   const study = createDefaultStudy();
   study.assays[1].acquisition.modality = study.assays[0].acquisition.modality;
   study.assays[1].naming.fields = { ...study.assays[0].naming.fields };
   const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.ok(report.crossAssayIssues.length > 0, 'sanity: conformance must produce the study-wide issue');
-  assert.equal(deriveWorkflowProgress(study, report, QUESTIONS).primary.find((step) => step.id === 'study').state, 'needs-attention');
+  assert.equal(primaryStep(deriveWorkflowProgress(study, report, QUESTIONS), 'study').state, 'needs-attention');
+});
+
+test('progress carries the single map snapshot by value without recomputing its next decision', () => {
+  const study = orient(emptyExperiment());
+  const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const result = deriveWorkflowProgress(study, report, QUESTIONS);
+
+  assert.deepEqual(result.map, buildExperimentMap(study, { conformance: report }));
+  assert.equal(result.map.nextDecision, result.map.decisions[0]);
+  assert.equal(result.map.nextDecision.id, `biological-replicates:${study.assays[0].id}`);
 });
 
 test('confirmed phase fields and a valid design advance each assay without making Guide required', () => {
@@ -76,7 +142,7 @@ test('confirmed phase fields and a valid design advance each assay without makin
   assert.equal(result.summary.total, 7);
 });
 
-test('progress distinguishes two assay states and surfaces an invalid design as needs-attention', () => {
+test('multi-measurement progress retains distinct assay states and surfaces an invalid design as needs-attention', () => {
   const study = createDefaultStudy();
   const [valid, invalid] = study.assays;
   valid.design.groups.levels = ['CTL', 'OPP'];
@@ -84,6 +150,7 @@ test('progress distinguishes two assay states and surfaces an invalid design as 
 
   const result = progress(study);
   assert.equal(result.assays.length, 4);
+  assert.equal(result.map.measurements.length, 4);
   assert.equal(result.assays[0].steps.design.state, 'complete');
   assert.equal(result.assays[1].steps.design.state, 'needs-attention');
   assert.equal(result.primary.find((step) => step.id === 'design').state, 'needs-attention');
@@ -99,6 +166,17 @@ test('overview state consumes report readiness rather than reclassifying issue d
   assert.equal(result.assays[0].steps.overview.state, 'needs-attention');
   assert.equal(result.primary.find((step) => step.id === 'overview').state, 'needs-attention');
   assert.equal(result.primary.find((step) => step.id === 'overview').readiness, 'blocked');
+});
+
+test('a fully oriented, conformance-ready study reports both Study-map and Review completion', () => {
+  const study = readyDefaultStudy();
+  const result = progress(study);
+
+  assert.equal(result.map.orientation.state, 'answered');
+  assert.match(result.map.nextDecision.id, /^biological-replicates:/);
+  assert.equal(primaryStep(result, 'home').state, 'complete');
+  assert.equal(primaryStep(result, 'overview').state, 'complete');
+  assert.equal(primaryStep(result, 'overview').readiness, 'ready');
 });
 
 test('workflow progress is deterministic and total for malformed input', () => {

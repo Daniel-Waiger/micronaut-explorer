@@ -1,4 +1,4 @@
-// The Study step: the one study-level surface, sitting above every assay.
+// The Measurements step: the one study-level surface, sitting above every assay.
 // First in main.js's steps array -- the landing page, and the
 // discoverability surface for "this app can model more than one assay,"
 // per docs/plans/planner-web-assay-tier.md's commit-2 sequencing.
@@ -42,7 +42,7 @@ function groupDivergenceSummary(experiment) {
   }).length;
 
   const total = assays.length;
-  return `${matching} of ${total} assay${total === 1 ? '' : 's'} use this group vocabulary.`;
+  return `${matching} of ${total} measurement${total === 1 ? '' : 's'} reuse these comparison labels.`;
 }
 
 function studyGroupTokens(value) {
@@ -79,15 +79,60 @@ function studyAssayBaseName(store, assayId) {
   return renderName(finalized, { ...NAMING_CONFIG, template: BASE_TEMPLATE });
 }
 
+function measurementReadout(assay) {
+  const value = assay && (assay.readoutText || assay.readout);
+  return value || 'Intended observation not yet described.';
+}
+
+function measurementSystemSummary(experiment, assay) {
+  const specimen = assay && assay.specimen && typeof assay.specimen === 'object' ? assay.specimen : {};
+  const system =
+    experiment && experiment.studyContext && typeof experiment.studyContext.system === 'string'
+      ? experiment.studyContext.system.trim()
+      : '';
+  const values = [system, specimen.organism, specimen.sampleType, specimen.preparation]
+    .map((value) => (typeof value === 'string' ? value.trim() : ''))
+    .filter(Boolean);
+  const seen = new Set();
+  const unique = values.filter((value) => {
+    const key = value.toLocaleLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return unique.join(' · ');
+}
+
+function progressStateLabel(state) {
+  const labels = {
+    'not-started': 'Not started',
+    'in-progress': 'In progress',
+    'needs-attention': 'Decision needed',
+    complete: 'Ready for now',
+  };
+  return labels[state] || '';
+}
+
+function measurementPlanningState(workflowProgress, assayId) {
+  const assays = workflowProgress && Array.isArray(workflowProgress.assays) ? workflowProgress.assays : [];
+  const progress = assays.find((assay) => assay && assay.id === assayId);
+  if (!progress || !progress.steps) return '';
+
+  const design = progressStateLabel(progress.steps.design && progress.steps.design.state);
+  const acquisition = progressStateLabel(progress.steps.microscopy && progress.steps.microscopy.state);
+  if (!design && !acquisition) return '';
+  return `Samples & design: ${design || 'Not started'} · Acquisition: ${acquisition || 'Not started'}`;
+}
+
 export const studyStep = {
   id: 'study',
-  title: 'Study',
-  render(main, store, { showToast, router } = {}) {
+  title: 'Measurements',
+  render(main, store, { showToast, router, workflowProgress } = {}) {
     main.textContent = '';
 
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
-    heading.textContent = 'Study';
+    heading.textContent = 'Measurements';
     main.appendChild(heading);
 
     // --- Research question -------------------------------------------
@@ -101,7 +146,7 @@ export const studyStep = {
     rqInput.type = 'text';
     rqInput.className = 'field-input';
     rqInput.placeholder = 'e.g. Does an oregano-plasma coating reduce bacterial load on wound dressings?';
-    rqInput.title = 'What the whole study is trying to answer -- every assay below exists in service of this one question.';
+    rqInput.title = 'What the whole study is trying to answer -- every measurement below exists in service of this one question.';
     rqInput.value = store.get().researchQuestion || '';
     rqInput.addEventListener('input', () => {
       // Study-level, unscoped -- same one-liner pattern describe.js already
@@ -112,18 +157,24 @@ export const studyStep = {
     rqRow.appendChild(rqInput);
     main.appendChild(rqRow);
 
-    // --- Group vocabulary -------------------------------------------------
+    // --- Shared comparison labels -----------------------------------------
     const vocabHeading = document.createElement('div');
     vocabHeading.className = 'design-subheading';
-    vocabHeading.textContent = 'Group vocabulary';
+    vocabHeading.textContent = 'Comparison labels';
     main.appendChild(vocabHeading);
+
+    const vocabHelp = document.createElement('p');
+    vocabHelp.className = 'proposals-empty';
+    vocabHelp.textContent =
+      'Reuse these labels when measurements compare groups or conditions. Observational studies may have no comparison labels.';
+    main.appendChild(vocabHelp);
 
     const vocabRow = document.createElement('div');
     vocabRow.className = 'field-row';
     const vocabLabel = document.createElement('span');
     vocabLabel.className = 'field-label';
     vocabLabel.id = 'study-group-vocabulary-label';
-    vocabLabel.textContent = 'Default groups for new assays';
+    vocabLabel.textContent = 'Labels to reuse for comparisons';
     vocabRow.appendChild(vocabLabel);
     const tokenField = document.createElement('div');
     tokenField.className = 'study-group-token-field';
@@ -136,10 +187,10 @@ export const studyStep = {
     const vocabInput = document.createElement('input');
     vocabInput.type = 'text';
     vocabInput.className = 'study-group-token-input';
-    vocabInput.placeholder = 'Type a group, then press Enter';
-    vocabInput.setAttribute('aria-label', 'Add a group');
+    vocabInput.placeholder = 'Type a comparison label, then press Enter';
+    vocabInput.setAttribute('aria-label', 'Add a comparison label');
     vocabInput.title =
-      'A TEMPLATE, not a shared axis -- each assay gets its own copy when created, and can diverge from it freely. Used to seed new assays and by "Apply to all assays" below.';
+      'A reusable seed, not a shared live axis -- each measurement keeps its own copy and can diverge freely. Used to seed new measurements and by "Apply to all measurements" below.';
     tokenField.appendChild(vocabInput);
 
     function vocabularyLevels() {
@@ -166,7 +217,7 @@ export const studyStep = {
         remove.type = 'button';
         remove.className = 'study-group-token-remove';
         remove.textContent = '×';
-        remove.setAttribute('aria-label', `Remove group ${group}`);
+        remove.setAttribute('aria-label', `Remove comparison label ${group}`);
         remove.addEventListener('pointerdown', (event) => {
           // Keep pointer removal from blurring and committing the adjacent
           // input before this same control receives its click.
@@ -226,9 +277,9 @@ export const studyStep = {
     const applyBtn = document.createElement('button');
     applyBtn.type = 'button';
     applyBtn.className = 'add-factor-button';
-    applyBtn.textContent = 'Apply to all assays';
+    applyBtn.textContent = 'Apply to all measurements';
     applyBtn.title =
-      "Fills in this vocabulary's groups for every assay that hasn't customized its own -- an assay whose groups you already edited by hand is left alone.";
+      "Seeds these comparison labels into every measurement that has not customized its own groups -- a measurement whose groups you already edited by hand is left alone.";
     applyBtn.addEventListener('click', () => {
       const experiment = store.get();
       const levels = (experiment.groupVocabulary && experiment.groupVocabulary.levels) || [];
@@ -248,8 +299,8 @@ export const studyStep = {
       if (showToast) {
         showToast(
           skipped > 0
-            ? `Applied to ${applied} assay(s); skipped ${skipped} that already have custom groups.`
-            : `Applied to ${applied} assay(s).`
+            ? `Applied to ${applied} measurement(s); skipped ${skipped} that already have custom groups.`
+            : `Applied to ${applied} measurement(s).`
         );
       }
       renderAssayList();
@@ -257,10 +308,10 @@ export const studyStep = {
     });
     main.appendChild(applyBtn);
 
-    // --- Per-assay list ---------------------------------------------------
+    // --- Per-measurement list ---------------------------------------------
     const listHeading = document.createElement('div');
     listHeading.className = 'design-subheading';
-    listHeading.textContent = 'Assays';
+    listHeading.textContent = 'Measurements';
     main.appendChild(listHeading);
 
     const assayList = document.createElement('div');
@@ -279,8 +330,8 @@ export const studyStep = {
         const labelInput = document.createElement('input');
         labelInput.type = 'text';
         labelInput.className = 'field-input';
-        labelInput.placeholder = `Assay ${index + 1}`;
-        labelInput.title = 'A short name for this assay, e.g. "Bacterial viability" -- shown in the switcher above.';
+        labelInput.placeholder = `Measurement ${index + 1}`;
+        labelInput.title = 'A short name for this measurement, e.g. "Bacterial viability" -- shown in the switcher above.';
         labelInput.value = assay.label || '';
         labelInput.addEventListener('input', () => {
           const { path, slotKey } = scopeWrite(store.get(), 'label', assay.id);
@@ -294,6 +345,28 @@ export const studyStep = {
           renderIssues();
         });
         row.appendChild(labelInput);
+
+        const details = document.createElement('div');
+        details.className = 'study-assay-details';
+        const readout = document.createElement('p');
+        readout.className = 'study-assay-readout';
+        readout.textContent = `Readout / intended observation: ${measurementReadout(assay)}`;
+        details.appendChild(readout);
+        const systemSummary = measurementSystemSummary(experiment, assay);
+        if (systemSummary) {
+          const system = document.createElement('p');
+          system.className = 'study-assay-system';
+          system.textContent = `System or specimen: ${systemSummary}`;
+          details.appendChild(system);
+        }
+        const planningState = measurementPlanningState(workflowProgress, assay.id);
+        if (planningState) {
+          const progress = document.createElement('p');
+          progress.className = 'study-assay-progress';
+          progress.textContent = planningState;
+          details.appendChild(progress);
+        }
+        row.appendChild(details);
 
         const baseNameEl = document.createElement('code');
         baseNameEl.className = 'base-name-value study-assay-basename';
@@ -312,7 +385,7 @@ export const studyStep = {
         const gotoBtn = document.createElement('button');
         gotoBtn.type = 'button';
         gotoBtn.className = 'question-answer';
-        gotoBtn.textContent = 'Go to Design';
+        gotoBtn.textContent = 'Continue planning this measurement';
         gotoBtn.addEventListener('click', () => {
           store.patch({ activeAssayId: assay.id });
           if (router) router.navigate('design');
@@ -326,7 +399,7 @@ export const studyStep = {
           removeBtn.textContent = 'Delete';
           removeBtn.addEventListener('click', () => {
             const ok = window.confirm(
-              `Delete "${assay.label || `Assay ${index + 1}`}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
+              `Delete "${assay.label || `Measurement ${index + 1}`}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
             );
             if (!ok) return;
             const result = removeAssay(store.get(), assay.id);
@@ -349,8 +422,8 @@ export const studyStep = {
     const assayCount = Array.isArray(store.get().assays) ? store.get().assays.length : 0;
     addAssayHint.textContent =
       assayCount >= MAX_STUDY_ROWS
-        ? `This study has reached the ${MAX_STUDY_ROWS}-assay cap.`
-        : 'Use "+ Add assay" in the bar above to add another assay to this study.';
+        ? `This study has reached the ${MAX_STUDY_ROWS}-measurement cap.`
+        : 'Use "+ Add measurement" in the bar above to add another measurement to this study.';
     main.appendChild(addAssayHint);
 
     // --- Cross-assay collision check --------------------------------------
@@ -369,6 +442,7 @@ export const studyStep = {
       for (const issue of issues) {
         const li = document.createElement('li');
         li.className = 'issue issue-' + issue.severity;
+        // studyNameIssues remains the sole collision validator.
         li.textContent = `${issue.field}: ${issue.message}`;
         issuesList.appendChild(li);
       }

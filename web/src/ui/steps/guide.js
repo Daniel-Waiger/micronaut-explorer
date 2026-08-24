@@ -119,11 +119,7 @@ export const guideStep = {
 
     para(
       main,
-      'Micronaut Planner helps you design a microscopy experiment before you acquire ' +
-        'anything: you describe what you are measuring, and it works out the groups and ' +
-        'controls you need, flags common pitfalls for your modality, and produces a ' +
-      'consistent file-naming convention as a by-product of the finished design. ' +
-        'Everything runs in your browser — no upload, no install, no account. The optional guided example covers Home through Overview; this Guide is reference material, not another guided step.'
+      'Micronaut Planner helps you plan a study before collecting data: describe what you are measuring, then plan comparisons, controls, acquisition, and files. A study contains measurements; each measurement has its own Samples & design, Acquisition, and Data plan, while Review considers the whole study. Everything runs in your browser — no upload, no install, no account. The optional guided example covers Study map through Review; this Guide is reference material, not another guided step.'
     );
 
     // --- Search (zen-planner Phase 5's "searchable wiki") -----------------
@@ -171,23 +167,23 @@ export const guideStep = {
       section(main, 'The steps', (c) => {
         para(
           c,
-          'For a guided example, start at Home — it can open, resume, or restart the optional ' +
+          'For a guided example, start at Study map — it can open, resume, or restart the optional ' +
             'seven-step walkthrough. This list is a quick reference for what each ' +
             'step in the left nav means. Use the steps in any order — the app works outside-in — ' +
-            'and note a study can hold several assays, switched with the tab row at the top.'
+            'and note a study can hold several measurements, switched with the tab row at the top.'
         );
         defList(c, [
-          ['Home', 'Landing page: optional guided example, description, or worked example.'],
-          ['Project', 'Per assay: readout, organism/cell line, sample type, preparation.'],
-          ['Study', 'Study-wide question, shared group vocabulary, and assay list.'],
-          ['Design', 'Per assay: control/treatment groups, crossing factors, replicate counts.'],
+          ['Study map', 'Whole study: question, system or material, comparison structure, measurements, and experimental unit.'],
+          ['Research brief', 'Whole-study narrative plus the active measurement’s readout, specimen, and intended observation.'],
+          ['Measurements', 'Measurement list, names, and reusable comparison labels.'],
+          ['Samples & design', 'Per measurement: groups or factors, independent and technical replicates, and conditions.'],
           [
-            'Microscopy',
-            'Per assay: instrument, modality, magnification, markers, spectral-overlap check, ' +
+            'Acquisition',
+            'Per measurement: instrument, modality, magnification, markers, spectral-overlap check, ' +
               'and an optional panel editor.',
           ],
-          ['Naming', 'Filename template and fields, plus the bench-schedule (.ics) export.'],
-          ['Overview', 'Read-only summary: study map, conformance check, controls, filenames.'],
+          ['Data plan', 'Per measurement: filename template and fields, plus the bench-schedule (.ics) export.'],
+          ['Review', 'Whole-study summary: study map, conformance check, controls, and planned files.'],
         ]);
       })
     );
@@ -195,10 +191,8 @@ export const guideStep = {
     trackSection(
       section(main, 'Getting started', (c) => {
         bullets(c, [
-          'You open onto a real worked example (an oregano wound-healing study) so nothing ' +
-            'starts blank. Edit any field and your change always wins over the example.',
-          'Start your own: use “New study” in the header for a blank slate, or “Reset to ' +
-            'example” to reload the example and undo your edits.',
+          'Choose “Plan my study” to start your own Study map, or “Explore a completed example” to inspect the oregano plan. The example is not your data.',
+          'Make a copy before treating an example as your own plan. You can return to the completed example without replacing your study.',
           'You do not have to answer everything. Fields you skip are simply marked as not set; ' +
             'the app still produces whatever it can from what you have entered.',
         ]);
@@ -209,15 +203,12 @@ export const guideStep = {
       section(main, 'Key ideas', (c) => {
         defList(c, [
           [
-            'Assay',
-            'One measurement approach within a study — its own readout, panel, specimen, and ' +
-              'modality. Real studies often bundle several assays that share only a question and ' +
-              'a test article.',
+            'Measurement',
+            'One observation or analysis used to answer the study question — its own readout, panel, specimen, and modality. In some fields, a measurement is called an assay.',
           ],
           [
-            'Group vocabulary',
-            'The comparison groups shared across the study (e.g. control, treatment). Applying it ' +
-              'fills each assay’s groups, except any assay you have already customized.',
+            'Comparison labels',
+            'Reusable comparison labels (e.g. control, treatment). They seed a measurement’s groups when helpful, but never overwrite a measurement you have already customized. Observational studies may have none.',
           ],
           [
             'Readout',
@@ -248,17 +239,17 @@ export const guideStep = {
       section(main, 'What you get out', (c) => {
         bullets(c, [
           'A consistent set of planned filenames for every condition in the design.',
-          'A visual study map (Overview) you can download as an SVG.',
+          'A visual study map (Review) you can download as an SVG.',
           'An exportable study document (Markdown) and a print / save-as-PDF view.',
           'A file manifest (CSV) — one row per planned filename with its group, factors, and ' +
-            'replicates — and a full raw-data dump (JSON) of the study document, both on Overview.',
-          'A bench card per assay (Overview) — a compact, print-oriented single-assay summary: ' +
+            'replicates — and a full raw-data dump (JSON) of the study document, both on Review.',
+          'A bench card per measurement (Review) — a compact, print-oriented single-measurement summary: ' +
             'channels, controls with their reasons, and two worked filename examples.',
-          'A bench schedule (.ics, Naming) built from your own timing answers — imports into ' +
+          'A bench schedule (.ics, Data plan) built from your own timing answers — imports into ' +
             'Google Calendar, Outlook, or Apple Calendar with no login.',
-          'A copy-paste prompt for your own LLM (Overview) — the study as JSON plus ground rules ' +
+          'A copy-paste prompt for your own LLM (Review) — the study as JSON plus ground rules ' +
             'that keep the model from inventing a domain fact.',
-          'Project review first finds exact supported text in your description. You can optionally ' +
+          'Research brief review first finds exact supported text in your description. You can optionally ' +
             'use a local Ollama model or copy and paste a model reply in place; every interpretation ' +
             'shows quoted evidence from your description, and nothing becomes a structured field until ' +
             'you explicitly accept it.',
@@ -273,7 +264,7 @@ export const guideStep = {
           'Your work is autosaved in this browser, so a refresh restores it. Local storage is a ' +
             'convenience, not a safe record — it can be cleared by the browser, is not shared ' +
             'between machines, and is lost in private/incognito windows. To keep a copy, use the ' +
-            'Download buttons on the Overview step.'
+            'Download buttons on the Review step.'
         );
       })
     );

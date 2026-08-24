@@ -145,7 +145,7 @@ export function createNamingStep(kb) {
   }
   return {
   id: 'naming',
-  title: 'Naming',
+  title: 'Data plan',
   render(main, store, { advisor, experience } = {}) {
     main.textContent = '';
 
@@ -157,8 +157,21 @@ export function createNamingStep(kb) {
 
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
-    heading.textContent = 'Name builder';
+    heading.textContent = 'Data plan';
     main.appendChild(heading);
+
+    const activeAssay = assayById(store.get(), assayId);
+    const activeAssayLabel = activeAssay?.label || 'this measurement';
+    const scope = document.createElement('p');
+    scope.className = 'proposals-empty';
+    scope.textContent = `Planning files and work for: ${activeAssayLabel}.`;
+    main.appendChild(scope);
+
+    const filenameGuidance = document.createElement('p');
+    filenameGuidance.className = 'proposals-empty';
+    filenameGuidance.textContent =
+      'Enter the details needed for a final filename here. Date, sample ID, and instrument label may be assigned later on acquisition day; until then previews use clearly labelled placeholders. Final exports remain guarded by planner checks.';
+    main.appendChild(filenameGuidance);
 
     const grid = document.createElement('div');
     grid.className = 'naming-grid';
@@ -245,6 +258,10 @@ export function createNamingStep(kb) {
     const plannedList = document.createElement('div');
     plannedList.className = 'planned-list';
     plannedBox.appendChild(plannedList);
+
+    const placeholderStatus = document.createElement('div');
+    placeholderStatus.className = 'planned-empty';
+    plannedBox.appendChild(placeholderStatus);
     main.appendChild(plannedBox);
 
     // --- Schedule (zen-planner Phase 1's timing interview + .ics export) --
@@ -380,6 +397,7 @@ export function createNamingStep(kb) {
 
     function update() {
       const view = currentExperimentView();
+      const rawFields = currentRawFields();
       lastPlanned = planFilenames(view, NAMING_CONFIG);
       advicePanel.update(view);
 
@@ -403,11 +421,36 @@ export function createNamingStep(kb) {
         plannedList.appendChild(line);
       }
 
+      // Defaults remain in the preview filename exactly as the naming engine
+      // produces them. This legend makes it clear that they were generated
+      // for preview rather than supplied by the researcher.
+      const generatedPlaceholders = FIELD_DEFS.filter(
+        (field) => Object.prototype.hasOwnProperty.call(NAMING_CONFIG.defaults, field.key) && !rawFields[field.key]
+      );
+      placeholderStatus.textContent = '';
+      if (generatedPlaceholders.length === 0) {
+        placeholderStatus.textContent = 'Every required filename value in this preview was supplied.';
+      } else {
+        const intro = document.createElement('p');
+        intro.textContent = 'Generated preview placeholders — not supplied values:';
+        placeholderStatus.appendChild(intro);
+        const list = document.createElement('ul');
+        for (const field of generatedPlaceholders) {
+          const item = document.createElement('li');
+          const value = document.createElement('mark');
+          value.textContent = NAMING_CONFIG.defaults[field.key];
+          item.appendChild(value);
+          item.append(` is a generated placeholder for ${field.label}.`);
+          list.appendChild(item);
+        }
+        placeholderStatus.appendChild(list);
+      }
+
       // Field-level validation runs against the fields as typed. The
       // path-length check runs per PLANNED NAME, deduped: with a design, the
       // longest row is the one that actually risks exceeding MAX_PATH, and N
       // equally-long rows should not produce N copies of one warning.
-      const finalized = finalizeFields('experiment.tif', currentRawFields(), NAMING_CONFIG);
+      const finalized = finalizeFields('experiment.tif', rawFields, NAMING_CONFIG);
       const issues = validateFields(finalized, DEFAULT_PROFILE);
       const pathMessages = new Set();
       for (const name of currentFilenames()) {

@@ -88,52 +88,52 @@ function factorSummary(factors) {
 }
 
 function templateFor(stepId, facts) {
-  const assayLabel = text(facts.assay.label, 'the active assay');
+  const assayLabel = text(facts.assay.label, 'the active measurement');
   switch (stepId) {
     case 'home':
       return {
-        outcome: 'Orient yourself before editing the study.',
-        what: 'Home is the stable starting point for the study and its example actions.',
-        why: 'It makes the current study state visible before you decide whether to explore or edit.',
+        outcome: 'Understand the study’s shape before planning its details.',
+        what: 'Study map establishes the research question, system or material, comparison structure, measurements, and experimental unit.',
+        why: 'A study contains measurements; each measurement then has its own Samples & design, Acquisition, and Data plan.',
         when: 'Use it when opening the app, returning from another route, or restarting the walkthrough.',
-        how: 'Review the study at a glance, then move to the workflow step that answers your next question.',
-        tryThis: 'Notice the study title and how many assays are currently available.',
-        exampleSummary: `${plural(facts.assayCount, 'assay')} are currently included${facts.study.title ? ` in “${facts.study.title}”` : ''}.`,
+        how: 'Review the study at a glance, then move to the workspace that owns your next question.',
+        tryThis: 'Notice the study title and how many measurements are currently included.',
+        exampleSummary: `${plural(facts.assayCount, 'measurement')} are currently included${facts.study.title ? ` in “${facts.study.title}”` : ''}.`,
       };
     case 'describe':
       return {
-        outcome: 'Make the purpose and material of the active assay explicit.',
-        what: 'Project captures what this assay measures and the specimen it uses.',
-        why: 'A clear readout and specimen let later guidance stay tied to the actual assay.',
-        when: 'Use it when defining an assay or when its biological target changes.',
-        how: 'Choose the readout, then record the specimen details for the active assay.',
-        tryThis: 'Compare the active assay’s readout and specimen with the assay you intend to run.',
+        outcome: 'Make the shared purpose and active measurement details explicit.',
+        what: 'Research brief holds the study narrative and records what the active measurement will observe and its specimen or system.',
+        why: 'A clear readout and specimen let later guidance stay tied to the active measurement.',
+        when: 'Use it when defining a measurement or when its readout or specimen changes.',
+        how: 'Describe the shared question, then choose the readout and record specimen details for the active measurement.',
+        tryThis: 'Compare the active measurement’s readout and specimen with the measurement you intend to plan.',
         exampleSummary: `${assayLabel} currently measures ${text(facts.assay.readout.label, text(facts.assay.readout.text, 'an unanswered readout'))} in ${text(facts.assay.specimen.organism, 'an unspecified specimen')}.`,
       };
     case 'study':
       return {
-        outcome: 'Keep the shared research question and group vocabulary coherent across assays.',
-        what: 'Study holds the whole-study question and the shared treatment-group vocabulary.',
-        why: 'Shared terms prevent assay plans and filenames from drifting apart.',
-        when: 'Use it before adding assays or when the overarching experiment changes.',
-        how: 'State the research question, then set the group terms every applicable assay should use.',
-        tryThis: 'Read the question, then check that the shared group terms match your planned comparison.',
-        exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Shared groups: ${list(facts.study.groupVocabulary, 'none yet')}.`,
+        outcome: 'Keep the study’s measurements and comparison labels coherent.',
+        what: 'Measurements lists the observations or analyses in the study and offers reusable comparison labels when helpful.',
+        why: 'Reusable labels keep applicable measurement plans and filenames aligned without overwriting a custom design.',
+        when: 'Use it when adding or naming measurements, or when the study’s comparison structure changes.',
+        how: 'State the research question, then name each measurement and add comparison labels only when they apply.',
+        tryThis: 'Read the question, then check that the comparison labels match your planned comparison or observational study.',
+        exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Comparison labels: ${list(facts.study.groupVocabulary, 'none yet')}.`,
       };
     case 'design':
       return {
-        outcome: 'Turn the active assay into an explicit, reviewable condition plan.',
-        what: 'Design defines groups, crossed factors, replicate counts, and the resulting conditions.',
+        outcome: 'Turn the active measurement into an explicit, reviewable sample and condition plan.',
+        what: 'Samples & design defines groups, crossed factors, replicate counts, and the resulting conditions.',
         why: 'The condition matrix is the source for downstream filename planning and review.',
-        when: 'Use it after defining the assay and before collecting data.',
+        when: 'Use it after defining the measurement and before collecting data.',
         how: 'Set groups and factors, then review the generated conditions rather than calculating them by hand.',
         tryThis: 'Inspect the generated condition count and make sure every intended comparison is represented.',
         exampleSummary: `${assayLabel} has ${plural(facts.assay.design.conditionCount, 'generated condition')}: groups ${list(facts.assay.design.groups, 'none yet')}; factors ${factorSummary(facts.assay.design.factors)}.`,
       };
     case 'microscopy':
       return {
-        outcome: 'Connect acquisition choices with the assay’s panel and controls.',
-        what: 'Microscopy records the acquisition modality and exposes the resolved panel and relevant controls.',
+        outcome: 'Connect acquisition choices with the measurement’s panel and controls.',
+        what: 'Acquisition records the modality and exposes the resolved panel and relevant controls.',
         why: 'Acquisition settings and controls need to be assessed together for an interpretable result.',
         when: 'Use it while planning imaging or when a marker, channel, or modality changes.',
         how: 'Choose the modality, review the resolved panel rows, and consider the controls the study projection provides.',
@@ -143,7 +143,7 @@ function templateFor(stepId, facts) {
     case 'naming':
       return {
         outcome: 'Produce consistent, traceable filenames from the current plan.',
-        what: 'Naming combines the active assay’s effective naming fields with its generated condition rows.',
+        what: 'Data plan combines the active measurement’s effective naming fields with its generated condition rows.',
         why: 'Generated filenames make each acquired file traceable to its condition without manual reconstruction.',
         when: 'Use it once design and acquisition details are sufficiently specified to plan files.',
         how: 'Review the generated plan and correct source fields on their owning steps when a filename needs attention.',
@@ -155,7 +155,7 @@ function templateFor(stepId, facts) {
     case 'overview':
       return {
         outcome: 'Review the whole study’s current readiness before handoff or acquisition.',
-        what: 'Overview brings the study document and conformance result together in one review surface.',
+        what: 'Review brings the study map, document, and conformance result together in one review surface.',
         why: 'A single readiness result makes outstanding issues visible without silently redefining them.',
         when: 'Use it before exporting, sharing, or treating the plan as ready to run.',
         how: 'Read the readiness result, then follow each issue back to the step that owns its source field.',

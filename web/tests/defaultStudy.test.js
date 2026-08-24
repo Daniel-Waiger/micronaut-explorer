@@ -5,6 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDefaultStudy } from '../src/core/defaultStudy.js';
+import { canOverwrite } from '../src/core/provenance.js';
+import { SCHEMA_VERSION, emptyExperiment, migrate } from '../src/core/schema.js';
 import { studyNameIssues } from '../src/engine/plan.js';
 import { readoutState } from '../src/engine/controls.js';
 
@@ -33,10 +35,15 @@ const NAMING_CONFIG = {
   safeCharPattern: '[^A-Za-z0-9_-]+',
 };
 const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
+const OREGANO_STUDY_CONTEXT = {
+  system: 'Oregano-derived plasma polymer coatings on glass coverslips for in vitro wound-healing evaluation',
+  experimentalUnit: 'One independently prepared glass coverslip assigned to CTL or OPP coating',
+  comparisonMode: 'groups',
+};
 
-test('createDefaultStudy returns a v4 study with 4 assays', () => {
+test('createDefaultStudy returns a current-version study with 4 assays', () => {
   const study = createDefaultStudy();
-  assert.equal(study.schemaVersion, 4);
+  assert.equal(study.schemaVersion, SCHEMA_VERSION);
   assert.equal(study.assays.length, 4);
   assert.equal(study.meta.origin, 'example');
 });
@@ -46,6 +53,38 @@ test('the research question and group vocabulary are the real oregano-study valu
   assert.match(study.researchQuestion, /RF-PECVD/);
   assert.match(study.researchQuestion, /oregano/);
   assert.deepEqual(study.groupVocabulary.levels, ['CTL', 'OPP']);
+});
+
+test('only the shipped oregano example seeds an explicit, weakly tagged study context', () => {
+  const study = createDefaultStudy();
+  assert.deepEqual(study.studyContext, OREGANO_STUDY_CONTEXT);
+
+  for (const key of ['system', 'experimentalUnit', 'comparisonMode']) {
+    const slot = study.provenance.slots[`studyContext.${key}`];
+    assert.deepEqual(slot, { tag: 'kb-default', detail: null }, key);
+    assert.ok(canOverwrite(slot.tag, 'user_edited'), `${key} seed must be replaceable by a user edit`);
+  }
+});
+
+test('blank and imported legacy studies remain neutral rather than acquiring oregano context', () => {
+  assert.deepEqual(emptyExperiment().studyContext, {
+    system: '',
+    experimentalUnit: '',
+    comparisonMode: 'not-decided',
+  });
+
+  const legacyImported = emptyExperiment();
+  legacyImported.schemaVersion = 4;
+  delete legacyImported.studyContext;
+  legacyImported.meta.origin = 'imported';
+  const migrated = migrate(legacyImported);
+  assert.deepEqual(migrated.studyContext, {
+    system: '',
+    experimentalUnit: '',
+    comparisonMode: 'not-decided',
+  });
+  assert.equal(migrated.meta.origin, 'imported');
+  assert.deepEqual(migrated.provenance.slots, {}, 'legacy provenance receives no oregano seed slots');
 });
 
 test('activeAssayId resolves to a real entry in assays (the first one)', () => {
@@ -120,6 +159,64 @@ test('researchQuestion and groupVocabulary have their own study-level provenance
   const study = createDefaultStudy();
   assert.equal(study.provenance.slots.researchQuestion.tag, 'kb-default');
   assert.equal(study.provenance.slots.groupVocabulary.tag, 'kb-default');
+});
+
+test('adding study context leaves the serialized four-assay seed and previous provenance entries unchanged', () => {
+  const study = createDefaultStudy();
+  const serializedAssays = JSON.stringify(study.assays);
+  const expectedAssayFacts = [
+    ['Bacterial viability', 'bacterial-viability', 'Bacteria (P. aeruginosa, S. aureus)', 'confocal', 'VIABILITY'],
+    ['Macrophage cytoskeleton', 'macrophage-cytoskeleton', 'RAW 264.7 macrophages', 'confocal', 'CYTOSKELETON'],
+    ['Intracellular ROS', 'ros', 'RAW 264.7 macrophages', 'confocal', 'ROS'],
+    ['Scratch / migration', 'scratch-migration', 'HFF-1 fibroblasts', 'live-cell phase contrast', 'SCRATCH'],
+  ];
+  assert.deepEqual(
+    study.assays.map((assay) => [
+      assay.label,
+      assay.readout,
+      assay.specimen.organism,
+      assay.acquisition.modality,
+      assay.naming.fields.exptype,
+    ]),
+    expectedAssayFacts
+  );
+  assert.equal(study.assays.length, 4);
+  assert.ok(serializedAssays.includes('Bacterial viability'), 'serialized seed retains the original assay content');
+
+  const contextSlotKeys = new Set([
+    'studyContext.system',
+    'studyContext.experimentalUnit',
+    'studyContext.comparisonMode',
+  ]);
+  const existingSlots = Object.fromEntries(
+    Object.entries(study.provenance.slots).filter(([key]) => !contextSlotKeys.has(key))
+  );
+  const expectedExistingSlotKeys = [
+    'researchQuestion',
+    'groupVocabulary',
+    ...study.assays.flatMap((assay) => {
+      const paths = [
+        'design.groups',
+        'specimen.organism',
+        'readout',
+        'readoutText',
+        'design.factors',
+        'acquisition.modality',
+        'naming.fields.markers',
+        'naming.fields.exptype',
+      ];
+      if (assay.label !== 'Scratch / migration') paths.push('naming.fields.magnification');
+      return paths.map((path) => `assay:${assay.id}.${path}`);
+    }),
+  ].sort();
+  assert.deepEqual(
+    Object.keys(existingSlots).sort(),
+    expectedExistingSlotKeys,
+    'no prior provenance entry was replaced, removed, or added'
+  );
+  for (const slot of Object.values(existingSlots)) {
+    assert.deepEqual(slot, { tag: 'kb-default', detail: null });
+  }
 });
 
 test('two calls to createDefaultStudy produce independent assay ids and object identity', () => {

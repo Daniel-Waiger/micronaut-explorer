@@ -64,7 +64,7 @@ function attrNodeContent(kind, assay) {
     case 'modality':
       return { caption: 'Modality', value: clip(assay.modality || 'not answered yet', 22) };
     case 'design':
-      return { caption: 'Design', value: clip(summarizeDesign(assay.design), 22) };
+      return { caption: 'Samples & design', value: clip(summarizeDesign(assay.design), 22) };
     case 'controls': {
       const controls = assay.controls || {};
       const n = (Array.isArray(controls.panel) ? controls.panel.length : 0) + (Array.isArray(controls.readout) ? controls.readout.length : 0);
@@ -138,8 +138,8 @@ export function buildDiagramLayout(doc) {
       y: rowY(assayRowY, 0),
       w: NODE_W,
       h: NODE_H,
-      caption: `Assay ${assay.index != null ? assay.index : i + 1}`,
-      value: clip(assay.label || `Assay ${i + 1}`, 22),
+      caption: `Measurement ${assay.index != null ? assay.index : i + 1}`,
+      value: clip(assay.label || `Measurement ${i + 1}`, 22),
     });
 
     // Study fans out to each assay.

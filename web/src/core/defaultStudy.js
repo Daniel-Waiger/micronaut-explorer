@@ -35,6 +35,17 @@ const RESEARCH_QUESTION =
 // two mutually exclusive groups, using the paper's exact labels.
 const GROUP_VOCABULARY = { levels: ['CTL', 'OPP'] };
 
+// These are explicit facts from the shipped paper-backed example, not values
+// inferred from its research question or its four measurement records. The
+// coating is the shared system under study and the CTL/OPP comparison is
+// assigned to independently prepared coverslips; individual measurements
+// remain free to carry their own specimen and method details.
+const STUDY_CONTEXT = {
+  system: 'Oregano-derived plasma polymer coatings on glass coverslips for in vitro wound-healing evaluation',
+  experimentalUnit: 'One independently prepared glass coverslip assigned to CTL or OPP coating',
+  comparisonMode: 'groups',
+};
+
 // One entry per assay. `fields` uses the same bare v2-shaped paths
 // assayView/scopeWrite already operate on -- applied directly to the assay
 // object via core/paths.js's setPath.
@@ -133,6 +144,7 @@ export function createDefaultStudy() {
     ...study,
     meta: { ...study.meta, origin: 'example' },
     researchQuestion: RESEARCH_QUESTION,
+    studyContext: { ...STUDY_CONTEXT },
     groupVocabulary: { levels: [...GROUP_VOCABULARY.levels] },
     assays,
     activeAssayId: assays[0].id,
@@ -141,6 +153,9 @@ export function createDefaultStudy() {
       slots: {
         ...study.provenance.slots,
         researchQuestion: { tag: 'kb-default', detail: null },
+        'studyContext.system': { tag: 'kb-default', detail: null },
+        'studyContext.experimentalUnit': { tag: 'kb-default', detail: null },
+        'studyContext.comparisonMode': { tag: 'kb-default', detail: null },
         groupVocabulary: { tag: 'kb-default', detail: null },
         ...provenanceSlots,
       },

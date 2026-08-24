@@ -31,7 +31,7 @@ function readoutSection(readout) {
 
 function designSection(design) {
   const lines = [];
-  lines.push(`**Design:** ${design.conditionCount} planned condition row(s).`);
+  lines.push(`**Samples & design:** ${design.conditionCount} planned condition row(s).`);
   if (design.groups.length > 0) lines.push(`- Groups (mutually exclusive): ${design.groups.join(', ')}`);
   for (const factor of design.factors) {
     lines.push(`- Crossing factor "${factor.name}": ${factor.levels.join(', ')}`);
@@ -39,7 +39,7 @@ function designSection(design) {
   if (design.biologicalReplicates) lines.push(`- Biological replicates: ${design.biologicalReplicates}`);
   if (design.technicalReplicates) lines.push(`- Technical replicates: ${design.technicalReplicates}`);
   if (design.issues.length > 0) {
-    lines.push('- **Design issues:**');
+    lines.push('- **Samples & design issues:**');
     for (const issue of design.issues) lines.push(`  - (${issue.severity}) ${issue.field}: ${issue.message}`);
   }
   return lines.join('\n');
@@ -72,11 +72,18 @@ function controlsSection(controls) {
 }
 
 /** The fixed 5-stage backbone, rendered ONCE for the whole study -- see studydoc.js's stageNotes comment for why. */
+function presentationLadderText(value) {
+  // `doc.ladder` retains the authored KB text verbatim for the document
+  // contract.  Markdown is a human-facing output, where the orientation
+  // vocabulary calls this unit of work a measurement.
+  return typeof value === 'string' ? value.replace(/\bassay\b/gi, 'measurement') : '';
+}
+
 function ladderSection(ladder) {
   const lines = [];
   for (const stage of ladder) {
-    lines.push(heading(3, stage.title));
-    lines.push(stage.body);
+    lines.push(heading(3, presentationLadderText(stage.title)));
+    lines.push(presentationLadderText(stage.body));
     lines.push('');
   }
   return lines.join('\n').trimEnd();
@@ -85,7 +92,7 @@ function ladderSection(ladder) {
 /** Per-assay STUDY-SPECIFIC notes only -- omitted entirely when an assay has none, per studydoc.js's stageNotes. */
 function stageNotesSection(stageNotes) {
   if (stageNotes.length === 0) return null;
-  const lines = ['**Notes for this assay:**'];
+  const lines = ['**Notes for this measurement:**'];
   for (const stage of stageNotes) {
     lines.push(`- ${stage.stageTitle}:`);
     for (const note of stage.notes) lines.push(`  - ${note}`);
@@ -94,7 +101,7 @@ function stageNotesSection(stageNotes) {
 }
 
 function filenamesSection(filenames) {
-  if (filenames.length === 0) return '_No planned filenames yet -- fill in the naming fields on the Naming step._';
+  if (filenames.length === 0) return '_No planned filenames yet -- fill in the filename fields on the Data plan step._';
   return '```\n' + filenames.map((f) => f.filename || `(${f.error})`).join('\n') + '\n```';
 }
 
@@ -116,18 +123,18 @@ export function renderMarkdown(doc) {
   sections.push('```mermaid\n' + renderMermaid(doc) + '\n```');
 
   if (doc.crossAssayIssues.length > 0) {
-    sections.push(heading(2, 'Cross-assay issues'));
+    sections.push(heading(2, 'Cross-measurement issues'));
     sections.push(bulletList(doc.crossAssayIssues.map((i) => `(${i.severity}) ${i.field}: ${i.message}`)));
   }
 
   // Rendered ONCE for the whole study, not per assay -- see studydoc.js's
   // stageNotes comment. Assay-specific extras follow inside each assay's
   // own section below.
-  sections.push(heading(2, 'How to run this project'));
+  sections.push(heading(2, 'How to run this study'));
   sections.push(ladderSection(doc.ladder));
 
   for (const assay of doc.assays) {
-    sections.push(heading(2, `Assay ${assay.index}: ${assay.label}`));
+    sections.push(heading(2, `Measurement ${assay.index}: ${assay.label}`));
     sections.push(readoutSection(assay.readout));
     sections.push(`**Modality:** ${assay.modality || 'not answered yet'}`);
     const specimenBits = [assay.specimen.organism, assay.specimen.sampleType, assay.specimen.preparation].filter(Boolean);

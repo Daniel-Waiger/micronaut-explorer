@@ -30,6 +30,9 @@ test('all seven contexts use the real default-study document and conformance pro
   assert.deepEqual(content.studyDocument, expectedDocument);
   assert.deepEqual(content.conformance, expectedConformance);
   assert.deepEqual(content.steps.map((step) => step.stepId), PRIMARY_WORKFLOW.map((step) => step.id));
+  assert.deepEqual(content.steps.map((step) => step.stepId), [
+    'home', 'describe', 'study', 'design', 'microscopy', 'naming', 'overview',
+  ]);
   assert.equal(content.steps.length, 7);
 
   for (const [index, step] of content.steps.entries()) {
@@ -49,9 +52,17 @@ test('all seven contexts use the real default-study document and conformance pro
   assert.match(byStep(content, 'microscopy').exampleSummary, new RegExp(expectedDocument.assays[0].modality));
   assert.match(byStep(content, 'naming').exampleSummary, new RegExp(expectedDocument.assays[0].filenames[0].filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(byStep(content, 'overview').exampleSummary, new RegExp(expectedConformance.readiness));
-  assert.match(byStep(content, 'study').exampleSummary, /Shared groups: CTL, OPP/);
+  assert.match(byStep(content, 'study').exampleSummary, /Comparison labels: CTL, OPP/);
   assert.match(byStep(content, 'design').exampleSummary, /groups CTL, OPP/);
   assert.doesNotMatch(JSON.stringify(content.steps), /\barms?\b/i);
+  assert.equal(byStep(content, 'home').title, 'Study map');
+  assert.equal(byStep(content, 'describe').title, 'Research brief');
+  assert.equal(byStep(content, 'study').title, 'Measurements');
+  assert.equal(byStep(content, 'design').title, 'Samples & design');
+  assert.equal(byStep(content, 'microscopy').title, 'Acquisition');
+  assert.equal(byStep(content, 'naming').title, 'Data plan');
+  assert.equal(byStep(content, 'overview').title, 'Review');
+  assert.match(byStep(content, 'home').why, /study contains measurements; each measurement then has its own Samples & design, Acquisition, and Data plan/i);
 });
 
 test('active-assay contexts refresh while Home and Study remain whole-study coherent', () => {
@@ -79,6 +90,13 @@ test('a fresh call reflects current producer values rather than cached guide tex
   assert.notEqual(byStep(before, 'naming').exampleSummary, byStep(after, 'naming').exampleSummary);
   assert.match(byStep(after, 'naming').exampleSummary, /FRESH_VALUE/);
   assert.equal(getGuidedExampleStep(study, 'naming', settings).exampleSummary, byStep(after, 'naming').exampleSummary);
+});
+
+test('guided copy is presentation-only and never mutates the supplied study', () => {
+  const study = createDefaultStudy();
+  const before = JSON.stringify(study);
+  buildGuidedExampleContent(study, options());
+  assert.equal(JSON.stringify(study), before);
 });
 
 test('malformed input is total and uses study-now wording outside explicit example origin', () => {

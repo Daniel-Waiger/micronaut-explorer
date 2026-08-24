@@ -82,7 +82,7 @@ export function createDescribeStep(kb) {
 
   return {
     id: 'describe',
-    title: 'Project',
+    title: 'Research brief',
     render(main, store, { showToast, advisor, experience } = {}) {
       // Route/assay rendering replaces the DOM. Invalidate any old request so
       // it cannot mutate this persistent session after a newer render starts.
@@ -100,17 +100,22 @@ export function createDescribeStep(kb) {
 
       const heading = document.createElement('h1');
       heading.className = 'step-heading';
-      heading.textContent = 'Project';
+      heading.textContent = 'Research brief';
       narrativeCard.appendChild(heading);
+
+      const scope = document.createElement('p');
+      scope.className = 'project-description-help';
+      scope.textContent = 'Shared across the whole study. Suggestions are never applied automatically.';
+      narrativeCard.appendChild(scope);
 
       const intro = document.createElement('p');
       intro.className = 'proposals-empty';
-      intro.textContent = 'Start with the experiment itself -- the question, the organism, why you’re running it -- before any microscope decision. Project design, then Microscopy.';
+      intro.textContent = 'Describe the whole study -- its question, system or material, and purpose -- before planning individual measurement details.';
       narrativeCard.appendChild(intro);
 
       const descriptionLabel = document.createElement('label');
       descriptionLabel.htmlFor = 'project-description';
-      descriptionLabel.textContent = 'Project description';
+      descriptionLabel.textContent = 'Study description';
       narrativeCard.appendChild(descriptionLabel);
 
       const textarea = document.createElement('textarea');
@@ -166,12 +171,12 @@ export function createDescribeStep(kb) {
       const renderAssays = Array.isArray(store.get().assays) ? store.get().assays : [];
       const activeAssayIndex = renderAssays.findIndex((assay) => assay && assay.id === renderAssayId);
       const activeAssay = activeAssayIndex === -1 ? null : renderAssays[activeAssayIndex];
-      const activeAssayLabel = activeAssay?.label || `Assay ${Math.max(0, activeAssayIndex) + 1}`;
-      detailsHeading.textContent = `Project details for ${activeAssayLabel}`;
+      const activeAssayLabel = activeAssay?.label || `Measurement ${Math.max(0, activeAssayIndex) + 1}`;
+      detailsHeading.textContent = `Measurement details — ${activeAssayLabel}`;
       details.appendChild(detailsHeading);
       const assayBinding = document.createElement('p');
       assayBinding.className = 'project-details-assay-binding';
-      assayBinding.textContent = `Accepted assay details will apply to: ${activeAssayLabel}.`;
+      assayBinding.textContent = `Accepted measurement details will apply only to: ${activeAssayLabel}.`;
       details.appendChild(assayBinding);
       const fieldHost = document.createElement('div');
       fieldHost.className = 'project-details-fields';
@@ -265,7 +270,7 @@ export function createDescribeStep(kb) {
             const address = scopeWrite(experiment, question.field, activeId);
             if (!store.setPath(address.path, value, tag, { slotKey: address.slotKey })) return;
             if (!writeReadoutCanonicalIfNeeded(store, question, value, tag, activeId, kb)) {
-              if (showToast) showToast('The linked readout value could not be saved. The Project field remains visible.');
+              if (showToast) showToast('The linked readout value could not be saved. The measurement field remains visible.');
               return;
             }
             unskipQuestion(store.get(), question.id);
@@ -350,14 +355,14 @@ export function createDescribeStep(kb) {
         const candidate = candidateIndex === -1 ? null : state.candidates[candidateIndex];
         const binding = freshBinding();
         if (!session || !candidate || !candidate.actionable || binding.narrative !== session.narrative || binding.assayId !== session.assayId) {
-          addSessionIssue('This suggestion is no longer bound to the current description and assay. Review again before accepting it.');
+          addSessionIssue('This suggestion is no longer bound to the current description and measurement. Review again before accepting it.');
           if (session) session.status = 'stale';
           renderReview();
           return;
         }
         const question = questionBank.find((item) => item.field === candidate.path);
         if (!question) {
-          addSessionIssue('This suggestion no longer maps to a supported Project field.');
+          addSessionIssue('This suggestion no longer maps to a supported Research brief field.');
           renderReview();
           return;
         }
@@ -368,7 +373,7 @@ export function createDescribeStep(kb) {
         try {
           address = scopeWrite(experiment, question.field, binding.assayId);
         } catch {
-          addSessionIssue('The active assay changed before this suggestion could be saved.');
+          addSessionIssue('The active measurement changed before this suggestion could be saved.');
           session.status = 'stale';
           renderReview();
           return;
@@ -416,7 +421,7 @@ export function createDescribeStep(kb) {
         const text = textarea.value;
         if (!text.trim()) {
           textarea.focus();
-          emptyAlert.textContent = 'Add a project description before reviewing it.';
+          emptyAlert.textContent = 'Add a study description before reviewing it.';
           emptyAlert.hidden = false;
           return;
         }

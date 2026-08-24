@@ -15,11 +15,11 @@ const STATUS_TEXT = {
   idle: 'No review yet. Add a description, then choose Review description.',
   scanning: 'Checking exact text matches…',
   'model-running': 'Exact matches are ready. Checking with your local model…',
-  complete: 'Review complete. Nothing has been added to your project.',
-  fallback: 'The local model could not be reached. Your description is still saved, and nothing was added to the project.',
+  complete: 'Review complete. Nothing has been added to your study.',
+  fallback: 'The local model could not be reached. Your description is still saved, and nothing was added to the study.',
   stale: 'Description changed — review again before accepting suggestions.',
   cancelled: 'Model review cancelled. Exact matches remain available.',
-  error: 'Review needs your attention. Nothing has been added to your project.',
+  error: 'Review needs your attention. Nothing has been added to your study.',
 };
 
 const SOURCE_LABELS = {
@@ -156,7 +156,7 @@ export function createProjectReview({
     element,
     'p',
     'project-review-session-disclosure',
-    'Suggestions stay in this tab until you change the description or switch assays. Accept a suggestion to save it.'
+    'Suggestions stay in this tab until you change the description or switch measurements. Accept a suggestion to save it.'
   );
   appendText(
     element,
@@ -219,7 +219,7 @@ export function createProjectReview({
     fallbackDetails,
     'p',
     'project-review-fallback-hint',
-    'Copy the prompt into a model you choose, then paste only its reply here. Pasting never changes your project by itself.'
+    'Copy the prompt into a model you choose, then paste only its reply here. Pasting never changes your study by itself.'
   );
   fallbackHint.id = 'project-review-fallback-hint';
 

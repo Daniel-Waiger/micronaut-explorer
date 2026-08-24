@@ -144,157 +144,56 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "Project workspace redesign verification and GitHub handoff",
-  "orchestrator": "Codex GPT-5",
-  "active_model": "Codex GPT-5",
-  "active_status": "done",
+  "run": "Utilities audit and GitHub release",
+  "orchestrator": "Codex",
+  "active_model": "Codex",
+  "active_status": "running",
   "phase": "",
-  "state_note": "Verified workspace redesign committed and pushed to origin/main.",
-  "current_task": null,
+  "state_note": "",
+  "current_task": {
+    "id": "REL-01",
+    "title": "Build, verify, commit, and push approved changes"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "JavaScript tests",
-      "v": "786 passed",
-      "tone": "ok"
+      "k": "Scope",
+      "v": "Utilities audit + approved release"
     },
     {
-      "k": "Python checks",
-      "v": "34 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Artifact",
-      "v": "Fresh HTTP smoke",
-      "tone": "ok"
-    },
-    {
-      "k": "File fallback",
-      "v": "Blocked by browser URL policy",
-      "tone": "warn"
-    },
-    {
-      "k": "GitHub handoff",
-      "v": "75a9941 pushed",
+      "k": "Verification",
+      "v": "811 JS + 34 Python + live Utilities pass",
       "tone": "ok"
     }
   ],
   "defects": [],
   "tasks": [
     {
-      "id": "PWR-01",
-      "phase": "Batch 1",
-      "title": "Align the constrained response schema with evidence and asks",
+      "id": "UTIL-01",
+      "phase": "1",
+      "title": "Audit Utilities menu and repair confirmed behavior",
       "status": "done",
-      "by": "Existing implementation verified"
+      "by": "Codex"
     },
     {
-      "id": "PWR-02",
-      "phase": "Batch 1",
-      "title": "Make the review prompt narrative-grounded and symmetric",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-03",
-      "phase": "Batch 2",
-      "title": "Enforce narrative evidence at the model-ingest boundary",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-04",
-      "phase": "Batch 3",
-      "title": "Create the pure Project review state and conflict model",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-05",
-      "phase": "Batch 1",
-      "title": "Extract environment availability from the retired guidance UI",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-06",
-      "phase": "Batch 4",
-      "title": "Build progressively disclosed Project model options",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-07",
-      "phase": "Batch 4",
-      "title": "Build the always-present Review renderer",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-08",
-      "phase": "Batch 5",
-      "title": "Replace Describe with the unified Project workspace",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-09",
-      "phase": "Batch 6",
-      "title": "Remove the new-tab draft handoff chain",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-10",
-      "phase": "Batch 6",
-      "title": "Remove the retired generic guidance surface",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-11",
-      "phase": "Batch 6",
-      "title": "Remove hosted-chat link-outs and their persisted option",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-12",
-      "phase": "Batch 7",
-      "title": "Style the Project workspace across responsive and accessible states",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-13",
-      "phase": "Batch 7",
-      "title": "Document the single Project review contract",
-      "status": "done",
-      "by": "Existing implementation verified"
-    },
-    {
-      "id": "PWR-14",
-      "phase": "Batch 8",
-      "title": "Adversarially verify the shipped Project workspace",
-      "status": "resolved",
-      "by": "Defect fixed and release gates verified"
+      "id": "REL-01",
+      "phase": "2",
+      "title": "Build, verify, commit, and push approved changes",
+      "status": "running",
+      "by": "Codex"
     }
   ],
   "log": [
     {
-      "time": "20:52:34",
-      "msg": "Release verification started against the existing working tree."
+      "time": "13:13:11",
+      "msg": "Started live Utilities audit; release will follow verified repair."
     },
     {
-      "time": "20:56:53",
-      "msg": "Adversarial paste trace found rejected-output visibility gap; repaired, rebuilt, and verified. file:// trace could not run because Browser policy blocks local-file navigation."
-    },
-    {
-      "time": "20:57:49",
-      "msg": "Commit 75a9941 pushed to origin/main. End-of-run dashboard snapshot recorded."
+      "time": "13:20:33",
+      "msg": "Repaired onboarding for every study origin, added explicit color modes, and guarded restore; release verification passed."
     }
   ],
-  "snapshot_at": "2026-08-23 20:57"
+  "snapshot_at": "2026-08-24 13:20"
 };
 /* CMA:EMBEDDED:END */
 

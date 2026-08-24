@@ -57,7 +57,7 @@ export function renderMermaid(doc) {
 
   for (const assay of doc.assays) {
     const aId = nodeId('assay', assay.index);
-    lines.push(`  STUDY --> ${aId}[${mermaidLabel(assay.label)}]`);
+    lines.push(`  STUDY --> ${aId}[${mermaidLabel(`Measurement: ${assay.label}`)}]`);
 
     const readoutId = nodeId(aId, 'readout');
     const readoutText =

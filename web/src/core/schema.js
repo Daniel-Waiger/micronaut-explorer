@@ -1,7 +1,8 @@
 // Experiment data model: shape, defaults, and version migration.
 //
 // v3 introduced the ASSAY TIER; v4 completes the user-facing terminology
-// migration from the legacy treatment-axis wording to "groups" in the study vocabulary.
+// migration from the legacy treatment-axis wording to "groups" in the study vocabulary;
+// v5 adds the study-level orientation context.
 // A study (still called Experiment, for
 // continuity with everything already written against that name) holds one
 // or more assays, each an almost-complete v2 slice
@@ -17,7 +18,7 @@
 import { emptyAssay, isAssayScopedPath } from './assay.js';
 import { shortId } from './ids.js';
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 // `origin` is intentionally descriptive rather than a permission or
 // provenance mechanism. It answers the UI's ownership question ("is this
@@ -26,6 +27,22 @@ export const SCHEMA_VERSION = 4;
 // are normalized to `user`, the conservative choice: old work must never be
 // presented as an example just because it resembles one.
 export const STUDY_ORIGINS = new Set(['blank', 'example', 'imported', 'draft', 'template', 'user']);
+
+// These values describe the study's comparison structure. They deliberately
+// do not duplicate group labels (groupVocabulary) or any assay-level design
+// fields: `observational` makes an empty group vocabulary intentional rather
+// than an omitted comparison decision.
+export const STUDY_COMPARISON_MODES = new Set(['not-decided', 'groups', 'observational']);
+
+const EMPTY_STUDY_CONTEXT = Object.freeze({
+  system: '',
+  experimentalUnit: '',
+  comparisonMode: 'not-decided',
+});
+
+function emptyStudyContext() {
+  return { ...EMPTY_STUDY_CONTEXT };
+}
 
 // Two-stage name.
 //
@@ -67,6 +84,10 @@ export function emptyExperiment() {
     // What the whole study is trying to answer. Study-level: every assay
     // exists in service of one question, unlike the per-assay design.
     researchQuestion: '',
+    // Orientation facts about the whole study. These stay separate from the
+    // research question, per-assay specimen, and comparison labels so their
+    // ownership remains explicit.
+    studyContext: emptyStudyContext(),
     narrative: {
       text: '',
       history: [],
@@ -263,11 +284,54 @@ function migrateV3toV4(obj) {
   };
 }
 
+/**
+ * v4 -> v5: add the explicit study-orientation context. This migration is
+ * intentionally additive: legacy saves did not distinguish an unanswered
+ * question from an answer embedded in prose, so it must never infer context
+ * from narrative text, groups, assay specimen, or example strings.
+ */
+function migrateV4toV5(obj) {
+  const src = obj && typeof obj === 'object' ? obj : {};
+  return {
+    ...src,
+    schemaVersion: 5,
+    studyContext: emptyStudyContext(),
+  };
+}
+
 const MIGRATIONS = {
   1: migrateV1toV2,
   2: migrateV2toV3,
   3: migrateV3toV4,
+  4: migrateV4toV5,
 };
+
+// v5 saves can have been written by an interrupted or older client. Normalize
+// the new additive object at the same boundary that normalizes meta.origin,
+// preserving any unrelated current-version data (including future additive
+// studyContext keys) instead of replacing the whole saved object.
+function normalizeStudyContext(current) {
+  const supplied =
+    current && current.studyContext && typeof current.studyContext === 'object' && !Array.isArray(current.studyContext)
+      ? current.studyContext
+      : null;
+  const normalized = {
+    ...(supplied || {}),
+    system: supplied && typeof supplied.system === 'string' ? supplied.system : '',
+    experimentalUnit: supplied && typeof supplied.experimentalUnit === 'string' ? supplied.experimentalUnit : '',
+    comparisonMode:
+      supplied && STUDY_COMPARISON_MODES.has(supplied.comparisonMode)
+        ? supplied.comparisonMode
+        : EMPTY_STUDY_CONTEXT.comparisonMode,
+  };
+
+  const isValid =
+    supplied &&
+    supplied.system === normalized.system &&
+    supplied.experimentalUnit === normalized.experimentalUnit &&
+    supplied.comparisonMode === normalized.comparisonMode;
+  return isValid ? current : { ...current, studyContext: normalized };
+}
 
 export function migrate(obj) {
   let current = obj;
@@ -293,11 +357,12 @@ export function migrate(obj) {
     version = current.schemaVersion;
   }
 
-  // Saved studies from before the additive meta.origin field are still
-  // otherwise valid data, so version migration alone cannot normalize them. Do it
-  // at the boundary every persisted experiment crosses instead. This returns
-  // the original object when it already carries a supported origin, retaining
-  // the existing no-op identity contract for current saves.
+  // Saved studies from before the additive meta.origin and studyContext fields
+  // are otherwise valid data, so version migration alone cannot normalize
+  // them. Do it at the boundary every persisted experiment crosses instead.
+  // Each normalizer preserves the original object when its own data is valid,
+  // retaining the no-op identity contract for already-valid current saves.
+  current = normalizeStudyContext(current);
   const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
   if (STUDY_ORIGINS.has(meta.origin)) return current;
   return { ...current, meta: { ...meta, origin: 'user' } };

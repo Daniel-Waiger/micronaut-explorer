@@ -207,11 +207,13 @@ function init() {
   }
 
   function resetToExample() {
+    exploreExample = false;
     store.replace(createDefaultStudy());
     showToast('Restored the oregano example. Your previous versions remain available in Restore.');
   }
 
   function startBlankStudy() {
+    exploreExample = false;
     store.replace(emptyExperiment());
     showToast('Started a blank study. Your previous versions remain available in Restore.');
   }
@@ -259,15 +261,23 @@ function init() {
 
   let exampleChooser = null;
   let guidedController = null;
+  let exploreExample = false;
 
   function showExampleChooser({ explicit = false } = {}) {
-    if (exampleChooser || loadOnboarding().completed || store.get().meta?.origin !== 'example') return false;
+    const isExample = store.get().meta?.origin === 'example';
+    if (exampleChooser || loadOnboarding().completed) return false;
     // A recovered autosave is returning work even if it began from the seed.
-    // Only an explicit utility request may reopen the chooser in that case.
-    if (!explicit && isPersisted) return false;
+    // Only an explicit utility request may reopen a guide for returning work.
+    if (!explicit && (!isExample || isPersisted)) return false;
     exampleChooser = showOnboardingGate({
+      isExample,
       onWalkThrough: () => guidedController.start(),
-      onExplore: () => {},
+      onExplore: () => {
+        // The onboarding choice is an action, not merely a dismissal: show
+        // the read-only example immediately while preserving its origin.
+        exploreExample = true;
+        router.navigate('home');
+      },
       onStartBlank: startBlankStudy,
       onDone: () => { exampleChooser = null; },
     });
@@ -367,6 +377,11 @@ function init() {
       showToast,
       advisor: kb.advisor,
       router,
+      // Steps that need shared orientation/progress context consume the same
+      // fresh projection as the shell. Passing it here keeps them from
+      // rebuilding workflow or next-decision state locally.
+      workflowProgress: currentWorkflowProgress(),
+      exploreExample,
       experience: loadOnboarding().experience,
       onNewBlank: startBlankStudy,
       onAdoptExample: adoptExampleTemplate,

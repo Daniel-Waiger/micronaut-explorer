@@ -37,8 +37,8 @@ function baseNameFor(store, assayId) {
 
 export const designStep = {
   id: 'design',
-  title: 'Design',
-  render(main, store, { advisor } = {}) {
+  title: 'Samples & design',
+  render(main, store, { advisor, router } = {}) {
     main.textContent = '';
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
@@ -49,8 +49,51 @@ export const designStep = {
 
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
-    heading.textContent = 'Experimental design';
+    heading.textContent = 'Samples & design';
     main.appendChild(heading);
+
+    // This scope label is deliberately derived from the active assay captured
+    // for this render, just like every scoped write below. The experimental
+    // unit itself remains study-level: this step displays it but never offers
+    // a second editor or infers a replicate count from its wording.
+    const assays = Array.isArray(store.get().assays) ? store.get().assays : [];
+    const activeAssayIndex = assays.findIndex((assay) => assay && assay.id === assayId);
+    const activeAssay = activeAssayIndex === -1 ? null : assays[activeAssayIndex];
+    const activeMeasurementLabel = activeAssay?.label ||
+      (activeAssayIndex === -1 ? 'Active measurement' : `Measurement ${activeAssayIndex + 1}`);
+    const scope = document.createElement('p');
+    scope.className = 'proposals-empty';
+    scope.textContent = `Planning samples and design for: ${activeMeasurementLabel}.`;
+    main.appendChild(scope);
+
+    const unitRow = document.createElement('div');
+    unitRow.className = 'field-row';
+    const unitLabel = document.createElement('span');
+    unitLabel.className = 'field-label';
+    unitLabel.textContent = 'Experimental unit (study-wide)';
+    unitRow.appendChild(unitLabel);
+    const unitValue = document.createElement('span');
+    unitValue.className = 'base-name-value';
+    const experimentalUnit = store.get().studyContext?.experimentalUnit;
+    unitValue.textContent =
+      typeof experimentalUnit === 'string' && experimentalUnit.trim() ? experimentalUnit.trim() : 'Not decided';
+    unitRow.appendChild(unitValue);
+    const editUnitButton = document.createElement('button');
+    editUnitButton.type = 'button';
+    editUnitButton.className = 'question-answer';
+    editUnitButton.textContent = 'Edit on Study map';
+    editUnitButton.title = 'Edit the study-wide experimental unit on the Study map.';
+    editUnitButton.addEventListener('click', () => {
+      if (router) router.navigate('home');
+    });
+    unitRow.appendChild(editUnitButton);
+    main.appendChild(unitRow);
+
+    const hierarchyHelp = document.createElement('p');
+    hierarchyHelp.className = 'proposals-empty';
+    hierarchyHelp.textContent =
+      'An experimental unit is what is independently assigned or sampled for the whole study. A biological (independent) replicate is another such unit; a technical replicate is a repeated measurement of the same unit. Groups are mutually exclusive alternatives, while factors can cross groups or one another to form combinations.';
+    main.appendChild(hierarchyHelp);
 
     function currentDesign() {
       return (
@@ -206,9 +249,9 @@ export const designStep = {
     }
 
     const bioRepInput = makeReplicatesRow(
-      'Biological replicates',
+      'Biological / independent replicates',
       'design.biologicalReplicates',
-      "How many biological replicates you have -- different animals, dishes, or samples. Leave blank if this doesn't apply to your experiment."
+      "How many independently assigned or sampled units you have. Leave blank if this doesn't apply to your experiment."
     );
     const techRepInput = makeReplicatesRow(
       'Technical replicates',

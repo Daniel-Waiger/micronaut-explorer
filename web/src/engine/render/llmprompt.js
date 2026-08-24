@@ -36,9 +36,11 @@ import { renderJson } from './json.js';
 
 const PREAMBLE = [
   'You are reviewing a microscopy experiment plan produced by Micronaut Planner.',
-  'The JSON below is the complete plan: assays, readouts, modality, design axes,',
+  'The JSON below is the complete plan: measurements, readouts, modality, design axes,',
   'recommended controls (each with the reason it was recommended), the fluorophore',
   'panel, and every planned filename.',
+  'A measurement is one observation or analysis used to answer the study question; some disciplines call it an assay.',
+  'For compatibility, the machine-readable JSON keeps its measurements under the "assays" key.',
   '',
   'Ground rules for your answer:',
   '- Reason ONLY over what the JSON actually contains. Do not invent a marker, a',

@@ -1,13 +1,25 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SCHEMA_VERSION, emptyExperiment, migrate } from '../src/core/schema.js';
+import {
+  SCHEMA_VERSION,
+  STUDY_COMPARISON_MODES,
+  emptyExperiment,
+  migrate,
+} from '../src/core/schema.js';
 
-test('emptyExperiment returns an object with all v4 top-level Study keys', () => {
+const EMPTY_STUDY_CONTEXT = {
+  system: '',
+  experimentalUnit: '',
+  comparisonMode: 'not-decided',
+};
+
+test('emptyExperiment returns an object with all v5 top-level Study keys', () => {
   const exp = emptyExperiment();
   const expectedKeys = [
     'schemaVersion',
     'meta',
     'researchQuestion',
+    'studyContext',
     'narrative',
     'groupVocabulary',
     'assays',
@@ -21,6 +33,14 @@ test('emptyExperiment returns an object with all v4 top-level Study keys', () =>
   for (const key of expectedKeys) {
     assert.ok(key in exp, `missing top-level key: ${key}`);
   }
+});
+
+test('emptyExperiment supplies the v5 study-context defaults and comparison vocabulary', () => {
+  assert.deepEqual(emptyExperiment().studyContext, EMPTY_STUDY_CONTEXT);
+  assert.deepEqual(
+    [...STUDY_COMPARISON_MODES],
+    ['not-decided', 'groups', 'observational']
+  );
 });
 
 test('emptyExperiment does NOT keep a vestigial copy of the per-assay roots at the top level', () => {
@@ -105,6 +125,46 @@ test('migrate no-ops at the current schema version', () => {
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
 });
 
+test('migrate preserves identity for every valid v5 comparison mode', () => {
+  for (const comparisonMode of STUDY_COMPARISON_MODES) {
+    const exp = emptyExperiment();
+    exp.studyContext = {
+      system: 'soil cores',
+      experimentalUnit: 'one independently sampled core',
+      comparisonMode,
+    };
+    assert.equal(migrate(exp), exp, comparisonMode);
+  }
+});
+
+test('migrate normalizes missing or malformed current-version study context without losing other data', () => {
+  const malformed = emptyExperiment();
+  malformed.studyContext = {
+    system: 42,
+    experimentalUnit: { text: 'leaf' },
+    comparisonMode: 'treatment-vs-control',
+    retainedFutureContext: 'keep me',
+  };
+  malformed.customTopLevelData = { preserved: true };
+
+  const migratedMalformed = migrate(malformed);
+  assert.notEqual(migratedMalformed, malformed);
+  assert.deepEqual(migratedMalformed.studyContext, {
+    ...EMPTY_STUDY_CONTEXT,
+    retainedFutureContext: 'keep me',
+  });
+  assert.equal(migratedMalformed.assays, malformed.assays);
+  assert.equal(migratedMalformed.naming, malformed.naming);
+  assert.equal(migratedMalformed.provenance, malformed.provenance);
+  assert.equal(migratedMalformed.customTopLevelData, malformed.customTopLevelData);
+
+  const missing = emptyExperiment();
+  delete missing.studyContext;
+  const migratedMissing = migrate(missing);
+  assert.deepEqual(migratedMissing.studyContext, EMPTY_STUDY_CONTEXT);
+  assert.equal(migratedMissing.assays, missing.assays);
+});
+
 test('migrate treats a legacy meta object with no origin as user work', () => {
   const legacy = emptyExperiment();
   delete legacy.meta.origin;
@@ -135,7 +195,7 @@ test('migrate throws when no migration path exists from an older version', () =>
   assert.throws(() => migrate(stale), /No migration path/);
 });
 
-// --- v1 -> v2 -> v3 -> v4 fixtures -----------------------------------------
+// --- v1 -> v2 -> v3 -> v4 -> v5 fixtures -----------------------------------
 // Without a real migration at each step, EVERY older autosave hard-fails on
 // load the moment SCHEMA_VERSION moves -- migrate() throws "No migration
 // path" for any version it doesn't recognize, so this is load-bearing, not
@@ -191,7 +251,7 @@ function v2Experiment(overrides = {}) {
   };
 }
 
-test('migrate chains v1 all the way to the current version (v4) in one call', () => {
+test('migrate chains v1 all the way to the current version (v5) in one call', () => {
   const migrated = migrate(v1Experiment());
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
   assert.equal(migrated.assays.length, 1);
@@ -218,7 +278,7 @@ test('migrate v1->v2 leaves factors untouched rather than guessing which one was
   assert.deepEqual(design.groups, { levels: [] });
 });
 
-test('migrate v1->v4 preserves study-level fields (meta, narrative) untouched', () => {
+test('migrate v1->v5 preserves study-level fields (meta, narrative) untouched', () => {
   const v1 = v1Experiment();
   v1.meta.title = 'my experiment';
   v1.narrative.text = 'a paragraph';
@@ -249,7 +309,7 @@ test('migrate v2->v3 hoists the whole per-assay slice into assays[0] verbatim', 
   assert.deepEqual(assay.naming.fields, { date: '2026-01-01', sample: 'E01' });
 });
 
-test('migrate v2 through v4 does NOT promote design.groups to groupVocabulary', () => {
+test('migrate v2 through v5 does NOT promote design.groups to groupVocabulary', () => {
   // The vocabulary is a seeding template for FUTURE assays; copying the v2
   // user's actual groups upward would assert every future assay shares them.
   const v2 = v2Experiment({ design: { groups: { levels: ['CT', 'OPP'] }, factors: [], biologicalReplicates: null, technicalReplicates: null, idScheme: '', conditions: [] } });
@@ -309,7 +369,7 @@ test('migrate v2->v3 is TOTAL: malformed/missing sub-objects degrade rather than
   assert.equal(migrated.assays.length, 1);
 });
 
-test('migrate v3->v4 renames the vocabulary and its provenance without data loss', () => {
+test('migrate v3->v4 renames the vocabulary and its provenance without data loss before v5 context is added', () => {
   const current = emptyExperiment();
   const { groupVocabulary: _currentVocabulary, ...v3 } = current;
   v3.schemaVersion = 3;
@@ -323,7 +383,7 @@ test('migrate v3->v4 renames the vocabulary and its provenance without data loss
   };
 
   const migrated = migrate(v3);
-  assert.equal(migrated.schemaVersion, 4);
+  assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
   assert.deepEqual(migrated.groupVocabulary, { levels: ['CTL', 'OPP'] });
   assert.deepEqual(migrated.provenance.slots.groupVocabulary, {
     tag: 'user',
@@ -340,4 +400,51 @@ test('migrate v3->v4 degrades a malformed vocabulary to an empty group vocabular
   v3.schemaVersion = 3;
   v3.armVocabulary = { levels: null };
   assert.deepEqual(migrate(v3).groupVocabulary, { levels: [] });
+});
+
+function v4Experiment() {
+  const current = emptyExperiment();
+  const { studyContext: _studyContext, ...v4 } = current;
+  return {
+    ...v4,
+    schemaVersion: 4,
+    researchQuestion: 'Does compost change soil respiration?',
+    narrative: { text: 'Legacy prose must not become structured context.', history: [] },
+    groupVocabulary: { levels: ['unamended', 'compost'] },
+    assays: [{
+      ...v4.assays[0],
+      specimen: { ...v4.assays[0].specimen, organism: 'soil' },
+      design: { ...v4.assays[0].design, groups: { levels: ['unamended', 'compost'] } },
+    }],
+    naming: { template: '{date}_{sample}', plannedNames: ['2026-01-01_core-A'] },
+    provenance: { slots: { 'narrative.text': { tag: 'user', detail: null } }, unanswered: [], skipped: [] },
+  };
+}
+
+test('migrate generated v1-v4 fixtures reaches v5 with empty context and preserves legacy slices', () => {
+  const v1 = v1Experiment({ biologicalReplicates: undefined });
+  const v2 = v2Experiment();
+  const v3Current = emptyExperiment();
+  const { studyContext: _v3Context, groupVocabulary: _v3Vocabulary, ...v3 } = v3Current;
+  v3.schemaVersion = 3;
+  v3.armVocabulary = { levels: ['legacy', 'current'] };
+  const v4 = v4Experiment();
+
+  for (const fixture of [v1, v2, v3, v4]) {
+    const migrated = migrate(fixture);
+    assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
+    assert.deepEqual(migrated.studyContext, EMPTY_STUDY_CONTEXT);
+    assert.ok(Array.isArray(migrated.assays), `v${fixture.schemaVersion} assay slice is preserved`);
+    assert.ok(migrated.naming && typeof migrated.naming === 'object', `v${fixture.schemaVersion} naming slice is preserved`);
+    assert.ok(migrated.provenance && typeof migrated.provenance === 'object', `v${fixture.schemaVersion} provenance slice is preserved`);
+  }
+
+  const before = JSON.parse(JSON.stringify(v4));
+  const migratedV4 = migrate(v4);
+  const { schemaVersion: _version, studyContext: _context, ...v4Payload } = migratedV4;
+  const { schemaVersion: _legacyVersion, ...expectedPayload } = before;
+  assert.deepEqual(v4Payload, expectedPayload, 'v4 data changes only by the additive v5 context');
+  assert.deepEqual(migratedV4.assays, before.assays);
+  assert.deepEqual(migratedV4.naming, before.naming);
+  assert.deepEqual(migratedV4.provenance, before.provenance);
 });

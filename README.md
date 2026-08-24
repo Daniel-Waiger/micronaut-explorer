@@ -7,7 +7,7 @@ The active project is the web **Planner** (`web/`).
 
 | Tool | What it is | Status |
 |------|------------|--------|
-| **Micronaut Planner** (`web/`) | A static, zero-install browser app that walks a researcher from design intent → assays, panel, controls, acquisition → a naming convention as a downstream artifact. No upload, no install, no server required — an optional, off-by-default panel can call a local LLM (e.g. Ollama) on your own network if you configure one. | **Active** |
+| **Micronaut Planner** (`web/`) | A static, zero-install browser app that walks a researcher from design intent → measurements, panel, controls, acquisition → a data plan as a downstream artifact. No upload, no install, no server required — an optional, off-by-default panel can call a local LLM (e.g. Ollama) on your own network if you configure one. | **Active** |
 
 Micronaut Classic, an earlier metadata-aware file renamer, was archived at tag
 `classic-final` and `_archive/micronaut-classic-2026-08-18.tar.gz` — see
@@ -26,21 +26,24 @@ identically from `file://`, a local server, or GitHub Pages.
 The planner walks these steps (jump to any of them — the app is usable
 outside-in, no forced order):
 
-- **Study** — the study-level surface above every assay. A real study can contain
-  several assays that share only a research question and a test article, each with
-  its own modality, panel, and specimen; the schema (v3, "the assay tier")
-  represents that directly.
-- **Project** — save a plain-language project description, then choose **Review
+- **Study map** — the study-level surface above every measurement. A real study can contain
+  several measurements that share a research question and test article, each with
+  its own modality, panel, and specimen; the persisted schema keeps them in its
+  compatible `assays` collection.
+- **Research brief** — save a plain-language study description, then choose **Review
   description**. Micronaut first extracts only deterministic exact-text matches:
   marker aliases from the dictionary, biological-replicate counts, magnification,
   and unambiguous ISO dates. Everything else remains saved narrative unless the
   researcher explicitly reviews and accepts a suggestion.
-- **Design** — modality, panel, and per-assay readouts/controls, with
+- **Measurements** — name and select the observations or analyses used to answer the study question.
+  A measurement is one observation or analysis; some disciplines call it an assay.
+- **Samples & design** — per-measurement groups, replication, and design details.
+- **Acquisition** — modality, panel, and per-measurement readouts/controls, with
   modality-specific advice (STED / confocal / widefield / light-sheet / SEM-TEM /
   Raman) surfaced from a rules knowledge base (`web/kb/advisor.json`).
-- **Naming** — builds the filename convention from the finished design, reusing
+- **Data plan** — builds the filename convention from the finished design, reusing
   Classic's naming/validation logic ported to JS.
-- **Color panel** — a qualitative spectral-spillover advisor over the active assay's
+- **Color panel** — a qualitative spectral-spillover advisor over the active measurement's
   fluorophores: excitation/emission peak-proximity flags, not a spectral-overlap
   integral. Content is Claude-drafted and flagged unreviewed (`web/kb/spectra.json`).
   An optional structured panel editor below it lets you name each channel's target
@@ -48,11 +51,11 @@ outside-in, no forced order):
   direct-binding probe / self-labeling tag) — the fact-precise alternative to the
   free-text markers field, and what lets the controls engine tell whether an
   antibody is actually involved.
-- **Overview** — a shareable study diagram, a conformance check (one pass/fail
+- **Review** — a shareable study diagram, a conformance check (one pass/fail
   verdict composed from every validator the app already runs), a deterministic
   walkthrough, a staged progression ladder (idea → advanced modality), and
   downloads: Markdown, an SVG study map, a CSV file manifest, a raw-data JSON
-  dump, a per-assay print-oriented bench card, and a separate **Copy prompt for
+  dump, a per-measurement print-oriented bench card, and a separate **Copy prompt for
   your own LLM** action (+ the study as JSON) for discussing the finished plan
   in whatever LLM you already use.
 - **Guide** — an in-app user guide, always in the step nav.
@@ -64,7 +67,7 @@ Everything works with the optional local model **disabled** — the deterministi
 exact-text review is always the floor, not a claim to understand every sentence
 of a scientific description. If the researcher explicitly enables a local
 Ollama endpoint in **Model options**, Micronaut may add bounded interpretations
-of the active Project fields. Choice values remain limited to the supplied
+of the active Research brief fields. Choice values remain limited to the supplied
 vocabulary, and every model or pasted suggestion must carry a verbatim quote
 from the saved description as evidence. Unsupported prose remains narrative.
 
@@ -76,14 +79,14 @@ continuation. The researcher can copy the constrained review prompt, paste a
 reply back, and inspect it under the same evidence and vocabulary checks.
 
 Review suggestions are never applied merely because a parser or model produced
-them. The Project workspace groups exact, local, and pasted candidates, shows
+them. The Research brief workspace groups exact, local, and pasted candidates, shows
 their quoted warrants and any conflicts/current value, and requires an explicit
 **Accept suggestion** or **Replace current value** action before a field is
 written. The model can contribute reviewable proposals, but no field is applied
 without explicit review and acceptance.
 
-Project has no new-tab draft workflow, hosted-chat link-out, or generic Project
-Ask surface. The Overview **Copy prompt for your own LLM**
+Research brief has no new-tab draft workflow, hosted-chat link-out, or generic
+Ask surface. The Review **Copy prompt for your own LLM**
 action remains a separate, read-only export of the finished plan.
 
 ## Run it locally

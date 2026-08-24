@@ -419,15 +419,18 @@ test('renderMarkdown never renders an empty controls section as silence', () => 
   assert.match(md, /Readout not answered yet/);
 });
 
-test('renderMarkdown renders the "How to run this project" ladder EXACTLY ONCE, not once per assay', () => {
+test('renderMarkdown renders the "How to run this study" ladder EXACTLY ONCE, not once per measurement', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const md = renderMarkdown(doc);
   assert.equal(doc.assays.length, 4, 'sanity: the default study has 4 assays');
-  const headingCount = (md.match(/^## How to run this project$/gm) || []).length;
+  const headingCount = (md.match(/^## How to run this study$/gm) || []).length;
   assert.equal(headingCount, 1, `expected exactly one ladder heading, got ${headingCount}`);
+  const ladder = md.split(/^## Measurement /m, 1)[0];
+  assert.doesNotMatch(ladder, /\bassay\b/i, 'human-facing ladder prose uses the shared Measurement terminology');
   // The ladder's first stage body is long and distinctive enough that a
   // count of 1 here directly falsifies the old per-assay duplication bug.
-  const bodyOccurrences = md.split(doc.ladder[0].body).length - 1;
+  const renderedLadderBody = doc.ladder[0].body.replace(/\bassay\b/gi, 'measurement');
+  const bodyOccurrences = md.split(renderedLadderBody).length - 1;
   assert.equal(bodyOccurrences, 1, `expected the ladder body to appear once, got ${bodyOccurrences}`);
 });
 
@@ -439,11 +442,11 @@ test('renderMarkdown embeds a ```mermaid fenced block containing the mermaid sou
   assert.ok(md.includes(mermaidSource), 'expected the exact mermaid source to appear verbatim in the markdown');
 });
 
-test('renderMarkdown lists every assay heading and every planned filename', () => {
+test('renderMarkdown lists every measurement heading and every planned filename', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const md = renderMarkdown(doc);
   for (const assay of doc.assays) {
-    assert.match(md, new RegExp(`## Assay ${assay.index}: ${assay.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
+    assert.match(md, new RegExp(`## Measurement ${assay.index}: ${assay.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
     for (const entry of assay.filenames) {
       if (entry.filename) assert.ok(md.includes(entry.filename), `expected filename '${entry.filename}' in the markdown output`);
     }
@@ -452,12 +455,13 @@ test('renderMarkdown lists every assay heading and every planned filename', () =
 
 // --- Mermaid rendering -------------------------------------------------
 
-test('renderMermaid starts with "flowchart TD" and has one branch per assay', () => {
+test('renderMermaid starts with "flowchart TD" and has one measurement branch per assay id', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const mermaid = renderMermaid(doc);
   assert.match(mermaid, /^flowchart TD/);
   for (const assay of doc.assays) {
     assert.match(mermaid, new RegExp(`STUDY --> assay_${assay.index}`));
+    assert.match(mermaid, new RegExp(`Measurement: ${assay.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   }
 });
 

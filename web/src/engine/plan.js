@@ -157,7 +157,7 @@ export function studyNameIssues(experiment, config, baseTemplate) {
     // switcher, ui/steps/study.js's list): a raw shortId would be
     // technically correct but unreadable in an issue message meant for a
     // person, not a debugger.
-    const label = (assay && assay.label) || `Assay ${index + 1}`;
+    const label = (assay && assay.label) || `Measurement ${index + 1}`;
     if (!byBaseName.has(base)) byBaseName.set(base, []);
     byBaseName.get(base).push(label);
   });
@@ -166,7 +166,7 @@ export function studyNameIssues(experiment, config, baseTemplate) {
     if (labels.length > 1) {
       issues.push({
         field: 'exptype',
-        message: `Assays ${labels.join(', ')} all produce the identical base name '${base}' -- give them different experiment types, or every file in one will overwrite the other.`,
+        message: `Measurements ${labels.join(', ')} all produce the identical base name '${base}' -- give them different experiment types, or every file in one will overwrite the other.`,
         severity: 'error',
       });
     }

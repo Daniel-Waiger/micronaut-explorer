@@ -2,8 +2,8 @@
    Palette follows the custom-property + light/dark pattern proven in
    tools/cma-dashboard/index.html: a default :root palette, an
    @media (prefers-color-scheme) override, and explicit
-   :root[data-theme="dark"|"light"] overrides so the in-app toggle always
-   wins over the OS preference in both directions. */
+   :root[data-theme="dark"|"light"] overrides so an explicit in-app mode
+   wins over the OS preference, while System keeps following the OS. */
 
 /* Modern SaaS system: neutral slate structure with indigo for focused work.
    The variables remain semantic so existing, dependency-free components can
@@ -2668,6 +2668,23 @@ td, th { border-color: var(--line); }
   background: var(--surface-muted);
 }
 
+.shell-theme-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shell-theme-action.is-selected {
+  color: var(--accent);
+  font-weight: 750;
+}
+
+.shell-theme-action.is-selected::after {
+  content: '✓';
+  color: var(--accent);
+  font-weight: 800;
+}
+
 .shell-utility-heading {
   padding: 8px 10px 3px;
   color: var(--muted);
@@ -4019,4 +4036,583 @@ td, th { border-color: var(--line); }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* -------------------------------------------------------------------------
+   Orientation-first integration. These selectors deliberately consume the
+   settled Study-map, compass, and workspace markup only; interaction and
+   data ownership remain in their existing UI modules.
+   ------------------------------------------------------------------------- */
+
+/* The compass stays an orientation aid rather than a second dashboard: title,
+   current scope, and the one consequential action lead; factual detail and
+   status badges occupy a quiet second row on wide screens. */
+.experiment-compass {
+  display: grid;
+  grid-template-columns: minmax(180px, .9fr) minmax(280px, 1.45fr) minmax(190px, 1fr) minmax(220px, 1.15fr);
+  gap: 8px 16px;
+  align-items: center;
+  padding: 12px clamp(18px, 2.4vw, 28px);
+  background: var(--panel);
+}
+
+.experiment-compass-title,
+.experiment-compass-scope,
+.experiment-compass-detail,
+.experiment-compass-next,
+.shell-mobile-compass-title,
+.shell-mobile-compass-scope {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.experiment-compass-title {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 780;
+  letter-spacing: -.012em;
+}
+
+.experiment-compass-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  min-width: 0;
+}
+
+.experiment-compass-detail,
+.experiment-compass-example {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--muted);
+  background: var(--surface-muted);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.experiment-compass-example {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.experiment-compass-scope {
+  display: block;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.experiment-compass-next {
+  min-width: 0;
+}
+
+.experiment-compass-next:not(:has(.experiment-compass-next-action)) {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.experiment-compass-next-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--line));
+  border-radius: 9px;
+  color: var(--accent);
+  background: var(--accent-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 740;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.experiment-compass-next-action:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+}
+
+.experiment-compass-next-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent);
+  outline-offset: 2px;
+}
+
+.experiment-compass .workflow-badges {
+  grid-column: 1 / -1;
+  padding-top: 2px;
+}
+
+/* Scope copy has the same restrained, high-contrast treatment across the
+   renamed workspaces without turning explanatory paragraphs into alerts. */
+.project-description-help,
+.shell-main > .step-heading + .proposals-empty {
+  max-width: 900px;
+  margin-top: -10px;
+  margin-bottom: 18px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-left: 3px solid var(--accent);
+  border-radius: 9px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent-soft) 62%, var(--panel));
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.project-description-card > .proposals-empty {
+  overflow-wrap: anywhere;
+}
+
+.project-details {
+  border-top-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+}
+
+/* Study-map intake and summary use the existing card language, while the
+   responsive grid makes the hierarchy legible at a glance without requiring
+   a diagram or horizontal scroller. */
+.study-map-editor {
+  display: grid;
+  gap: 18px;
+  width: min(100%, 1120px);
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.study-map-intake,
+.study-map-summary,
+.study-map-measurement,
+.study-map-add-measurement,
+.study-map-next-decision {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: var(--shadow-card);
+}
+
+.study-map-intake,
+.study-map-add-measurement,
+.study-map-next-decision {
+  padding: clamp(16px, 2.5vw, 24px);
+}
+
+.study-map-progress {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .065em;
+  text-transform: uppercase;
+}
+
+.study-map-intake > .design-subheading,
+.study-map-editor > .design-subheading {
+  margin: 0 0 14px;
+  font-size: clamp(19px, 2.3vw, 25px);
+  line-height: 1.28;
+  text-transform: none;
+}
+
+.study-map-field {
+  min-width: 0;
+  margin-top: 14px;
+}
+
+.study-map-field .proposals-empty,
+.study-map-comparison > .proposals-empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.study-map-field .field-input {
+  width: 100%;
+}
+
+.study-map-field textarea.field-input {
+  min-height: 132px;
+}
+
+.study-map-comparison {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 16px 0 0;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.study-map-comparison legend {
+  max-width: 100%;
+  padding: 0 4px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.study-map-comparison .question-answer {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--panel);
+  line-height: 1.35;
+}
+
+.study-map-comparison .question-answer:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  background: var(--accent-soft);
+}
+
+.study-map-comparison input[type='radio'] {
+  width: 18px;
+  height: 18px;
+  margin: 0 8px 0 0;
+  accent-color: var(--accent);
+}
+
+.study-map-status {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.study-map-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.study-map-actions :is(.workflow-back, .workflow-continue, .question-answer),
+.study-map-next-decision .workflow-continue {
+  min-height: 44px;
+}
+
+.study-map-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  padding: clamp(16px, 2.5vw, 24px);
+}
+
+.study-map-summary .study-map-comparison {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.study-map-measurements {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.study-map-measurement {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  padding: 16px;
+}
+
+.study-map-measurement h4,
+.study-map-add-measurement h4,
+.study-map-next-decision h3 {
+  margin: 0 0 7px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 760;
+  line-height: 1.3;
+}
+
+.study-map-add-measurement {
+  display: grid;
+  grid-template-columns: minmax(180px, .75fr) minmax(240px, 1.25fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.study-map-add-measurement h4,
+.study-map-add-measurement .study-map-status {
+  grid-column: 1 / -1;
+}
+
+.study-map-add-measurement .add-factor-button {
+  min-height: 44px;
+  margin: 0;
+}
+
+.study-map-next-decision {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 72%, var(--panel)), var(--panel));
+}
+
+.study-map-next-decision p {
+  margin: 0 0 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* A measurement row remains compact at desktop widths, then becomes a clear
+   vertical card as available inline space narrows. */
+.study-assay-row {
+  align-items: flex-start;
+  padding: 14px;
+}
+
+.study-assay-details {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.study-assay-details p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.study-assay-readout { color: var(--ink); font-weight: 650; }
+.study-assay-system,
+.study-assay-progress { margin-top: 4px !important; color: var(--muted); font-size: 12.5px; }
+.study-assay-progress { color: var(--accent); font-weight: 700; }
+
+.study-assay-basename {
+  align-self: center;
+  max-width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  overflow-wrap: anywhere;
+}
+
+.study-assay-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.study-assay-actions :is(.question-answer, .remove-factor-button) {
+  min-height: 44px;
+}
+
+.assay-pill-label,
+.assay-pill-delete,
+.assay-pill-add,
+.nav-step {
+  min-height: 44px;
+}
+
+.assay-pill-label { padding-block: 8px; }
+.assay-pill-delete { min-width: 36px; padding-block: 8px; }
+
+/* Values deliberately generated for a preview are visible as a bounded
+   placeholder state rather than as facts about the study. */
+.planned-box .planned-empty {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding: 11px 12px;
+  border: 1px dashed color-mix(in srgb, var(--warn) 45%, var(--line));
+  border-radius: 9px;
+  color: var(--muted);
+  background: var(--warn-soft);
+  line-height: 1.45;
+}
+
+.planned-box .planned-empty > :first-child { margin-top: 0; }
+.planned-box .planned-empty > :last-child { margin-bottom: 0; }
+.planned-box .planned-empty mark {
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--warn) 30%, var(--panel));
+  font-family: var(--mono);
+  font-size: .94em;
+  font-weight: 700;
+}
+
+/* The Review already supplies textual tier names. These headings provide a
+   repeated visual rhythm without conflating consequence tier with severity. */
+.conformance > h3.overview-node-title {
+  margin: 20px 0 9px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--surface-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.conformance > h3.overview-node-title:nth-of-type(2) { border-left-color: var(--ok); }
+.conformance > h3.overview-node-title:nth-of-type(3) { border-left-color: var(--warn); }
+.conformance > h3.overview-node-title:nth-of-type(4) { border-left-color: var(--muted); }
+
+.conformance > h3.overview-node-title + .issues-list { margin-bottom: 16px; }
+.conformance .issue { overflow-wrap: anywhere; }
+.conformance .conformance-issue-link { width: 100%; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer; }
+.conformance .conformance-issue-link:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent); outline-offset: 3px; }
+
+@media (max-width: 1200px) {
+  .experiment-compass {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 1.1fr);
+  }
+
+  .experiment-compass-details,
+  .experiment-compass .workflow-badges { display: none; }
+}
+
+@media (max-width: 760px) {
+  /* Override the older mobile rule only for the settled compass: its details
+     collapse, but the study title, scope, and valid next action remain. */
+  .workflow-strip.experiment-compass {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
+    min-height: 0;
+    padding: 10px 14px;
+  }
+
+  .experiment-compass-title { font-size: 13px; }
+  .experiment-compass-scope { grid-column: 1 / -1; font-size: 11.5px; }
+  .experiment-compass-next { grid-column: 1 / -1; }
+  .experiment-compass-next-action { min-height: 44px; }
+  .shell-mobile-compass { display: none; }
+
+  .study-map-editor { gap: 14px; }
+  .study-map-intake,
+  .study-map-summary,
+  .study-map-add-measurement,
+  .study-map-next-decision { padding: 16px; }
+  .study-map-summary,
+  .study-map-add-measurement { grid-template-columns: minmax(0, 1fr); }
+  .study-map-add-measurement h4,
+  .study-map-add-measurement .study-map-status { grid-column: auto; }
+  .study-map-measurements { grid-template-columns: 1fr; }
+  .study-map-actions { justify-content: stretch; }
+  .study-map-actions :is(.workflow-back, .workflow-continue, .question-answer),
+  .study-map-next-decision .workflow-continue { flex: 1 1 130px; }
+
+  .study-assay-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .study-assay-row .field-input { width: 100%; max-width: none; }
+  .study-assay-basename { align-self: start; }
+  .study-assay-actions { width: 100%; margin-left: 0; justify-content: stretch; }
+  .study-assay-actions :is(.question-answer, .remove-factor-button) { flex: 1 1 170px; }
+}
+
+@media (max-width: 430px) {
+  .workflow-strip.experiment-compass { padding-inline: 12px; }
+  .study-map-actions { display: grid; grid-template-columns: 1fr; }
+  .study-map-actions :is(.workflow-back, .workflow-continue, .question-answer),
+  .study-map-next-decision .workflow-continue,
+  .study-assay-actions :is(.question-answer, .remove-factor-button) { width: 100%; }
+  .study-map-comparison { padding: 12px; }
+}
+
+/* Shell controls remain comfortably touchable at every breakpoint. The
+   compact rail still has a 76px track, so its 44px toggle preserves the
+   original density without reducing the usable main column. */
+.shell-new-study,
+.shell-utility-toggle,
+.shell-utility-action,
+.mobile-assay-select,
+.mobile-step-select,
+.workflow-back,
+.workflow-continue,
+.workflow-explain {
+  min-height: 44px;
+}
+
+.nav-toggle {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+}
+
+@media (max-width: 430px) {
+  /* Flex shrink previously clipped the Utilities label at 320px. A bounded
+     two-column grid gives both header actions a real minimum track, while
+     the save state deliberately occupies its own row. */
+  .header-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 6px;
+  }
+
+  .shell-new-study,
+  .shell-utilities,
+  .shell-utility-toggle {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .shell-utility-toggle {
+    justify-content: center;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .shell-save-indicator {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .shell-utility-menu {
+    right: 0;
+    left: auto;
+  }
+}
+
+@media (max-width: 340px) {
+  .header-actions { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .experiment-compass *,
+  .experiment-compass *::before,
+  .experiment-compass *::after,
+  .study-map-editor *,
+  .study-map-editor *::before,
+  .study-map-editor *::after {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media print {
+  .experiment-compass,
+  .study-map-intake .study-map-actions,
+  .study-map-add-measurement,
+  .study-map-next-decision { display: none !important; }
+
+  .study-map-editor,
+  .study-map-summary,
+  .study-map-measurements,
+  .study-map-measurement { display: block; width: 100%; box-shadow: none; }
+  .study-map-measurement + .study-map-measurement { margin-top: 10px; }
 }

@@ -16,6 +16,9 @@ test('contains the ground rules that keep the model from inventing domain facts'
   assert.match(prompt, /say that it is missing/);
   assert.match(prompt, /not yet reviewed by a microscopy specialist/i);
   assert.match(prompt, /planning aid, not a validated instrument model/);
+  assert.match(prompt, /measurements, readouts, modality, design axes/i);
+  assert.match(prompt, /some disciplines call it an assay/i);
+  assert.match(prompt, /"assays" key/);
 });
 
 test('embeds the study JSON byte-identically to the raw-data export -- one serialization, not two', () => {

@@ -69,7 +69,7 @@ function cardControlsSection(controls) {
  */
 export function renderBenchCard(assay) {
   if (!assay || typeof assay !== 'object') {
-    return '_No such assay -- nothing to show on a bench card._';
+    return '_No such measurement -- nothing to show on a bench card._';
   }
 
   const specimenBits = [
@@ -79,7 +79,7 @@ export function renderBenchCard(assay) {
   ].filter(Boolean);
 
   const lines = [
-    cardHeading(1, `Bench card -- ${assay.label || 'Untitled assay'}`),
+    cardHeading(1, `Measurement bench card -- ${assay.label || 'Untitled measurement'}`),
     '',
     `**Readout:** ${(assay.readout && assay.readout.text) || 'not answered yet'}`,
     `**Modality:** ${assay.modality || 'not answered yet'}`,
@@ -97,7 +97,7 @@ export function renderBenchCard(assay) {
 
   const examples = (Array.isArray(assay.filenames) ? assay.filenames : []).filter((f) => f.filename).slice(0, 2);
   if (examples.length === 0) {
-    lines.push('_No planned filenames yet -- see the issues on the Design step._');
+    lines.push('_No planned filenames yet -- see the issues on the Samples & design step._');
   } else {
     for (const entry of examples) lines.push(`\`${entry.filename}\``);
   }

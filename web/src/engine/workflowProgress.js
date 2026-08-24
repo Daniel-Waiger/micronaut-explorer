@@ -6,16 +6,19 @@
 
 import { assayView } from '../core/assay.js';
 import { conditionIssues } from './conditions.js';
+import { buildExperimentMap } from './experimentMap.js';
 import { phaseQuestions } from './interview.js';
 
 export const PRIMARY_WORKFLOW = Object.freeze([
-  Object.freeze({ id: 'home', label: 'Home' }),
-  Object.freeze({ id: 'describe', label: 'Project' }),
-  Object.freeze({ id: 'study', label: 'Study' }),
-  Object.freeze({ id: 'design', label: 'Design' }),
-  Object.freeze({ id: 'microscopy', label: 'Microscopy' }),
-  Object.freeze({ id: 'naming', label: 'Naming' }),
-  Object.freeze({ id: 'overview', label: 'Overview' }),
+  Object.freeze({ id: 'home', label: 'Study map' }),
+  Object.freeze({ id: 'describe', label: 'Research brief' }),
+  Object.freeze({ id: 'study', label: 'Measurements' }),
+  Object.freeze({ id: 'design', label: 'Samples & design' }),
+  // Keep the workflow id as `microscopy`; main and the router deliberately
+  // translate it to the stable persisted/hash route id `panel`.
+  Object.freeze({ id: 'microscopy', label: 'Acquisition' }),
+  Object.freeze({ id: 'naming', label: 'Data plan' }),
+  Object.freeze({ id: 'overview', label: 'Review' }),
 ]);
 
 // Guide remains reachable but deliberately does not make the progress bar
@@ -72,6 +75,20 @@ function designProgress(design) {
 function readinessState(readiness) {
   if (readiness === 'ready') return 'complete';
   if (readiness === 'needs-review' || readiness === 'blocked') return 'needs-attention';
+  return 'not-started';
+}
+
+function orientationProgress(map) {
+  const orientation = map && typeof map.orientation === 'object' ? map.orientation : {};
+  const answered = Number.isInteger(orientation.answered) ? orientation.answered : 0;
+  const total = Number.isInteger(orientation.total) ? orientation.total : 0;
+
+  if (orientation.state === 'needs-attention') return 'needs-attention';
+  if (orientation.state === 'answered' || (total > 0 && answered >= total)) return 'complete';
+  // A skipped/provisional map answer is still an intentional orientation
+  // action. Likewise, some (but not all) answered map facts make the map
+  // in-progress even though its aggregate map state remains `missing`.
+  if (orientation.state === 'provisional' || answered > 0) return 'in-progress';
   return 'not-started';
 }
 
@@ -148,13 +165,17 @@ function reportForAssay(conformance, assayId) {
  * conformance report, and the already-loaded question bank.
  *
  * The return value is deterministic and intentionally UI-neutral:
- * `{ primary, optional, assays, summary }`. `primary` follows the ordered
- * seven-stage workflow; `optional` is Guide and must not contribute to the
- * summary. Per-assay `overview` consumes conformance's `readiness` verbatim,
- * and the study Overview mirrors the whole-study readiness verbatim.
+ * `{ map, primary, optional, assays, summary }`. `map` is the one Study-map
+ * snapshot built for this progress projection; consumers must use its
+ * decisions and nextDecision rather than recreate their ordering. `primary`
+ * follows the ordered seven-stage workflow; `optional` is Guide and must not
+ * contribute to the summary. Per-assay `overview` consumes conformance's
+ * `readiness` verbatim, and the study Overview mirrors the whole-study
+ * readiness verbatim.
  */
 export function deriveWorkflowProgress(experiment, conformance, questions = []) {
   const exp = experiment && typeof experiment === 'object' ? experiment : {};
+  const map = buildExperimentMap(exp, { conformance });
   const assays = Array.isArray(exp.assays) ? exp.assays : [];
   const perAssay = assays.map((assay, index) => {
     const view = assayView(exp, assay && assay.id);
@@ -176,7 +197,7 @@ export function deriveWorkflowProgress(experiment, conformance, questions = []) 
 
   const byStep = (step) => perAssay.map((assay) => assay.steps[step].state);
   const primary = [
-    { ...PRIMARY_WORKFLOW[0], state: 'complete' },
+    { ...PRIMARY_WORKFLOW[0], state: orientationProgress(map) },
     { ...PRIMARY_WORKFLOW[1], state: aggregate(byStep('project')) },
     { ...PRIMARY_WORKFLOW[2], state: studyProgress(exp, conformance, assays) },
     { ...PRIMARY_WORKFLOW[3], state: aggregate(byStep('design')) },
@@ -187,6 +208,7 @@ export function deriveWorkflowProgress(experiment, conformance, questions = []) 
   const complete = primary.filter((step) => step.state === 'complete').length;
 
   return {
+    map,
     primary,
     optional: OPTIONAL_WORKFLOW.map((step) => ({ ...step })),
     assays: perAssay,

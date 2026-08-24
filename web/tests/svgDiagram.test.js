@@ -42,8 +42,11 @@ test('node captions and values carry the real content', () => {
   const [studyNode, assayNode, readoutNode, , designNode, controlsNode, filesNode] =
     buildDiagramLayout(docWith([assay()], { title: 'Oregano study' })).nodes;
   assert.equal(studyNode.value, 'Oregano study');
+  assert.equal(assayNode.id, 'assay-0', 'the internal node id remains assay-based');
+  assert.equal(assayNode.caption, 'Measurement 1');
   assert.equal(assayNode.value, 'Bacterial viability');
   assert.equal(readoutNode.value, 'Bacterial viability');
+  assert.equal(designNode.caption, 'Samples & design');
   assert.match(designNode.value, /group/);
   assert.equal(controlsNode.value, '3 control(s)'); // 1 panel + 2 readout
   assert.equal(filesNode.value, '4 planned');

@@ -1,0 +1,264 @@
+{
+  "run": "Orientation-first UX redesign",
+  "branch": "codex/orientation-first-ux",
+  "objective": "Give Micronaut a persistent, domain-neutral Study map that establishes the user's experiment before detailed editing, clarifies Study -> Measurements -> per-measurement planning, recommends the next consequential decision, and preserves all existing offline, provenance, assay-tier, and export-safety contracts.",
+  "executor": "Terra",
+  "required_reading": [
+    "docs/cma-lessons.md",
+    "docs/plans/orientation-first-ux.md"
+  ],
+  "global_invariants": [
+    "Do not rename the persisted assays array, assay ids, assayView(), scopeWrite(), or assay-scoped provenance keys; Measurement is a presentation term.",
+    "Do not add a dependency, server, account, cloud call, framework, forced route guard, or scientific-validity claim.",
+    "All state writes continue through the existing store/provenance/autosave machinery; no UI module writes localStorage project data directly.",
+    "The pure experiment-map projection is the only owner of next-decision ordering; the shell, Home, and Review consume it.",
+    "Decision tier never changes conformance severity or export permission; the existing fresh conformance report remains the final-artifact gate.",
+    "Executors inspect the dirty tree first, preserve unrelated/user changes, run focused tests plus the full JavaScript suite, and never commit or push."
+  ],
+  "batches": [
+    ["ORI-01"],
+    ["ORI-02", "ORI-03", "ORI-04"],
+    ["ORI-05", "ORI-06"],
+    ["ORI-07", "ORI-08"],
+    ["ORI-09", "ORI-10", "ORI-11", "ORI-12"],
+    ["ORI-13", "ORI-14", "ORI-15"],
+    ["ORI-16"],
+    ["ORI-17"],
+    ["ORI-18"]
+  ],
+  "tasks": [
+    {
+      "id": "ORI-01",
+      "title": "Add the v5 study-context persistence contract",
+      "scope": "Advance SCHEMA_VERSION from 4 to 5. Add studyContext {system:'', experimentalUnit:'', comparisonMode:'not-decided'} to emptyExperiment(). Define and export the allowed comparison-mode vocabulary. Add a total v4->v5 migration that supplies only empty/default context and never infers from prose, group vocabulary, assay specimen, or example strings. Normalize malformed current-version studyContext values at the migration boundary without deleting other current data. Preserve v1->v4 migrations, meta.origin behavior, assay identities, assay slices, naming templates, provenance, and no-op identity for already-valid v5 objects where the existing migrate contract requires it.",
+      "verification": "Update schema tests with generated v1-v4 fixtures: migrate each to v5 and assert the new context defaults plus byte-equivalent legacy assay/design/naming/provenance slices. Test every allowed comparison mode, malformed/missing context normalization, unsupported future version rejection, and emptyExperiment defaults. Run `node --test web/tests/schema.test.js web/tests/assay.test.js web/tests/persist.test.js`, then `node --test web/tests/*.test.js`.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "files": [
+        "web/src/core/schema.js",
+        "web/tests/schema.test.js"
+      ]
+    },
+    {
+      "id": "ORI-02",
+      "title": "Seed truthful study context in the worked example",
+      "scope": "Update createDefaultStudy() so only the shipped oregano example receives useful weak/default-tagged studyContext values for system, experimentalUnit, and comparisonMode. Do not derive them at runtime from narrative or assay data. Preserve all four example assays, their ids/order/content, origin='example', research question, group vocabulary, and existing provenance strength. Add provenance slots for the seeded context using the weakest existing seed tag that a user edit can replace.",
+      "verification": "Update default-study tests to assert exact seeded context, weak provenance, unchanged four-assay content, and that emptyExperiment/imported legacy studies do not receive oregano values. Compare the serialized assays and existing provenance entries against the pre-task fixture except for explicitly added context slots. Run `node --test web/tests/defaultStudy.test.js web/tests/provenance.test.js web/tests/schema.test.js`, then the full JS suite.",
+      "depends_on": ["ORI-01"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/defaultStudy.js",
+        "web/tests/defaultStudy.test.js"
+      ]
+    },
+    {
+      "id": "ORI-03",
+      "title": "Build the pure experiment-map and next-decision projection",
+      "scope": "Create engine/experimentMap.js as the only UI-neutral authority for the Study map described in the prose plan. Project question, system, comparison mode/groups, experimental unit, and measurement summaries from the real schema without mutating it. Produce fixed missing/provisional/answered/needs-attention states, ordered decision objects with routeId and optional measurementId, deterministic orientation progress, and one nextDecision. Treat observational comparison as answered without groups; require group labels only for mode=groups. A measurement is defined when it has a nonblank label plus a recognized readout or nonblank readoutText; do not require multiple measurements. Use assay ids, never array indices, in decision destinations. Accept optional existing workflow/conformance inputs, but remain total for malformed/partial studies.",
+      "verification": "Add experimentMap tests covering an empty v5 study, the seeded example, groups vs observational branches, skipped/provisional fields, multiple measurements with different readiness, missing biological replicate decision, missing modality, conformance-derived issues, stale/unknown assay ids, and malformed data. Assert the exact decision order and that repeated calls are deep-equal and do not mutate input. Include plant, soil/material, and surface-characterization fixtures to prove no biology-specific inference. Run `node --test web/tests/experimentMap.test.js web/tests/assay.test.js web/tests/workflowProgress.test.js`, then the full JS suite.",
+      "depends_on": ["ORI-01"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/experimentMap.js",
+        "web/tests/experimentMap.test.js"
+      ]
+    },
+    {
+      "id": "ORI-04",
+      "title": "Classify outstanding decisions by scientific consequence",
+      "scope": "Create engine/decisionTriage.js. Combine experiment-map decisions and existing conformance issues into the four fixed tiers: study-shape, measurement-design, before-acquisition, later. Classify by canonical field/section identity, never by user-facing message substring. Preserve original issue severity, section, assay id, and route. Blocking remains blocking even if its ordinary timing tier would be later. Return stable ordered groups and counts; do not modify checkConformance(), compute export permission, or claim scientific validity.",
+      "verification": "Add a truth-table test for every currently emitted conformance section/field class plus the new study-context decisions. Explicitly prove: missing experimental unit -> study-shape; missing biological replicates -> measurement-design; panel/path conflict -> before-acquisition; placeholder date/sample id -> later; invalid date/path retains blocking severity. Assert no input mutation and deterministic order. Run `node --test web/tests/decisionTriage.test.js web/tests/conformance.test.js`, then the full JS suite.",
+      "depends_on": ["ORI-01"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/decisionTriage.js",
+        "web/tests/decisionTriage.test.js"
+      ]
+    },
+    {
+      "id": "ORI-05",
+      "title": "Make workflow progress carry the Study map and coherent labels",
+      "scope": "Update workflowProgress.js to expose the new visible route labels: Study map, Research brief, Measurements, Samples & design, Acquisition, Data plan, Review. Keep route ids and panel/microscopy alias stable. Consume buildExperimentMap() and include its projection in the returned progress object so main/shell/Home/Review share one snapshot. Home/Study-map progress reflects orientation state rather than being permanently complete. Keep the existing per-measurement project/design/microscopy/naming/readiness computations unless a map decision directly supplies the same fact; do not duplicate next-decision ordering or conformance severity.",
+      "verification": "Update workflow-progress tests for empty, partially oriented, observational, multi-measurement, needs-attention, and ready studies. Assert exact labels/route ids, map object identity-by-value, Study-map progress transitions, existing per-assay state behavior, Guide exclusion, and no second next-decision calculation. Run `node --test web/tests/workflowProgress.test.js web/tests/experimentMap.test.js web/tests/conformance.test.js`, then the full JS suite.",
+      "depends_on": ["ORI-03"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/workflowProgress.js",
+        "web/tests/workflowProgress.test.js"
+      ]
+    },
+    {
+      "id": "ORI-06",
+      "title": "Create the reusable Study-map intake and summary component",
+      "scope": "Add ui/studyMap.js, a DOM-only component that consumes the pure map plus the existing store/router contracts. Render two modes in the same region: orientation intake when consequential study-shape answers are missing, and editable map summary otherwise. Implement the five questions and exact interaction contract from the prose plan: Continue, Back, Decide later, no modal/focus trap, real labels/help, agricultural and non-biological examples, and direct navigation always available. Write question/system/context/group/measurement data only through store.setPath/store.patch with user provenance; create measurements via the existing id and seedAssayFromVocabulary helpers in one atomic patch. The component must consume map.nextDecision rather than recreate priority. When routing a measurement decision, validate the id, patch activeAssayId first, then navigate. Do not read/write localStorage or call a model.",
+      "verification": "Add pure helper tests only where state transitions can be extracted without a DOM framework. Build the single file and manually drive: reload after every answer, groups and observational branches, Decide later, back/forward, add two measurements without duplicates, edit map answers, stale deleted measurement destination safe no-op, and keyboard labels/focus. Snapshot store.get() before/after each action to prove only intended schema/provenance paths change. Run relevant schema/assay/store/experimentMap tests and the full JS suite, then build.",
+      "depends_on": ["ORI-03"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/studyMap.js"
+      ]
+    },
+    {
+      "id": "ORI-07",
+      "title": "Replace Home with the orientation-first Study-map front door",
+      "scope": "Recompose home.js around the new Study-map component and explicit ownership. Whenever origin=example, begin with the two explicit choices 'Plan my study' (calls the existing blank-study lifecycle) and 'Explore a completed example' (reveals the example without adopting it). Exploration carries an unambiguous 'Example — changes are not your study' state and 'Make a copy of this example' using the existing adoption callback. For blank/user work, lead with Plan my study and the inline map/intake. Remove competing tile language that presents the full seven-step editor before a map exists. Keep the guided example, Guide entry, and restore/import ownership intact. Change the step title/heading to Study map and use current UI components/classes where possible.",
+      "verification": "Against a fresh built artifact, trace no-save first run, recovered user work, example exploration, template adoption, blank start, guided walkthrough start/resume/restart, and reload. Prove the example never appears as user-owned, adopting preserves all measurements, and no orientation answer is lost. Check one dominant action at each state, no blocked navigation, keyboard order, and no console errors. Run onboarding/defaultStudy/guidedProgress/guidedExample tests plus the full JS suite and build.",
+      "depends_on": ["ORI-02", "ORI-05", "ORI-06"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/home.js"
+      ]
+    },
+    {
+      "id": "ORI-08",
+      "title": "Turn the global shell into a persistent experiment compass",
+      "scope": "Update shell.js to render the compact compass from workflowProgress.map: study title/question, system, comparison summary, measurement count, current Whole study vs Measurement scope, example ownership, and map.nextDecision. Replace 'Workflow: N of 7 complete' with map-oriented summary copy. Map existing states to Not started/In progress/Decision needed/Ready for now. Change visible shell terminology from Assay to Measurement in switcher, mobile control, add/delete accessible names, and active labels while retaining internal ids/functions. Next-decision click validates and activates measurementId before routing. Preserve utilities, persistence status, recovery, nav collapse, mobile selects, guided aside, Back/Continue, router aliases, and every callback boundary. The shell remains a consumer and must not implement decision ordering or write context fields.",
+      "verification": "Build and trace empty/partial/example/observational/multi-measurement maps; every route's Whole study vs Measurement scope; measurement switch/delete/add; next-decision routes with a valid and stale id; mobile select synchronization after widening; utilities and save-state updates; nav collapse; guided aside. Assert no localStorage project access was added and the shell never imports decisionTriage or reclassifies conformance. Run workflowProgress, feedbackReport, persist, and store tests plus full JS and build.",
+      "depends_on": ["ORI-05"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/shell.js"
+      ]
+    },
+    {
+      "id": "ORI-09",
+      "title": "Clarify whole-study and active-measurement scope in Research brief",
+      "scope": "Retitle describe.js from Project to Research brief. Add the exact whole-study scope statement from the prose plan above the narrative/Review workspace. Retitle the structured grid to 'Measurement details — {active measurement}' and its binding to 'Accepted measurement details will apply only to: {label}.' Replace remaining user-facing Project phase/destination copy only where it describes this page; preserve internal phase='project', model schema paths, active assay ids, session bindings, exact evidence, stale/race/cancel behavior, explicit Accept/Replace boundary, textarea caret preservation, local-model fallback, and no-silent-write invariant. Do not add studyContext fields to model proposals in this task.",
+      "verification": "Run all project-review/model/parser/interview tests. In a built artifact, trace exact-only, model success, malformed paste, refused write, prose-edit race, measurement-switch race, and sequential field edits. Confirm the shared narrative remains unchanged when switching measurements; structured details update to the active measurement; no value applies before Accept/Replace/Confirm; no old 'Project details for' or ambiguous scope copy remains. Then run full JS and build.",
+      "depends_on": ["ORI-08"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/describe.js"
+      ]
+    },
+    {
+      "id": "ORI-10",
+      "title": "Reframe Study as the Measurements workspace",
+      "scope": "Retitle study.js to Measurements and replace primary visible Assay language with Measurement. Keep this file the owner of research-question quick edit, shared comparison vocabulary, measurement rename/list, apply-to-all seeding, cross-measurement collision display, and delete/go-to actions. Reword the group vocabulary as comparison labels reused when helpful, explicitly state observational studies may have none, and preserve its seed-not-live-axis semantics and STRONG-write protection. Each measurement row must show name, readout/intended observation, specimen/system summary when available, current design/acquisition state from injected/shared progress when available, and one 'Continue planning this measurement' action. Do not duplicate the Study-map next-decision engine or change internal assay storage.",
+      "verification": "Built-browser traces: group-mode and observational studies; add/rename/delete multiple measurements; apply vocabulary with one customized measurement; change active measurement; collision warning; readout/specimen summary; go-to action. Snapshot stored assays/provenance before and after to prove presentation renaming does not migrate or duplicate data. Search this page's rendered DOM/accessibility tree for unintended primary 'Assay' labels while confirming internal tests still use assays. Run plan/assay/conditions/workflowProgress tests, full JS, and build.",
+      "depends_on": ["ORI-08"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/study.js"
+      ]
+    },
+    {
+      "id": "ORI-11",
+      "title": "Make Samples & design teach the experimental-unit hierarchy",
+      "scope": "Retitle design.js to Samples & design and add persistent active-measurement scope copy. At the top, show the study-level experimentalUnit value read-only (or 'Not decided') with an Edit on Study map action. Add concise domain-neutral help distinguishing experimental unit, biological/independent replicate, technical replicate/repeated measurement, mutually exclusive groups, and crossing factors. Reuse current controls and condition generation; do not create a second unit field, mutate replicate values from the unit text, change condition expansion, or infer units. All existing per-assay writes remain scopeWrite-bound.",
+      "verification": "Built-browser traces for plant, soil, and material examples; switch active measurement and confirm scope; edit unit via Study map and return; define groups/factors/replicates; verify condition rows and filenames are byte-equivalent to pre-task output for identical data. Confirm changing unit does not change biological/technical replicate counts. Run conditions/plan/naming/assay tests, full JS, and build.",
+      "depends_on": ["ORI-08"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/design.js"
+      ]
+    },
+    {
+      "id": "ORI-12",
+      "title": "Reframe Microscopy as scoped Acquisition without losing specialization",
+      "scope": "Retitle panel.js to Acquisition and add 'Planning how data will be acquired for: {measurement label}.' Keep microscopy/modality as the current technical specialization without implying every system is biological. Preserve Acquisition/Fluorophores/Spectral view/Panel assembly/Guidance disclosures, fieldInterview confirmation/provenance, marker synchronization, channel ordering, spectra, controls inputs, advice, and all scopeWrite paths. Copy may acknowledge imaging, microscopy, spectroscopy, and surface characterization, but do not add unsupported modalities or modify KB scientific content.",
+      "verification": "Use free-text-marker and structured-channel measurements. Switch measurements; confirm the scope and values change together. Re-run sequential edits, seed channels, add/reorder/remove channel, spillover/spectral refresh, keyboard disclosures, and SEM/TEM/Raman paths. Compare generated panel/control data before/after for identical inputs. Run panelAssembly/spectra/spectralView/interview/controls tests, full JS, and build.",
+      "depends_on": ["ORI-08"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/panel.js"
+      ]
+    },
+    {
+      "id": "ORI-13",
+      "title": "Reframe Naming as a scoped Data plan and expose placeholders honestly",
+      "scope": "Retitle naming.js to Data plan and add active-measurement scope copy. Keep filename template, field editing, planned names, Copy all, schedule inputs, and ICS export intact. Visually and textually distinguish supplied values from generated placeholders such as 1970-01-01 and UNKNOWN; state that date/sample/instrument values may be assigned later but final exports remain guarded. Do not change placeholder constants, token order, renderName/finalizeFields behavior, condition rows, autosaved-input semantics, or schedule arithmetic.",
+      "verification": "Trace missing, partially supplied, and complete naming data; prove placeholders are labelled but generated filenames are byte-identical; fill date/sample and see labels clear; switch measurements; verify schedule and ICS content unchanged. Run naming/plan/validation/ics/interview tests, full JS, and build.",
+      "depends_on": ["ORI-08"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/naming.js"
+      ]
+    },
+    {
+      "id": "ORI-14",
+      "title": "Make Review consume the shared map and consequence-based triage",
+      "scope": "Retitle overview.js to Review. Render the same experiment-map summary first, then decision groups from decisionTriage in the fixed order and exact headings from the prose plan. Route each decision to its owner and activate measurementId first where present. Change readiness success copy to 'All planner checks complete' and explicitly disclaim scientific validation. Replace visible Assay labels with Measurement in cards/controls/copy while retaining document ids. Keep controls, ladder, filenames, map SVG, bench cards, LLM prompt, print, and every export. Crucially, permitFinalExport continues to recompute and consume checkConformance(); triage may organize messages but may not grant export.",
+      "verification": "Test empty/partial/ready/blocked studies and exact tier placement: experimental unit study-shape, replicates measurement-design, panel/path before-acquisition, date/sample later. Drive decision links including a stale measurement id. Prove blocked/needs-review/ready export behavior is unchanged by triage and uses a fresh report after edits. Expand every measurement card and compare controls/filenames/doc data to pre-task behavior. Run decisionTriage/conformance/studydoc/plan/benchcard/render tests, full JS, and build.",
+      "depends_on": ["ORI-04", "ORI-06", "ORI-08"],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/overview.js"
+      ]
+    },
+    {
+      "id": "ORI-15",
+      "title": "Align Guide, onboarding, and guided explanations with the new mental model",
+      "scope": "Update the explanatory content surfaces to teach one hierarchy: Study -> Measurements -> per-measurement Samples & design/Acquisition/Data plan -> Review. Define measurement once as an observation/analysis, sometimes called an assay. Replace the seven old visible step names and ambiguous Project/Study ordering. Onboarding offers Plan my study vs Explore a completed example and never describes the example as the user's data. Guided explanations consume the new workflow labels while preserving progress persistence, pause/resume/restart, non-mutating behavior, and route ids. This is a content/contract task, not a new tutorial engine.",
+      "verification": "Update guidedExample tests for exact new labels/what/how content and unchanged route ids/state. In the built app, read onboarding, Guide, and every Explain this step panel; verify terminology, example ownership, domain-neutral language, keyboard/escape/dismiss behavior, and no state mutation. Search shipped visible text for the old ordered sequence and ambiguous 'Project details for'. Run onboarding/guidedExample/guidedProgress tests, full JS, and build.",
+      "depends_on": ["ORI-05", "ORI-07"],
+      "parallel_safe": false,
+      "files": [
+        "web/src/engine/guidedExample.js",
+        "web/src/ui/steps/guide.js",
+        "web/src/ui/steps/onboarding.js",
+        "web/tests/guidedExample.test.js",
+        "web/tests/onboarding.test.js"
+      ]
+    },
+    {
+      "id": "ORI-16",
+      "title": "Align generated study outputs and public documentation vocabulary",
+      "scope": "Make generated human-facing artifacts use Measurement as their primary hierarchy term while retaining internal JSON property names and ids. Update Markdown, SVG/Mermaid captions, bench-card headings, LLM prompt explanatory prose, README workflow list, and directly relevant documentation. CSV/JSON field names that form a machine contract remain unchanged unless already presentation-only. Include one note that some disciplines call a measurement an assay. Do not change document structure, filenames, data rows, control selection, render order, or prompt grounding rules.",
+      "verification": "Update renderer snapshots/assertions to prove only presentation labels changed: same assay ids, counts, filenames, groups, controls, and machine JSON/CSV keys. Render a multi-measurement study through Markdown, SVG, Mermaid, bench card, CSV, JSON, and LLM prompt; inspect for coherent visible language and byte-stable non-label data. Run all render/studydoc/llmprompt tests, full JS, Python regex/build tests, and build.",
+      "depends_on": ["ORI-14", "ORI-15"],
+      "parallel_safe": false,
+      "files": [
+        "web/src/engine/render/markdown.js",
+        "web/src/engine/render/svgDiagram.js",
+        "web/src/engine/render/mermaid.js",
+        "web/src/engine/render/benchcard.js",
+        "web/src/engine/render/llmprompt.js",
+        "README.md",
+        "web/tests/benchcard.test.js",
+        "web/tests/llmprompt.test.js",
+        "web/tests/svgDiagram.test.js"
+      ]
+    },
+    {
+      "id": "ORI-17",
+      "title": "Apply the sole responsive visual integration pass",
+      "scope": "As the only CSS owner, style the settled Study-map intake/summary, compact compass, example state, scope banners, measurement rows, decision tiers, placeholder labels, and renamed workspaces in the existing visual language: restrained cards, native controls/disclosures, current typography/colors/focus conventions, no decorative dashboard excess. At desktop preserve the rail and content density; at tablet/mobile stack map nodes and collapse compass details while keeping title/current scope/next action. Ensure 44px targets, visible focus, text-wrapping, both themes, print exclusions, 200% zoom, reduced motion, and no horizontal scroller at 320/375/430px. Do not change behavior or invent new selector contracts beyond settled markup.",
+      "verification": "Inspect the freshly built artifact at 1440, 1200, 760, 430, 375, and 320px in both themes; keyboard-only; 200% zoom; reduced-motion emulation; long question/system/measurement/error strings; 1 and maximum measurement counts; collapsed/expanded nav and compass. Prove no clipped content, horizontal page scroll, obscured action, inaccessible focus, color-only state, print-only compass clutter, or regression to existing panel/spectral layouts. Run build and Python build tests.",
+      "depends_on": ["ORI-07", "ORI-08", "ORI-09", "ORI-10", "ORI-11", "ORI-12", "ORI-13", "ORI-14", "ORI-15", "ORI-16"],
+      "parallel_safe": false,
+      "files": [
+        "web/styles/app.css"
+      ]
+    },
+    {
+      "id": "ORI-18",
+      "title": "Adversarially verify the complete orientation-first experience",
+      "scope": "Do not add features. Re-read the full plan, graph, CMA lessons, all diffs, and every executor-reported problem/deviation. Run the complete test/build gate and all sixteen adversarial traces in the prose plan against a freshly built HTTP-served artifact, plus the actual file:// offline smoke. Falsify the load-bearing mechanisms: map is the sole next-decision producer; observational mode clears group demand; measurement decision activates by id before route; stale ids cannot index/write; triage never weakens conformance; schema migration never infers; UI terminology never renames machine contracts. Fix only concrete defects, rerun focused and full gates, and classify repaired task status as resolved rather than done.",
+      "verification": "Run `node --test web/tests/*.test.js`; `python -m pytest -q tests/test_single_file_build.py tests/test_kb_json_valid.py tests/test_regex_conformance.py`; `python tools/build_single_file.py --web-dir web --out dist`; serve dist and record every adversarial trace with concrete expected/actual evidence. Inspect console logs, DOM/accessibility tree, stored JSON, exported artifacts, responsive screenshots, and dirty-tree scope. A pass requires zero unexplained console errors, all tests/builds green, offline boot, no unrelated-file mutation, and a written handover with exact pass counts and any residual product risk.",
+      "depends_on": ["ORI-17"],
+      "parallel_safe": false,
+      "files": [
+        "web/src/core/schema.js",
+        "web/src/core/defaultStudy.js",
+        "web/src/engine/experimentMap.js",
+        "web/src/engine/decisionTriage.js",
+        "web/src/engine/workflowProgress.js",
+        "web/src/engine/guidedExample.js",
+        "web/src/ui/studyMap.js",
+        "web/src/ui/shell.js",
+        "web/src/ui/steps/home.js",
+        "web/src/ui/steps/describe.js",
+        "web/src/ui/steps/study.js",
+        "web/src/ui/steps/design.js",
+        "web/src/ui/steps/panel.js",
+        "web/src/ui/steps/naming.js",
+        "web/src/ui/steps/overview.js",
+        "web/src/ui/steps/guide.js",
+        "web/src/ui/steps/onboarding.js",
+        "web/styles/app.css",
+        "README.md"
+      ]
+    }
+  ]
+}

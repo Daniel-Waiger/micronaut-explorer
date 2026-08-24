@@ -22,7 +22,12 @@ function savePreference(key, value) {
 function routeForWorkflow(id) { return id === 'microscopy' ? 'panel' : id; }
 function workflowForRoute(id) { return id === 'panel' ? 'microscopy' : id; }
 function stateLabel(state) {
-  return { 'not-started': 'Not started', 'in-progress': 'In progress', 'needs-attention': 'Needs review', complete: 'Complete' }[state] || 'Not started';
+  return {
+    'not-started': 'Not started',
+    'in-progress': 'In progress',
+    'needs-attention': 'Decision needed',
+    complete: 'Ready for now',
+  }[state] || 'Not started';
 }
 export function saveLabel(saveState) {
   if (saveState?.status === 'saving') return 'Saving locally…';
@@ -107,11 +112,11 @@ export function renderShell(root, store, router, options = {}) {
     utilityToggle.setAttribute('aria-expanded', 'false');
     if (focus) utilityToggle.focus();
   }
-  function action(label, callback, className = '') {
+  function action(label, callback, className = '', role = 'menuitem') {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = `shell-utility-action ${className}`.trim();
-    button.setAttribute('role', 'menuitem');
+    button.setAttribute('role', role);
     button.textContent = label;
     button.addEventListener('click', () => { closeMenu(); callback(); });
     return button;
@@ -167,7 +172,11 @@ export function renderShell(root, store, router, options = {}) {
       return;
     }
     recoveryEntries.forEach((entry, index) => {
-      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entry.title || 'Untitled study'}`, () => onRestoreRecovery(entry.id), 'shell-restore-action');
+      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entry.title || 'Untitled study'}`, () => {
+        if (window.confirm('Restore this saved version? Your current work remains available in Restore.')) {
+          onRestoreRecovery(entry.id);
+        }
+      }, 'shell-restore-action');
       restore.title = 'Restore this saved version';
       restoreList.appendChild(restore);
     });
@@ -185,36 +194,79 @@ export function renderShell(root, store, router, options = {}) {
       : report;
     window.open(`${FEEDBACK_ISSUES_URL}?title=${encodeURIComponent('Feedback: ')}&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
   }));
-  let theme = readPreference(THEME_KEY) || (osPrefersLight() ? 'light' : 'dark');
-  if (readPreference(THEME_KEY)) document.documentElement.setAttribute('data-theme', theme);
-  const appearance = action('', () => {
-    theme = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', theme);
+  // A persisted theme is an explicit preference. With System selected, do
+  // not set a data-theme attribute so the stylesheet's media query can track
+  // the operating system as it changes.
+  const storedTheme = readPreference(THEME_KEY);
+  let theme = ['dark', 'light', 'system'].includes(storedTheme) ? storedTheme : 'system';
+  const themeGroup = document.createElement('div');
+  themeGroup.className = 'shell-theme-group';
+  const themeTitle = document.createElement('div');
+  themeTitle.className = 'shell-utility-heading';
+  themeTitle.textContent = 'Color mode';
+  themeGroup.appendChild(themeTitle);
+  const themeActions = new Map();
+  function applyTheme() {
+    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', theme);
     savePreference(THEME_KEY, theme);
-    renderAppearance();
+    themeActions.forEach((button, mode) => {
+      const selected = mode === theme;
+      button.setAttribute('aria-checked', String(selected));
+      button.classList.toggle('is-selected', selected);
+    });
+  }
+  ['dark', 'light', 'system'].forEach((mode) => {
+    const label = mode === 'system' ? 'System' : `${mode[0].toUpperCase()}${mode.slice(1)} mode`;
+    const modeAction = action(label, () => {
+      theme = mode;
+      applyTheme();
+    }, 'shell-theme-action', 'menuitemradio');
+    modeAction.setAttribute('aria-checked', 'false');
+    themeActions.set(mode, modeAction);
+    themeGroup.appendChild(modeAction);
   });
-  function renderAppearance() { appearance.textContent = theme === 'dark' ? 'Use light appearance' : 'Use dark appearance'; }
-  renderAppearance();
-  utilityMenu.appendChild(appearance);
+  applyTheme();
+  utilityMenu.appendChild(themeGroup);
   utilities.append(utilityToggle, utilityMenu);
   headerActions.appendChild(utilities);
   header.append(brand, headerActions);
 
   const workflowStrip = document.createElement('section');
-  workflowStrip.className = 'workflow-strip';
-  workflowStrip.setAttribute('aria-label', 'Study workflow progress');
+  workflowStrip.className = 'workflow-strip experiment-compass';
+  workflowStrip.setAttribute('aria-label', 'Study map compass');
   const workflowSummary = document.createElement('span');
-  workflowSummary.className = 'workflow-summary';
+  // Keep the compass title independent of the legacy workflow-summary rule,
+  // which deliberately disappears at tablet widths. ORI-17 will own the
+  // settled visual treatment for this new compass selector.
+  workflowSummary.className = 'experiment-compass-title';
+  const compassDetails = document.createElement('div');
+  compassDetails.className = 'experiment-compass-details';
+  const compassScope = document.createElement('span');
+  compassScope.className = 'experiment-compass-scope';
+  const compassNext = document.createElement('div');
+  compassNext.className = 'experiment-compass-next';
   const workflowBadges = document.createElement('div');
   workflowBadges.className = 'workflow-badges';
-  workflowStrip.append(workflowSummary, workflowBadges);
+  workflowStrip.append(workflowSummary, compassDetails, compassScope, compassNext, workflowBadges);
 
   const mobileControls = document.createElement('section');
   mobileControls.className = 'shell-mobile-controls';
   mobileControls.setAttribute('aria-label', 'Workflow navigation');
+  const mobileCompass = document.createElement('div');
+  mobileCompass.className = 'shell-mobile-compass';
+  // This is deliberately kept in the existing mobile navigation surface so
+  // title and scope survive the desktop compass being collapsed at narrow
+  // widths. ORI-17 owns its final responsive styling.
+  mobileCompass.style.gridColumn = '1 / -1';
+  const mobileCompassTitle = document.createElement('span');
+  mobileCompassTitle.className = 'shell-mobile-compass-title';
+  const mobileCompassScope = document.createElement('span');
+  mobileCompassScope.className = 'shell-mobile-compass-scope';
+  mobileCompass.append(mobileCompassTitle, mobileCompassScope);
   const assayLabel = document.createElement('label');
   assayLabel.htmlFor = 'mobile-active-assay';
-  assayLabel.textContent = 'Assay';
+  assayLabel.textContent = 'Measurement';
   const assaySelect = document.createElement('select');
   assaySelect.id = 'mobile-active-assay';
   assaySelect.className = 'mobile-assay-select';
@@ -223,15 +275,15 @@ export function renderShell(root, store, router, options = {}) {
   const stepSelect = document.createElement('select');
   stepSelect.id = 'mobile-workflow-step';
   stepSelect.className = 'mobile-step-select';
-  mobileControls.append(assayLabel, assaySelect, stepLabel, stepSelect);
+  mobileControls.append(mobileCompass, assayLabel, assaySelect, stepLabel, stepSelect);
 
   const switcher = document.createElement('div');
   switcher.className = 'assay-switcher-bar';
   switcher.setAttribute('role', 'tablist');
-  switcher.setAttribute('aria-label', 'Assays');
+  switcher.setAttribute('aria-label', 'Measurements');
   const switcherLabel = document.createElement('span');
   switcherLabel.className = 'assay-switcher-label';
-  switcherLabel.textContent = 'Active assay';
+  switcherLabel.textContent = 'Active measurement';
 
   function primarySteps() {
     return (Array.isArray(workflowProgress.primary) ? workflowProgress.primary : []).map((step) => ({ ...step, routeId: routeForWorkflow(step.id) }));
@@ -241,6 +293,117 @@ export function renderShell(root, store, router, options = {}) {
   }
   function assayState(id) {
     return workflowProgress.assays?.find((assay) => assay?.id === id)?.state || 'not-started';
+  }
+  function compassText(value, fallback) {
+    return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+  }
+  function compassDisplayText(value, limit = 96) {
+    return value.length > limit ? `${value.slice(0, Math.max(1, limit - 1)).trimEnd()}…` : value;
+  }
+  function comparisonSummary(map) {
+    const comparison = map && typeof map.comparison === 'object' ? map.comparison : {};
+    const groups = Array.isArray(comparison.groups)
+      ? comparison.groups.filter((group) => typeof group === 'string' && group.trim()).map((group) => group.trim())
+      : [];
+    if (comparison.mode === 'observational') return 'Observational study';
+    if (comparison.mode === 'groups') return groups.length > 0 ? groups.join(' vs ') : 'Groups not decided';
+    return 'Not decided';
+  }
+  function measurementScope(experiment, map, routeId) {
+    // These are the existing active-assay workspaces. The shell only names
+    // their scope; each step remains responsible for its own data binding.
+    if (!['describe', 'design', 'panel', 'naming'].includes(routeId)) return 'Whole study';
+    const measurements = Array.isArray(map?.measurements) ? map.measurements : [];
+    const active = measurements.find((measurement) => measurement?.id === experiment.activeAssayId);
+    return `Measurement: ${compassText(active?.label, 'Not selected')}`;
+  }
+  function nextDecisionDestination(nextDecision, experiment) {
+    if (!nextDecision || typeof nextDecision !== 'object' || typeof nextDecision.routeId !== 'string') return null;
+    const routeId = routeForWorkflow(nextDecision.routeId);
+    if (!router.steps.some((step) => step.id === routeId)) return null;
+    const measurementId = typeof nextDecision.measurementId === 'string' ? nextDecision.measurementId : '';
+    if (measurementId && !(Array.isArray(experiment.assays) && experiment.assays.some((assay) => assay?.id === measurementId))) return null;
+    return { routeId, measurementId };
+  }
+  function renderCompass(activeId = router.current()) {
+    const experiment = store.get();
+    const map = workflowProgress.map && typeof workflowProgress.map === 'object' ? workflowProgress.map : {};
+    const measurements = Array.isArray(map.measurements) ? map.measurements : [];
+    const titleText = compassText(experiment.meta?.title, compassText(map.question?.value, 'Untitled study'));
+    const questionText = compassText(map.question?.value, 'Not decided');
+    const systemText = compassText(map.system?.value, 'Not decided');
+    const countText = `${measurements.length} measurement${measurements.length === 1 ? '' : 's'}`;
+    const scopeText = measurementScope(experiment, map, activeId);
+    const routeLabel = workflowStep(activeId)?.label || (activeId === 'guide' ? 'Guide' : 'Workspace');
+
+    workflowSummary.textContent = compassDisplayText(titleText);
+    workflowSummary.title = titleText;
+    workflowSummary.setAttribute('aria-label', titleText);
+    const scopeLine = `Now editing: ${scopeText} → ${routeLabel}`;
+    compassScope.textContent = compassDisplayText(scopeLine);
+    compassScope.title = scopeLine;
+    compassScope.setAttribute('aria-label', scopeLine);
+    mobileCompassTitle.textContent = compassDisplayText(titleText);
+    mobileCompassTitle.title = titleText;
+    mobileCompassTitle.setAttribute('aria-label', titleText);
+    mobileCompassScope.textContent = compassDisplayText(scopeText);
+    mobileCompassScope.title = scopeText;
+    mobileCompassScope.setAttribute('aria-label', scopeText);
+
+    compassDetails.textContent = '';
+    [
+      `Question: ${questionText}`,
+      `System: ${systemText}`,
+      `Comparison: ${comparisonSummary(map)}`,
+      countText,
+    ].forEach((text) => {
+      const detail = document.createElement('span');
+      detail.className = 'experiment-compass-detail';
+      detail.textContent = compassDisplayText(text);
+      detail.title = text;
+      detail.setAttribute('aria-label', text);
+      compassDetails.appendChild(detail);
+    });
+    if (experiment.meta?.origin === 'example') {
+      const ownership = document.createElement('span');
+      ownership.className = 'experiment-compass-example';
+      ownership.textContent = 'Example — changes are not your study';
+      compassDetails.appendChild(ownership);
+    }
+
+    compassNext.textContent = '';
+    const nextDecision = map.nextDecision && typeof map.nextDecision === 'object' ? map.nextDecision : null;
+    if (!nextDecision) {
+      compassNext.textContent = 'No outstanding map decision.';
+      return;
+    }
+    const nextLabel = `Next decision: ${compassText(nextDecision.label, 'Review the study map')}`;
+    const destination = nextDecisionDestination(nextDecision, experiment);
+    if (!destination) {
+      // A stale map must remain inert: never navigate, and especially never
+      // select a deleted measurement from an old decision payload.
+      compassNext.textContent = nextLabel;
+      return;
+    }
+    const nextButton = document.createElement('button');
+    nextButton.type = 'button';
+    nextButton.className = 'experiment-compass-next-action';
+    nextButton.textContent = nextLabel;
+    nextButton.addEventListener('click', () => {
+      const current = store.get();
+      const currentDestination = nextDecisionDestination(nextDecision, current);
+      if (!currentDestination) {
+        showToast('That measurement is no longer available.');
+        return;
+      }
+      // Validate against fresh state and select by stable id before the route
+      // renders; no decision/context logic is recreated in the shell.
+      if (currentDestination.measurementId && current.activeAssayId !== currentDestination.measurementId) {
+        store.patch({ activeAssayId: currentDestination.measurementId });
+      }
+      router.navigate(currentDestination.routeId);
+    });
+    compassNext.appendChild(nextButton);
   }
   function renderSwitcher(experiment) {
     switcher.replaceChildren(switcherLabel);
@@ -254,7 +417,7 @@ export function renderShell(root, store, router, options = {}) {
       select.className = 'assay-pill-label';
       select.setAttribute('role', 'tab');
       select.setAttribute('aria-selected', String(active));
-      select.textContent = assay.label || `Assay ${index + 1}`;
+      select.textContent = assay.label || `Measurement ${index + 1}`;
       select.addEventListener('click', () => { if (assay.id !== store.get().activeAssayId) store.patch({ activeAssayId: assay.id }); });
       const badge = document.createElement('span');
       badge.className = `assay-progress-badge is-${assayState(assay.id)}`;
@@ -265,10 +428,10 @@ export function renderShell(root, store, router, options = {}) {
         remove.type = 'button';
         remove.className = 'assay-pill-delete';
         remove.appendChild(createIcon('close', 'button-icon'));
-        remove.setAttribute('aria-label', `Delete ${assay.label || `Assay ${index + 1}`}`);
+        remove.setAttribute('aria-label', `Delete measurement ${assay.label || `Measurement ${index + 1}`}`);
         remove.addEventListener('click', (event) => {
           event.stopPropagation();
-          if (!window.confirm(`Delete "${assay.label || `Assay ${index + 1}`}"?`)) return;
+          if (!window.confirm(`Delete measurement "${assay.label || `Measurement ${index + 1}`}"?`)) return;
           const next = removeAssay(store.get(), assay.id);
           if (next) store.patch(next);
         });
@@ -279,7 +442,8 @@ export function renderShell(root, store, router, options = {}) {
     const add = document.createElement('button');
     add.type = 'button';
     add.className = 'assay-pill-add';
-    add.textContent = '+ Add assay';
+    add.textContent = '+ Add measurement';
+    add.setAttribute('aria-label', 'Add measurement');
     add.disabled = assays.length >= MAX_STUDY_ROWS;
     add.addEventListener('click', () => {
       const current = store.get();
@@ -347,8 +511,7 @@ export function renderShell(root, store, router, options = {}) {
 
   function renderWorkflowStrip() {
     const steps = primarySteps();
-    const complete = Number.isInteger(workflowProgress.summary?.complete) ? workflowProgress.summary.complete : steps.filter((step) => step.state === 'complete').length;
-    workflowSummary.textContent = `Workflow: ${complete} of ${steps.length || 7} complete`;
+    renderCompass();
     workflowBadges.textContent = '';
     steps.forEach((step) => {
       const badge = document.createElement('span');
@@ -388,7 +551,7 @@ export function renderShell(root, store, router, options = {}) {
     const experiment = store.get();
     assaySelect.textContent = '';
     (Array.isArray(experiment.assays) ? experiment.assays : []).forEach((assay, index) => {
-      const option = document.createElement('option'); option.value = assay.id; option.textContent = assay.label || `Assay ${index + 1}`; option.selected = assay.id === experiment.activeAssayId; assaySelect.appendChild(option);
+      const option = document.createElement('option'); option.value = assay.id; option.textContent = assay.label || `Measurement ${index + 1}`; option.selected = assay.id === experiment.activeAssayId; assaySelect.appendChild(option);
     });
     const steps = primarySteps();
     stepSelect.textContent = '';
@@ -405,20 +568,35 @@ export function renderShell(root, store, router, options = {}) {
     const steps = primarySteps();
     const index = steps.findIndex((step) => step.routeId === activeId);
     const currentStep = workflowStep(activeId);
+    const mapDecision = workflowProgress.map?.nextDecision;
+    const mapDestination = nextDecisionDestination(mapDecision, store.get());
     position.textContent = index === -1 ? 'Guide (optional)' : `Step ${index + 1} of ${steps.length}`;
     back.disabled = index <= 0;
-    next.disabled = index === -1 || index >= steps.length - 1;
+    next.disabled = mapDestination === null && (index === -1 || index >= steps.length - 1);
+    next.textContent = mapDestination ? 'Continue to next decision' : 'Continue';
     explain.disabled = !currentStep || typeof explainStepHandler !== 'function';
     back.onclick = () => { if (index > 0) router.navigate(steps[index - 1].routeId); };
-    next.onclick = () => { if (index !== -1 && index < steps.length - 1) router.navigate(steps[index + 1].routeId); };
+    next.onclick = () => {
+      if (mapDestination) {
+        const current = store.get();
+        const freshDestination = nextDecisionDestination(mapDecision, current);
+        if (!freshDestination) return;
+        if (freshDestination.measurementId && current.activeAssayId !== freshDestination.measurementId) {
+          store.patch({ activeAssayId: freshDestination.measurementId });
+        }
+        router.navigate(freshDestination.routeId);
+        return;
+      }
+      if (index !== -1 && index < steps.length - 1) router.navigate(steps[index + 1].routeId);
+    };
     // currentStep.id is the canonical workflow id: workflowStep() applies
     // the existing panel -> microscopy alias in one shared place.
     explain.onclick = () => {
       if (currentStep && typeof explainStepHandler === 'function') explainStepHandler(currentStep.id);
     };
   }
-  router.onChange((id) => { renderNav(id); renderMobileControls(id); renderFooter(id); });
-  store.subscribe((state) => { renderSwitcher(state); renderMobileControls(router.current()); });
+  router.onChange((id) => { renderCompass(id); renderNav(id); renderMobileControls(id); renderFooter(id); });
+  store.subscribe((state) => { renderCompass(router.current()); renderSwitcher(state); renderMobileControls(router.current()); });
   renderSwitcher(store.get());
   renderWorkflowStrip();
   renderNav(router.current());
@@ -452,8 +630,4 @@ export function renderShell(root, store, router, options = {}) {
       body.classList.toggle('has-guided-aside', isVisible);
     },
   };
-}
-
-function osPrefersLight() {
-  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)').matches;
 }

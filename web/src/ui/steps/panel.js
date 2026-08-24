@@ -67,7 +67,7 @@ const STATE_LABELS = {
 function stateSentence(entry) {
   switch (entry.state) {
     case 'unrecognized':
-      return `"${entry.token}" isn't a marker this app recognizes yet -- check the spelling on the Naming step.`;
+      return `"${entry.token}" isn't a marker this app recognizes yet -- check the spelling on the Data plan step.`;
     case 'ambiguous-family':
       return `"${entry.token}" names a multi-color family -- specify which variant (e.g. "${entry.token} Red") to check it for spillover.`;
     case 'no-intrinsic-spectrum':
@@ -124,7 +124,7 @@ function summaryText(channels) {
   return (
     `${channels.length} channel(s), ${filled} with a fluorophore named -- ` +
     (antibodyCount > 0
-      ? `${antibodyCount} use an antibody (isotype/secondary-antibody controls will be recommended on Overview).`
+      ? `${antibodyCount} use an antibody (isotype/secondary-antibody controls will be recommended on Review).`
       : 'none use an antibody.') +
     ` ${filterCount} detection filter(s) entered.`
   );
@@ -144,6 +144,13 @@ function createMicroscopySection(title, initiallyOpen = false) {
   return details;
 }
 
+function activeMeasurementLabel(experiment, assayId) {
+  const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];
+  const index = assays.findIndex((assay) => assay && assay.id === assayId);
+  const assay = index === -1 ? null : assays[index];
+  return assay?.label || (index === -1 ? 'Active measurement' : `Measurement ${index + 1}`);
+}
+
 // Same question-bank load as ui/steps/describe.js's module-level constant --
 // one parse of web/kb/questions.json, shared by both step factories via the
 // same `kb` object main.js already passes each of them. See loadQuestions'
@@ -156,11 +163,11 @@ export function createPanelStep(kb) {
   const fluorophoreOptions = panelFluorophoreOptions(kb.spectra);
   return {
     id: 'panel',
-    // Retitled 'Microscopy' (zen-planner Phase 1's reframe): this is where
+    // Retitled 'Acquisition': this is where
     // acquisition specifics -- modality, instrument, magnification, markers
     // -- get decided, after Project and before Outputs. The id stays
     // 'panel' (URL hash, every render() call site) -- label only.
-    title: 'Microscopy',
+    title: 'Acquisition',
     render(main, store, { advisor, experience } = {}) {
       // Commit 1 of the assay tier idiom (naming.js/design.js/describe.js
       // all cache this identically): the active assay never changes for the
@@ -180,8 +187,13 @@ export function createPanelStep(kb) {
 
         const heading = document.createElement('h1');
         heading.className = 'step-heading';
-        heading.textContent = 'Microscopy';
+        heading.textContent = 'Acquisition';
         main.appendChild(heading);
+
+        const scope = document.createElement('p');
+        scope.className = 'proposals-empty';
+        scope.textContent = `Planning how data will be acquired for: ${activeMeasurementLabel(store.get(), assayId)}.`;
+        main.appendChild(scope);
 
         const acquisitionSection = createMicroscopySection('Acquisition', true);
         const fluorophoresSection = createMicroscopySection('Fluorophores and spillover');
@@ -215,7 +227,7 @@ export function createPanelStep(kb) {
       const explainer = document.createElement('p');
       explainer.className = 'proposals-empty';
       explainer.textContent =
-        'A qualitative check for spectral spillover across this assay’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
+        'A qualitative check for spectral spillover across this measurement’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
       fluorophoresSection.appendChild(explainer);
 
       const banner = document.createElement('div');
@@ -233,7 +245,7 @@ export function createPanelStep(kb) {
       if (panelState === 'unanswered') {
         const empty = document.createElement('p');
         empty.className = 'panel-empty';
-        empty.textContent = 'No markers entered yet -- fill in the markers field on the Naming step to see a color panel here.';
+        empty.textContent = 'No markers entered yet -- fill in the markers field on the Data plan step to see a color panel here.';
         fluorophoresSection.appendChild(empty);
       } else if (panelState === 'no-markers-declared') {
         // A DECLARATION ("NONE", "N/A", "unstained", ...), not a typo -- see
@@ -242,7 +254,7 @@ export function createPanelStep(kb) {
         // answer was "there are no fluorophores in this assay."
         const declared = document.createElement('p');
         declared.className = 'panel-empty';
-        declared.textContent = 'This assay declares no markers/fluorophores -- nothing for a color panel to check here.';
+        declared.textContent = 'This measurement declares no markers/fluorophores -- nothing for a color panel to check here.';
         fluorophoresSection.appendChild(declared);
       } else {
         const list = document.createElement('div');
@@ -294,8 +306,8 @@ export function createPanelStep(kb) {
       const assemblyExplainer = document.createElement('p');
       assemblyExplainer.className = 'panel-empty';
       assemblyExplainer.textContent =
-        'Optional: name each channel’s biological target and how its fluorophore is attached. More precise than the ' +
-        'markers field above -- in particular, it is what tells the Overview step’s controls whether an antibody is ' +
+        'Optional: name each channel’s target or feature and how its fluorophore is attached. More precise than the ' +
+        'markers field above -- in particular, it is what tells the Review step’s controls whether an antibody is ' +
         'actually involved, so it can recommend an isotype control only when one is warranted. Enter a detection ' +
         'filter as center/bandwidth nm to overlay it above. Drag channel handles or use the arrow buttons to reorder; ' +
         'ordering changes the saved channel list, never a fluorophore’s physical wavelength.';
