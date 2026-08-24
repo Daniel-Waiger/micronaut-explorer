@@ -16,6 +16,8 @@ const ORIENTATION_QUESTIONS = Object.freeze([
   Object.freeze({ id: 'experimental-unit', skipIds: ['experimental-unit', 'studyContext.experimentalUnit'] }),
 ]);
 
+const COMPARISON_MODE_PROMPT = 'Will you compare groups or conditions, or is this an observational study?';
+
 function studyMapText(value) {
   return typeof value === 'string' ? value : '';
 }
@@ -188,12 +190,16 @@ export function createStudyMap({ store, router, getMap, document: suppliedDocume
     host.appendChild(progress);
   }
 
-  function appendComparisonControls(host, map) {
+  function appendComparisonControls(host, map, { labelledBy } = {}) {
     const fieldset = doc.createElement('fieldset');
     fieldset.className = 'study-map-comparison';
-    const legend = doc.createElement('legend');
-    legend.textContent = 'Will you compare groups or conditions, or is this an observational study?';
-    fieldset.appendChild(legend);
+    if (labelledBy) {
+      fieldset.setAttribute('aria-labelledby', labelledBy);
+    } else {
+      const legend = doc.createElement('legend');
+      legend.textContent = COMPARISON_MODE_PROMPT;
+      fieldset.appendChild(legend);
+    }
     const help = doc.createElement('p');
     help.className = 'proposals-empty';
     help.textContent = 'Examples: irrigated and dry plants; amended and unamended soil; coated and uncoated food films; or a descriptive survey of surface roughness.';
@@ -264,9 +270,10 @@ export function createStudyMap({ store, router, getMap, document: suppliedDocume
       });
       content.appendChild(field.row);
     } else if (question.id === 'comparison-mode') {
-      heading.textContent = 'Will you compare groups or conditions, or is this an observational study?';
+      heading.id = 'study-map-comparison-heading';
+      heading.textContent = COMPARISON_MODE_PROMPT;
       content.appendChild(heading);
-      appendComparisonControls(content, map);
+      appendComparisonControls(content, map, { labelledBy: heading.id });
     } else if (question.id === 'measurement') {
       heading.textContent = 'What will you measure or observe?';
       content.appendChild(heading);
