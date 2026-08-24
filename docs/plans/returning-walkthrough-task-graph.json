@@ -1,0 +1,33 @@
+{
+  "run": "Returning walkthrough and issue routing",
+  "batches": [["RW-1"], ["RW-2"], ["RW-3"]],
+  "tasks": [
+    {
+      "id": "RW-1",
+      "title": "Add 24-hour feature-tour return eligibility",
+      "phase": "visit state",
+      "depends_on": [],
+      "files": ["web/src/core/featureWalkthroughVisit.js", "web/tests/featureWalkthroughVisit.test.js"],
+      "scope": "Create small browser-storage-safe visit logic that distinguishes a new tab session from a refresh, triggers after 24 hours away, and supports a long-hidden tab returning without persisting a forced tour state.",
+      "verification": "Unit-test first visit, refresh suppression, under/over threshold returns, hidden-tab return, and unavailable storage behavior."
+    },
+    {
+      "id": "RW-2",
+      "title": "Integrate recurring tour, disclosure spotlighting, and GitHub login routing",
+      "phase": "UI integration",
+      "depends_on": ["RW-1"],
+      "files": ["web/src/main.js", "web/src/ui/featureWalkthrough.js", "web/src/ui/steps/panel.js", "web/src/ui/steps/feedback.js"],
+      "scope": "Start the focused tour on qualifying genuine entries without competing with onboarding/guided overlays; expand tour-owned collapsed Acquisition disclosures while focused and restore them on advance/close; route the private-repository issue action through GitHub sign-in with the prefilled report preserved.",
+      "verification": "Inspect the priority order and disclosure ownership state; prove only tour-opened disclosures re-close; assert GitHub login return URL contains the prepared issue URL."
+    },
+    {
+      "id": "RW-3",
+      "title": "Verify return-time tour behavior in shipped build",
+      "phase": "verification",
+      "depends_on": ["RW-2"],
+      "files": ["web/tests/featureWalkthrough.test.js", "dist/index.html"],
+      "scope": "Run targeted and complete JavaScript tests, rebuild, run build gates, and live-check the focused panel disclosure behavior plus the error-free issue action URL.",
+      "verification": "All tests pass, artifact has no static imports, automatic eligibility is independently covered, and the panel tour reveals then restores collapsed sections."
+    }
+  ]
+}

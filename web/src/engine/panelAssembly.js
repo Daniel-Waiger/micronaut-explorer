@@ -75,6 +75,19 @@ export function defaultChannelFilterPair(emissionPeakNm) {
 }
 
 /**
+ * The filter pair a spectrum should show for a channel. A complete saved
+ * pair is an explicit microscope setting and wins; otherwise use the same
+ * emission-derived suggestion displayed in the channel row. Keeping this
+ * decision here prevents the form from showing a suggested filter that the
+ * spectrum silently omits.
+ */
+export function effectiveChannelFilterPair(channel, emissionPeakNm) {
+  const saved = normalizePanelFilterPair(channel || {});
+  if (saved.filterCenterNm !== null) return saved;
+  return defaultChannelFilterPair(emissionPeakNm);
+}
+
+/**
  * The color actually shown for a channel: the user's explicit `channel.color`
  * override when set, else `computedDefault` (engine/color.js's
  * `wavelengthToColor` over the channel's resolved emission peak), else `null`
@@ -154,14 +167,21 @@ export function panelFluorophoreOptions(fluorophores) {
 }
 
 /** Write one picker value into the mode-appropriate field by stable channel id. */
-export function panelFluorophoreWriteValue(channels, channelId, value) {
+export function panelFluorophoreWriteValue(channels, channelId, value, options = {}) {
   const savedValue = typeof value === 'string' ? value : '';
+  const resetFilter = Boolean(options && options.resetFilter);
   if (!Array.isArray(channels)) return [];
   return channels.map((channel) => {
     if (!channel || channel.id !== channelId) return channel;
-    return channel.conjugation === 'tag-ligand'
-      ? { ...channel, conjugateDye: savedValue }
-      : { ...channel, fluorophore: savedValue };
+    const spectralField = channel.conjugation === 'tag-ligand' ? 'conjugateDye' : 'fluorophore';
+    return {
+      ...channel,
+      [spectralField]: savedValue,
+      // A library pick changes which dye the channel represents, so an old
+      // bandpass suggestion must not masquerade as a setting for the new
+      // dye. The UI then immediately derives the new default from emission.
+      ...(resetFilter ? { filterCenterNm: null, filterBandwidthNm: null } : {}),
+    };
   });
 }
 

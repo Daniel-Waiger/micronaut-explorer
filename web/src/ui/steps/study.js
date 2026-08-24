@@ -164,7 +164,7 @@ export const studyStep = {
     main.appendChild(vocabHeading);
 
     const vocabHelp = document.createElement('p');
-    vocabHelp.className = 'proposals-empty';
+    vocabHelp.className = 'proposals-empty supporting-description';
     vocabHelp.textContent =
       'Reuse these labels when measurements compare groups or conditions. Observational studies may have no comparison labels.';
     main.appendChild(vocabHelp);
@@ -418,7 +418,7 @@ export const studyStep = {
     }
 
     const addAssayHint = document.createElement('p');
-    addAssayHint.className = 'proposals-empty';
+    addAssayHint.className = 'proposals-empty supporting-description';
     const assayCount = Array.isArray(store.get().assays) ? store.get().assays.length : 0;
     addAssayHint.textContent =
       assayCount >= MAX_STUDY_ROWS

@@ -525,7 +525,7 @@ export function createOverviewStep(kb) {
       main.appendChild(heading);
 
       const explainer = document.createElement('p');
-      explainer.className = 'proposals-empty';
+      explainer.className = 'proposals-empty supporting-description';
       explainer.textContent =
         'A deterministic review of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
       main.appendChild(explainer);

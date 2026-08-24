@@ -163,12 +163,12 @@ export function createNamingStep(kb) {
     const activeAssay = assayById(store.get(), assayId);
     const activeAssayLabel = activeAssay?.label || 'this measurement';
     const scope = document.createElement('p');
-    scope.className = 'proposals-empty';
+    scope.className = 'proposals-empty supporting-description';
     scope.textContent = `Planning files and work for: ${activeAssayLabel}.`;
     main.appendChild(scope);
 
     const filenameGuidance = document.createElement('p');
-    filenameGuidance.className = 'proposals-empty';
+    filenameGuidance.className = 'proposals-empty supporting-description';
     filenameGuidance.textContent =
       'Enter the details needed for a final filename here. Date, sample ID, and instrument label may be assigned later on acquisition day; until then previews use clearly labelled placeholders. Final exports remain guarded by planner checks.';
     main.appendChild(filenameGuidance);
@@ -282,7 +282,7 @@ export function createNamingStep(kb) {
     main.appendChild(scheduleHeading);
 
     const scheduleHint = document.createElement('p');
-    scheduleHint.className = 'proposals-empty';
+    scheduleHint.className = 'proposals-empty supporting-description';
     scheduleHint.textContent =
       'Roughly how long each bench/microscope task takes for you -- used to build a downloadable schedule, scaled to the planned sample count above. Enter hours and minutes; leave blank to skip.';
     main.appendChild(scheduleHint);

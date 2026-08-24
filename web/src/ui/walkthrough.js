@@ -65,6 +65,8 @@ function completeStep(step, fallbackId) {
  *
  * `subscribe(listener)` is optional and is normally `store.subscribe`; it
  * refreshes values such as an active assay without changing guide progress.
+ * `onExportProject()` is the app-owned project-backup export action. It is
+ * surfaced only while the walkthrough focuses the Review step.
  * `onVisibilityChange(visible)` is an optional shell presentation hook; it
  * fires only when this controller actually opens or closes the aside.
  */
@@ -81,6 +83,7 @@ export function createWalkthroughController({
   onAdoptExample,
   onNewBlank,
   onKeepExploringExample,
+  onExportProject,
   onVisibilityChange,
 } = {}) {
   if (!host || !host.ownerDocument) {
@@ -258,7 +261,7 @@ export function createWalkthroughController({
 
     const top = element(doc, 'div', 'guided-walkthrough-topline');
     top.appendChild(element(doc, 'p', 'guided-walkthrough-position', mode === 'explanation'
-      ? `Explain this step · ${context.title}`
+      ? `About this step · ${context.title}`
       : `Example walkthrough · Step ${Math.max(index + 1, 1)} of ${workflow.length}`));
     top.appendChild(button(doc, 'guided-walkthrough-close', 'Close', close));
 
@@ -275,6 +278,17 @@ export function createWalkthroughController({
     const tryThis = element(doc, 'section', 'guided-walkthrough-try');
     tryThis.append(element(doc, 'h3', '', 'Try this'), element(doc, 'p', '', context.tryThis));
     const actions = element(doc, 'div', 'guided-walkthrough-actions');
+
+    // Keep the full study-format export menu in the Review workspace. This
+    // focused walkthrough action is the durable whole-project backup that
+    // was otherwise available only through the header utility menu.
+    if (stepId === 'overview' && typeof onExportProject === 'function') {
+      const exportProject = button(doc, 'guided-walkthrough-project-export', 'Download project backup', () => {
+        onExportProject();
+      });
+      exportProject.title = 'Download a backup of this whole project';
+      actions.appendChild(exportProject);
+    }
 
     if (mode === 'walkthrough') {
       const previous = index > 0 ? workflow[index - 1] : null;

@@ -1,0 +1,15 @@
+{
+  "run": "Spectral channel filter synchronization",
+  "batches": [["SP-1"]],
+  "tasks": [
+    {
+      "id": "SP-1",
+      "title": "Synchronize spectral filters with channel fluorophores",
+      "phase": "implement-and-verify",
+      "depends_on": [],
+      "files": ["web/src/engine/panelAssembly.js", "web/src/ui/steps/panel.js", "web/src/ui/spectralView.js", "web/tests/panelAssembly.test.js"],
+      "scope": "Use the spectrum-derived filter suggestion whenever a structured channel has no saved complete filter pair. On a discrete library fluorophore change, clear the prior channel filter pair so the new fluorophore's default replaces it. Do not change free-text marker behavior or overwrite a filter while its user is typing.",
+      "verification": "Exercise the producer-to-consumer path: a known structured channel with null stored filters must yield a plotted default filter; then change its library fluorophore after a complete old filter pair exists and prove the plotted center changes to the new emission-derived default. Preserve explicit custom-name typing behavior without a structural rerender. Run the full JS suite and the built artifact checks."
+    }
+  ]
+}

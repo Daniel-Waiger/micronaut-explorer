@@ -10,6 +10,7 @@ import {
   channelSpectralField,
   defaultChannelFilterPair,
   effectiveChannelColor,
+  effectiveChannelFilterPair,
   emptyChannel,
   normalizeChannels,
   panelFluorophoreOptions,
@@ -112,6 +113,21 @@ test('panelFluorophoreWriteValue updates by current id and mode without losing s
   assert.deepEqual(panelFluorophoreWriteValue(null, 'direct', 'x'), []);
 });
 
+test('a structural fluorophore pick clears the old filter so the new dye can supply its own default', () => {
+  const channels = [
+    { id: 'direct', conjugation: 'direct-probe', fluorophore: 'ALEXA488', filterCenterNm: 520, filterBandwidthNm: 30 },
+    { id: 'sibling', conjugation: 'direct-probe', fluorophore: 'mCherry', filterCenterNm: 610, filterBandwidthNm: 35 },
+  ];
+
+  const changed = panelFluorophoreWriteValue(channels, 'direct', 'mCherry', { resetFilter: true });
+
+  assert.deepEqual(changed[0], {
+    id: 'direct', conjugation: 'direct-probe', fluorophore: 'mCherry', filterCenterNm: null, filterBandwidthNm: null,
+  });
+  assert.deepEqual(changed[1], channels[1]);
+  assert.deepEqual(channels[0].filterCenterNm, 520);
+});
+
 test('emptyChannel has every field, defaulting to a non-antibody direct probe with auto color', () => {
   const channel = emptyChannel('c1');
   assert.deepEqual(channel, {
@@ -136,6 +152,18 @@ test('defaultChannelFilterPair returns null when there is no emission peak -- ne
   assert.equal(defaultChannelFilterPair(undefined), null);
   assert.equal(defaultChannelFilterPair(NaN), null);
   assert.equal(defaultChannelFilterPair('525'), null);
+});
+
+test('effectiveChannelFilterPair supplies the displayed default when no complete pair is saved, but preserves a real pair', () => {
+  assert.deepEqual(effectiveChannelFilterPair({ filterCenterNm: null, filterBandwidthNm: null }, 519), {
+    filterCenterNm: 519,
+    filterBandwidthNm: 30,
+  });
+  assert.deepEqual(effectiveChannelFilterPair({ filterCenterNm: 525, filterBandwidthNm: 50 }, 519), {
+    filterCenterNm: 525,
+    filterBandwidthNm: 50,
+  });
+  assert.equal(effectiveChannelFilterPair({ filterCenterNm: 525, filterBandwidthNm: null }, null), null);
 });
 
 test('effectiveChannelColor prefers the explicit override, else the computed default, else null', () => {

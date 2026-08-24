@@ -158,8 +158,8 @@ function templateFor(stepId, facts) {
         what: 'Review brings the study map, document, and conformance result together in one review surface.',
         why: 'A single readiness result makes outstanding issues visible without silently redefining them.',
         when: 'Use it before exporting, sharing, or treating the plan as ready to run.',
-        how: 'Read the readiness result, then follow each issue back to the step that owns its source field.',
-        tryThis: 'Review the readiness state and decide which listed issue should be resolved first.',
+        how: 'Read the readiness result, then follow each issue back to the step that owns its source field. Use the project-backup button in this focused walkthrough panel when you want a durable copy of the whole study.',
+        tryThis: 'Review the readiness state, decide which listed issue should be resolved first, then download a project backup if you want to keep this version.',
         exampleSummary: `This study is ${text(facts.conformance.readiness, 'not assessed')} with ${plural(facts.conformance.issueCount, 'reported issue')}.`,
       };
     default:

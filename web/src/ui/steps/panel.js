@@ -42,6 +42,7 @@ import {
   CONJUGATION_MODES,
   channelSpectralField,
   defaultChannelFilterPair,
+  effectiveChannelFilterPair,
   effectiveChannelColor,
   emptyChannel,
   normalizeChannels,
@@ -133,10 +134,11 @@ function summaryText(channels) {
 // Native disclosures keep the dense microscopy workflow scan-friendly while
 // preserving its complete, keyboard-operable content. All state lives in the
 // existing store/render paths below; these elements only group that content.
-function createMicroscopySection(title, initiallyOpen = false) {
+function createMicroscopySection(title, initiallyOpen = false, tourSection = '') {
   const details = document.createElement('details');
   details.className = 'microscopy-section';
   details.open = initiallyOpen;
+  if (tourSection) details.dataset.tourSection = tourSection;
   const summary = document.createElement('summary');
   summary.className = 'microscopy-section-summary';
   summary.textContent = title;
@@ -191,14 +193,14 @@ export function createPanelStep(kb) {
         main.appendChild(heading);
 
         const scope = document.createElement('p');
-        scope.className = 'proposals-empty';
+        scope.className = 'proposals-empty supporting-description';
         scope.textContent = `Planning how data will be acquired for: ${activeMeasurementLabel(store.get(), assayId)}.`;
         main.appendChild(scope);
 
-        const acquisitionSection = createMicroscopySection('Acquisition', true);
-        const fluorophoresSection = createMicroscopySection('Fluorophores and spillover');
-        const spectralSection = createMicroscopySection('Spectral view');
-        const assemblySection = createMicroscopySection('Panel assembly');
+        const acquisitionSection = createMicroscopySection('Acquisition', true, 'acquisition');
+        const fluorophoresSection = createMicroscopySection('Fluorophores and spillover', false, 'fluorophores');
+        const spectralSection = createMicroscopySection('Spectral view', false, 'spectral');
+        const assemblySection = createMicroscopySection('Panel assembly', false, 'assembly');
         const guidanceSection = createMicroscopySection('Guidance');
         main.appendChild(acquisitionSection);
         main.appendChild(fluorophoresSection);
@@ -225,7 +227,7 @@ export function createPanelStep(kb) {
         });
 
       const explainer = document.createElement('p');
-      explainer.className = 'proposals-empty';
+      explainer.className = 'proposals-empty supporting-description';
       explainer.textContent =
         'A qualitative check for spectral spillover across this measurement’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
       fluorophoresSection.appendChild(explainer);
@@ -348,6 +350,10 @@ export function createPanelStep(kb) {
         const resolved = token
           ? resolveMarkerToken(token, kb.index, kb.markersKb, kb.spectra)
           : { token: 'Unnamed channel', canonical: null, state: 'unrecognized' };
+        const effectiveFilter = effectiveChannelFilterPair(
+          channel,
+          resolved.state === 'known' ? resolved.emissionPeakNm : null
+        );
         // Same effective-color computation as the channel row's own swatch
         // (appendColorControls) -- the spectral view and the row it came
         // from can never show a channel in two different colors.
@@ -355,8 +361,8 @@ export function createPanelStep(kb) {
         return {
           ...resolved,
           channelId: channel.id,
-          filterCenterNm: channel.filterCenterNm,
-          filterBandwidthNm: channel.filterBandwidthNm,
+          filterCenterNm: effectiveFilter ? effectiveFilter.filterCenterNm : null,
+          filterBandwidthNm: effectiveFilter ? effectiveFilter.filterBandwidthNm : null,
           color: effectiveChannelColor(channel, computedColor),
         };
       }
@@ -555,7 +561,9 @@ export function createPanelStep(kb) {
             // re-render to pick up the new selection -- writeChannelsData
             // alone left them showing whatever the row resolved to before
             // this pick (often nothing, for a brand-new channel).
-            const next = panelFluorophoreWriteValue(currentChannels(), channel.id, value);
+            const next = panelFluorophoreWriteValue(currentChannels(), channel.id, value, {
+              resetFilter: isStructural,
+            });
             if (isStructural) writeChannelsStructure(next);
             else writeChannelsData(next);
           },

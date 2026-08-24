@@ -62,7 +62,7 @@ export const designStep = {
     const activeMeasurementLabel = activeAssay?.label ||
       (activeAssayIndex === -1 ? 'Active measurement' : `Measurement ${activeAssayIndex + 1}`);
     const scope = document.createElement('p');
-    scope.className = 'proposals-empty';
+    scope.className = 'proposals-empty supporting-description';
     scope.textContent = `Planning samples and design for: ${activeMeasurementLabel}.`;
     main.appendChild(scope);
 
@@ -90,7 +90,7 @@ export const designStep = {
     main.appendChild(unitRow);
 
     const hierarchyHelp = document.createElement('p');
-    hierarchyHelp.className = 'proposals-empty';
+    hierarchyHelp.className = 'proposals-empty supporting-description';
     hierarchyHelp.textContent =
       'An experimental unit is what is independently assigned or sampled for the whole study. A biological (independent) replicate is another such unit; a technical replicate is a repeated measurement of the same unit. Groups are mutually exclusive alternatives, while factors can cross groups or one another to form combinations.';
     main.appendChild(hierarchyHelp);
@@ -183,7 +183,7 @@ export const designStep = {
     main.appendChild(groupsHeading);
 
     const groupsHint = document.createElement('p');
-    groupsHint.className = 'proposals-empty';
+    groupsHint.className = 'proposals-empty supporting-description';
     groupsHint.textContent =
       'Your experimental groups, such as a control group and one or more treatment groups. Every sample belongs to exactly ONE group.';
     main.appendChild(groupsHint);

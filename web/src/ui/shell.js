@@ -5,13 +5,11 @@ import { removeAssay, seedAssayFromVocabulary } from '../core/assay.js';
 import { shortId } from '../core/ids.js';
 import { MAX_STUDY_ROWS } from '../engine/plan.js';
 import { buildFeedbackReport } from '../core/feedbackReport.js';
-import { copyToClipboard } from './clipboard.js';
+import { handoffFeedback } from './feedbackHandoff.js';
 import { createIcon } from './icons.js';
 
 const THEME_KEY = 'micronaut.theme';
 const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
-const FEEDBACK_ISSUES_URL = 'https://github.com/Daniel-Waiger/micronaut-planner/issues/new';
-const GITHUB_ISSUE_BODY_LIMIT = 6000;
 
 function readPreference(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -52,12 +50,18 @@ export function renderShell(root, store, router, options = {}) {
   let saveState = options.saveState || { status: 'unsaved' };
   let recoveryEntries = Array.isArray(options.recoveryEntries) ? options.recoveryEntries : [];
   let workflowProgress = options.workflowProgress || { primary: [], assays: [], summary: {} };
+  let themeNavButton = null;
+  let featureWalkthroughHandler = null;
   root.textContent = '';
 
   const header = document.createElement('header');
   header.className = 'shell-header';
-  const brand = document.createElement('div');
+  const brand = document.createElement('button');
+  brand.type = 'button';
   brand.className = 'shell-brand';
+  brand.title = 'Go to Home';
+  brand.setAttribute('aria-label', 'Go to Home');
+  brand.addEventListener('click', () => router.navigate('home'));
   brand.appendChild(createIcon('microscope', 'brand-mark'));
   const brandCopy = document.createElement('div');
   const title = document.createElement('div');
@@ -94,6 +98,16 @@ export function renderShell(root, store, router, options = {}) {
     });
     headerActions.appendChild(newStudy);
   }
+
+  const featureWalkthrough = document.createElement('button');
+  featureWalkthrough.type = 'button';
+  featureWalkthrough.className = 'shell-feature-walkthrough';
+  featureWalkthrough.append(createIcon('walkthrough', 'button-icon'), document.createTextNode('Walkthrough'));
+  featureWalkthrough.title = 'Take a focused tour of the app’s feature areas.';
+  featureWalkthrough.setAttribute('aria-label', 'Start feature walkthrough');
+  featureWalkthrough.disabled = true;
+  featureWalkthrough.addEventListener('click', () => featureWalkthroughHandler?.(featureWalkthrough));
+  headerActions.appendChild(featureWalkthrough);
 
   const utilities = document.createElement('div');
   utilities.className = 'shell-utilities';
@@ -183,16 +197,13 @@ export function renderShell(root, store, router, options = {}) {
   }
   renderRecoveryEntries();
   if (onResetOnboarding) utilityMenu.appendChild(action('Show onboarding again', onResetOnboarding));
-  utilityMenu.appendChild(action('Copy feedback report', async () => {
+  utilityMenu.appendChild(action('Copy feedback report', () => {
     const report = buildFeedbackReport({ currentStepId: router.current(), kbIssueCount, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined, experiment: store.get() });
-    showToast((await copyToClipboard(report)) ? 'Copied a feedback report.' : 'Could not copy automatically.');
+    handoffFeedback({ report, channel: 'copy' });
   }));
   utilityMenu.appendChild(action('Open GitHub issue', () => {
     const report = buildFeedbackReport({ currentStepId: router.current(), kbIssueCount, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined, experiment: store.get() });
-    const body = report.length > GITHUB_ISSUE_BODY_LIMIT
-      ? `${report.slice(0, GITHUB_ISSUE_BODY_LIMIT)}\n\n...(truncated — use Copy feedback report for the full study JSON)`
-      : report;
-    window.open(`${FEEDBACK_ISSUES_URL}?title=${encodeURIComponent('Feedback: ')}&body=${encodeURIComponent(body)}`, '_blank', 'noopener');
+    handoffFeedback({ report, channel: 'github' });
   }));
   // A persisted theme is an explicit preference. With System selected, do
   // not set a data-theme attribute so the stylesheet's media query can track
@@ -215,6 +226,20 @@ export function renderShell(root, store, router, options = {}) {
       button.setAttribute('aria-checked', String(selected));
       button.classList.toggle('is-selected', selected);
     });
+    if (themeNavButton) {
+      // This is an action, not a readout: it names the appearance a click
+      // will apply. System follows the current OS appearance until a user
+      // makes that first explicit light/dark choice.
+      const effectiveTheme = theme === 'system'
+        ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+        : theme;
+      const nextTheme = effectiveTheme === 'dark' ? 'light' : 'dark';
+      const label = `${nextTheme[0].toUpperCase()}${nextTheme.slice(1)}`;
+      themeNavButton.textContent = `Theme · ${label}`;
+      themeNavButton.dataset.themeMode = nextTheme;
+      themeNavButton.setAttribute('aria-label', `Switch to ${label} theme.`);
+      themeNavButton.title = `Switch to ${label} theme.`;
+    }
   }
   ['dark', 'light', 'system'].forEach((mode) => {
     const label = mode === 'system' ? 'System' : `${mode[0].toUpperCase()}${mode.slice(1)} mode`;
@@ -475,7 +500,20 @@ export function renderShell(root, store, router, options = {}) {
   renderNavToggle();
   const navSteps = document.createElement('div');
   navSteps.className = 'nav-steps';
-  sticky.append(navToggle, navSteps);
+  const navUtilities = document.createElement('div');
+  navUtilities.className = 'nav-utilities';
+  themeNavButton = document.createElement('button');
+  themeNavButton.type = 'button';
+  themeNavButton.className = 'nav-theme-toggle';
+  themeNavButton.addEventListener('click', () => {
+    const effectiveTheme = theme === 'system'
+      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : theme;
+    theme = effectiveTheme === 'dark' ? 'light' : 'dark';
+    applyTheme();
+  });
+  applyTheme();
+  sticky.append(navToggle, navSteps, navUtilities);
   nav.appendChild(sticky);
   const main = document.createElement('main');
   main.className = 'shell-main';
@@ -522,6 +560,7 @@ export function renderShell(root, store, router, options = {}) {
   }
   function renderNav(activeId) {
     navSteps.textContent = '';
+    navUtilities.textContent = '';
     router.steps.forEach((step) => {
       const current = workflowStep(step.id);
       const button = document.createElement('button');
@@ -544,8 +583,9 @@ export function renderShell(root, store, router, options = {}) {
         button.appendChild(badge);
       }
       button.addEventListener('click', () => router.navigate(step.id));
-      navSteps.appendChild(button);
+      (step.utility ? navUtilities : navSteps).appendChild(button);
     });
+    navUtilities.appendChild(themeNavButton);
   }
   function renderMobileControls(activeId = router.current()) {
     const experiment = store.get();
@@ -569,24 +609,38 @@ export function renderShell(root, store, router, options = {}) {
     const index = steps.findIndex((step) => step.routeId === activeId);
     const currentStep = workflowStep(activeId);
     const mapDecision = workflowProgress.map?.nextDecision;
-    const mapDestination = nextDecisionDestination(mapDecision, store.get());
+    const currentExperiment = store.get();
+    const mapDestination = nextDecisionDestination(mapDecision, currentExperiment);
+    // A map decision owned by the visible step is useful guidance, but it is
+    // not a navigation destination. Treating it as one made Continue route
+    // back to the same hash (notably Samples & design) and appear inert.
+    // Switching to another measurement on this same route remains a real
+    // destination and must keep the map-aware behavior.
+    const isCurrentDestination = (destination, experiment) =>
+      destination &&
+      destination.routeId === activeId &&
+      (!destination.measurementId || destination.measurementId === experiment.activeAssayId);
+    const continueDestination = isCurrentDestination(mapDestination, currentExperiment) ? null : mapDestination;
     position.textContent = index === -1 ? 'Guide (optional)' : `Step ${index + 1} of ${steps.length}`;
     back.disabled = index <= 0;
-    next.disabled = mapDestination === null && (index === -1 || index >= steps.length - 1);
-    next.textContent = mapDestination ? 'Continue to next decision' : 'Continue';
+    next.disabled = continueDestination === null && (index === -1 || index >= steps.length - 1);
+    next.textContent = continueDestination ? 'Continue to next decision' : 'Continue';
     explain.disabled = !currentStep || typeof explainStepHandler !== 'function';
     back.onclick = () => { if (index > 0) router.navigate(steps[index - 1].routeId); };
     next.onclick = () => {
-      if (mapDestination) {
+      if (continueDestination) {
         const current = store.get();
         const freshDestination = nextDecisionDestination(mapDecision, current);
-        if (!freshDestination) return;
-        if (freshDestination.measurementId && current.activeAssayId !== freshDestination.measurementId) {
-          store.patch({ activeAssayId: freshDestination.measurementId });
+        if (freshDestination && !isCurrentDestination(freshDestination, current)) {
+          if (freshDestination.measurementId && current.activeAssayId !== freshDestination.measurementId) {
+            store.patch({ activeAssayId: freshDestination.measurementId });
+          }
+          router.navigate(freshDestination.routeId);
+          return;
         }
-        router.navigate(freshDestination.routeId);
-        return;
       }
+      // The map either already points here or changed while the user was
+      // deciding. In both cases Continue retains its dependable linear path.
       if (index !== -1 && index < steps.length - 1) router.navigate(steps[index + 1].routeId);
     };
     // currentStep.id is the canonical workflow id: workflowStep() applies
@@ -623,6 +677,10 @@ export function renderShell(root, store, router, options = {}) {
     setExplainStepHandler(handler) {
       explainStepHandler = typeof handler === 'function' ? handler : null;
       renderFooter(router.current());
+    },
+    setFeatureWalkthroughHandler(handler) {
+      featureWalkthroughHandler = typeof handler === 'function' ? handler : null;
+      featureWalkthrough.disabled = !featureWalkthroughHandler;
     },
     setGuidedAsideVisible(visible) {
       const isVisible = Boolean(visible);

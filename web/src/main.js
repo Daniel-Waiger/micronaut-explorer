@@ -27,6 +27,8 @@ import {
   startGuidedProgress,
 } from './core/guidedProgress.js';
 import { createWalkthroughController } from './ui/walkthrough.js';
+import { createFeatureWalkthroughController } from './ui/featureWalkthrough.js';
+import { createFeatureWalkthroughVisit } from './core/featureWalkthroughVisit.js';
 import { BASE_TEMPLATE, createNamingStep, NAMING_CONFIG } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
 import { designStep } from './ui/steps/design.js';
@@ -35,6 +37,8 @@ import { createPanelStep } from './ui/steps/panel.js';
 import { createOverviewStep } from './ui/steps/overview.js';
 import { guideStep } from './ui/steps/guide.js';
 import { homeStep } from './ui/steps/home.js';
+import { feedbackStep } from './ui/steps/feedback.js';
+import { settingsStep } from './ui/steps/settings.js';
 import { showOnboardingGate } from './ui/steps/onboarding.js';
 import { loadOnboarding, resetOnboarding } from './core/onboarding.js';
 
@@ -138,7 +142,7 @@ function init() {
   // Guide LAST: stays permanently in the nav so it is always reachable, even
   // though Home's own "Take the walkthrough" card is now the more prominent
   // entry point to the same content. See ui/steps/guide.js's header.
-  const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep];
+  const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep, feedbackStep, settingsStep];
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
@@ -261,6 +265,7 @@ function init() {
 
   let exampleChooser = null;
   let guidedController = null;
+  let featureWalkthroughController = null;
   let exploreExample = false;
 
   function showExampleChooser({ explicit = false } = {}) {
@@ -333,9 +338,25 @@ function init() {
     onAdoptExample: adoptExampleTemplate,
     onNewBlank: startBlankStudy,
     onKeepExploringExample: () => {},
+    onExportProject: exportProjectBackup,
     onVisibilityChange: shell.setGuidedAsideVisible,
   });
   shell.setExplainStepHandler((stepId) => guidedController.explain(stepId));
+  featureWalkthroughController = createFeatureWalkthroughController({ router });
+  shell.setFeatureWalkthroughHandler((trigger) => featureWalkthroughController.start(trigger));
+  const featureTourVisit = createFeatureWalkthroughVisit();
+
+  function startReturningFeatureTour() {
+    if (exampleChooser || guidedProgressState.status === 'active' || featureWalkthroughController.isOpen()) return false;
+    featureWalkthroughController.start();
+    return true;
+  }
+
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') featureTourVisit.markHidden();
+    if (document.visibilityState === 'visible' && featureTourVisit.shouldStartOnReturn()) startReturningFeatureTour();
+  });
+  window.addEventListener('pagehide', () => featureTourVisit.markLeaving());
 
   function explainGuided(stepId) {
     const routeStepId = guidedStepIdForRoute(router.current());
@@ -391,6 +412,9 @@ function init() {
       onResumeGuided: () => guidedController.resume(),
       onRestartGuided: () => guidedController.restart(),
       onExplainGuided: explainGuided,
+      kbIssueCount: kb.issues.length,
+      onExportProject: exportProjectBackup,
+      onImportProject: importProjectBackup,
     });
   }
 
@@ -461,6 +485,7 @@ function init() {
 
   const chooserShown = showExampleChooser();
   if (!chooserShown && guidedProgressState.status === 'active') guidedController.resume();
+  else if (!chooserShown && featureTourVisit.shouldStartNow()) startReturningFeatureTour();
 }
 
 init();

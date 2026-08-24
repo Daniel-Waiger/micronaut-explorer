@@ -84,7 +84,7 @@ function appendExampleMapSummary(main, store) {
   heading.className = 'design-subheading';
   heading.textContent = 'Example study map';
   const copy = document.createElement('p');
-  copy.className = 'proposals-empty';
+  copy.className = 'proposals-empty supporting-description';
   copy.textContent = 'Read-only while you explore. Make a copy to edit this study.';
   const facts = document.createElement('ul');
   facts.className = 'overview-controls-list';
@@ -169,7 +169,7 @@ export const homeStep = {
     heading.textContent = 'Study map';
     main.appendChild(heading);
     const subheading = document.createElement('p');
-    subheading.className = 'proposals-empty';
+    subheading.className = 'proposals-empty supporting-description';
     subheading.textContent = 'Start with the shape of your study, then move directly to the workspace that owns each decision.';
     main.appendChild(subheading);
 

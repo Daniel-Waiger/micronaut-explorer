@@ -378,6 +378,18 @@ button:focus-visible {
   gap: 8px;
 }
 
+.nav-utilities { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
+.nav-utilities .nav-step { color: #fff; border-color: transparent; }
+.nav-utilities .nav-step[data-step-id="feedback"] { background: #d95f02; }
+.nav-utilities .nav-step[data-step-id="settings"] { background: #c62828; }
+.nav-utilities .nav-step:hover, .nav-utilities .nav-step.active { color: #fff; filter: brightness(1.08); box-shadow: none; }
+.shell-utilities { display: none; }
+
+.nav-theme-toggle { min-height: 42px; border: 2px solid; border-radius: 9px; padding: 8px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(15 23 42 / 18%); }
+.nav-theme-toggle[data-theme-mode="light"] { color: #0f172a; background: #fff; border-color: #0f172a; }
+.nav-theme-toggle[data-theme-mode="dark"] { color: #f8fafc; background: #0f172a; border-color: #94a3b8; }
+.nav-theme-toggle:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 2px; }
+
 .field-commit-row > .field-input,
 .field-commit-row > .duration-control {
   flex: 1 1 auto;
@@ -2070,6 +2082,23 @@ textarea {
   align-items: center;
   min-width: 0;
   gap: 11px;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.shell-brand:hover .shell-title,
+.shell-brand:hover .shell-subtitle {
+  color: var(--accent);
+}
+
+.shell-brand:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 12px;
 }
 
 .brand-mark {
@@ -2521,6 +2550,7 @@ td, th { border-color: var(--line); }
 .shell-utilities { position: relative; }
 
 .shell-new-study,
+.shell-feature-walkthrough,
 .shell-utility-toggle,
 .shell-utility-action,
 .mobile-assay-select,
@@ -2628,6 +2658,7 @@ td, th { border-color: var(--line); }
 }
 
 .shell-new-study,
+.shell-feature-walkthrough,
 .shell-utility-toggle {
   display: inline-flex;
   align-items: center;
@@ -2647,6 +2678,21 @@ td, th { border-color: var(--line); }
   border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+}
+
+.shell-feature-walkthrough {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.shell-feature-walkthrough:hover:not(:disabled) {
+  filter: brightness(.95);
+}
+
+.shell-feature-walkthrough:disabled {
+  opacity: .55;
+  cursor: wait;
 }
 
 .shell-utility-toggle:hover,
@@ -3033,6 +3079,7 @@ td, th { border-color: var(--line); }
   .header-actions { gap: 6px; }
   .shell-save-indicator { order: 3; flex-basis: 100%; }
   .shell-new-study,
+  .shell-feature-walkthrough,
   .shell-utility-toggle { flex: 1 1 auto; }
   .shell-mobile-controls { grid-template-columns: 1fr; gap: 3px; }
   .shell-mobile-controls label { margin-top: 4px; }
@@ -3131,6 +3178,7 @@ td, th { border-color: var(--line); }
 .guided-walkthrough-adopt,
 .guided-walkthrough-blank,
 .guided-walkthrough-keep,
+.guided-walkthrough-project-export,
 .workflow-explain {
   display: inline-flex;
   align-items: center;
@@ -3161,6 +3209,7 @@ td, th { border-color: var(--line); }
 .guided-walkthrough-pause:hover,
 .guided-walkthrough-blank:hover,
 .guided-walkthrough-keep:hover,
+.guided-walkthrough-project-export:hover,
 .workflow-explain:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   color: var(--accent);
@@ -3192,6 +3241,7 @@ td, th { border-color: var(--line); }
 .guided-walkthrough-adopt:focus-visible,
 .guided-walkthrough-blank:focus-visible,
 .guided-walkthrough-keep:focus-visible,
+.guided-walkthrough-project-export:focus-visible,
 .guided-walkthrough-details > summary:focus-visible,
 .workflow-explain:focus-visible,
 .onboarding-choice:focus-visible {
@@ -3513,6 +3563,46 @@ td, th { border-color: var(--line); }
   background: var(--accent-soft);
 }
 
+.feedback-handoff-backdrop {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  background: rgb(15 23 42 / 58%);
+  backdrop-filter: blur(3px);
+}
+
+.feedback-handoff-dialog {
+  position: fixed;
+  z-index: 61;
+  top: 50%;
+  left: 50%;
+  width: min(520px, calc(100vw - 40px));
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: clamp(22px, 4vw, 32px);
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgb(15 23 42 / 32%);
+}
+
+.feedback-handoff-dialog .step-heading { margin-bottom: 8px; }
+
+.feedback-handoff-description {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.feedback-handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
 @media (max-width: 760px) {
   .onboarding-choice-dialog {
     top: 14px;
@@ -3521,6 +3611,13 @@ td, th { border-color: var(--line); }
     max-height: calc(100vh - 28px);
     transform: none;
     padding: 20px;
+  }
+
+  .feedback-handoff-dialog {
+    top: 14px;
+    left: 14px;
+    width: calc(100vw - 28px);
+    transform: none;
   }
 
   .onboarding-choice-list {
@@ -4218,6 +4315,16 @@ td, th { border-color: var(--line); }
   overflow-wrap: anywhere;
 }
 
+/* Supporting descriptions are deliberately inset from the page and section
+   headings. Empty-state messages retain their original alignment, so this
+   creates a quieter text hierarchy without moving controls or status copy. */
+.supporting-description {
+  /* A fixed indent disappeared at high zoom and on broad displays. Scale the
+     supporting-copy gutter with the viewport, while clamping it to a calm
+     minimum/maximum so it never crowds compact layouts or drifts too far. */
+  margin-inline-start: clamp(16px, 2vw, 32px);
+}
+
 .project-details {
   border-top-color: color-mix(in srgb, var(--accent) 42%, var(--line));
 }
@@ -4577,6 +4684,7 @@ td, th { border-color: var(--line); }
    compact rail still has a 76px track, so its 44px toggle preserves the
    original density without reducing the usable main column. */
 .shell-new-study,
+.shell-feature-walkthrough,
 .shell-utility-toggle,
 .shell-utility-action,
 .mobile-assay-select,
@@ -4605,6 +4713,7 @@ td, th { border-color: var(--line); }
   }
 
   .shell-new-study,
+  .shell-feature-walkthrough,
   .shell-utilities,
   .shell-utility-toggle {
     min-width: 0;
@@ -4644,6 +4753,85 @@ td, th { border-color: var(--line); }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+}
+
+/* Feature walkthrough: four dimming panes leave the current feature fully
+   visible while the rest of the app is softly blurred. Unlike a full-screen
+   opaque dialog this keeps the explanation spatially attached to its target. */
+.feature-tour-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.feature-tour-shade {
+  position: fixed;
+  pointer-events: auto;
+  background: rgb(15 23 42 / 46%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.feature-tour-target {
+  position: relative;
+  border-radius: 10px;
+  outline: 3px solid color-mix(in srgb, var(--accent) 72%, #fff);
+  outline-offset: 5px;
+  box-shadow: 0 0 0 8px rgb(255 255 255 / 20%);
+}
+
+.feature-tour-dialog {
+  position: fixed;
+  z-index: 1001;
+  box-sizing: border-box;
+  max-width: calc(100vw - 32px);
+  border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--line));
+  border-top: 3px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px;
+  color: var(--ink);
+  background: var(--panel);
+  box-shadow: 0 18px 48px rgb(15 23 42 / 28%);
+}
+
+.feature-tour-position {
+  margin: 0 0 7px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.feature-tour-title { margin: 0 0 6px; font-size: 17px; line-height: 1.2; }
+.feature-tour-body { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.48; }
+.feature-tour-actions { display: grid; grid-template-columns: auto 1fr auto; gap: 7px; margin-top: 14px; }
+.feature-tour-actions button {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--ink);
+  background: var(--panel-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.feature-tour-next { border-color: var(--accent) !important; color: var(--accent-ink) !important; background: var(--accent) !important; }
+.feature-tour-actions button:hover:not(:disabled) { filter: brightness(.96); }
+.feature-tour-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.feature-tour-actions button:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .feature-tour-dialog { padding: 12px; }
+  .feature-tour-actions { grid-template-columns: 1fr 1fr; }
+  .feature-tour-next { grid-column: 1 / -1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feature-tour-shade { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 @media print {

@@ -1,0 +1,24 @@
+{
+  "run": "Feedback URL privacy repair",
+  "batches": [["FP-1"], ["FP-2"]],
+  "tasks": [
+    {
+      "id": "FP-1",
+      "title": "Keep feedback packages out of GitHub URLs",
+      "phase": "repair",
+      "depends_on": [],
+      "files": ["web/src/ui/steps/feedback.js", "web/tests/feedback.test.js"],
+      "scope": "Open only a clean GitHub sign-in return path and copy the generated feedback package locally for the user to paste, so study data and browser metadata never enter a URL.",
+      "verification": "Assert the generated login URL contains no report content and the issue handler invokes local copy before reporting its paste guidance."
+    },
+    {
+      "id": "FP-2",
+      "title": "Verify shipped privacy repair",
+      "phase": "verification",
+      "depends_on": ["FP-1"],
+      "files": ["dist/index.html"],
+      "scope": "Run targeted and full tests, rebuild the artifact, and prove no issue-login URL construction includes feedback report content.",
+      "verification": "Full suite passes and a source/artifact scan confirms report() is absent from GitHub URL construction."
+    }
+  ]
+}

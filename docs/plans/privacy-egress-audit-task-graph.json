@@ -1,0 +1,33 @@
+{
+  "run": "Cross-app privacy egress audit",
+  "batches": [["PA-1"], ["PA-2"], ["PA-3"]],
+  "tasks": [
+    {
+      "id": "PA-1",
+      "title": "Inventory every outbound and persistence sink",
+      "phase": "inventory",
+      "depends_on": [],
+      "files": ["web/src/**", "web/*.html", "tools/build_single_file.py"],
+      "scope": "Enumerate network calls, external navigation, URL construction, mailto links, clipboard writes, downloads, browser storage, console output, and any serialization of study or browser metadata.",
+      "verification": "Every sink class has a repository-wide search and each match is classified by source data, destination, user gesture, and persistence surface."
+    },
+    {
+      "id": "PA-2",
+      "title": "Trace sensitive data into each sink",
+      "phase": "data flow",
+      "depends_on": ["PA-1"],
+      "files": ["web/src/core/**", "web/src/ui/**", "web/src/llm/**"],
+      "scope": "Trace feedback prose, complete study JSON, narrative text, browser metadata, identifiers, and configuration values from producers through every outbound or persistent consumer; distinguish confirmed leaks from explicit local exports and configured model requests.",
+      "verification": "Adversarially test for sensitive URL query/hash/referrer/history exposure and unprompted network transmission; record exact file and line evidence."
+    },
+    {
+      "id": "PA-3",
+      "title": "Report confirmed risks and safe paths",
+      "phase": "verification",
+      "depends_on": ["PA-2"],
+      "files": [],
+      "scope": "Re-scan built and source paths, prioritize confirmed findings, document intentional exports, and state any limitations. Do not change app behavior during this audit.",
+      "verification": "The report separates confirmed exposure, conditional/configured transmission, local-only persistence, and false positives, with actionable remediation."
+    }
+  ]
+}

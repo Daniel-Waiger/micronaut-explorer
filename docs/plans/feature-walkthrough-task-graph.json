@@ -1,0 +1,33 @@
+{
+  "run": "Focused feature walkthrough",
+  "batches": [["FT-1"], ["FT-2"], ["FT-3"]],
+  "tasks": [
+    {
+      "id": "FT-1",
+      "title": "Build the feature-level walkthrough controller and tour map",
+      "phase": "controller",
+      "depends_on": [],
+      "files": ["web/src/ui/featureWalkthrough.js"],
+      "scope": "Create a DOM-only controller and concise, selector-based tour map covering the shell plus meaningful feature areas on every app route. It must move between routes, skip unavailable conditional targets, use Back/Next/Close/Escape, return focus, and expose one highlighted target plus a short adjacent dialog at a time.",
+      "verification": "Prove tour-map route coverage, finite forward traversal, safe missing-target skipping, and pure controller module syntax."
+    },
+    {
+      "id": "FT-2",
+      "title": "Wire the header trigger and focused overlay presentation",
+      "phase": "integration",
+      "depends_on": ["FT-1"],
+      "files": ["web/src/ui/shell.js", "web/src/main.js", "web/styles/app.css"],
+      "scope": "Place a Walkthrough button immediately after New study, wire it to the controller, and render a dimmed/blurred four-pane spotlight with an anchored 2–3 sentence dialog. Preserve Explain this step and existing guided walkthrough behavior.",
+      "verification": "Inspect the button order and controller wiring, confirm the backdrop excludes only the target rectangle, and verify compact-screen dialog placement remains clamped to the viewport."
+    },
+    {
+      "id": "FT-3",
+      "title": "Verify the focused tour in the shipped artifact",
+      "phase": "verification",
+      "depends_on": ["FT-2"],
+      "files": ["web/tests/featureWalkthrough.test.js", "dist/index.html"],
+      "scope": "Add focused tests for route coverage and navigation invariants, rebuild the single-file artifact, run the full JavaScript suite, and live-check launch, highlighting, and movement to a subsequent feature.",
+      "verification": "Full suite passes; built artifact contains no static imports; the local tour opens from the header and its Next action changes the highlighted feature or route."
+    }
+  ]
+}

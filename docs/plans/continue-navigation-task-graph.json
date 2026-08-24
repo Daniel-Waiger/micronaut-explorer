@@ -1,0 +1,15 @@
+{
+  "run": "Continue navigation same-step recovery",
+  "batches": [["CN-1"]],
+  "tasks": [
+    {
+      "id": "CN-1",
+      "title": "Prevent Continue from routing to its current step",
+      "phase": "implement-and-verify",
+      "depends_on": [],
+      "files": ["web/src/ui/shell.js"],
+      "scope": "When the workflow map's next decision resolves to the current route, the footer Continue action must use the normal next primary workflow route instead of navigating to the same hash. Keep a cross-step map destination authoritative and retain active-measurement selection behavior.",
+      "verification": "Check the two-path truth table in source and the built artifact: same-route map decision falls through; a different valid map route still wins. Build dist, run the full JS test suite, and run diff checks."
+    }
+  ]
+}

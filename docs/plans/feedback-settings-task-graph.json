@@ -1,0 +1,30 @@
+{
+  "title": "Feedback and Settings navigation",
+  "batches": [["FS-1"], ["FS-2"], ["FS-3"]],
+  "tasks": [
+    {
+      "id": "FS-1",
+      "title": "Add utility routes and bottom navigation actions",
+      "phase": "Navigation",
+      "files": ["web/src/main.js", "web/src/ui/shell.js", "web/styles/app.css"],
+      "scope": "Add non-workflow Feedback and Settings routes, render vibrant persistent bottom navigation actions, and remove the header Utilities trigger without breaking project backup/import/recovery lifecycle callbacks.",
+      "verification": "Serve the built artifact. Verify Feedback and Settings buttons remain visible below the workflow navigation, route correctly by mouse and keyboard, and no header Utilities button remains."
+    },
+    {
+      "id": "FS-2",
+      "title": "Build the local-first feedback workspace",
+      "phase": "Feedback",
+      "files": ["web/src/ui/steps/feedback.js", "web/src/core/feedbackReport.js", "web/src/main.js", "web/styles/app.css"],
+      "scope": "Create a feedback page that records a bounded route journey locally, lets the user describe an issue and select included context, and supports email, copy, download, and corrected GitHub issue fallbacks. The anonymous send action must be visibly unavailable without a configured endpoint and must not transmit data.",
+      "verification": "Exercise each action in the built artifact: no data is sent by opening the page; Copy/Download/Email/GitHub actions use the reviewed package; disabled Send feedback cannot transmit; changing route and opening Feedback records the visible journey context."
+    },
+    {
+      "id": "FS-3",
+      "title": "Build Settings page and verify cross-surface behavior",
+      "phase": "Settings and verification",
+      "files": ["web/src/ui/steps/settings.js", "web/src/main.js", "web/styles/app.css"],
+      "scope": "Move theme, project backup/import, recovery, onboarding, and reset controls into a Settings page, retaining confirmations and accessible file-input behavior.",
+      "verification": "Run the full JS suite and build. In the built artifact test Settings backup/import/recovery/reset controls, Feedback route history, and mobile/desktop bottom utility navigation without horizontal overflow."
+    }
+  ]
+}

@@ -144,53 +144,85 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "Guided walkthrough repair",
-  "orchestrator": "Codex",
+  "run": "Cross-app privacy egress audit",
+  "orchestrator": "Codex warm-context direct",
   "active_model": "Codex",
   "active_status": "complete",
-  "phase": "",
-  "state_note": "",
-  "current_task": null,
+  "phase": "verification",
+  "state_note": "Audit complete: two confirmed URI exposures, one conditional remote-model disclosure, and one local token-storage hardening issue. No analytics, third-party assets, WebSockets, beacons, XHR, service workers, or unprompted study-data network transmission found.",
+  "current_task": {
+    "id": "PA-1",
+    "title": "Inventory every outbound and persistence sink"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "Scope",
-      "v": "Guided walkthrough repair"
+      "k": "Confirmed URI exposures",
+      "v": "2"
     },
     {
-      "k": "Verification",
-      "v": "813 JS tests + 34 Python tests + live compact/wide walkthrough",
-      "tone": " passed"
+      "k": "Conditional disclosure risks",
+      "v": "1"
+    },
+    {
+      "k": "Unprompted study-data network calls",
+      "v": "0"
     }
   ],
-  "defects": [],
+  "defects": [
+    {
+      "id": "PA-D1",
+      "location": "web/src/ui/shell.js:211",
+      "title": "Header Utilities GitHub action embeds feedback and study data in a URL",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "PA-D2",
+      "location": "web/src/ui/steps/feedback.js:35",
+      "title": "Email action embeds the full feedback package in a mailto URI",
+      "body": "",
+      "repro": ""
+    }
+  ],
   "tasks": [
     {
-      "id": "GUIDE-01",
-      "phase": "1",
-      "title": "Reproduce guided walkthrough entry and repair its hand-off",
+      "id": "PA-1",
+      "phase": "Batch 1",
+      "title": "Inventory every outbound and persistence sink",
       "status": "done",
       "by": "Codex"
     },
     {
-      "id": "VERIFY-GUIDE",
-      "phase": "2",
-      "title": "Build and verify guided walkthrough interactions",
+      "id": "PA-2",
+      "phase": "Batch 2",
+      "title": "Trace sensitive data into each sink",
       "status": "done",
-      "by": "Codex"
+      "by": "queued"
+    },
+    {
+      "id": "PA-3",
+      "phase": "Batch 3",
+      "title": "Report confirmed risks and safe paths",
+      "status": "done",
+      "by": "queued"
     }
   ],
   "log": [
     {
-      "time": "13:42:08",
-      "msg": "Started live walkthrough reproduction."
+      "time": "22:06:58",
+      "msg": "Started repository-wide privacy sink inventory"
     },
     {
-      "time": "13:47:13",
-      "msg": "Guided walkthrough now scrolls and focuses after the route settles on compact layouts; verified live through Step 3 with no console errors."
+      "time": "22:09:50",
+      "msg": "PA-1 sink inventory complete; PA-2 source-to-sink tracing complete. Runtime UI confirms the legacy Utilities actions are mounted."
+    },
+    {
+      "time": "22:09:51",
+      "msg": "Built artifact re-scan and live UI verification complete."
     }
   ],
-  "snapshot_at": "2026-08-24 13:47"
+  "snapshot_at": "2026-08-24 22:09"
 };
 /* CMA:EMBEDDED:END */
 

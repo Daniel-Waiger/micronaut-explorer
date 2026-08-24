@@ -109,7 +109,7 @@ export function createDescribeStep(kb) {
       narrativeCard.appendChild(scope);
 
       const intro = document.createElement('p');
-      intro.className = 'proposals-empty';
+      intro.className = 'proposals-empty supporting-description';
       intro.textContent = 'Describe the whole study -- its question, system or material, and purpose -- before planning individual measurement details.';
       narrativeCard.appendChild(intro);
 
