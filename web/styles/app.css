@@ -367,12 +367,14 @@ button:focus-visible {
 }
 
 /* The name-builder-style field interview (ui/fieldInterview.js, zen-planner
-   Phase 1 feedback): a box plus a small ✓ to confirm it, replacing the
-   earlier full-sentence question + Answer/Skip button pair. The "why" text
-   moves to the box's native title tooltip -- no visible subtitle. */
+   Phase 1 feedback): a box with its labelled confirmation action directly
+   beneath it, replacing the earlier full-sentence question + Answer/Skip
+   button pair. The "why" text moves to the box's native title tooltip -- no
+   visible subtitle. */
 .field-commit-row {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
 }
 
@@ -382,19 +384,8 @@ button:focus-visible {
   min-width: 0;
 }
 
-/* An "Other…" choice is a select plus a conditional free-text box. It is
-   taller than the one-line fields beside it, so keeping its confirmation
-   button in the same narrow grid track lets that button spill into the next
-   field. Give the composite control its own line and keep the action below
-   it; ordinary one-line interview fields retain their compact side-by-side
-   layout. */
-.field-commit-row:has(> .question-control-group) {
-  flex-wrap: wrap;
-  align-items: flex-start;
-}
-
 .field-commit-row > .question-control-group {
-  flex: 1 1 100%;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -406,7 +397,7 @@ button:focus-visible {
 
 .field-commit {
   flex: 0 0 auto;
-  width: 40px;
+  align-self: flex-start;
   height: 40px;
   min-height: 0;
   font-size: 16px;
@@ -2607,6 +2598,13 @@ td, th { border-color: var(--line); }
   cursor: pointer;
 }
 
+.field-commit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
 .study-group-token-remove:hover {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
@@ -2883,8 +2881,30 @@ td, th { border-color: var(--line); }
 .field-commit-confirmed { border-color: var(--ok); color: var(--accent-ink); background: var(--ok); }
 .field-commit-confirmed:hover { filter: brightness(.95); }
 
-.reveal.field-chooser-help { margin-top: 2px; }
-.reveal.field-chooser-help > .proposals-empty { margin: 8px 0 0; }
+.field-commit-actions .reveal.field-chooser-help {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.field-commit-actions .field-chooser-help > .reveal-summary {
+  padding: 7px 10px;
+  font-size: 11.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.field-commit-actions .field-chooser-help > .reveal-summary::before {
+  margin-right: 6px;
+}
+
+.field-commit-actions .field-chooser-help[open] {
+  flex-basis: 100%;
+}
+
+.field-commit-actions .field-chooser-help > .proposals-empty {
+  margin: 8px 0 0;
+  padding: 0 10px 10px;
+}
 
 .microscopy-section,
 .overview-assay,

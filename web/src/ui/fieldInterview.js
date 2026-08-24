@@ -15,7 +15,7 @@
 
 import { buildQuestionControl } from './questionControl.js';
 
-// Novice-only "Not sure? Help me choose" expanders (zen-planner
+// Novice-only "Help me choose" expanders (zen-planner
 // experience-verbosity slice), keyed by the question's `field` path -- NOT
 // its `id`, since `field` is the stable cross-file join key (see
 // engine/interview.js's questions.json contract and lesson 50 in
@@ -71,7 +71,7 @@ function appendChooserHelp(cell, question) {
   details.className = 'reveal field-chooser-help';
   const summary = document.createElement('summary');
   summary.className = 'reveal-summary';
-  summary.textContent = 'Not sure? Help me choose';
+  summary.textContent = 'Help me choose';
   details.appendChild(summary);
   const body = document.createElement('p');
   body.className = 'proposals-empty';
@@ -83,16 +83,18 @@ function appendChooserHelp(cell, question) {
 /**
  * Render `questions` into `container` as a field grid.
  *
- * `onCommit(question, rawValue)` is invoked when the user clicks a box's ✓,
- * with the box's current value -- the caller writes it (STRONG) and is
- * expected to re-render so `confirmed` flips. An empty box is a no-op: an
- * unfilled field is a skipped question, never a committed blank.
+ * `onCommit(question, rawValue)` is invoked when the user clicks a box's
+ * confirmation button, with the box's current value -- the caller writes it
+ * (STRONG) and is expected to re-render so `confirmed` flips. An empty box
+ * is a no-op: an unfilled field is a skipped question, never a committed
+ * blank.
  *
  * `experience` ('novice' | 'occasional' | 'frequent' | null | undefined,
  * zen-planner experience-verbosity slice) is threaded straight from the
  * step's own render(ctx) call, same as advice.js's defaultExpanded --
- * ONLY 'novice' renders the small "Not sure? Help me choose" expander
- * beneath the handful of fields in FIELD_CHOOSER_HELP above; every other
+ * ONLY 'novice' renders the small "Help me choose" expander beside the
+ * confirmation button for the handful of fields in FIELD_CHOOSER_HELP above;
+ * every other
  * value (including the pre-onboarding null default) renders exactly as
  * before this slice.
  */
@@ -188,10 +190,13 @@ export function renderFieldInterview(container, { questions, onCommit, experienc
       if (raw === '' || raw === undefined || raw === null) return;
       if (typeof onCommit === 'function') onCommit(question, raw);
     });
-    commitRow.appendChild(commitBtn);
+    const actions = document.createElement('div');
+    actions.className = 'field-commit-actions';
+    actions.appendChild(commitBtn);
+    if (experience === 'novice') appendChooserHelp(actions, question);
+    commitRow.appendChild(actions);
 
     cell.appendChild(commitRow);
-    if (experience === 'novice') appendChooserHelp(cell, question);
     grid.appendChild(cell);
   }
 }
