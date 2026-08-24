@@ -235,10 +235,16 @@ export function renderShell(root, store, router, options = {}) {
         : theme;
       const nextTheme = effectiveTheme === 'dark' ? 'light' : 'dark';
       const label = `${nextTheme[0].toUpperCase()}${nextTheme.slice(1)}`;
-      themeNavButton.textContent = `Theme · ${label}`;
+      const bulbState = nextTheme === 'light' ? 'on' : 'off';
+      const bulb = createIcon(bulbState === 'on' ? 'lightbulb-on' : 'lightbulb', 'nav-theme-icon');
+      const copy = document.createElement('span');
+      copy.className = 'nav-theme-label';
+      copy.textContent = `Theme · ${label}`;
+      themeNavButton.replaceChildren(bulb, copy);
       themeNavButton.dataset.themeMode = nextTheme;
+      themeNavButton.dataset.bulbState = bulbState;
       themeNavButton.setAttribute('aria-label', `Switch to ${label} theme.`);
-      themeNavButton.title = `Switch to ${label} theme.`;
+      themeNavButton.title = `Light bulb ${bulbState}. Switch to ${label} theme.`;
     }
   }
   ['dark', 'light', 'system'].forEach((mode) => {
