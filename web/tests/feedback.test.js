@@ -8,8 +8,22 @@ test('GitHub issue action signs in first without putting a feedback package in t
   assert.equal(loginUrl.origin, 'https://github.com');
   assert.equal(loginUrl.pathname, '/login');
   const returnTo = loginUrl.searchParams.get('return_to');
-  assert.equal(returnTo, '/Daniel-Waiger/micronaut-explorer/issues/new');
+  // GitHub decodes return_to and redirects the signed-in user straight there,
+  // so the destination -- issue path AND its own `labels` query -- must
+  // survive as one opaque value, not be split across two query strings that
+  // GitHub's login redirect would only carry one of.
+  assert.equal(returnTo, '/Daniel-Waiger/micronaut-explorer/issues/new?labels=feedback');
   assert.doesNotMatch(loginUrl.href, /reproducible|report|body=/i);
+});
+
+// GitHub's new-issue form pre-applies any label named in its OWN query string
+// -- this is the entire "feedback folder" mechanism: no server, no token, just
+// a label the repo must already define (see gh CLI note in the PR/commit).
+test('the GitHub destination requests the feedback label', () => {
+  const loginUrl = new URL(githubLoginUrl());
+  const returnTo = new URL(loginUrl.searchParams.get('return_to'), 'https://github.com');
+  assert.equal(returnTo.pathname, '/Daniel-Waiger/micronaut-explorer/issues/new');
+  assert.equal(returnTo.searchParams.get('labels'), 'feedback');
 });
 
 test('a configured email action addresses a real recipient and carries no package', () => {

@@ -20,6 +20,25 @@ This matters more than it looks. A pilot whose goal is "does the flow make
 sense?" needs a return channel, or the silence that comes back is
 indistinguishable from success.
 
+## Feedback storage (2026-09-03) — shipped
+
+Feedback opened via GitHub now lands with the `feedback` label pre-applied
+(`web/src/ui/feedbackHandoff.js`) — GitHub's new-issue form reads `labels` from
+its own query string, so this is a static link change, not a server or
+integration. Issues opened this way are one filterable group in the repo: the
+"folder" a zero-server app can actually have.
+
+**Requires the `feedback` label to exist in the repo** (a label name in the
+link is silently ignored if undefined):
+
+```
+gh label create feedback --repo Daniel-Waiger/micronaut-explorer --color d93f0b --description "Opened via the app's Feedback page"
+```
+
+`docs/plans` note: `web/src/ui/shell.js`'s own header **Copy feedback report**
+action goes through the same GitHub path and inherits the label with no
+separate change.
+
 ## Pilot-readiness restructure (2026-09-03) — shipped
 
 Three commits, each green. See each commit message for the full reasoning.

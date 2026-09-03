@@ -1,6 +1,14 @@
 import { copyToClipboard } from './clipboard.js';
 
-const GITHUB_ISSUE_PATH = '/Daniel-Waiger/micronaut-explorer/issues/new';
+// GitHub's "new issue" form reads `labels` from its own query string and
+// pre-applies it. This is the whole mechanism: it turns "issues opened from
+// the app" into a filterable, linkable group inside the repo -- effectively a
+// feedback folder -- with no server, no token, and no new dependency. Because
+// the sign-in redirect (githubFeedbackUrl below) carries this whole path as
+// its OWN query value, the label has to be encoded into the path string here
+// rather than appended after building the login URL, or GitHub would receive
+// `return_to=/…/issues/new` with the label silently dropped.
+const GITHUB_ISSUE_PATH = '/Daniel-Waiger/micronaut-explorer/issues/new?labels=feedback';
 
 // The address feedback email is addressed to. Deliberately blank until a real
 // non-personal inbox exists: a `mailto:` with no recipient opens an empty

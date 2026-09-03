@@ -70,8 +70,11 @@ not steps to march through — jump to any of them in any order:
 
 A **Feedback** page collects what you were doing, the current page, browser
 details, and your full study into one package you can copy, download, or take
-to a GitHub issue. Nothing is sent anywhere unless you choose one of those
-actions.
+to a GitHub issue. The GitHub issue path pre-applies the `feedback` label
+(GitHub's new-issue form reads it from the link's own query string), so
+feedback opened from the app is one filterable group inside the repo — no
+server or credential involved. Nothing is sent anywhere unless you choose one
+of those actions.
 
 ## On language models
 
