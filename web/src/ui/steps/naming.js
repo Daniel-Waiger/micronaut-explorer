@@ -100,12 +100,6 @@ const FIELD_DEFS = [
     hint: 'The zoom level or objective you used, like 40x or 100x.',
   },
   {
-    key: 'group',
-    label: 'Group',
-    placeholder: 'e.g. CTL, OPP -- set per-row by the Design step, or type one here',
-    hint: 'Which experimental group this file belongs to, such as your control group or a treatment group. Usually filled in for you from the Design page.',
-  },
-  {
     key: 'sample',
     label: 'Sample',
     placeholder: 'e.g. ABC01',
@@ -184,7 +178,26 @@ export function createNamingStep(kb) {
     // effectiveNamingFields (an engine function that must never learn
     // assays exist) already expects.
     const prefill = effectiveNamingFields(assayView(store.get(), assayId));
+
+    // Group is READ-ONLY here. It used to be a text box a person could type
+    // into directly, duplicating the same question Samples & design already
+    // asks -- see docs/plans, this task's plan file. Now it just shows what
+    // that page decided, updated by update() below from the same planned
+    // rows the filename preview uses, so this line can never disagree with
+    // the {group} token actually embedded in the filenames.
+    const groupRow = document.createElement('div');
+    groupRow.className = 'field-row';
+    const groupLabelText = document.createElement('span');
+    groupLabelText.className = 'field-label';
+    groupLabelText.textContent = 'Group';
+    groupRow.appendChild(groupLabelText);
+    const groupValue = document.createElement('span');
+    groupValue.className = 'field-readonly-value';
+    groupValue.title = 'Set on Samples & design for this measurement -- not editable here.';
+    groupRow.appendChild(groupValue);
+
     for (const field of FIELD_DEFS) {
+      if (field.key === 'sample') grid.appendChild(groupRow);
       const row = document.createElement('label');
       row.className = 'field-row';
 
@@ -384,6 +397,14 @@ export function createNamingStep(kb) {
         // rendering so the two paths can never format replicates differently.
         raw[field.key] = prefix ? formatReplicateToken(prefix, Number(value)) : value;
       }
+      // group has no input box any more (Samples & design is the one place it
+      // is typed), but a value already saved to naming.fields.group -- from
+      // before this change, or a deliberate one-off with no design at all --
+      // must still reach the filename. planFilenames overrides this with the
+      // design's own group label whenever the design actually has groups, so
+      // this is only ever the value that survives for a design with none.
+      const storedGroup = assayView(store.get(), assayId).naming?.fields?.group;
+      if (storedGroup) raw.group = storedGroup;
       return raw;
     }
 
@@ -409,6 +430,12 @@ export function createNamingStep(kb) {
       const rawFields = currentRawFields();
       lastPlanned = planFilenames(view, NAMING_CONFIG);
       advicePanel.update(view);
+
+      // Distinct group labels actually embedded in the planned filenames --
+      // reading lastPlanned rather than the design directly means this can
+      // never show a group the filenames themselves disagree with.
+      const groupLabels = [...new Set(lastPlanned.map((entry) => entry.groupLabel).filter(Boolean))];
+      groupValue.textContent = groupLabels.length > 0 ? groupLabels.join(', ') : 'None';
 
       const count = lastPlanned.length;
       plannedLabel.textContent =

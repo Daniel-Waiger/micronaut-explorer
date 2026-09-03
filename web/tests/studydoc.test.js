@@ -36,9 +36,10 @@ test('study document and text renderers use group terminology exclusively', () =
   const markdown = renderMarkdown(doc);
   const mermaid = renderMermaid(doc);
 
-  assert.deepEqual(doc.study.groupVocabulary, ['CTL', 'OPP']);
+  // There is no study-level groupVocabulary any more -- groups are a
+  // per-measurement fact only (design.groups on each assay).
+  assert.ok(!('groupVocabulary' in doc.study));
   assert.deepEqual(doc.assays[0].design.groups, ['CTL', 'OPP']);
-  assert.match(markdown, /Study-wide group vocabulary/);
   assert.match(markdown, /Groups \(mutually exclusive\)/);
   assert.match(mermaid, /group\(s\)/);
   for (const output of [serialized, markdown, mermaid]) {

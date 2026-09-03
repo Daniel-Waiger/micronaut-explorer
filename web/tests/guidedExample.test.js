@@ -54,7 +54,7 @@ test('all five contexts use the real default-study document and conformance proj
   assert.match(measurementSummary, new RegExp(expectedDocument.assays[0].modality));
   assert.match(measurementSummary, new RegExp(expectedDocument.assays[0].filenames[0].filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(byStep(content, 'overview').exampleSummary, new RegExp(expectedConformance.readiness));
-  assert.match(byStep(content, 'study').exampleSummary, /Comparison labels: CTL, OPP/);
+  assert.match(byStep(content, 'study').exampleSummary, /Groups in use: CTL, OPP/);
   assert.match(byStep(content, 'measurement').exampleSummary, /groups CTL, OPP/);
   assert.doesNotMatch(JSON.stringify(content.steps), /\barms?\b/i);
   assert.equal(byStep(content, 'home').title, 'Study map');

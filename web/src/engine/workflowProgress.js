@@ -114,13 +114,16 @@ function hasContent(value, seen = new WeakSet()) {
   return hasValue(value);
 }
 
+function anyAssayHasGroups(assays) {
+  return assays.some((assay) => {
+    const levels = assay && assay.design && assay.design.groups && assay.design.groups.levels;
+    return Array.isArray(levels) && levels.some(hasValue);
+  });
+}
+
 function studyProgress(experiment, conformance, assays) {
-  const groupLevels =
-    experiment && experiment.groupVocabulary && Array.isArray(experiment.groupVocabulary.levels)
-      ? experiment.groupVocabulary.levels
-      : [];
   const hasResearchQuestion = hasValue(experiment && experiment.researchQuestion);
-  const hasGroupVocabulary = groupLevels.some(hasValue);
+  const hasGroups = anyAssayHasGroups(assays);
   const allAssaysHaveContent = assays.length > 0 && assays.every(hasAssayContent);
   const crossAssayIssues = Array.isArray(conformance && conformance.crossAssayIssues)
     ? conformance.crossAssayIssues
@@ -130,8 +133,8 @@ function studyProgress(experiment, conformance, assays) {
   // so consume its existing output rather than rerunning studyNameIssues or
   // trying to reinterpret severities here.
   if (crossAssayIssues.length > 0) return 'needs-attention';
-  if (hasResearchQuestion && hasGroupVocabulary && allAssaysHaveContent) return 'complete';
-  if (hasResearchQuestion || hasGroupVocabulary || assays.some(hasAssayContent)) return 'in-progress';
+  if (hasResearchQuestion && hasGroups && allAssaysHaveContent) return 'complete';
+  if (hasResearchQuestion || hasGroups || assays.some(hasAssayContent)) return 'in-progress';
   return 'not-started';
 }
 

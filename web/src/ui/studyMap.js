@@ -3,7 +3,7 @@
 // decision ordering: those stay with the injected store/router and the pure
 // experiment-map projection respectively.
 
-import { assayById, scopeWrite, seedAssayFromVocabulary } from '../core/assay.js';
+import { assayById, groupSeedLevels, scopeWrite, seedAssayGroups } from '../core/assay.js';
 import { shortId } from '../core/ids.js';
 import { editTagFor } from '../core/provenance.js';
 import { buildExperimentMap } from '../engine/experimentMap.js';
@@ -58,18 +58,6 @@ function studyMapButton(doc, className, label, onClick) {
   control.textContent = label;
   control.addEventListener('click', onClick);
   return control;
-}
-
-function uniqueLevels(raw) {
-  const seen = new Set();
-  return String(raw)
-    .split(/[\n,]/)
-    .map((value) => value.trim())
-    .filter((value) => {
-      if (!value || seen.has(value.toLocaleLowerCase())) return false;
-      seen.add(value.toLocaleLowerCase());
-      return true;
-    });
 }
 
 function knownMeasurementIds(experiment) {
@@ -218,21 +206,24 @@ export function createStudyMap({ store, router, getMap, document: suppliedDocume
       radio.checked = currentMode === choice[0];
       radio.addEventListener('change', () => {
         write('studyContext.comparisonMode', choice[0]);
-        groups.row.hidden = choice[0] !== 'groups';
+        groupsSummary.hidden = choice[0] !== 'groups';
       });
       label.append(radio, doc.createTextNode(` ${choice[1]}`));
       fieldset.appendChild(label);
     }
-    const groups = input(doc, {
-      id: 'study-map-comparison-groups',
-      label: 'Comparison labels',
-      value: Array.isArray(map.comparison?.groups) ? map.comparison.groups.join(', ') : '',
-      placeholder: 'e.g. control, treatment',
-      help: 'For a groups study, add the labels you will compare. Separate labels with commas.',
-      onInput: (value) => write('groupVocabulary', { levels: uniqueLevels(value) }),
-    });
-    groups.row.hidden = currentMode !== 'groups';
-    fieldset.appendChild(groups.row);
+    // Read-only: groups themselves are typed exactly once, per measurement,
+    // on Samples & design -- see ui/steps/design.js. This line is a summary
+    // of what those measurements already say, not a second place to type
+    // them (that duplicate editor is what this change removes).
+    const groupsSummary = doc.createElement('p');
+    groupsSummary.className = 'study-map-groups-summary proposals-empty';
+    const groupLevels = Array.isArray(map.comparison?.groups) ? map.comparison.groups : [];
+    groupsSummary.textContent =
+      groupLevels.length > 0
+        ? `Groups in use: ${groupLevels.join(', ')}`
+        : "You'll name the groups on each measurement, under Samples & design.";
+    groupsSummary.hidden = currentMode !== 'groups';
+    fieldset.appendChild(groupsSummary);
     host.appendChild(fieldset);
   }
 
@@ -460,7 +451,7 @@ export function createStudyMap({ store, router, getMap, document: suppliedDocume
         addStatus.textContent = 'Could not create a unique measurement identifier. Please try again.';
         return;
       }
-      const seeded = seedAssayFromVocabulary(current.groupVocabulary, id);
+      const seeded = seedAssayGroups(groupSeedLevels(current), id);
       const provenance = current.provenance && typeof current.provenance === 'object' ? current.provenance : {};
       const slots = provenance.slots && typeof provenance.slots === 'object' ? provenance.slots : {};
       // One patch keeps the new assay and its weak group seed inseparable;

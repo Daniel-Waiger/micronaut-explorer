@@ -14,15 +14,17 @@
 // read-only-plus-"Edit on Study map" pattern Samples & design already uses for
 // the experimental unit.
 //
-// Group-vocabulary authoring and the cross-assay collision check stay here:
-// both are properties of the measurement COLLECTION, which is what this page
-// owns.
+// Groups are typed once, per measurement, on that measurement's own Samples
+// & design page -- this page only shows them (the registry's Groups column)
+// and offers a "copy to measurements that have none" shortcut, a property of
+// the measurement COLLECTION rather than any one measurement. The
+// cross-assay collision check stays here for the same reason.
 //
 // No advice panel: every advisor rule keys on a per-assay fact
 // (acquisition.modality, etc.); study shape is not a guidance surface the KB
 // models today.
 
-import { assayView, removeAssay, scopeWrite, seedAssayFromVocabulary } from '../../core/assay.js';
+import { assayView, groupSeedLevels, removeAssay, scopeWrite, seedAssayGroups } from '../../core/assay.js';
 import { effectiveNamingFields, MAX_STUDY_ROWS, studyNameIssues } from '../../engine/plan.js';
 import { finalizeFields, renderName } from '../../engine/naming.js';
 import { shortId } from '../../core/ids.js';
@@ -68,51 +70,6 @@ function registrySelect(parent, { label, options, onChange }) {
   wrapper.appendChild(select);
   parent.appendChild(wrapper);
   return select;
-}
-
-/**
- * "N of M assays use this vocabulary" -- how many assays' current group axis
- * matches the study's vocabulary verbatim. Order-sensitive (JSON.stringify
- * on the array): a vocabulary and an assay that list the same groups in a
- * different order are NOT considered converged, since order is part of what
- * "matches the template" means here, not incidental.
- *
- * Returns null when the vocabulary is empty -- there is nothing for an
- * assay's groups to converge TO yet, so there is nothing useful to report.
- */
-function groupDivergenceSummary(experiment) {
-  const vocabLevels =
-    experiment.groupVocabulary && Array.isArray(experiment.groupVocabulary.levels)
-      ? experiment.groupVocabulary.levels
-      : [];
-  if (vocabLevels.length === 0) return null;
-
-  const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
-  const vocabKey = JSON.stringify(vocabLevels);
-  const matching = assays.filter((assay) => {
-    const levels = assay.design && assay.design.groups && assay.design.groups.levels;
-    return JSON.stringify(Array.isArray(levels) ? levels : []) === vocabKey;
-  }).length;
-
-  const total = assays.length;
-  return `${matching} of ${total} measurement${total === 1 ? '' : 's'} reuse these comparison labels.`;
-}
-
-function studyGroupTokens(value) {
-  return String(value)
-    .split(/[,\n]/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
-function uniqueStudyGroups(values) {
-  const seen = new Set();
-  return values.filter((value) => {
-    const key = value.toLocaleLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
 }
 
 /**
@@ -176,133 +133,36 @@ export const studyStep = {
     rqRow.appendChild(rqEdit);
     main.appendChild(rqRow);
 
-    // --- Shared comparison labels -----------------------------------------
-    const vocabHeading = document.createElement('div');
-    vocabHeading.className = 'design-subheading';
-    vocabHeading.textContent = 'Comparison labels';
-    main.appendChild(vocabHeading);
+    // --- Groups -------------------------------------------------------------
+    // Groups are typed exactly once, per measurement, on that measurement's
+    // own Samples & design (ui/steps/design.js). This page only ever shows
+    // them (the registry's Groups column below) and offers a one-click way to
+    // reuse an existing measurement's groups on the others.
+    const groupsHeading = document.createElement('div');
+    groupsHeading.className = 'design-subheading';
+    groupsHeading.textContent = 'Groups';
+    main.appendChild(groupsHeading);
 
-    const vocabHelp = document.createElement('p');
-    vocabHelp.className = 'proposals-empty supporting-description';
-    vocabHelp.textContent =
-      'Reuse these labels when measurements compare groups or conditions. Observational studies may have no comparison labels.';
-    main.appendChild(vocabHelp);
-
-    const vocabRow = document.createElement('div');
-    vocabRow.className = 'field-row';
-    const vocabLabel = document.createElement('span');
-    vocabLabel.className = 'field-label';
-    vocabLabel.id = 'study-group-vocabulary-label';
-    vocabLabel.textContent = 'Labels to reuse for comparisons';
-    vocabRow.appendChild(vocabLabel);
-    const tokenField = document.createElement('div');
-    tokenField.className = 'study-group-token-field';
-    tokenField.setAttribute('role', 'group');
-    tokenField.setAttribute('aria-labelledby', vocabLabel.id);
-    vocabRow.appendChild(tokenField);
-    const tokenList = document.createElement('div');
-    tokenList.className = 'study-group-token-list';
-    tokenField.appendChild(tokenList);
-    const vocabInput = document.createElement('input');
-    vocabInput.type = 'text';
-    vocabInput.className = 'study-group-token-input';
-    vocabInput.placeholder = 'Type a comparison label, then press Enter';
-    vocabInput.setAttribute('aria-label', 'Add a comparison label');
-    vocabInput.title =
-      'A reusable seed, not a shared live axis -- each measurement keeps its own copy and can diverge freely. Used to seed new measurements and by "Apply to all measurements" below.';
-    tokenField.appendChild(vocabInput);
-
-    function vocabularyLevels() {
-      const levels = store.get().groupVocabulary && store.get().groupVocabulary.levels;
-      return Array.isArray(levels) ? levels : [];
-    }
-
-    function saveVocabulary(levels) {
-      store.setPath('groupVocabulary', { levels }, 'user');
-      renderGroupTokens();
-      renderDivergence();
-    }
-
-    function renderGroupTokens() {
-      tokenList.textContent = '';
-      vocabularyLevels().forEach((group, index) => {
-        const token = document.createElement('span');
-        token.className = 'study-group-token';
-        const text = document.createElement('span');
-        text.className = 'study-group-token-text';
-        text.textContent = group;
-        token.appendChild(text);
-        const remove = document.createElement('button');
-        remove.type = 'button';
-        remove.className = 'study-group-token-remove';
-        remove.textContent = '×';
-        remove.setAttribute('aria-label', `Remove comparison label ${group}`);
-        remove.addEventListener('pointerdown', (event) => {
-          // Keep pointer removal from blurring and committing the adjacent
-          // input before this same control receives its click.
-          event.preventDefault();
-        });
-        remove.addEventListener('click', () => {
-          saveVocabulary(vocabularyLevels().filter((_, itemIndex) => itemIndex !== index));
-          vocabInput.focus();
-        });
-        token.appendChild(remove);
-        tokenList.appendChild(token);
-      });
-    }
-
-    function commitPendingGroups(rawValue = vocabInput.value) {
-      const additions = studyGroupTokens(rawValue);
-      if (additions.length === 0) return false;
-      saveVocabulary(uniqueStudyGroups([...vocabularyLevels(), ...additions]));
-      vocabInput.value = '';
-      return true;
-    }
-
-    vocabInput.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ',') return;
-      event.preventDefault();
-      commitPendingGroups();
-    });
-    vocabInput.addEventListener('blur', (event) => {
-      // Moving from the input to a token's Remove button must not rebuild
-      // the token list before that button receives its click.
-      if (event.relatedTarget && tokenField.contains(event.relatedTarget)) return;
-      commitPendingGroups();
-    });
-    vocabInput.addEventListener('paste', (event) => {
-      const pasted = event.clipboardData && event.clipboardData.getData('text');
-      if (!pasted || !/[,\n]/.test(pasted)) return;
-      event.preventDefault();
-      commitPendingGroups(`${vocabInput.value}${vocabInput.value ? ',' : ''}${pasted}`);
-    });
-    tokenField.addEventListener('click', (event) => {
-      if (event.target === tokenField || event.target === tokenList) vocabInput.focus();
-    });
-    main.appendChild(vocabRow);
-
-    const divergenceLine = document.createElement('p');
-    divergenceLine.className = 'study-divergence';
-    main.appendChild(divergenceLine);
-
-    function renderDivergence() {
-      const summary = groupDivergenceSummary(store.get());
-      divergenceLine.textContent = summary || '';
-      divergenceLine.hidden = !summary;
-    }
-
-    renderGroupTokens();
+    const groupsHelp = document.createElement('p');
+    groupsHelp.className = 'proposals-empty supporting-description';
+    groupsHelp.textContent =
+      'Each measurement defines its own groups on its Samples & design page. Observational studies may have none.';
+    main.appendChild(groupsHelp);
 
     const applyBtn = document.createElement('button');
     applyBtn.type = 'button';
     applyBtn.className = 'add-factor-button';
-    applyBtn.textContent = 'Apply to all measurements';
+    applyBtn.textContent = 'Copy groups to measurements that have none';
     applyBtn.title =
-      "Seeds these comparison labels into every measurement that has not customized its own groups -- a measurement whose groups you already edited by hand is left alone.";
+      "Copies the active measurement's groups into every OTHER measurement that has not defined its own -- a measurement whose groups you already edited by hand is left alone.";
     applyBtn.addEventListener('click', () => {
       const experiment = store.get();
-      const levels = (experiment.groupVocabulary && experiment.groupVocabulary.levels) || [];
+      const levels = groupSeedLevels(experiment);
       const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
+      if (levels.length === 0) {
+        if (showToast) showToast('No measurement has groups defined yet -- add some on Samples & design first.');
+        return;
+      }
       let applied = 0;
       let skipped = 0;
       for (const assay of assays) {
@@ -323,7 +183,6 @@ export const studyStep = {
         );
       }
       renderAssayList();
-      renderDivergence();
     });
     main.appendChild(applyBtn);
 
@@ -389,7 +248,7 @@ export const studyStep = {
       // Same seeding path the shell's switcher uses, so a measurement created
       // here is identical to one created there -- one way to make one.
       const id = shortId();
-      const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(current.groupVocabulary, id);
+      const { assay, provenanceSlotKey, provenanceEntry } = seedAssayGroups(groupSeedLevels(current), id);
       store.patch((state) => ({
         assays: [...state.assays, assay],
         activeAssayId: id,
@@ -534,7 +393,6 @@ export const studyStep = {
             if (result) {
               store.patch(result);
               renderAssayList();
-              renderDivergence();
               renderIssues();
               if (showToast) showToast(`Deleted "${deletedLabel}" and its design, panel, and naming data.`);
             }
@@ -578,7 +436,6 @@ export const studyStep = {
       }
     }
 
-    renderDivergence();
     renderAssayList();
     renderIssues();
   },

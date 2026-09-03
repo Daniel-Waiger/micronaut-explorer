@@ -1,7 +1,7 @@
 // Global UI shell. Project persistence and readiness are supplied by main.js;
 // this module only renders those contracts and routes user actions back out.
 
-import { removeAssay, seedAssayFromVocabulary } from '../core/assay.js';
+import { groupSeedLevels, removeAssay, seedAssayGroups } from '../core/assay.js';
 import { shortId } from '../core/ids.js';
 import { MAX_STUDY_ROWS } from '../engine/plan.js';
 import { buildFeedbackReport } from '../core/feedbackReport.js';
@@ -489,7 +489,7 @@ export function renderShell(root, store, router, options = {}) {
     add.addEventListener('click', () => {
       const current = store.get();
       const id = shortId();
-      const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(current.groupVocabulary, id);
+      const { assay, provenanceSlotKey, provenanceEntry } = seedAssayGroups(groupSeedLevels(current), id);
       store.patch((state) => ({ assays: [...state.assays, assay], activeAssayId: id, provenance: { ...state.provenance, slots: { ...state.provenance.slots, [provenanceSlotKey]: provenanceEntry } } }));
     });
     switcher.appendChild(add);

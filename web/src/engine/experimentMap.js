@@ -111,6 +111,26 @@ function measurementState(assay, slots, skipped, index) {
   return 'missing';
 }
 
+// The groups "in use" for the whole study: the deduped union across every
+// measurement's own design.groups.levels. There is no study-level group
+// list any more -- each measurement is the one place its groups are typed
+// (ui/steps/design.js) -- so this projection is the closest thing to one,
+// built fresh from the measurements rather than a separately-maintained field
+// that could disagree with them.
+function unionGroupLevels(assays) {
+  const seen = new Set();
+  const union = [];
+  for (const assay of assays) {
+    for (const level of levels(object(object(assay.design).groups).levels)) {
+      const key = level.toLocaleLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      union.push(level);
+    }
+  }
+  return union;
+}
+
 function orderedMeasurements(experiment, assays) {
   const activeId = typeof experiment.activeAssayId === 'string' ? experiment.activeAssayId : '';
   const activeIndex = assays.findIndex((assay) => assay.id === activeId);
@@ -208,7 +228,7 @@ export function buildExperimentMap(experiment, inputs = {}) {
   const mode = ['not-decided', 'groups', 'observational'].includes(context.comparisonMode)
     ? context.comparisonMode
     : 'not-decided';
-  const groups = levels(object(exp.groupVocabulary).levels);
+  const groups = unionGroupLevels(assays);
 
   const question = {
     value: questionValue,
@@ -225,22 +245,12 @@ export function buildExperimentMap(experiment, inputs = {}) {
     skipped,
     ['comparison-mode', 'studyContext.comparisonMode']
   );
-  const groupsState =
-    mode === 'observational'
-      ? 'answered'
-      : stateFor(groups, slots, ['groupVocabulary'], skipped, ['comparison-groups', 'groupVocabulary']);
-  const comparison = {
-    mode,
-    groups,
-    state:
-      mode === 'not-decided'
-        ? modeState
-        : modeState !== 'answered'
-          ? modeState
-          : mode === 'observational'
-            ? 'answered'
-            : groupsState,
-  };
+  // Whether the study has said groups vs. observational is the study-shape
+  // decision (modeState above); whether any given measurement HAS its groups
+  // is a per-measurement decision (the measurement-groups:<id> loop below).
+  // There is no separate study-wide "has groups" state any more -- see
+  // unionGroupLevels's comment.
+  const comparison = { mode, groups, state: modeState };
   const experimentalUnit = {
     value: unitValue,
     state: stateFor(
@@ -281,9 +291,9 @@ export function buildExperimentMap(experiment, inputs = {}) {
   if (modeState !== 'answered') {
     decisions.push(decision('comparison-mode', 'study-shape', 'Choose a comparison structure', 'Say whether this study compares groups or is observational.', 'home', modeState));
   }
-  if (mode === 'groups' && groupsState !== 'answered') {
-    decisions.push(decision('comparison-groups', 'study-shape', 'Add comparison groups or conditions', 'A groups study needs its comparison labels.', 'study', groupsState));
-  }
+  // A groups study whose measurements have no groups yet is already covered
+  // per-measurement below (measurement-groups:<id>) -- no separate study-wide
+  // "add comparison groups" decision.
   const undefinedMeasurements = measurements.filter((measurement) => measurement.state !== 'answered');
   if (measurements.length === 0) {
     decisions.push(decision('measurement-definition', 'study-shape', 'Define a measurement', 'Add a named measurement and what it will observe.', 'study', 'missing'));

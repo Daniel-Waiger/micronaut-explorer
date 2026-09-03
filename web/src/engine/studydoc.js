@@ -268,7 +268,6 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
     study: {
       title: (exp.meta && exp.meta.title) || '',
       researchQuestion: exp.researchQuestion || '',
-      groupVocabulary: (exp.groupVocabulary && Array.isArray(exp.groupVocabulary.levels) ? exp.groupVocabulary.levels : []).slice(),
     },
     // The fixed 5-stage "how to run this project" backbone, ONCE for the
     // whole study -- see the stageNotes comment above for why this is

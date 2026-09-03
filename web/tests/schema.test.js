@@ -13,7 +13,7 @@ const EMPTY_STUDY_CONTEXT = {
   comparisonMode: 'not-decided',
 };
 
-test('emptyExperiment returns an object with all v5 top-level Study keys', () => {
+test('emptyExperiment returns an object with all v6 top-level Study keys', () => {
   const exp = emptyExperiment();
   const expectedKeys = [
     'schemaVersion',
@@ -21,7 +21,6 @@ test('emptyExperiment returns an object with all v5 top-level Study keys', () =>
     'researchQuestion',
     'studyContext',
     'narrative',
-    'groupVocabulary',
     'assays',
     'activeAssayId',
     'naming',
@@ -50,7 +49,7 @@ test('emptyExperiment does NOT keep a vestigial copy of the per-assay roots at t
   // absorb writes nothing reads. The presence-only check above would not
   // have caught this.
   const exp = emptyExperiment();
-  for (const key of ['specimen', 'design', 'panel', 'acquisition', 'controls']) {
+  for (const key of ['specimen', 'design', 'panel', 'acquisition', 'controls', 'groupVocabulary']) {
     assert.ok(!(key in exp), `unexpected vestigial top-level key: ${key}`);
   }
   assert.ok(!('fields' in exp.naming), 'naming.fields must live on the assay, not the study');
@@ -251,7 +250,7 @@ function v2Experiment(overrides = {}) {
   };
 }
 
-test('migrate chains v1 all the way to the current version (v5) in one call', () => {
+test('migrate chains v1 all the way to the current version in one call', () => {
   const migrated = migrate(v1Experiment());
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
   assert.equal(migrated.assays.length, 1);
@@ -309,12 +308,15 @@ test('migrate v2->v3 hoists the whole per-assay slice into assays[0] verbatim', 
   assert.deepEqual(assay.naming.fields, { date: '2026-01-01', sample: 'E01' });
 });
 
-test('migrate v2 through v5 does NOT promote design.groups to groupVocabulary', () => {
-  // The vocabulary is a seeding template for FUTURE assays; copying the v2
-  // user's actual groups upward would assert every future assay shares them.
+test('migrate v2 through current does not synthesize a study-level vocabulary from design.groups', () => {
+  // There is no study-level vocabulary field at all any more (v6): groups
+  // are a per-assay fact only. A v2 study's own groups must survive the
+  // hoist into assays[0] unchanged, with no groupVocabulary key appearing
+  // anywhere in the result.
   const v2 = v2Experiment({ design: { groups: { levels: ['CT', 'OPP'] }, factors: [], biologicalReplicates: null, technicalReplicates: null, idScheme: '', conditions: [] } });
   const migrated = migrate(v2);
-  assert.deepEqual(migrated.groupVocabulary, { levels: [] });
+  assert.ok(!('groupVocabulary' in migrated));
+  assert.deepEqual(migrated.assays[0].design.groups, { levels: ['CT', 'OPP'] });
 });
 
 test('migrate v2->v3 leaves NO vestigial root copy of the hoisted slices', () => {
@@ -369,10 +371,13 @@ test('migrate v2->v3 is TOTAL: malformed/missing sub-objects degrade rather than
   assert.equal(migrated.assays.length, 1);
 });
 
-test('migrate v3->v4 renames the vocabulary and its provenance without data loss before v5 context is added', () => {
+test('migrate v3 with a legacy armVocabulary reaches current with its levels seeded onto the (single, ungrouped) assay', () => {
+  // v3->v4 renamed armVocabulary to groupVocabulary; v5->v6 later retires
+  // that field entirely by seeding it onto whichever assay has no groups of
+  // its own yet -- see migrateV5toV6. A study migrating all the way from v3
+  // must land in that same final state, not an intermediate v4 shape.
   const current = emptyExperiment();
-  const { groupVocabulary: _currentVocabulary, ...v3 } = current;
-  v3.schemaVersion = 3;
+  const v3 = { ...current, schemaVersion: 3 };
   v3.armVocabulary = { levels: ['CTL', 'OPP'] };
   v3.provenance = {
     ...v3.provenance,
@@ -384,22 +389,24 @@ test('migrate v3->v4 renames the vocabulary and its provenance without data loss
 
   const migrated = migrate(v3);
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
-  assert.deepEqual(migrated.groupVocabulary, { levels: ['CTL', 'OPP'] });
-  assert.deepEqual(migrated.provenance.slots.groupVocabulary, {
-    tag: 'user',
-    detail: 'legacy study',
-  });
+  assert.ok(!('groupVocabulary' in migrated));
   assert.ok(!('armVocabulary' in migrated));
   assert.ok(!('armVocabulary' in migrated.provenance.slots));
+  assert.ok(!('groupVocabulary' in migrated.provenance.slots));
+  assert.deepEqual(migrated.assays[0].design.groups, { levels: ['CTL', 'OPP'] });
+  assert.deepEqual(migrated.provenance.slots[`assay:${migrated.assays[0].id}.design.groups`], {
+    tag: 'kb-default',
+    detail: null,
+  });
   assert.deepEqual(v3.armVocabulary, { levels: ['CTL', 'OPP'] }, 'migration must not mutate v3 input');
 });
 
-test('migrate v3->v4 degrades a malformed vocabulary to an empty group vocabulary', () => {
+test('migrate v3 with a malformed legacy vocabulary reaches current with nothing seeded and no stray key', () => {
   const current = emptyExperiment();
-  const { groupVocabulary: _currentVocabulary, ...v3 } = current;
-  v3.schemaVersion = 3;
-  v3.armVocabulary = { levels: null };
-  assert.deepEqual(migrate(v3).groupVocabulary, { levels: [] });
+  const v3 = { ...current, schemaVersion: 3, armVocabulary: { levels: null } };
+  const migrated = migrate(v3);
+  assert.ok(!('groupVocabulary' in migrated));
+  assert.deepEqual(migrated.assays[0].design.groups, { levels: [] });
 });
 
 function v4Experiment() {
@@ -421,11 +428,11 @@ function v4Experiment() {
   };
 }
 
-test('migrate generated v1-v4 fixtures reaches v5 with empty context and preserves legacy slices', () => {
+test('migrate generated v1-v4 fixtures reaches current with empty context and preserves legacy slices', () => {
   const v1 = v1Experiment({ biologicalReplicates: undefined });
   const v2 = v2Experiment();
   const v3Current = emptyExperiment();
-  const { studyContext: _v3Context, groupVocabulary: _v3Vocabulary, ...v3 } = v3Current;
+  const { studyContext: _v3Context, ...v3 } = v3Current;
   v3.schemaVersion = 3;
   v3.armVocabulary = { levels: ['legacy', 'current'] };
   const v4 = v4Experiment();
@@ -434,17 +441,77 @@ test('migrate generated v1-v4 fixtures reaches v5 with empty context and preserv
     const migrated = migrate(fixture);
     assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
     assert.deepEqual(migrated.studyContext, EMPTY_STUDY_CONTEXT);
+    assert.ok(!('groupVocabulary' in migrated), `v${fixture.schemaVersion} carries no groupVocabulary key`);
     assert.ok(Array.isArray(migrated.assays), `v${fixture.schemaVersion} assay slice is preserved`);
     assert.ok(migrated.naming && typeof migrated.naming === 'object', `v${fixture.schemaVersion} naming slice is preserved`);
     assert.ok(migrated.provenance && typeof migrated.provenance === 'object', `v${fixture.schemaVersion} provenance slice is preserved`);
   }
 
+  // v4's assay already carries its own groups (['unamended', 'compost']), so
+  // v5->v6 has nothing to seed there -- the only change beyond the v5
+  // context is that the now-redundant study-level groupVocabulary is gone.
   const before = JSON.parse(JSON.stringify(v4));
   const migratedV4 = migrate(v4);
-  const { schemaVersion: _version, studyContext: _context, ...v4Payload } = migratedV4;
-  const { schemaVersion: _legacyVersion, ...expectedPayload } = before;
-  assert.deepEqual(v4Payload, expectedPayload, 'v4 data changes only by the additive v5 context');
+  const { schemaVersion: _version, studyContext: _context, groupVocabulary: _migratedVocab, ...v4Payload } = migratedV4;
+  const { schemaVersion: _legacyVersion, groupVocabulary: _legacyVocab, ...expectedPayload } = before;
+  assert.deepEqual(v4Payload, expectedPayload, 'v4 data changes only by the additive v5 context and the dropped legacy vocabulary');
+  assert.ok(!('groupVocabulary' in migratedV4));
   assert.deepEqual(migratedV4.assays, before.assays);
   assert.deepEqual(migratedV4.naming, before.naming);
   assert.deepEqual(migratedV4.provenance, before.provenance);
+});
+
+// --- v5 -> v6: retire groupVocabulary ---------------------------------------
+
+test('migrate v5->v6 seeds an assay with empty, unconfirmed groups from the legacy vocabulary', () => {
+  const v5 = { ...emptyExperiment(), schemaVersion: 5, groupVocabulary: { levels: ['CTL', 'OPP'] } };
+  const migrated = migrate(v5);
+  assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
+  assert.ok(!('groupVocabulary' in migrated));
+  assert.deepEqual(migrated.assays[0].design.groups, { levels: ['CTL', 'OPP'] });
+  assert.deepEqual(migrated.provenance.slots[`assay:${migrated.assays[0].id}.design.groups`], {
+    tag: 'kb-default',
+    detail: null,
+  });
+});
+
+test('migrate v5->v6 leaves an assay that already has its own groups untouched', () => {
+  const base = emptyExperiment();
+  const assay = { ...base.assays[0], design: { ...base.assays[0].design, groups: { levels: ['ALREADY-SET'] } } };
+  const v5 = { ...base, schemaVersion: 5, groupVocabulary: { levels: ['CTL', 'OPP'] }, assays: [assay] };
+  const migrated = migrate(v5);
+  assert.deepEqual(migrated.assays[0].design.groups, { levels: ['ALREADY-SET'] });
+});
+
+test('migrate v5->v6 never overwrites an assay whose empty groups are already a deliberate, STRONG-tagged user edit', () => {
+  const base = emptyExperiment();
+  const id = base.assays[0].id;
+  const v5 = {
+    ...base,
+    schemaVersion: 5,
+    groupVocabulary: { levels: ['CTL', 'OPP'] },
+    provenance: {
+      ...base.provenance,
+      slots: { ...base.provenance.slots, [`assay:${id}.design.groups`]: { tag: 'user', detail: null } },
+    },
+  };
+  const migrated = migrate(v5);
+  assert.deepEqual(migrated.assays[0].design.groups, { levels: [] });
+  assert.deepEqual(migrated.provenance.slots[`assay:${id}.design.groups`], { tag: 'user', detail: null });
+});
+
+test('migrate v5->v6 drops groupVocabulary and its provenance slot entirely when there is nothing to seed', () => {
+  const base = emptyExperiment();
+  const v5 = {
+    ...base,
+    schemaVersion: 5,
+    groupVocabulary: { levels: [] },
+    provenance: {
+      ...base.provenance,
+      slots: { ...base.provenance.slots, groupVocabulary: { tag: 'kb-default', detail: null } },
+    },
+  };
+  const migrated = migrate(v5);
+  assert.ok(!('groupVocabulary' in migrated));
+  assert.ok(!('groupVocabulary' in migrated.provenance.slots));
 });

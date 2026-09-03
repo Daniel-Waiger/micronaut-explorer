@@ -207,8 +207,8 @@ export const guideStep = {
             'One observation or analysis used to answer the study question — its own readout, panel, specimen, and modality. In some fields, a measurement is called an assay.',
           ],
           [
-            'Comparison labels',
-            'Reusable comparison labels (e.g. control, treatment). They seed a measurement’s groups when helpful, but never overwrite a measurement you have already customized. Observational studies may have none.',
+            'Groups',
+            'Your experimental groups (e.g. control, treatment), such as CTL vs. OPP. Set once, per measurement, on that measurement’s Samples & design; “copy to measurements that have none” reuses them elsewhere without overwriting a measurement you have already customized. Observational studies may have none.',
           ],
           [
             'Readout',
