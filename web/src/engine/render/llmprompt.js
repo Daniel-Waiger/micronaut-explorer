@@ -2,24 +2,21 @@
 // copy-paste block -- an instruction preamble, the study JSON, and a few
 // suggested questions -- for whatever model the user already has open.
 //
-// UPDATE (local-llm-guidance): the app can now ALSO call a model directly,
-// through web/src/llm/'s provider seam (manual-paste and opt-in local
-// Ollama adapters). That seam was deliberately deferred when this file was
-// first written -- see git history for the "never calls a model" version of
-// this comment -- and is now open. What has NOT changed is the rule this
-// module exists to keep true: the model never originates a domain fact; it
-// may only emit IDs/values from a vocabulary the app supplies. Today that
-// is enforced by construction (copy-paste, no write path exists). With the
-// Ollama adapter it is enforced by JSON-schema constrained decoding
-// (engine/llmschema.js builds an `enum` per question straight from that
-// question's own options) PLUS provenance (a model's write lands tagged
-// `llm`/`llm_freetext`, PROVISIONAL, and core/provenance.js's canOverwrite
-// refuses to let it clobber anything the user actually set).
+// This is now the ONLY model path in the app, and it is one-way. Micronaut
+// briefly also called a local Ollama endpoint and parsed pasted model JSON
+// back into study fields; that path is gone. The rule this module exists to
+// keep true -- the model never originates a domain fact -- is therefore
+// enforced by construction again, and by the strongest possible means: there
+// is no write path for a model's output to travel down. Nothing a model says
+// re-enters the study except by the researcher typing it.
 //
-// The manual-paste path stays exactly as it was: opt-in, LAN-only when the
-// Ollama adapter is used instead, no API key stored, and nothing leaves the
-// user's own network unless they opt in and configure an endpoint
-// themselves. Nothing here defaults to calling out anywhere.
+// That also changes what this block should be FOR. Filling in fields was
+// never the valuable part; the researcher has to check every suggestion
+// anyway, which costs about what typing it costs. What a bench scientist
+// genuinely cannot do alone is know which questions to ask about their own
+// design -- so the block below carries the decisions the deterministic
+// engines already know are still open (engine/conformance.js via
+// engine/decisionTriage.js) and points the model at those specifically.
 //
 // The preamble is written AT the model, in the imperative, and states the
 // constraints that actually matter for this domain: reason over the
@@ -54,6 +51,46 @@ const PREAMBLE = [
   '  settings must be confirmed at the microscope.',
 ].join('\n');
 
+const DECISION_TIER_LABELS = {
+  'study-shape': 'Study shape',
+  'measurement-design': 'Measurement design',
+  'before-acquisition': 'Before acquisition',
+  later: 'Can be assigned later',
+};
+
+const MAX_PROMPT_DECISIONS_PER_TIER = 8;
+
+// Turn the triage projection into a short, plainly-worded section. Bounded and
+// TOTAL: a malformed or absent triage simply contributes no section rather
+// than throwing inside a clipboard handler.
+function renderOpenDecisions(decisions) {
+  const groups = decisions && Array.isArray(decisions.groups) ? decisions.groups : [];
+  const lines = [];
+  for (const group of groups) {
+    if (!group || !Array.isArray(group.items) || group.items.length === 0) continue;
+    if (group.tier === 'later') continue; // Not worth a model's attention yet.
+    const heading = DECISION_TIER_LABELS[group.tier] || 'Open decisions';
+    const items = group.items
+      .slice(0, MAX_PROMPT_DECISIONS_PER_TIER)
+      .map((item) => {
+        const label = typeof item?.label === 'string' && item.label.trim() ? item.label.trim() : null;
+        if (!label) return null;
+        const reason = typeof item?.reason === 'string' && item.reason.trim() ? ` -- ${item.reason.trim()}` : '';
+        return `- ${label}${reason}`;
+      })
+      .filter(Boolean);
+    if (items.length === 0) continue;
+    lines.push(`${heading}:`, ...items, '');
+  }
+  if (lines.length === 0) return [];
+  return [
+    '--- DECISIONS THIS PLAN HAS NOT MADE YET ---',
+    'Micronaut detected these deterministically. Prioritise them in your answer:',
+    '',
+    ...lines,
+  ];
+}
+
 const SUGGESTED_QUESTIONS = [
   'What is missing from my controls for the claims this design could support?',
   'Is the replication structure adequate for the comparison I am actually making?',
@@ -62,19 +99,25 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 /**
- * `doc` is engine/studydoc.js's buildStudyDocument output. Returns one
- * plain-text block ready for the clipboard. TOTAL: never throws -- a
- * malformed/missing document still produces a valid block whose JSON
- * section is `null`, which is honest (the model sees there is no plan)
- * rather than a broken paste.
+ * `doc` is engine/studydoc.js's buildStudyDocument output. `decisions` is an
+ * optional engine/decisionTriage.js result; when supplied, the open decisions
+ * it names are included so the model reviews the real gaps rather than
+ * guessing at what matters. Returns one plain-text block ready for the
+ * clipboard.
+ *
+ * TOTAL: never throws -- a malformed/missing document still produces a valid
+ * block whose JSON section is `null`, which is honest (the model sees there is
+ * no plan) rather than a broken paste, and a malformed triage simply omits its
+ * section.
  */
-export function renderLlmPrompt(doc) {
+export function renderLlmPrompt(doc, decisions) {
   return [
     PREAMBLE,
     '',
     '--- STUDY PLAN (JSON) ---',
     renderJson(doc),
     '',
+    ...renderOpenDecisions(decisions),
     '--- QUESTIONS TO CONSIDER ---',
     ...SUGGESTED_QUESTIONS.map((q) => `- ${q}`),
     '',

@@ -7,7 +7,7 @@ The active project is the web **Planner** (`web/`).
 
 | Tool | What it is | Status |
 |------|------------|--------|
-| **Micronaut Planner** (`web/`) | A static, zero-install browser app that walks a researcher from design intent → measurements, panel, controls, acquisition → a data plan as a downstream artifact. No upload, no install, no server required — an optional, off-by-default panel can call a local LLM (e.g. Ollama) on your own network if you configure one. | **Active** |
+| **Micronaut Planner** (`web/`) | A static, zero-install browser app for planning a microscopy study: what you're asking, what you'll measure, and the files, controls and conditions that follow from it — decided before you're at the microscope. No upload, no install, no server, and no model is ever called. | **Active** |
 
 Micronaut Classic, an earlier metadata-aware file renamer, was archived at tag
 `classic-final` and `_archive/micronaut-classic-2026-08-18.tar.gz` — see
@@ -23,26 +23,34 @@ identically from `file://`, a local server, or GitHub Pages.
 
 ## What it does today
 
-The planner walks these steps (jump to any of them — the app is usable
-outside-in, no forced order):
+The planner has three workspaces plus a review. They are things a study *has*,
+not steps to march through — jump to any of them in any order:
 
-- **Study map** — the study-level surface above every measurement. A real study can contain
-  several measurements that share a research question and test article, each with
-  its own modality, panel, and specimen; the persisted schema keeps them in its
+- **Study map** — the shape of the study: the research question, the system or
+  material, whether you're comparing groups or observing, and what counts as one
+  independent experimental unit. Everything else follows from these. A study can
+  hold several measurements that share a question and test article, each with its
+  own modality, panel, and specimen; the persisted schema keeps them in its
   compatible `assays` collection.
 - **Research brief** — save a plain-language study description, then choose **Review
   description**. Micronaut first extracts only deterministic exact-text matches:
   marker aliases from the dictionary, biological-replicate counts, magnification,
   and unambiguous ISO dates. Everything else remains saved narrative unless the
   researcher explicitly reviews and accepts a suggestion.
-- **Measurements** — name and select the observations or analyses used to answer the study question.
+- **Measurements** — a registry of the observations or analyses used to answer the
+  study question: search it, filter by status or modality, and open one to plan it.
   A measurement is one observation or analysis; some disciplines call it an assay.
-- **Samples & design** — per-measurement groups, replication, and design details.
-- **Acquisition** — modality, panel, and per-measurement readouts/controls, with
-  modality-specific advice (STED / confocal / widefield / light-sheet / SEM-TEM /
-  Raman) surfaced from a rules knowledge base (`web/kb/advisor.json`).
-- **Data plan** — builds the filename convention from the finished design, reusing
-  Classic's naming/validation logic ported to JS.
+  Each row carries one status — **Draft**, **Needs a decision**, or **Ready to
+  acquire**. "Ready" means the planner's own checks are satisfied; it never claims
+  the experiment is correct, powered, or approved.
+- **A measurement's own page** — opening a row gives you that measurement's whole
+  plan on one scroll, because these three decide each other:
+  - *Samples & design* — groups, replication, and the conditions they generate.
+  - *Acquisition* — modality, panel, and readouts/controls, with modality-specific
+    advice (STED / confocal / widefield / light-sheet / SEM-TEM / Raman) from a
+    rules knowledge base (`web/kb/advisor.json`).
+  - *Data plan* — the filename convention built from the finished design, reusing
+    Classic's naming/validation logic ported to JS.
 - **Color panel** — a qualitative spectral-spillover advisor over the active measurement's
   fluorophores: excitation/emission peak-proximity flags, not a spectral-overlap
   integral. Content is Claude-drafted and flagged unreviewed (`web/kb/spectra.json`).
@@ -60,34 +68,41 @@ outside-in, no forced order):
   in whatever LLM you already use.
 - **Guide** — an in-app user guide, always in the step nav.
 
-A "Copy feedback report" button in the header copies the current step, browser,
-and full study as text — for reporting problems during the alpha.
+A **Feedback** page collects what you were doing, the current page, browser
+details, and your full study into one package you can copy, download, or take
+to a GitHub issue. The GitHub issue path pre-applies the `feedback` label
+(GitHub's new-issue form reads it from the link's own query string), so
+feedback opened from the app is one filterable group inside the repo — no
+server or credential involved. Nothing is sent anywhere unless you choose one
+of those actions.
 
-Everything works with the optional local model **disabled** — the deterministic
-exact-text review is always the floor, not a claim to understand every sentence
-of a scientific description. If the researcher explicitly enables a local
-Ollama endpoint in **Model options**, Micronaut may add bounded interpretations
-of the active Research brief fields. Choice values remain limited to the supplied
-vocabulary, and every model or pasted suggestion must carry a verbatim quote
-from the saved description as evidence. Unsupported prose remains narrative.
+## On language models
 
-Local interpretation is private to the endpoint the researcher configures.
-If local calls are disabled, unavailable from `file://` or offline, rate
-limited, fail, or return malformed output, the same Review area keeps the
-deterministic results and offers an in-place **Use copy and paste instead**
-continuation. The researcher can copy the constrained review prompt, paste a
-reply back, and inspect it under the same evidence and vocabulary checks.
+**Micronaut never calls a model.** Every result in the app is deterministic, and
+nothing a model produces is read back into your study. There is no API key, no
+endpoint to configure, and no network request.
 
-Review suggestions are never applied merely because a parser or model produced
-them. The Research brief workspace groups exact, local, and pasted candidates, shows
-their quoted warrants and any conflicts/current value, and requires an explicit
-**Accept suggestion** or **Replace current value** action before a field is
-written. The model can contribute reviewable proposals, but no field is applied
-without explicit review and acceptance.
+Two things use a model's help, both one-way:
 
-Research brief has no new-tab draft workflow, hosted-chat link-out, or generic
-Ask surface. The Review **Copy prompt for your own LLM**
-action remains a separate, read-only export of the finished plan.
+- **Research brief review** is a deterministic exact-text scan of your saved
+  description. It recognises marker aliases from the dictionary, biological
+  replicate counts, magnification, and unambiguous ISO dates — and nothing else.
+  Each suggestion quotes the exact text it matched, and no field is written until
+  you choose **Accept suggestion** or **Replace current value**. Everything the
+  scan did not match stays narrative; the app never claims to have understood
+  your whole description.
+- **Review → Copy prompt for your own LLM** hands you a block to paste into
+  whatever model you already use: ground rules that keep it from inventing a
+  marker or a setting, your study as JSON, the decisions Micronaut can tell you
+  have not been made yet, and questions worth asking. You read the reply and act
+  on it yourself.
+
+Earlier versions could call a local Ollama endpoint and parse a pasted model
+reply back into study fields. That path is gone. It only worked for people who
+had Ollama installed, and it spent a lot of machinery guarding a write path that
+saved a few seconds of typing you still had to check. Asking a model which
+questions to ask about your own design is the part worth having; letting it fill
+in your fields was not.
 
 ## Run it locally
 
@@ -136,8 +151,11 @@ bare `node --test web/tests/` fails with `MODULE_NOT_FOUND` on Node 22.
 web/                         Micronaut Planner (static browser app)
   index.html                 dev entry (BUILD:* markers for the inliner)
   src/core/                  schema, store, tiered provenance, router, persistence
-  src/engine/                naming, validation, interview, advisor, controls, spectra, render
-  src/ui/steps/              study, describe, design, naming, panel, overview, guide
+  src/engine/                naming, validation, interview, advisor, controls, spectra,
+                             measurement status, render
+  src/ui/steps/              home (study map), describe, study (registry),
+                             measurement (composes design + panel + naming),
+                             overview, guide, feedback, settings
   kb/                        knowledge pack (markers, stages, controls, advisor, spectra, …)
   tests/                     node --test suite (zero npm deps)
 

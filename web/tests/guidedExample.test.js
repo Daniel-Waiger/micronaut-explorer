@@ -20,7 +20,7 @@ function byStep(content, id) {
   return content.steps.find((step) => step.stepId === id);
 }
 
-test('all seven contexts use the real default-study document and conformance projections', () => {
+test('all five contexts use the real default-study document and conformance projections', () => {
   const study = createDefaultStudy();
   const settings = options();
   const expectedDocument = buildStudyDocument(study, settings.kb, NAMING_CONFIG, BASE_TEMPLATE);
@@ -31,9 +31,9 @@ test('all seven contexts use the real default-study document and conformance pro
   assert.deepEqual(content.conformance, expectedConformance);
   assert.deepEqual(content.steps.map((step) => step.stepId), PRIMARY_WORKFLOW.map((step) => step.id));
   assert.deepEqual(content.steps.map((step) => step.stepId), [
-    'home', 'describe', 'study', 'design', 'microscopy', 'naming', 'overview',
+    'home', 'describe', 'study', 'measurement', 'overview',
   ]);
-  assert.equal(content.steps.length, 7);
+  assert.equal(content.steps.length, 5);
 
   for (const [index, step] of content.steps.entries()) {
     for (const key of ['stepId', 'title', 'outcome', 'what', 'why', 'when', 'how', 'exampleLabel', 'exampleSummary', 'tryThis']) {
@@ -48,19 +48,19 @@ test('all seven contexts use the real default-study document and conformance pro
   }
 
   assert.match(byStep(content, 'describe').exampleSummary, new RegExp(expectedDocument.assays[0].readout.label));
-  assert.match(byStep(content, 'design').exampleSummary, new RegExp(String(expectedDocument.assays[0].design.conditionCount)));
-  assert.match(byStep(content, 'microscopy').exampleSummary, new RegExp(expectedDocument.assays[0].modality));
-  assert.match(byStep(content, 'naming').exampleSummary, new RegExp(expectedDocument.assays[0].filenames[0].filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  // One composed measurement context now carries all three sections' facts.
+  const measurementSummary = byStep(content, 'measurement').exampleSummary;
+  assert.match(measurementSummary, new RegExp(String(expectedDocument.assays[0].design.conditionCount)));
+  assert.match(measurementSummary, new RegExp(expectedDocument.assays[0].modality));
+  assert.match(measurementSummary, new RegExp(expectedDocument.assays[0].filenames[0].filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(byStep(content, 'overview').exampleSummary, new RegExp(expectedConformance.readiness));
   assert.match(byStep(content, 'study').exampleSummary, /Comparison labels: CTL, OPP/);
-  assert.match(byStep(content, 'design').exampleSummary, /groups CTL, OPP/);
+  assert.match(byStep(content, 'measurement').exampleSummary, /groups CTL, OPP/);
   assert.doesNotMatch(JSON.stringify(content.steps), /\barms?\b/i);
   assert.equal(byStep(content, 'home').title, 'Study map');
   assert.equal(byStep(content, 'describe').title, 'Research brief');
   assert.equal(byStep(content, 'study').title, 'Measurements');
-  assert.equal(byStep(content, 'design').title, 'Samples & design');
-  assert.equal(byStep(content, 'microscopy').title, 'Acquisition');
-  assert.equal(byStep(content, 'naming').title, 'Data plan');
+  assert.equal(byStep(content, 'measurement').title, 'Measurement');
   assert.equal(byStep(content, 'overview').title, 'Review');
   assert.match(byStep(content, 'home').why, /study contains measurements; each measurement then has its own Samples & design, Acquisition, and Data plan/i);
 });
@@ -72,7 +72,7 @@ test('active-assay contexts refresh while Home and Study remain whole-study cohe
   study.activeAssayId = study.assays[2].id;
   const switched = buildGuidedExampleContent(study, settings);
 
-  for (const id of ['describe', 'design', 'microscopy', 'naming']) {
+  for (const id of ['describe', 'measurement']) {
     assert.notEqual(byStep(first, id).exampleSummary, byStep(switched, id).exampleSummary, `${id} should follow active assay`);
   }
   assert.equal(byStep(first, 'home').exampleSummary, byStep(switched, 'home').exampleSummary);
@@ -87,9 +87,9 @@ test('a fresh call reflects current producer values rather than cached guide tex
   study.assays[0].naming.fields.exptype = 'FRESH_VALUE';
   const after = buildGuidedExampleContent(study, settings);
 
-  assert.notEqual(byStep(before, 'naming').exampleSummary, byStep(after, 'naming').exampleSummary);
-  assert.match(byStep(after, 'naming').exampleSummary, /FRESH_VALUE/);
-  assert.equal(getGuidedExampleStep(study, 'naming', settings).exampleSummary, byStep(after, 'naming').exampleSummary);
+  assert.notEqual(byStep(before, 'measurement').exampleSummary, byStep(after, 'measurement').exampleSummary);
+  assert.match(byStep(after, 'measurement').exampleSummary, /FRESH_VALUE/);
+  assert.equal(getGuidedExampleStep(study, 'measurement', settings).exampleSummary, byStep(after, 'measurement').exampleSummary);
 });
 
 test('guided copy is presentation-only and never mutates the supplied study', () => {
@@ -104,7 +104,7 @@ test('malformed input is total and uses study-now wording outside explicit examp
   for (const malformed of [undefined, null, {}, 'not a study', 42]) {
     assert.doesNotThrow(() => buildGuidedExampleContent(malformed, settings));
     const content = buildGuidedExampleContent(malformed, settings);
-    assert.equal(content.steps.length, 7);
+    assert.equal(content.steps.length, 5);
     for (const step of content.steps) {
       assert.equal(step.exampleLabel, 'In this study now');
       assert.ok(step.exampleSummary);

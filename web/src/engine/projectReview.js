@@ -1,20 +1,25 @@
 // Pure Project-review authority. This module deliberately does not parse,
-// render, fetch, persist, or write: callers supply already-parsed exact/local/
-// paste results and the current session binding, then consume this immutable
+// render, fetch, persist, or write: callers supply already-parsed exact-text
+// results and the current session binding, then consume this immutable
 // projection to render and (separately) perform an explicit accepted write.
+//
+// There is exactly one candidate source: the deterministic exact-text scan
+// (engine/freetext.js). The in-app model path that once supplied `local` and
+// `paste` candidates is gone -- nothing a model produces is parsed back into
+// the study, so there is no untrusted write path left to arbitrate between.
+// That removed four of the eight lifecycle states (`model-running`,
+// `fallback`, `cancelled`, `error`) along with every in-flight race they
+// existed to describe. `stale` remains and still matters: editing the
+// narrative must invalidate un-accepted candidates from the previous text.
 
 const PROJECT_REVIEW_STATUSES = new Set([
   'idle',
   'scanning',
-  'model-running',
   'complete',
-  'fallback',
   'stale',
-  'cancelled',
-  'error',
 ]);
 
-const PROJECT_REVIEW_SOURCE_ORDER = ['exact', 'local', 'paste'];
+const PROJECT_REVIEW_SOURCE_ORDER = ['exact'];
 const PROJECT_REVIEW_MAX_CANDIDATES = 50;
 const PROJECT_REVIEW_MAX_QUESTIONS = 100;
 const PROJECT_REVIEW_MAX_ASKS = 12;
@@ -59,7 +64,7 @@ function emptyReview(status = 'idle') {
     currentNarrativeRevision: null,
     currentAssayId: null,
     actionable: false,
-    nonActionableReason: status === 'cancelled' ? 'cancelled' : 'not-ready',
+    nonActionableReason: 'not-ready',
     groups: [],
     candidates: [],
     asks: [],
@@ -266,8 +271,8 @@ function collectAdvisories(input, kind, limit, issues) {
  * Build the one UI-neutral Project review projection.
  *
  * Input contract:
- * - `exact`, `local`, and `paste` are parser-result objects containing any of
- *   `{ proposals, asks, repairs, issues }`.
+ * - `exact` is a parser-result object containing any of
+ *   `{ proposals, asks, repairs, issues }`. It is the only candidate source.
  * - `questions` is the question-bank list; `currentValues` maps question paths
  *   to the active assay's current structured values.
  * - `narrativeRevision`/`assayId` bind the result; the corresponding `current*`
@@ -294,7 +299,7 @@ export function buildProjectReview(input = {}) {
       assayId === currentAssayId;
     const bindingMismatch = hasBinding && !bindingMatches;
     const status = reviewStatus(safeInput, bindingMismatch);
-    const actionable = bindingMatches && status !== 'stale' && status !== 'cancelled' && status !== 'idle' && status !== 'scanning';
+    const actionable = bindingMatches && status !== 'stale' && status !== 'idle' && status !== 'scanning';
     const candidatesByKey = collectCandidates(safeInput, questionByPath, issues);
     const dismissedIds = projectReviewDismissedIds(safeInput, issues);
     for (const [key, candidate] of candidatesByKey) {
@@ -356,7 +361,7 @@ export function buildProjectReview(input = {}) {
       currentNarrativeRevision,
       currentAssayId,
       actionable,
-      nonActionableReason: bindingMismatch ? 'stale' : status === 'cancelled' ? 'cancelled' : actionable ? null : 'not-ready',
+      nonActionableReason: bindingMismatch ? 'stale' : actionable ? null : 'not-ready',
       groups,
       candidates,
       asks,

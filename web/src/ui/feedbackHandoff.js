@@ -1,13 +1,42 @@
 import { copyToClipboard } from './clipboard.js';
 
-const GITHUB_ISSUE_PATH = '/Daniel-Waiger/micronaut-explorer/issues/new';
+// GitHub's "new issue" form reads `labels` from its own query string and
+// pre-applies it. This is the whole mechanism: it turns "issues opened from
+// the app" into a filterable, linkable group inside the repo -- effectively a
+// feedback folder -- with no server, no token, and no new dependency. Because
+// the sign-in redirect (githubFeedbackUrl below) carries this whole path as
+// its OWN query value, the label has to be encoded into the path string here
+// rather than appended after building the login URL, or GitHub would receive
+// `return_to=/…/issues/new` with the label silently dropped.
+const GITHUB_ISSUE_PATH = '/Daniel-Waiger/micronaut-explorer/issues/new?labels=feedback';
+
+// The address feedback email is addressed to. Deliberately blank until a real
+// non-personal inbox exists: a `mailto:` with no recipient opens an empty
+// compose window, which reads as a working button and silently loses every
+// message sent through it. While this is blank the Email action is not
+// rendered at all -- see feedbackEmailAvailable() and ui/steps/feedback.js.
+// Fill this in (a shared/team address, NOT a GitHub `@users.noreply` one,
+// which discards incoming mail) to turn the action back on.
+export const FEEDBACK_EMAIL = '';
 
 export function githubFeedbackUrl() {
   return `https://github.com/login?return_to=${encodeURIComponent(GITHUB_ISSUE_PATH)}`;
 }
 
-export function emailFeedbackUrl() {
-  return `mailto:?subject=${encodeURIComponent('Micronaut Planner feedback')}`;
+export function feedbackEmailAvailable(address = FEEDBACK_EMAIL) {
+  return typeof address === 'string' && address.trim() !== '';
+}
+
+// The address is a parameter (defaulting to the module constant) purely so the
+// configured and unconfigured branches are both reachable from a test without
+// a build-time injection mechanism. Production call sites pass nothing.
+export function emailFeedbackUrl(address = FEEDBACK_EMAIL) {
+  if (!feedbackEmailAvailable(address)) return null;
+  // `@` is legal and expected in a mailto recipient; encodeURIComponent escapes
+  // it to %40, which most clients tolerate but none require. Restore it so the
+  // address reads correctly in the URL and in any client that shows it raw.
+  const recipient = encodeURIComponent(address.trim()).replace(/%40/g, '@');
+  return `mailto:${recipient}?subject=${encodeURIComponent('Micronaut Planner feedback')}`;
 }
 
 const CHANNELS = {

@@ -21,8 +21,6 @@ function review(overrides = {}) {
     questions: QUESTIONS,
     currentValues: {},
     exact: { proposals: [] },
-    local: { proposals: [] },
-    paste: { proposals: [] },
     ...overrides,
   });
 }
@@ -45,29 +43,30 @@ test('exact-only results become bound, actionable candidates with destination me
   assert.equal(candidate.currentState, 'new');
 });
 
-test('local and pasted candidates retain their source kind and their warrants', () => {
+// The exact-text scan is now the ONLY candidate source. Model-sourced
+// candidates (`local`, `paste`) are not merely absent by default -- they are
+// no longer a recognised input, so a stray one cannot re-enter the study.
+test('model-sourced candidates are not a recognised input any more', () => {
   const result = review({
     local: { proposals: [proposal('acquisition.modality', 'Confocal', 'local quote')] },
     paste: { proposals: [proposal('naming.fields.notes', 'A note', 'pasted quote')] },
   });
-  assert.deepEqual(result.candidates.map((candidate) => candidate.sources), [['local'], ['paste']]);
-  assert.deepEqual(result.candidates.map((candidate) => candidate.warrants[0].evidence), ['local quote', 'pasted quote']);
+  assert.equal(result.candidates.length, 0);
+  assert.equal(result.groups.length, 0);
 });
 
-test('agreeing sources coalesce without losing warrants, while disagreeing values remain an explicit conflict', () => {
+test('two exact matches for one field remain an explicit conflict, neither applied', () => {
   const agreeing = review({
-    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'exact quote')] },
-    local: { proposals: [proposal('acquisition.modality', 'Confocal', 'local quote')] },
+    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'exact quote'), proposal('acquisition.modality', 'Confocal', 'second quote')] },
   });
   assert.equal(agreeing.groups.length, 1);
   assert.equal(agreeing.groups[0].conflict, false);
   assert.equal(agreeing.groups[0].candidates.length, 1);
-  assert.deepEqual(agreeing.candidates[0].sources, ['exact', 'local']);
-  assert.deepEqual(agreeing.candidates[0].evidence, ['exact quote', 'local quote']);
+  assert.deepEqual(agreeing.candidates[0].sources, ['exact']);
+  assert.deepEqual(agreeing.candidates[0].evidence, ['exact quote', 'second quote']);
 
   const conflicting = review({
-    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'Confocal')] },
-    local: { proposals: [proposal('acquisition.modality', 'STED', 'STED')] },
+    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'Confocal'), proposal('acquisition.modality', 'STED', 'STED')] },
   });
   assert.equal(conflicting.groups[0].conflict, true);
   assert.deepEqual(conflicting.groups[0].candidates.map((candidate) => candidate.value), ['Confocal', 'STED']);
@@ -91,30 +90,18 @@ test('current structured values are compared without any write decision', () => 
 
 test('asks, repairs, and rejected parser output are bounded review data, never candidates', () => {
   const result = review({
-    local: {
+    exact: {
       proposals: [],
       asks: [{ topic: 'Pixel size', why: 'smallest feature is unknown' }],
       repairs: ['removed a trailing comma'],
       issues: [{ field: 'acquisition.modality', message: 'evidence is not in the narrative', severity: 'error' }],
     },
   });
-  assert.deepEqual(result.asks, [{ id: 'ask:local:0', source: 'local', topic: 'Pixel size', why: 'smallest feature is unknown' }]);
-  assert.deepEqual(result.repairs, [{ id: 'repair:local:0', source: 'local', message: 'removed a trailing comma' }]);
+  assert.deepEqual(result.asks, [{ id: 'ask:exact:0', source: 'exact', topic: 'Pixel size', why: 'smallest feature is unknown' }]);
+  assert.deepEqual(result.repairs, [{ id: 'repair:exact:0', source: 'exact', message: 'removed a trailing comma' }]);
   assert.equal(result.candidates.length, 0);
-  assert.equal(result.issues[0].source, 'local');
+  assert.equal(result.issues[0].source, 'exact');
   assert.match(result.issues[0].message, /evidence is not in the narrative/);
-});
-
-test('model failure keeps exact candidates visible and actionable', () => {
-  const result = review({
-    status: 'error',
-    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'Confocal')] },
-    local: { issues: [{ field: 'local', message: 'connection refused' }] },
-  });
-  assert.equal(result.status, 'error');
-  assert.equal(result.candidates.length, 1);
-  assert.equal(result.candidates[0].actionable, true);
-  assert.match(result.issues[0].message, /connection refused/);
 });
 
 test('stale narrative or assay bindings disable every candidate action', () => {
@@ -131,8 +118,7 @@ test('stale narrative or assay bindings disable every candidate action', () => {
 
 test('session-owned dismissed IDs remove only their exact candidate and recalculate a conflict', () => {
   const source = {
-    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'Confocal')] },
-    local: { proposals: [proposal('acquisition.modality', 'STED', 'STED')] },
+    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'Confocal'), proposal('acquisition.modality', 'STED', 'STED')] },
   };
   const original = review(source);
   const dismissedId = original.candidates.find((candidate) => candidate.value === 'Confocal').id;
@@ -162,24 +148,19 @@ test('session-owned dismissed IDs remove only their exact candidate and recalcul
   assert.ok(malformed.issues.some((issue) => issue.field === 'dismissedCandidateIds'));
 });
 
-test('cancelled review retains data but offers no candidate action', () => {
-  const result = review({
-    status: 'cancelled',
-    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'Confocal')] },
-  });
-  assert.equal(result.status, 'cancelled');
-  assert.equal(result.nonActionableReason, 'cancelled');
-  assert.equal(result.candidates[0].actionable, false);
-});
-
-test('all lifecycle states are represented, with idle/scanning non-actionable', () => {
-  for (const status of ['idle', 'scanning', 'model-running', 'complete', 'fallback', 'stale', 'cancelled', 'error']) {
-    const result = review({ status });
-    assert.equal(result.status, status);
+// Four states went with the in-app model path: model-running, fallback,
+// cancelled, and error described a request in flight, and there is no request.
+// An unrecognised status must fall back to idle rather than be echoed.
+test('the lifecycle is exactly idle/scanning/complete/stale', () => {
+  for (const status of ['idle', 'scanning', 'complete', 'stale']) {
+    assert.equal(review({ status }).status, status);
+  }
+  for (const retired of ['model-running', 'fallback', 'cancelled', 'error']) {
+    assert.equal(review({ status: retired }).status, 'idle');
   }
   assert.equal(review({ status: 'idle' }).actionable, false);
   assert.equal(review({ status: 'scanning' }).actionable, false);
-  assert.equal(review({ status: 'model-running' }).actionable, true);
+  assert.equal(review({ status: 'complete' }).actionable, true);
   const unboundIdle = buildProjectReview({ status: 'idle' });
   assert.equal(unboundIdle.status, 'idle');
   assert.equal(unboundIdle.actionable, false);
@@ -190,8 +171,11 @@ test('malformed and oversized inputs are rejected safely and every returned coll
   const tooManyAsks = Array.from({ length: 20 }, (_, index) => ({ topic: `topic ${index}` }));
   const result = review({
     questions: [...QUESTIONS, ...Array.from({ length: 101 }, (_, index) => ({ field: `x.${index}` }))],
-    exact: { proposals: [null, { path: 'unknown.path', value: 'x', evidence: 'x' }, ...tooMany] },
-    local: { asks: [...tooManyAsks, { topic: 'x'.repeat(301) }], repairs: [null, 'x'.repeat(301)] },
+    exact: {
+      proposals: [null, { path: 'unknown.path', value: 'x', evidence: 'x' }, ...tooMany],
+      asks: [...tooManyAsks, { topic: 'x'.repeat(301) }],
+      repairs: [null, 'x'.repeat(301)],
+    },
   });
   assert.ok(result.candidates.length <= 50);
   assert.ok(result.groups.length <= 50);
@@ -200,7 +184,7 @@ test('malformed and oversized inputs are rejected safely and every returned coll
   assert.ok(result.issues.length <= 12);
   assert.ok(result.issues.length > 0);
   assert.doesNotThrow(() => buildProjectReview(null));
-  assert.doesNotThrow(() => buildProjectReview({ exact: { proposals: 'nope' }, local: { asks: {} } }));
+  assert.doesNotThrow(() => buildProjectReview({ exact: { proposals: 'nope', asks: {} } }));
 });
 
 test('output is deterministic and does not mutate inputs', () => {
@@ -212,8 +196,10 @@ test('output is deterministic and does not mutate inputs', () => {
     currentAssayId: 'a',
     questions: QUESTIONS,
     currentValues: {},
-    exact: { proposals: [proposal('acquisition.modality', 'Confocal', 'exact'), proposal('naming.fields.notes', 'note', 'note')] },
-    local: { proposals: [proposal('acquisition.modality', 'Confocal', 'local')], asks: [{ topic: 'control' }] },
+    exact: {
+      proposals: [proposal('acquisition.modality', 'Confocal', 'exact'), proposal('naming.fields.notes', 'note', 'note')],
+      asks: [{ topic: 'control' }],
+    },
   };
   const before = structuredClone(input);
   const first = buildProjectReview(input);

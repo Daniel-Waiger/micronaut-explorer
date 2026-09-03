@@ -9,15 +9,20 @@ import { conditionIssues } from './conditions.js';
 import { buildExperimentMap } from './experimentMap.js';
 import { phaseQuestions } from './interview.js';
 
+// Nouns, not steps. The nav used to list seven workspaces in a fixed order,
+// which read as a seven-part exam a researcher could be failing at any moment.
+// It now names three things a study HAS -- its shape, its measurements, and a
+// review of both -- and the per-measurement work (samples & design,
+// acquisition, data plan) lives inside whichever measurement you opened.
+//
+// The `microscopy`, `design` and `naming` workflow ids are retired from the
+// visible workflow but remain valid route ids for hash compatibility; see
+// core/router.js's ROUTE_ALIASES.
 export const PRIMARY_WORKFLOW = Object.freeze([
   Object.freeze({ id: 'home', label: 'Study map' }),
   Object.freeze({ id: 'describe', label: 'Research brief' }),
   Object.freeze({ id: 'study', label: 'Measurements' }),
-  Object.freeze({ id: 'design', label: 'Samples & design' }),
-  // Keep the workflow id as `microscopy`; main and the router deliberately
-  // translate it to the stable persisted/hash route id `panel`.
-  Object.freeze({ id: 'microscopy', label: 'Acquisition' }),
-  Object.freeze({ id: 'naming', label: 'Data plan' }),
+  Object.freeze({ id: 'measurement', label: 'Measurement' }),
   Object.freeze({ id: 'overview', label: 'Review' }),
 ]);
 
@@ -168,7 +173,7 @@ function reportForAssay(conformance, assayId) {
  * `{ map, primary, optional, assays, summary }`. `map` is the one Study-map
  * snapshot built for this progress projection; consumers must use its
  * decisions and nextDecision rather than recreate their ordering. `primary`
- * follows the ordered seven-stage workflow; `optional` is Guide and must not
+ * follows the ordered five-stage workflow; `optional` is Guide and must not
  * contribute to the summary. Per-assay `overview` consumes conformance's
  * `readiness` verbatim, and the study Overview mirrors the whole-study
  * readiness verbatim.
@@ -186,11 +191,17 @@ export function deriveWorkflowProgress(experiment, conformance, questions = []) 
     const naming = namingProgress(view, report);
     const overview = { state: readinessState(report && report.readiness), readiness: report && report.readiness };
 
+    // `measurement` is the composed page's own state: the three per-measurement
+    // workspaces are sections of one route now, so their states aggregate into
+    // one. design/microscopy/naming stay individually addressable because the
+    // guided walkthrough and the per-assay tree still speak about them by name.
+    const measurement = { state: aggregate([design.state, microscopy.state, naming.state]) };
+
     return {
       id: assay && assay.id,
       label: (assay && assay.label) || `Assay ${index + 1}`,
       readiness: report && report.readiness,
-      steps: { project, design, microscopy, naming, overview },
+      steps: { project, design, microscopy, naming, measurement, overview },
       state: aggregate([project.state, design.state, microscopy.state, naming.state, overview.state]),
     };
   });
@@ -200,10 +211,8 @@ export function deriveWorkflowProgress(experiment, conformance, questions = []) 
     { ...PRIMARY_WORKFLOW[0], state: orientationProgress(map) },
     { ...PRIMARY_WORKFLOW[1], state: aggregate(byStep('project')) },
     { ...PRIMARY_WORKFLOW[2], state: studyProgress(exp, conformance, assays) },
-    { ...PRIMARY_WORKFLOW[3], state: aggregate(byStep('design')) },
-    { ...PRIMARY_WORKFLOW[4], state: aggregate(byStep('microscopy')) },
-    { ...PRIMARY_WORKFLOW[5], state: aggregate(byStep('naming')) },
-    { ...PRIMARY_WORKFLOW[6], state: readinessState(conformance && conformance.readiness), readiness: conformance && conformance.readiness },
+    { ...PRIMARY_WORKFLOW[3], state: aggregate(byStep('measurement')) },
+    { ...PRIMARY_WORKFLOW[4], state: readinessState(conformance && conformance.readiness), readiness: conformance && conformance.readiness },
   ];
   const complete = primary.filter((step) => step.state === 'complete').length;
 

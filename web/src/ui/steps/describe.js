@@ -1,32 +1,16 @@
 import { parseFreeText } from '../../engine/freetext.js';
-import { loadQuestions, nextQuestions, phaseQuestions, unskipQuestion } from '../../engine/interview.js';
+import { loadQuestions, phaseQuestions, unskipQuestion } from '../../engine/interview.js';
 import { editTagFor } from '../../core/provenance.js';
 import { getPath } from '../../core/paths.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
 import { resolveReadoutCanonical } from '../../engine/controls.js';
-import { buildProposalSchema } from '../../engine/llmschema.js';
-import { parseLlmAsks, parseLlmProposals } from '../../engine/llmproposals.js';
 import { buildProjectReview } from '../../engine/projectReview.js';
-import { renderProposalRequestPrompt, PROPOSAL_SYSTEM_PROMPT } from '../../engine/render/llmdraftprompt.js';
-import { extractJsonReply } from '../../engine/llmreply.js';
-import { createOllamaProvider } from '../../llm/ollama.js';
-import { localEndpointCallsAvailable } from '../../llm/availability.js';
-import { recordOllamaRequest } from '../../llm/rateLimit.js';
 import { createAdvicePanel } from '../advice.js';
-import { createProjectModelOptions } from '../projectModelOptions.js';
 import { createProjectReview } from '../projectReview.js';
-import { rateLimitLabel } from '../rateLimitLabel.js';
-import { startModelProgress } from '../llmStatus.js';
-import { copyToClipboard } from '../clipboard.js';
 import { renderFieldInterview } from '../fieldInterview.js';
 import { coerceAnswer } from '../questionControl.js';
 
-const OLLAMA_PROPOSAL_SYSTEM_PROMPT = `${PROPOSAL_SYSTEM_PROMPT}\n- Return JSON matching the supplied schema and nothing else.`;
 const MAX_DISMISSED_CANDIDATES = 50;
-
-function issue(field, message) {
-  return { field, message, severity: 'error' };
-}
 
 function currentValues(questions, experiment) {
   const values = {};
@@ -41,52 +25,40 @@ function writeReadoutCanonicalIfNeeded(store, question, value, tag, assayId, kb)
   return store.setPath(path, canonical, tag, { slotKey });
 }
 
-function safeModelFailureDetail(error) {
-  const name = typeof error?.name === 'string' ? error.name : 'Error';
-  const message = typeof error?.message === 'string' ? error.message : 'The local model request failed.';
-  const raw = `${name}: ${message}`;
-  const redacted = raw
-    .replace(/\b(?:https?|wss?):\/\/[^\s'"`]+/gi, '[endpoint redacted]')
-    .replace(/\b(?:authorization|bearer|token|api[_ -]?key)\b\s*[:=]?\s*[^\s,;]+/gi, '[credential redacted]');
-  return redacted.slice(0, 300);
-}
-
 /**
- * Project's one workspace: a narrative, an always-present review, and the
- * active assay's Project field grid. Review state is session-only and bound
- * to the exact narrative text and assay id that produced it.
+ * Research brief's one workspace: a narrative, an always-present review, and
+ * the active measurement's field grid.
+ *
+ * The review is a DETERMINISTIC EXACT-TEXT SCAN and nothing else. It reads
+ * marker aliases, biological-replicate counts, magnification, and unambiguous
+ * ISO dates straight out of the saved description, quotes the text it matched,
+ * and waits for an explicit Accept. Everything it did not match stays narrative
+ * -- the page never claims to have understood the whole description.
+ *
+ * There is no in-app model. Micronaut used to offer a local Ollama call and a
+ * copy/paste round trip that parsed a model's JSON back into study fields, and
+ * that path carried the entire request lifecycle: abort controllers, request
+ * generations, rate limits, availability probes, evidence falsification checks.
+ * It bought a researcher a few seconds of typing in exchange for reviewing
+ * every suggestion anyway, and only worked for the few who had Ollama
+ * installed. The model conversation worth having is about the science, and it
+ * lives on Review as a one-way "Copy prompt for your own LLM" export -- nothing
+ * a model writes is parsed back in, which is why nothing here has to defend
+ * against it.
+ *
+ * Review state stays session-only and bound to the exact narrative text and
+ * measurement id that produced it.
  */
 export function createDescribeStep(kb) {
   const { questions: questionBank, issues: questionIssues } = loadQuestions(kb.questions);
   if (questionIssues.length) console.error('Question bank issues:', questionIssues);
 
   let session = null;
-  let activeRequest = null;
-  let generation = 0;
-  let stopElapsed = null;
-  let elapsedHost = null;
-
-  function stopElapsedLabel() {
-    if (stopElapsed) stopElapsed();
-    stopElapsed = null;
-    if (elapsedHost) elapsedHost.textContent = '';
-  }
-
-  function stopRequest(reason = 'cancelled') {
-    generation += 1;
-    if (activeRequest) activeRequest.abort();
-    activeRequest = null;
-    stopElapsedLabel();
-    if (session && (session.status === 'scanning' || session.status === 'model-running')) session.status = reason;
-  }
 
   return {
     id: 'describe',
     title: 'Research brief',
     render(main, store, { showToast, advisor, experience } = {}) {
-      // Route/assay rendering replaces the DOM. Invalidate any old request so
-      // it cannot mutate this persistent session after a newer render starts.
-      stopRequest('cancelled');
       main.textContent = '';
 
       const renderAssayId = store.get().activeAssayId;
@@ -154,11 +126,8 @@ export function createDescribeStep(kb) {
       narrativeCard.appendChild(reviewButton);
 
       function syncReviewButton() {
-        reviewButton.disabled = !textarea.value.trim() || activeRequest !== null;
+        reviewButton.disabled = !textarea.value.trim();
       }
-
-      const modelOptions = createProjectModelOptions();
-      narrativeCard.appendChild(modelOptions.element);
 
       const reviewHost = document.createElement('div');
       reviewHost.className = 'project-review-host';
@@ -191,17 +160,13 @@ export function createDescribeStep(kb) {
         };
       }
 
-      function sessionPrompt() {
-        return session ? renderProposalRequestPrompt(session.openQuestions, session.narrative) : '';
-      }
-
       function reviewState() {
         const binding = freshBinding();
         const view = assayView(store.get(), binding.assayId);
         if (!session) {
           return buildProjectReview({ status: 'idle', questions: questionBank, currentValues: currentValues(questionBank, view) });
         }
-        const projection = buildProjectReview({
+        return buildProjectReview({
           status: session.status,
           questions: questionBank,
           currentValues: currentValues(questionBank, view),
@@ -210,31 +175,17 @@ export function createDescribeStep(kb) {
           currentNarrativeRevision: binding.narrative,
           currentAssayId: binding.assayId,
           exact: session.exact,
-          local: session.local,
-          paste: session.paste,
           dismissedCandidateIds: session.dismissedCandidateIds,
         });
-        // Rendering may name a model, but the pure review authority remains
-        // concerned only with candidates, bindings, and actionability.
-        return {
-          ...projection,
-          exactOnly: session.exactOnly === true,
-          modelLabel: session.modelLabel || '',
-        };
       }
 
       const advicePanel = createAdvicePanel(advisor || [], 'describe');
       const review = createProjectReview({
         state: reviewState(),
-        fallbackPrompt: sessionPrompt(),
         onAcceptCandidate: acceptCandidate,
         onDismissCandidate: dismissCandidate,
-        onPasteReply: reviewPastedReply,
-        onCancelReview: cancelReview,
-        onCopyPrompt: copyPrompt,
       });
       reviewHost.appendChild(review.element);
-      elapsedHost = review.elapsedHost;
       review.planningNotesHost.appendChild(advicePanel.element);
 
       function updateAdvice() {
@@ -244,12 +195,8 @@ export function createDescribeStep(kb) {
 
       function renderReview() {
         review.update(reviewState(), {
-          fallbackPrompt: sessionPrompt(),
           onAcceptCandidate: acceptCandidate,
           onDismissCandidate: dismissCandidate,
-          onPasteReply: reviewPastedReply,
-          onCancelReview: cancelReview,
-          onCopyPrompt: copyPrompt,
         });
         updateAdvice();
       }
@@ -283,9 +230,9 @@ export function createDescribeStep(kb) {
 
       function addSessionIssue(message) {
         if (!session) return;
-        session.local = session.local || { proposals: [], asks: [], issues: [] };
-        session.local.issues = Array.isArray(session.local.issues) ? session.local.issues : [];
-        session.local.issues.push(issue('review', message));
+        session.exact = session.exact || { proposals: [], issues: [] };
+        session.exact.issues = Array.isArray(session.exact.issues) ? session.exact.issues : [];
+        session.exact.issues.push({ field: 'review', message, severity: 'error' });
       }
 
       function focusAfterCandidateAction(previousIndex) {
@@ -306,24 +253,6 @@ export function createDescribeStep(kb) {
         );
         if (next) next.focus();
         else if (typeof review.focusHeading === 'function') review.focusHeading();
-      }
-
-      async function copyPrompt(prompt) {
-        const ok = await copyToClipboard(typeof prompt === 'string' ? prompt : sessionPrompt());
-        const message = ok ? 'Review prompt copied.' : 'Could not copy automatically. Select the prompt and copy it.';
-        saveState.textContent = message;
-        if (showToast) showToast(message);
-      }
-
-      function cancelReview() {
-        if (!session || !activeRequest) return;
-        generation += 1;
-        activeRequest.abort();
-        activeRequest = null;
-        stopElapsedLabel();
-        session.status = 'cancelled';
-        syncReviewButton();
-        renderReview();
       }
 
       function dismissCandidate(candidateId) {
@@ -395,29 +324,9 @@ export function createDescribeStep(kb) {
         focusAfterCandidateAction(candidateIndex);
       }
 
-      function reviewPastedReply(text) {
-        if (!session) return;
-        const binding = freshBinding();
-        if (binding.narrative !== session.narrative || binding.assayId !== session.assayId) {
-          session.status = 'stale';
-          renderReview();
-          return;
-        }
-        const extracted = extractJsonReply(text, { requireKey: 'proposals' });
-        const parsed = parseLlmProposals(extracted.json, session.openQuestions, { narrative: session.narrative });
-        const asks = parseLlmAsks(extracted.json);
-        session.paste = {
-          proposals: parsed.proposals,
-          asks: asks.asks,
-          repairs: extracted.repairs,
-          issues: [...extracted.issues, ...parsed.issues, ...asks.issues],
-        };
-        session.exactOnly = false;
-        session.status = 'complete';
-        renderReview();
-      }
-
-      async function startReview() {
+      // Synchronous by construction: there is no request to await, so the scan
+      // cannot be stale, cancelled, or half-finished at the moment it renders.
+      function startReview() {
         const text = textarea.value;
         if (!text.trim()) {
           textarea.focus();
@@ -426,109 +335,28 @@ export function createDescribeStep(kb) {
           return;
         }
         emptyAlert.hidden = true;
-        stopRequest('cancelled');
         const binding = freshBinding();
-        const openQuestions = nextQuestions(questionBank, assayView(store.get(), binding.assayId), questionBank.length);
         const exactResult = parseFreeText(binding.narrative, kb.index);
         session = {
           narrative: binding.narrative,
           revision: binding.narrative,
           assayId: binding.assayId,
-          openQuestions,
           exact: { proposals: exactResult.proposals, issues: [] },
-          local: { proposals: [], asks: [], issues: [] },
-          paste: { proposals: [], asks: [], issues: [] },
           dismissedCandidateIds: [],
-          status: 'scanning',
-          exactOnly: true,
-          modelLabel: '',
+          status: 'complete',
         };
-        renderReview(); // Exact matches render before a provider request starts.
-
-        const config = modelOptions.getConfig();
-        const limit = rateLimitLabel();
-        if (!config.enabled) {
-          session.status = 'complete';
-          renderReview();
-          return;
-        }
-        if (!localEndpointCallsAvailable()) {
-          session.status = 'fallback';
-          addSessionIssue('Local model calls are unavailable in this environment. Use copy and paste instead.');
-          renderReview();
-          return;
-        }
-        if (limit.atLimit) {
-          session.status = 'fallback';
-          addSessionIssue(`${limit.text}. Use copy and paste instead.`);
-          renderReview();
-          return;
-        }
-        const provider = createOllamaProvider(config);
-        if (!provider.isAvailable()) {
-          session.status = 'fallback';
-          addSessionIssue('The local model is not configured. Use copy and paste instead.');
-          renderReview();
-          return;
-        }
-
-        const requestGeneration = ++generation;
-        const controller = new AbortController();
-        activeRequest = controller;
-        session.status = 'model-running';
-        session.modelLabel = config.model || 'your local model';
-        reviewButton.disabled = true;
-        stopElapsedLabel();
-        stopElapsed = startModelProgress(review.elapsedHost, review.progressActivityHost, session.modelLabel);
         renderReview();
-        try {
-          recordOllamaRequest();
-          const result = await provider.complete({
-            system: OLLAMA_PROPOSAL_SYSTEM_PROMPT,
-            user: renderProposalRequestPrompt(openQuestions, binding.narrative),
-            schema: buildProposalSchema(openQuestions),
-            signal: controller.signal,
-          });
-          if (requestGeneration !== generation || activeRequest !== controller) return;
-          if (!result || !result.json) {
-            session.status = 'fallback';
-            addSessionIssue('The local model returned no valid JSON. Use copy and paste instead.');
-            renderReview();
-            return;
-          }
-          const parsed = parseLlmProposals(result.json, openQuestions, { narrative: binding.narrative });
-          const asks = parseLlmAsks(result.json);
-          session.local = { proposals: parsed.proposals, asks: asks.asks, issues: [...parsed.issues, ...asks.issues] };
-          session.exactOnly = false;
-          session.status = 'complete';
-          renderReview();
-        } catch (error) {
-          if (requestGeneration !== generation || activeRequest !== controller) return;
-          session.status = controller.signal.aborted ? 'cancelled' : 'fallback';
-          if (!controller.signal.aborted) {
-            addSessionIssue(`The local model could not be reached. ${safeModelFailureDetail(error)}`);
-          }
-          renderReview();
-        } finally {
-          if (requestGeneration === generation && activeRequest === controller) {
-            activeRequest = null;
-            stopElapsedLabel();
-            syncReviewButton();
-          }
-        }
       }
 
       textarea.addEventListener('input', () => {
-        // Do not normalize text: it is the evidence source for every model
-        // interpretation and must remain byte-for-byte what the user typed.
+        // Do not normalize text: it is the evidence source for every candidate
+        // and must remain byte-for-byte what the user typed.
         store.setPath('narrative.text', textarea.value, 'user');
         saveState.textContent = 'Description is saved with this study.';
         emptyAlert.hidden = true;
         syncReviewButton();
         if (session && textarea.value !== session.narrative) {
-          stopRequest('stale');
           session.status = 'stale';
-          syncReviewButton();
           renderReview();
         }
       });

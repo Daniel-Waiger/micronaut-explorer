@@ -120,37 +120,23 @@ function templateFor(stepId, facts) {
         tryThis: 'Read the question, then check that the comparison labels match your planned comparison or observational study.',
         exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Comparison labels: ${list(facts.study.groupVocabulary, 'none yet')}.`,
       };
-    case 'design':
+    // One case, because Samples & design, Acquisition and Data plan are one
+    // page now (ui/steps/measurement.js). Splitting the walkthrough across
+    // three stops for what a researcher sees as one screen would reintroduce
+    // exactly the step-sequence framing the restructure removed.
+    case 'measurement':
       return {
-        outcome: 'Turn the active measurement into an explicit, reviewable sample and condition plan.',
-        what: 'Samples & design defines groups, crossed factors, replicate counts, and the resulting conditions.',
-        why: 'The condition matrix is the source for downstream filename planning and review.',
-        when: 'Use it after defining the measurement and before collecting data.',
-        how: 'Set groups and factors, then review the generated conditions rather than calculating them by hand.',
-        tryThis: 'Inspect the generated condition count and make sure every intended comparison is represented.',
-        exampleSummary: `${assayLabel} has ${plural(facts.assay.design.conditionCount, 'generated condition')}: groups ${list(facts.assay.design.groups, 'none yet')}; factors ${factorSummary(facts.assay.design.factors)}.`,
-      };
-    case 'microscopy':
-      return {
-        outcome: 'Connect acquisition choices with the measurement’s panel and controls.',
-        what: 'Acquisition records the modality and exposes the resolved panel and relevant controls.',
-        why: 'Acquisition settings and controls need to be assessed together for an interpretable result.',
-        when: 'Use it while planning imaging or when a marker, channel, or modality changes.',
-        how: 'Choose the modality, review the resolved panel rows, and consider the controls the study projection provides.',
-        tryThis: 'Check whether the displayed panel and control guidance fit the acquisition you will perform.',
-        exampleSummary: `${assayLabel} uses ${text(facts.assay.modality, 'an unspecified modality')} with ${plural(facts.assay.panelRows.length, 'resolved panel row')} and ${plural(facts.controlCount, 'suggested control')}.`,
-      };
-    case 'naming':
-      return {
-        outcome: 'Produce consistent, traceable filenames from the current plan.',
-        what: 'Data plan combines the active measurement’s effective naming fields with its generated condition rows.',
-        why: 'Generated filenames make each acquired file traceable to its condition without manual reconstruction.',
-        when: 'Use it once design and acquisition details are sufficiently specified to plan files.',
-        how: 'Review the generated plan and correct source fields on their owning steps when a filename needs attention.',
-        tryThis: 'Open a planned filename and confirm that its tokens describe a real acquisition condition.',
-        exampleSummary: facts.assay.filenames[0] && facts.assay.filenames[0].filename
-          ? `${assayLabel} currently plans “${facts.assay.filenames[0].filename}”.`
-          : `${assayLabel} has no planned filename available yet.`,
+        outcome: 'Turn one measurement into a reviewable plan: its samples, its acquisition, and the files it will produce.',
+        what: 'A measurement page holds Samples & design (groups, factors, replicates), Acquisition (modality, panel, controls), and Data plan (the filenames those choices generate).',
+        why: 'These three decide each other. The condition matrix feeds the filenames; the panel decides which controls you need. Seeing them apart hides that.',
+        when: 'Use it after the measurement exists and before you collect any data.',
+        how: 'Work down the page. Set groups and factors, choose the modality and panel, then read the generated filenames rather than composing them by hand.',
+        tryThis: 'Change one group label and watch the planned filenames below it change with it.',
+        exampleSummary: `${assayLabel}: ${plural(facts.assay.design.conditionCount, 'generated condition')} from groups ${list(facts.assay.design.groups, 'none yet')}; ${text(facts.assay.modality, 'an unspecified modality')} with ${plural(facts.assay.panelRows.length, 'resolved panel row')} and ${plural(facts.controlCount, 'suggested control')}; ${
+          facts.assay.filenames[0] && facts.assay.filenames[0].filename
+            ? `planning “${facts.assay.filenames[0].filename}”`
+            : 'no planned filename yet'
+        }.`,
       };
     case 'overview':
       return {

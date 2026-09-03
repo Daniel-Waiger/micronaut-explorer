@@ -28,19 +28,17 @@ import {
 } from './core/guidedProgress.js';
 import { createWalkthroughController } from './ui/walkthrough.js';
 import { createFeatureWalkthroughController } from './ui/featureWalkthrough.js';
-import { createFeatureWalkthroughVisit } from './core/featureWalkthroughVisit.js';
 import { BASE_TEMPLATE, createNamingStep, NAMING_CONFIG } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
-import { designStep } from './ui/steps/design.js';
 import { studyStep } from './ui/steps/study.js';
 import { createPanelStep } from './ui/steps/panel.js';
 import { createOverviewStep } from './ui/steps/overview.js';
 import { guideStep } from './ui/steps/guide.js';
 import { homeStep } from './ui/steps/home.js';
+import { createMeasurementStep } from './ui/steps/measurement.js';
 import { feedbackStep } from './ui/steps/feedback.js';
 import { settingsStep } from './ui/steps/settings.js';
-import { showOnboardingGate } from './ui/steps/onboarding.js';
-import { loadOnboarding, resetOnboarding } from './core/onboarding.js';
+import { loadOnboarding } from './core/onboarding.js';
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -63,11 +61,19 @@ function loadAppKb() {
 
 /**
  * The thin wrapper around core/persist.js's loadMostRecentRecoverable that
- * supplies main.js's own console.error logging and the createDefaultStudy()
- * fallback -- persist.js deliberately doesn't know what a fresh study looks
- * like, so `experiment: null` means "start fresh" here. Only fires when
- * NO usable autosave exists at all (true first run, or every ring slot was
- * corrupted) -- an existing in-progress study is never touched.
+ * supplies main.js's own console.error logging and the empty-study fallback --
+ * persist.js deliberately doesn't know what a fresh study looks like, so
+ * `experiment: null` means "start fresh" here. Only fires when NO usable
+ * autosave exists at all (true first run, or every ring slot was corrupted) --
+ * an existing in-progress study is never touched.
+ *
+ * A first run starts BLANK, not on the shipped oregano example. Seeding the
+ * example made a visitor's first workspace someone else's four-measurement
+ * study, and an entire ownership subsystem (banners, read-only exploration,
+ * "make a copy") existed only to walk that back. The example is still one
+ * click away -- see openExampleStudy() and Home's "Open the example study" --
+ * but it is now something the visitor asks for rather than something they
+ * have to disown.
  */
 function loadInitialExperiment() {
   const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
@@ -75,7 +81,7 @@ function loadInitialExperiment() {
       console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
   });
   return {
-    experiment: experiment || createDefaultStudy(),
+    experiment: experiment || emptyExperiment(),
     skippedCount,
     totalSaved,
     // `totalSaved` can be non-zero when every slot was unreadable. Only an
@@ -124,25 +130,26 @@ function init() {
   const panelStep = createPanelStep(kb);
   const overviewStep = createOverviewStep(kb);
   const namingStep = createNamingStep(kb);
-  // Home FIRST (zen-planner Phase 1's reframe): the router lands on
-  // steps[0] by default, and Home is now the deliberate landing page --
-  // superseding Study's earlier claim to that spot (see the walkthrough
-  // redirect below main.js's step nav order also carries the reframe's
-  // "question before microscope" story: Describe ("Project") moves ahead of
-  // Study/Design so the project-level questioning happens before the study
-  // axes and the microscopy details, and Naming/Overview close out as
-  // Outputs.
-  // Panel ("Microscopy"): it reads naming.fields.markers (Naming is where
-  // that field is entered) plus its own phase-scoped acquisition interview.
-  // See ui/steps/panel.js's module header and
-  // docs/plans/planner-web-color-panel.md, Decision 1.
-  // Overview last: it is a pure READ over every other step's data (the
-  // shareable diagram + deterministic walkthrough), never a place new facts
-  // are entered -- see ui/steps/overview.js's module header.
-  // Guide LAST: stays permanently in the nav so it is always reachable, even
-  // though Home's own "Take the walkthrough" card is now the more prominent
-  // entry point to the same content. See ui/steps/guide.js's header.
-  const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep, feedbackStep, settingsStep];
+  // The nav names things a study HAS, not steps to march through:
+  //
+  //   Study map     the shape of the study -- question, system, comparison, unit
+  //   Research brief the narrative and what the exact-text scan found in it
+  //   Measurements  the registry: every measurement, searchable and filterable
+  //   Measurement   the one you opened: samples & design + acquisition + data plan
+  //   Review        a read over everything, plus every export
+  //
+  // Samples & design, Acquisition and Data plan are no longer routes. They are
+  // sections of the measurement page, composed by createMeasurementStep from
+  // the very same step objects -- which is why designStep/panelStep/namingStep
+  // are still constructed here and handed to it rather than being rewritten.
+  // Old #/design, #/panel and #/naming links still resolve; see
+  // core/router.js's ROUTE_ALIASES.
+  //
+  // Guide, Feedback and Settings stay reachable but sit outside the workflow:
+  // they are utilities, and counting them as planning stages was part of what
+  // made the nav read as an exam.
+  const measurementStep = createMeasurementStep({ panelStep, namingStep });
+  const steps = [homeStep, describeStep, studyStep, measurementStep, overviewStep, guideStep, feedbackStep, settingsStep];
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
@@ -210,14 +217,18 @@ function init() {
     return true;
   }
 
-  function resetToExample() {
-    exploreExample = false;
-    store.replace(createDefaultStudy());
-    showToast('Restored the oregano example. Your previous versions remain available in Restore.');
+  // Opening the example is now an explicit request, so it arrives as ordinary
+  // editable work tagged `template` ("started from the example") rather than
+  // `example` ("the shipped seed, not yours"). Nothing has to be adopted,
+  // copied, or disowned before the visitor may type in it. `origin: 'example'`
+  // still exists in the schema so older autosaves keep loading unchanged.
+  function openExampleStudy() {
+    const example = createDefaultStudy();
+    store.replace(withOrigin(example, 'template'));
+    showToast('Opened the example study. It is yours to edit; your previous versions remain in Restore.');
   }
 
   function startBlankStudy() {
-    exploreExample = false;
     store.replace(emptyExperiment());
     showToast('Started a blank study. Your previous versions remain available in Restore.');
   }
@@ -238,12 +249,15 @@ function init() {
     return deriveWorkflowProgress(experiment, conformance, kb.questions);
   }
 
+  // The guided walkthrough and the router now share one vocabulary: the
+  // walkthrough's per-measurement stop IS the measurement route. The old
+  // microscopy<->panel translation is gone with the panel route.
   function guidedRouteIdForStep(stepId) {
-    return stepId === 'microscopy' ? 'panel' : stepId;
+    return stepId;
   }
 
   function guidedStepIdForRoute(routeId) {
-    return routeId === 'panel' ? 'microscopy' : routeId;
+    return routeId;
   }
 
   function reportGuidedStorageFailure(error) {
@@ -263,31 +277,8 @@ function init() {
     return guidedProgressState;
   }
 
-  let exampleChooser = null;
   let guidedController = null;
   let featureWalkthroughController = null;
-  let exploreExample = false;
-
-  function showExampleChooser({ explicit = false } = {}) {
-    const isExample = store.get().meta?.origin === 'example';
-    if (exampleChooser || loadOnboarding().completed) return false;
-    // A recovered autosave is returning work even if it began from the seed.
-    // Only an explicit utility request may reopen a guide for returning work.
-    if (!explicit && (!isExample || isPersisted)) return false;
-    exampleChooser = showOnboardingGate({
-      isExample,
-      onWalkThrough: () => guidedController.start(),
-      onExplore: () => {
-        // The onboarding choice is an action, not merely a dismissal: show
-        // the read-only example immediately while preserving its origin.
-        exploreExample = true;
-        router.navigate('home');
-      },
-      onStartBlank: startBlankStudy,
-      onDone: () => { exampleChooser = null; },
-    });
-    return true;
-  }
 
   shell = renderShell(root, store, router, {
     kbIssueCount: kb.issues.length,
@@ -297,16 +288,13 @@ function init() {
     // These lifecycle actions replace the in-memory root and deliberately
     // leave the five prior recovery slots intact. That makes a mistaken reset
     // recoverable instead of making a "start over" action a data-loss trap.
-    onReset: resetToExample,
+    onReset: openExampleStudy,
     onNewBlank: startBlankStudy,
     onAdoptExample: adoptExampleTemplate,
+    onOpenExample: openExampleStudy,
     onExportProject: exportProjectBackup,
     onImportProject: importProjectBackup,
     onRestoreRecovery: restoreRecoverySlot,
-    onResetOnboarding: () => {
-      resetOnboarding();
-      showExampleChooser({ explicit: true });
-    },
   });
   const { main, showToast } = shell;
 
@@ -342,21 +330,13 @@ function init() {
     onVisibilityChange: shell.setGuidedAsideVisible,
   });
   shell.setExplainStepHandler((stepId) => guidedController.explain(stepId));
+  // The feature tour is available ONLY from the header's Walkthrough button.
+  // It used to launch itself on a first visit and again on any return after
+  // 24h away, so a returning user opening a new tab was met by a multi-stop
+  // product tour they never asked for. Guidance that starts itself is the
+  // thing that made five explanatory surfaces feel like five interruptions.
   featureWalkthroughController = createFeatureWalkthroughController({ router });
   shell.setFeatureWalkthroughHandler((trigger) => featureWalkthroughController.start(trigger));
-  const featureTourVisit = createFeatureWalkthroughVisit();
-
-  function startReturningFeatureTour() {
-    if (exampleChooser || guidedProgressState.status === 'active' || featureWalkthroughController.isOpen()) return false;
-    featureWalkthroughController.start();
-    return true;
-  }
-
-  window.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') featureTourVisit.markHidden();
-    if (document.visibilityState === 'visible' && featureTourVisit.shouldStartOnReturn()) startReturningFeatureTour();
-  });
-  window.addEventListener('pagehide', () => featureTourVisit.markLeaving());
 
   function explainGuided(stepId) {
     const routeStepId = guidedStepIdForRoute(router.current());
@@ -402,10 +382,10 @@ function init() {
       // fresh projection as the shell. Passing it here keeps them from
       // rebuilding workflow or next-decision state locally.
       workflowProgress: currentWorkflowProgress(),
-      exploreExample,
       experience: loadOnboarding().experience,
       onNewBlank: startBlankStudy,
       onAdoptExample: adoptExampleTemplate,
+      onOpenExample: openExampleStudy,
       guidedStatus: guidedProgressState,
       getGuidedStatus: () => guidedProgressState,
       onStartGuided: () => guidedController.start(),
@@ -483,9 +463,9 @@ function init() {
     }, AUTOSAVE_DEBOUNCE_MS);
   });
 
-  const chooserShown = showExampleChooser();
-  if (!chooserShown && guidedProgressState.status === 'active') guidedController.resume();
-  else if (!chooserShown && featureTourVisit.shouldStartNow()) startReturningFeatureTour();
+  // The one thing allowed to open itself on load, and only because the user
+  // explicitly left a walkthrough paused mid-way on a previous visit.
+  if (guidedProgressState.status === 'active') guidedController.resume();
 }
 
 init();

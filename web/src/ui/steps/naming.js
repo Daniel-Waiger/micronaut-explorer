@@ -11,6 +11,7 @@ import { coerceAnswer, localDateInputValue } from '../questionControl.js';
 import { renderFieldInterview } from '../fieldInterview.js';
 import { buildIcsSchedule, renderIcs } from '../../engine/render/ics.js';
 import { downloadTextFile } from '../../core/persist.js';
+import { appendStepHeading } from '../stepHeading.js';
 
 // Interim defaults until the P1 knowledge pack supplies a real profile and
 // per-lab naming config -- mirrors microscopy_naming_assistant's
@@ -146,7 +147,7 @@ export function createNamingStep(kb) {
   return {
   id: 'naming',
   title: 'Data plan',
-  render(main, store, { advisor, experience } = {}) {
+  render(main, store, { advisor, experience, embedded = false } = {}) {
     main.textContent = '';
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
@@ -155,17 +156,14 @@ export function createNamingStep(kb) {
     // safe, matching this file's existing snapshot-per-render idiom.
     const assayId = store.get().activeAssayId;
 
-    const heading = document.createElement('h1');
-    heading.className = 'step-heading';
-    heading.textContent = 'Data plan';
-    main.appendChild(heading);
-
     const activeAssay = assayById(store.get(), assayId);
     const activeAssayLabel = activeAssay?.label || 'this measurement';
-    const scope = document.createElement('p');
-    scope.className = 'proposals-empty supporting-description';
-    scope.textContent = `Planning files and work for: ${activeAssayLabel}.`;
-    main.appendChild(scope);
+    appendStepHeading(main, {
+      title: 'Data plan',
+      scopeText: `Planning files and work for: ${activeAssayLabel}.`,
+      embedded,
+      id: 'measurement-section-dataplan',
+    });
 
     const filenameGuidance = document.createElement('p');
     filenameGuidance.className = 'proposals-empty supporting-description';

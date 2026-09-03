@@ -54,19 +54,37 @@ function readyDefaultStudy() {
   return study;
 }
 
-test('defines the seven labelled routes separately from the excluded Guide route', () => {
+test('defines the five labelled routes separately from the excluded Guide route', () => {
   assert.deepEqual(PRIMARY_WORKFLOW.map(({ id, label }) => ({ id, label })), [
     { id: 'home', label: 'Study map' },
     { id: 'describe', label: 'Research brief' },
     { id: 'study', label: 'Measurements' },
-    { id: 'design', label: 'Samples & design' },
-    { id: 'microscopy', label: 'Acquisition' },
-    { id: 'naming', label: 'Data plan' },
+    { id: 'measurement', label: 'Measurement' },
     { id: 'overview', label: 'Review' },
   ]);
   assert.deepEqual(OPTIONAL_WORKFLOW.map((step) => step.id), ['guide']);
-  assert.equal(PRIMARY_WORKFLOW[4].id, 'microscopy', 'the panel/microscopy router alias remains stable');
-  assert.equal(deriveWorkflowProgress({}, { readiness: 'ready', assays: [] }).summary.total, 7);
+  assert.equal(deriveWorkflowProgress({}, { readiness: 'ready', assays: [] }).summary.total, 5);
+});
+
+// design/microscopy/naming are sections of one page now, but they remain
+// individually addressable per assay: the guided walkthrough and the per-assay
+// tree still speak about them by name, and `measurement` is their aggregate.
+test('the measurement route aggregates its three sections without losing them', () => {
+  const result = progress(emptyExperiment());
+  const assay = result.assays[0];
+  for (const section of ['design', 'microscopy', 'naming']) {
+    assert.ok(assay.steps[section], `${section} remains addressable`);
+  }
+  // The aggregate is exactly its parts' aggregate -- needs-attention wins,
+  // then in-progress, and complete only when all three are.
+  const sections = [assay.steps.design.state, assay.steps.microscopy.state, assay.steps.naming.state];
+  const expected = sections.includes('needs-attention')
+    ? 'needs-attention'
+    : sections.every((state) => state === 'complete')
+      ? 'complete'
+      : sections.includes('in-progress') ? 'in-progress' : 'not-started';
+  assert.equal(assay.steps.measurement.state, expected);
+  assert.equal(primaryStep(result, 'measurement').state, expected);
 });
 
 test('an empty Study map is not started, while its incomplete readiness is routed through conformance', () => {
@@ -139,7 +157,7 @@ test('confirmed phase fields and a valid design advance each assay without makin
   assert.equal(result.assays[0].steps.microscopy.state, 'complete');
   assert.equal(result.assays[0].steps.design.state, 'complete');
   assert.equal(result.optional[0].id, 'guide');
-  assert.equal(result.summary.total, 7);
+  assert.equal(result.summary.total, 5);
 });
 
 test('multi-measurement progress retains distinct assay states and surfaces an invalid design as needs-attention', () => {
@@ -153,7 +171,9 @@ test('multi-measurement progress retains distinct assay states and surfaces an i
   assert.equal(result.map.measurements.length, 4);
   assert.equal(result.assays[0].steps.design.state, 'complete');
   assert.equal(result.assays[1].steps.design.state, 'needs-attention');
-  assert.equal(result.primary.find((step) => step.id === 'design').state, 'needs-attention');
+  // One bad design surfaces on the composed Measurement route, since that is
+  // the route that now owns Samples & design.
+  assert.equal(result.primary.find((step) => step.id === 'measurement').state, 'needs-attention');
 });
 
 test('overview state consumes report readiness rather than reclassifying issue details', () => {

@@ -1,9 +1,12 @@
 // DOM-only Project Review renderer. It consumes the pure projection from
-// engine/projectReview.js but intentionally imports nothing: request parsing,
-// providers, persistence, current-value reads, and accepted writes stay in
-// the caller. Every mutable, user-editable fallback control stays mounted
-// across update() calls so status refreshes cannot erase a pasted reply or
-// steal its focus.
+// engine/projectReview.js but intentionally imports nothing: parsing,
+// persistence, current-value reads, and accepted writes stay in the caller.
+//
+// Every candidate here comes from the deterministic exact-text scan. The
+// progress bar, elapsed timer, cancel control, model disclosure, and the
+// copy-prompt/paste-reply round trip all belonged to an in-app model path that
+// no longer exists -- see ui/steps/describe.js's header for why. What is left
+// renders synchronously and cannot be mid-flight.
 
 const MAX_RENDERED_GROUPS = 20;
 const MAX_RENDERED_CANDIDATES = 30;
@@ -14,18 +17,12 @@ const MAX_RENDERED_ISSUES = 12;
 const STATUS_TEXT = {
   idle: 'No review yet. Add a description, then choose Review description.',
   scanning: 'Checking exact text matches…',
-  'model-running': 'Exact matches are ready. Checking with your local model…',
-  complete: 'Review complete. Nothing has been added to your study.',
-  fallback: 'The local model could not be reached. Your description is still saved, and nothing was added to the study.',
+  complete: 'Exact-text review complete. Micronaut kept everything else as narrative, not structured data.',
   stale: 'Description changed — review again before accepting suggestions.',
-  cancelled: 'Model review cancelled. Exact matches remain available.',
-  error: 'Review needs your attention. Nothing has been added to your study.',
 };
 
 const SOURCE_LABELS = {
   exact: 'Exact text match',
-  local: 'Local model',
-  paste: 'Pasted model response',
 };
 
 function projectReviewUiRecord(value) {
@@ -78,19 +75,6 @@ function candidateDismissLabel(candidate) {
 }
 
 function statusText(state) {
-  if (state && state.status === 'model-running') {
-    return `Exact matches are ready. Checking with ${state.modelLabel || 'your local model'}…`;
-  }
-  const candidates = projectReviewUiList(state && state.candidates);
-  const exactOnly =
-    state &&
-    state.status === 'complete' &&
-    (state.exactOnly === true ||
-      (candidates.length > 0 &&
-        candidates.every((candidate) => projectReviewUiList(candidate && candidate.sources).every((source) => source === 'exact'))));
-  if (exactOnly) {
-    return 'Exact-text review complete. Micronaut kept everything else as narrative, not structured data.';
-  }
   return STATUS_TEXT[state && state.status] || STATUS_TEXT.idle;
 }
 
@@ -99,25 +83,17 @@ function statusText(state) {
  *
  * `state` is a buildProjectReview(...) result. The caller supplies callbacks:
  * - `onAcceptCandidate(id)` receives only the stable candidate identity;
- * - `onDismissCandidate(id)` receives only the stable candidate identity;
- * - `onPasteReply(text)` receives a submitted fallback reply;
- * - `onPasteInput(text)` receives edits without the component storing them.
+ * - `onDismissCandidate(id)` receives only the stable candidate identity.
  *
- * `fallbackPrompt` is shown in a selectable read-only textarea. `update(state,
- * options)` refreshes review content while preserving the fallback reply's
- * value and focus; options may replace callbacks and/or fallbackPrompt.
+ * `update(state, options)` refreshes review content; options may replace
+ * either callback.
  */
 export function createProjectReview({
   state = {},
-  fallbackPrompt = '',
   onAcceptCandidate,
   onDismissCandidate,
-  onPasteReply,
-  onPasteInput,
-  onCancelReview,
-  onCopyPrompt,
 } = {}) {
-  let handlers = { onAcceptCandidate, onDismissCandidate, onPasteReply, onPasteInput, onCancelReview, onCopyPrompt };
+  let handlers = { onAcceptCandidate, onDismissCandidate };
 
   const element = document.createElement('section');
   element.className = 'project-review';
@@ -129,40 +105,11 @@ export function createProjectReview({
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
-  const elapsed = appendText(element, 'p', 'project-review-elapsed', '');
-  elapsed.hidden = true;
-  const progressRegion = document.createElement('div');
-  progressRegion.className = 'project-review-progress';
-  progressRegion.hidden = true;
-  const progress = document.createElement('progress');
-  progress.className = 'project-review-progress-bar';
-  progress.setAttribute('aria-label', 'Local model review in progress');
-  progressRegion.appendChild(progress);
-  const progressActivity = appendText(progressRegion, 'p', 'project-review-progress-activity', '');
-  progressActivity.setAttribute('role', 'status');
-  progressActivity.setAttribute('aria-live', 'polite');
-  element.appendChild(progressRegion);
-  const cancelButton = document.createElement('button');
-  cancelButton.type = 'button';
-  cancelButton.className = 'project-review-cancel';
-  cancelButton.textContent = 'Cancel model review';
-  cancelButton.hidden = true;
-  cancelButton.disabled = true;
-  cancelButton.addEventListener('click', () => {
-    if (!cancelButton.disabled && typeof handlers.onCancelReview === 'function') handlers.onCancelReview();
-  });
-  element.appendChild(cancelButton);
   appendText(
     element,
     'p',
     'project-review-session-disclosure',
     'Suggestions stay in this tab until you change the description or switch measurements. Accept a suggestion to save it.'
-  );
-  appendText(
-    element,
-    'p',
-    'project-review-model-disclosure',
-    'Model suggestions are interpretations, not facts. Review the quoted evidence before accepting one.'
   );
 
   const suggestions = document.createElement('section');
@@ -209,57 +156,6 @@ export function createProjectReview({
   notConverted.appendChild(technicalErrors);
   element.appendChild(notConverted);
 
-  const fallbackDetails = document.createElement('details');
-  fallbackDetails.className = 'project-review-fallback reveal';
-  const fallbackSummary = document.createElement('summary');
-  fallbackSummary.className = 'reveal-summary';
-  fallbackSummary.textContent = 'Use copy and paste instead';
-  fallbackDetails.appendChild(fallbackSummary);
-  const fallbackHint = appendText(
-    fallbackDetails,
-    'p',
-    'project-review-fallback-hint',
-    'Copy the prompt into a model you choose, then paste only its reply here. Pasting never changes your study by itself.'
-  );
-  fallbackHint.id = 'project-review-fallback-hint';
-
-  const promptLabel = document.createElement('label');
-  promptLabel.htmlFor = 'project-review-copy-prompt';
-  promptLabel.textContent = 'Prompt to copy';
-  fallbackDetails.appendChild(promptLabel);
-  const promptBox = document.createElement('textarea');
-  promptBox.id = 'project-review-copy-prompt';
-  promptBox.className = 'project-review-copy-prompt';
-  promptBox.readOnly = true;
-  promptBox.setAttribute('aria-describedby', fallbackHint.id);
-  promptBox.value = typeof fallbackPrompt === 'string' ? fallbackPrompt : '';
-  fallbackDetails.appendChild(promptBox);
-  const copyPromptButton = document.createElement('button');
-  copyPromptButton.type = 'button';
-  copyPromptButton.className = 'project-review-copy-prompt-button';
-  copyPromptButton.textContent = 'Copy review prompt';
-  copyPromptButton.addEventListener('click', () => {
-    if (typeof handlers.onCopyPrompt === 'function') handlers.onCopyPrompt(promptBox.value);
-  });
-  fallbackDetails.appendChild(copyPromptButton);
-
-  const replyLabel = document.createElement('label');
-  replyLabel.htmlFor = 'project-review-pasted-reply';
-  replyLabel.textContent = 'Paste the model response';
-  fallbackDetails.appendChild(replyLabel);
-  const replyBox = document.createElement('textarea');
-  replyBox.id = 'project-review-pasted-reply';
-  replyBox.className = 'project-review-pasted-reply';
-  replyBox.setAttribute('aria-describedby', fallbackHint.id);
-  fallbackDetails.appendChild(replyBox);
-
-  const pasteButton = document.createElement('button');
-  pasteButton.type = 'button';
-  pasteButton.className = 'project-review-paste-submit';
-  pasteButton.textContent = 'Review pasted response';
-  fallbackDetails.appendChild(pasteButton);
-  element.appendChild(fallbackDetails);
-
   const planningDetails = document.createElement('details');
   planningDetails.className = 'project-review-planning-notes reveal';
   const planningSummary = document.createElement('summary');
@@ -270,13 +166,6 @@ export function createProjectReview({
   planningNotesHost.className = 'project-review-planning-notes-host';
   planningDetails.appendChild(planningNotesHost);
   element.appendChild(planningDetails);
-
-  replyBox.addEventListener('input', () => {
-    if (typeof handlers.onPasteInput === 'function') handlers.onPasteInput(replyBox.value);
-  });
-  pasteButton.addEventListener('click', () => {
-    if (typeof handlers.onPasteReply === 'function') handlers.onPasteReply(replyBox.value);
-  });
 
   function renderCandidates(nextState) {
     suggestionsBody.textContent = '';
@@ -432,23 +321,9 @@ export function createProjectReview({
     const safeOptions = projectReviewUiRecord(options) ? options : {};
     if ('onAcceptCandidate' in safeOptions) handlers.onAcceptCandidate = safeOptions.onAcceptCandidate;
     if ('onDismissCandidate' in safeOptions) handlers.onDismissCandidate = safeOptions.onDismissCandidate;
-    if ('onPasteReply' in safeOptions) handlers.onPasteReply = safeOptions.onPasteReply;
-    if ('onPasteInput' in safeOptions) handlers.onPasteInput = safeOptions.onPasteInput;
-    if ('onCancelReview' in safeOptions) handlers.onCancelReview = safeOptions.onCancelReview;
-    if ('onCopyPrompt' in safeOptions) handlers.onCopyPrompt = safeOptions.onCopyPrompt;
-    if ('fallbackPrompt' in safeOptions) promptBox.value = typeof safeOptions.fallbackPrompt === 'string' ? safeOptions.fallbackPrompt : '';
 
     status.textContent = statusText(safeState);
     status.dataset.state = typeof safeState.status === 'string' ? safeState.status : 'idle';
-    const modelRunning = safeState.status === 'model-running';
-    if (modelRunning) element.setAttribute('aria-busy', 'true');
-    else element.removeAttribute('aria-busy');
-    elapsed.hidden = !modelRunning;
-    progressRegion.hidden = !modelRunning;
-    if (!modelRunning) progressActivity.textContent = '';
-    cancelButton.hidden = !modelRunning;
-    cancelButton.disabled = !modelRunning;
-    if (safeState.status === 'fallback' || safeState.status === 'error') fallbackDetails.open = true;
     renderCandidates(safeState);
     renderAsks(safeState);
     renderNotConverted(safeState);
@@ -460,27 +335,11 @@ export function createProjectReview({
     element,
     update,
     statusHost: status,
-    elapsedHost: elapsed,
-    progressActivityHost: progressActivity,
     focusHeading: () => heading.focus(),
     planningNotesHost,
     setPlanningNotesVisible: (visible) => {
       planningDetails.hidden = !visible;
       if (!visible) planningDetails.open = false;
-    },
-    fallback: {
-      details: fallbackDetails,
-      prompt: promptBox,
-      reply: replyBox,
-      submit: () => {
-        if (typeof handlers.onPasteReply === 'function') return handlers.onPasteReply(replyBox.value);
-        return undefined;
-      },
-      getReply: () => replyBox.value,
-      setReply: (value) => {
-        replyBox.value = typeof value === 'string' ? value : '';
-      },
-      focusReply: () => replyBox.focus(),
     },
   };
 }

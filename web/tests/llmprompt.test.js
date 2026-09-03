@@ -45,3 +45,38 @@ test('deterministic: same document in, byte-identical prompt out', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.equal(renderLlmPrompt(doc), renderLlmPrompt(doc));
 });
+
+test('open decisions the engines already detected are named for the model', () => {
+  const decisions = {
+    groups: [
+      {
+        tier: 'study-shape',
+        count: 1,
+        items: [{ id: 'unit', tier: 'study-shape', label: 'Define the independent experimental unit', reason: 'nothing is recorded yet' }],
+      },
+      {
+        tier: 'before-acquisition',
+        count: 1,
+        items: [{ id: 'modality', tier: 'before-acquisition', label: 'Choose an acquisition method', reason: '' }],
+      },
+      // `later` is deliberately excluded: an unassigned acquisition date is not
+      // something a model should spend a review on.
+      { tier: 'later', count: 1, items: [{ id: 'date', tier: 'later', label: 'Acquisition date' }] },
+    ],
+  };
+  const prompt = renderLlmPrompt({}, decisions);
+  assert.match(prompt, /DECISIONS THIS PLAN HAS NOT MADE YET/);
+  assert.match(prompt, /Study shape:/);
+  assert.match(prompt, /- Define the independent experimental unit -- nothing is recorded yet/);
+  assert.match(prompt, /Before acquisition:/);
+  assert.match(prompt, /- Choose an acquisition method$/m);
+  assert.doesNotMatch(prompt, /Acquisition date/);
+});
+
+test('a missing or malformed triage omits the section instead of throwing', () => {
+  for (const bad of [undefined, null, {}, { groups: 'nope' }, { groups: [null, { items: [{}] }] }]) {
+    const prompt = renderLlmPrompt({}, bad);
+    assert.doesNotMatch(prompt, /DECISIONS THIS PLAN HAS NOT MADE YET/);
+    assert.match(prompt, /QUESTIONS TO CONSIDER/);
+  }
+});

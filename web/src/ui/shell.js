@@ -43,7 +43,7 @@ export function saveLabel(saveState) {
 export function renderShell(root, store, router, options = {}) {
   const {
     onReset, onNewBlank, onAdoptExample, onExportProject, onImportProject,
-    onRestoreRecovery, onResetOnboarding, kbIssueCount,
+    onRestoreRecovery, kbIssueCount,
   } = options;
   // Missing lifecycle state must degrade conservatively. Only main can know
   // that a recovery slot was actually loaded or a save completed.
@@ -196,7 +196,6 @@ export function renderShell(root, store, router, options = {}) {
     });
   }
   renderRecoveryEntries();
-  if (onResetOnboarding) utilityMenu.appendChild(action('Show onboarding again', onResetOnboarding));
   utilityMenu.appendChild(action('Copy feedback report', () => {
     const report = buildFeedbackReport({ currentStepId: router.current(), kbIssueCount, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined, experiment: store.get() });
     handoffFeedback({ report, channel: 'copy' });
@@ -341,9 +340,10 @@ export function renderShell(root, store, router, options = {}) {
     return 'Not decided';
   }
   function measurementScope(experiment, map, routeId) {
-    // These are the existing active-assay workspaces. The shell only names
-    // their scope; each step remains responsible for its own data binding.
-    if (!['describe', 'design', 'panel', 'naming'].includes(routeId)) return 'Whole study';
+    // Research brief accepts measurement-scoped details, and the measurement
+    // page is entirely one measurement. Everything else is whole-study. The
+    // shell only names the scope; each step still owns its data binding.
+    if (!['describe', 'measurement'].includes(routeId)) return 'Whole study';
     const measurements = Array.isArray(map?.measurements) ? map.measurements : [];
     const active = measurements.find((measurement) => measurement?.id === experiment.activeAssayId);
     return `Measurement: ${compassText(active?.label, 'Not selected')}`;
@@ -370,7 +370,12 @@ export function renderShell(root, store, router, options = {}) {
     workflowSummary.textContent = compassDisplayText(titleText);
     workflowSummary.title = titleText;
     workflowSummary.setAttribute('aria-label', titleText);
-    const scopeLine = `Now editing: ${scopeText} → ${routeLabel}`;
+    // On the measurement page the scope already names the measurement, so
+    // appending the route label repeated the word three times over
+    // ("Measurement: Measurement 1 → Measurement").
+    const scopeLine = scopeText === `Measurement: ${routeLabel}` || routeLabel === 'Measurement'
+      ? `Now editing: ${scopeText}`
+      : `Now editing: ${scopeText} → ${routeLabel}`;
     compassScope.textContent = compassDisplayText(scopeLine);
     compassScope.title = scopeLine;
     compassScope.setAttribute('aria-label', scopeLine);
@@ -564,6 +569,17 @@ export function renderShell(root, store, router, options = {}) {
       workflowBadges.appendChild(badge);
     });
   }
+  // Falls back to the generic word when nothing is selected yet, so the nav
+  // never renders an empty item.
+  function activeMeasurementNavLabel() {
+    const experiment = store.get();
+    const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
+    const index = assays.findIndex((assay) => assay && assay.id === experiment.activeAssayId);
+    if (index === -1) return 'Measurement';
+    const label = assays[index] && typeof assays[index].label === 'string' ? assays[index].label.trim() : '';
+    return label || `Measurement ${index + 1}`;
+  }
+
   function renderNav(activeId) {
     navSteps.textContent = '';
     navUtilities.textContent = '';
@@ -573,7 +589,12 @@ export function renderShell(root, store, router, options = {}) {
       button.type = 'button';
       button.className = `nav-step${step.id === activeId ? ' active' : ''}${current ? ` workflow-state-${current.state}` : ''}`;
       button.dataset.stepId = step.id;
-      const label = step.title || step.id;
+      // "Measurements" (the registry) and "Measurement" (the one you opened)
+      // truncate to the same thing in the collapsed rail and read as a
+      // duplicate when expanded. The detail route names the measurement it is
+      // actually showing instead, which is both distinguishable and more
+      // useful -- it says where you are, not what kind of page this is.
+      const label = step.id === 'measurement' ? activeMeasurementNavLabel() : (step.title || step.id);
       const accessibleLabel = current ? `${label} — ${stateLabel(current.state)}` : label;
       button.setAttribute('aria-label', accessibleLabel);
       // Native hover text cannot be clipped by the narrow collapsed rail.
