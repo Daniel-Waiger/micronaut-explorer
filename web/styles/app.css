@@ -5173,3 +5173,25 @@ td, th { border-color: var(--line); }
   flex: 0 0 auto;
   margin-top: 1px;
 }
+
+/* The sticky workflow footer used a translucent background, so whatever sat at
+   the bottom of the page showed through it as ghost controls -- on a blank
+   first run that meant the Study map's own Continue / Decide later buttons
+   appeared twice, one set unreadable. An overlay that reveals what it covers
+   reads as a rendering fault. Make it opaque, and leave enough room below the
+   content that a page's last controls are never underneath it. */
+.workflow-footer {
+  background: var(--panel);
+}
+
+.shell-main {
+  padding-bottom: 96px;
+  scroll-padding-bottom: 96px;
+}
+
+@media (max-width: 620px) {
+  .shell-main {
+    padding-bottom: 112px;
+    scroll-padding-bottom: 112px;
+  }
+}
