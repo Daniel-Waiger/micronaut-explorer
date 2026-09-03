@@ -6,48 +6,16 @@
 const stop = (routeId, selector, title, body, revealSelector = null) => Object.freeze({ routeId, selector, title, body, revealSelector });
 
 export const FEATURE_TOUR = Object.freeze([
-  stop(null, '.shell-brand', 'Home', 'This mark always returns you to the Study map, the app’s starting point.'),
-  stop(null, '.shell-new-study', 'New study', 'Start a blank plan here. Your earlier browser-local versions remain recoverable.'),
-  stop(null, '.shell-nav', 'Planner navigation', 'Move between the core planning workspaces here. Their order follows the normal study-design flow.'),
-  stop(null, '.nav-utilities', 'Feedback and settings', 'Feedback collects a shareable report when you choose an action. Settings keeps backup and reset tools out of the planning flow.'),
-  stop(null, '.nav-theme-toggle', 'Theme', 'This compact toggle switches the appearance for the next click. It keeps its border visible against either navigation background.'),
-
-  stop('home', '.experiment-compass', 'Study map', 'This is the live picture of what is known and what deserves attention next. Its next-decision action can take you directly to the owning workspace.'),
-  stop('home', '.home-grid', 'Starting paths', 'Use these cards to begin with a blank study or explore an example. The example is read-only until you make a copy.'),
-
-  stop('describe', '.project-description-card', 'Research brief', 'Describe the question, material or system, and purpose in one place. The rest of the planner uses this as shared context.'),
-  stop('describe', '.project-review-button', 'Review the brief', 'This checks your prose against the project context and surfaces structured suggestions. It does not silently rewrite your description.'),
-  stop('describe', '.project-details', 'Confirmed details', 'Use these details to inspect the facts derived from the brief. You can correct them at their owning input when needed.'),
-
-  stop('study', '.field-row', 'Study question', 'Set the study-level question before splitting work into measurements. This keeps shared intent separate from per-measurement details.'),
-  stop('study', '.study-group-token-field', 'Comparison vocabulary', 'Add reusable group or condition labels once here. Measurements can then use the same comparison language consistently.'),
-  stop('study', '.study-assay-row', 'Measurements', 'Each measurement has its own design, acquisition, and data-plan details. Open its workspace from the row when you are ready to specify it.'),
-
-  stop('design', '.question-answer', 'Experimental unit', 'Confirm what counts as one independently assigned or sampled unit. Replicates and conditions build on that definition.'),
-  stop('design', '.factors-list', 'Groups and factors', 'Define the alternatives and crossed variables that form your planned conditions. Add or edit them here without changing the study-wide question.'),
-  stop('design', '.conditions-table', 'Planned conditions', 'This preview expands groups, factors, and replicate counts into the rows you intend to acquire. Correct the source controls above rather than editing generated rows.'),
-
-  stop('panel', '[data-tour-section="acquisition"]', 'Acquisition', 'Confirm the imaging setup and measurement-specific acquisition facts here. These answers feed the downstream data plan.', '[data-tour-section="acquisition"]'),
-  stop('panel', '[data-tour-section="fluorophores"]', 'Fluorophores and spillover', 'Check the fluorophores declared for this measurement and any qualitative spillover flags. This temporary opening closes again as the tour moves on.', '[data-tour-section="fluorophores"]'),
-  stop('panel', '.spectral-view-host', 'Spectral view', 'This compares the known fluorophore curves and detection bands for the current measurement. Curves are schematic, so use it as planning guidance rather than a measured spectrum.', '[data-tour-section="spectral"]'),
-  stop('panel', '[data-tour-section="assembly"] .panel-list', 'Panel assembly', 'Add channels and name their targets, fluorophores, and detection filters here. The structured panel drives more precise controls and the spectral view.', '[data-tour-section="assembly"]'),
-
-  stop('naming', '.naming-grid', 'Naming fields', 'Enter the pieces that make every acquired file traceable to its condition. Previews use clear placeholders for details that are assigned later.'),
-  stop('naming', '.planned-box', 'Filename preview', 'Review the generated filenames before acquisition. The source fields above remain the place to make corrections.'),
-  stop('naming', '.duration-control', 'Schedule estimates', 'Enter only the task times you know. The planner scales them to the planned sample count for the optional downloadable schedule.'),
-
-  stop('overview', '.study-map', 'Study map summary', 'Review the current study structure and readiness in one place. Use linked issues to return to the feature that owns a decision.'),
-  stop('overview', '.overview-export-menu', 'Exports', 'Choose the artifact you need for handoff, planning, or backup. Final-facing exports remain guarded by the planner checks.'),
-  stop('overview', '.overview-secondary-actions', 'Additional handoff tools', 'These actions support sharing, printing, and model-assisted review without changing the study itself.'),
-
-  stop('guide', '.guide-search-row', 'Guide search', 'Search the reference material by the words you need. It filters the guide without altering your study.'),
-  stop('guide', '.guide-section', 'Reference sections', 'These sections explain the planning concepts behind the workspaces. They are optional reference material, not required steps.'),
-
-  stop('feedback', '.describe-textarea', 'Feedback', 'Describe what you tried and where the app stopped helping. This text stays local until you choose a sharing action.'),
-  stop('feedback', '.reveal', 'Technical context', 'Open this to see the context included with a feedback package. Browser details and the study are included only when you export or share.'),
-  stop('feedback', '.overview-secondary-actions', 'Share choices', 'Copy, download, email, or create an issue with the report using these actions. Choose the channel that works for you; none sends automatically.'),
-
-  stop('settings', '.overview-secondary-actions', 'Project backups', 'Download or import a project backup here, or begin a new blank study. Existing browser-local versions remain available through recovery.'),
+  // Deliberately short. The previous tour had 33 stops across ten routes and
+  // started itself; a tour long enough to need its own endurance is a sign the
+  // interface is not explaining itself. These name the few places whose
+  // purpose is not obvious from looking at them.
+  stop(null, '.shell-nav', 'Navigation', 'Three workspaces: the shape of your study, its measurements, and a review of both. There is no required order.'),
+  stop('home', '.study-map-editor', 'Study map', 'The shape of the study: question, system, comparison structure, and what counts as one independent unit. Everything else follows from these.'),
+  stop('study', '.measurement-registry-controls', 'Finding a measurement', 'Search and filter the list. Each measurement is one observation or analysis used to answer the study question.'),
+  stop('study', '.measurement-registry-row', 'One row per measurement', 'Its status says whether it is a draft, waiting on a decision, or ready to acquire. Open it to plan it.'),
+  stop('measurement', '.measurement-anchor-rail', 'One measurement, one page', 'Samples & design, acquisition, and the data plan are sections of this page, because each one decides the next.'),
+  stop('overview', '.overview-export-menu', 'Exports', 'Everything the plan can produce: a study document, a file manifest, bench cards, and a prompt for your own LLM.'),
 ]);
 
 export function featureTourRouteIds() {

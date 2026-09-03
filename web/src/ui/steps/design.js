@@ -5,6 +5,7 @@ import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 import { createAdvicePanel } from '../advice.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
+import { appendStepHeading } from '../stepHeading.js';
 
 // Exported so ui/steps/study.js's group-vocabulary input parses its
 // comma-separated levels list with the identical rule this step's own group
@@ -38,7 +39,7 @@ function baseNameFor(store, assayId) {
 export const designStep = {
   id: 'design',
   title: 'Samples & design',
-  render(main, store, { advisor, router } = {}) {
+  render(main, store, { advisor, router, embedded = false } = {}) {
     main.textContent = '';
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
@@ -46,11 +47,6 @@ export const designStep = {
     // changes for the lifetime of one render -- caching its id once here is
     // safe, matching naming.js's identical snapshot-per-render idiom.
     const assayId = store.get().activeAssayId;
-
-    const heading = document.createElement('h1');
-    heading.className = 'step-heading';
-    heading.textContent = 'Samples & design';
-    main.appendChild(heading);
 
     // This scope label is deliberately derived from the active assay captured
     // for this render, just like every scoped write below. The experimental
@@ -61,19 +57,25 @@ export const designStep = {
     const activeAssay = activeAssayIndex === -1 ? null : assays[activeAssayIndex];
     const activeMeasurementLabel = activeAssay?.label ||
       (activeAssayIndex === -1 ? 'Active measurement' : `Measurement ${activeAssayIndex + 1}`);
-    const scope = document.createElement('p');
-    scope.className = 'proposals-empty supporting-description';
-    scope.textContent = `Planning samples and design for: ${activeMeasurementLabel}.`;
-    main.appendChild(scope);
+    appendStepHeading(main, {
+      title: 'Samples & design',
+      scopeText: `Planning samples and design for: ${activeMeasurementLabel}.`,
+      embedded,
+      id: 'measurement-section-design',
+    });
 
     const unitRow = document.createElement('div');
-    unitRow.className = 'field-row';
+    // Same label/value/owner-link shape as Measurements' research-question row.
+    // Plain .field-row is a column flex built for label-over-input, which made
+    // this secondary "Edit on Study map" action stretch to the full page width
+    // and read as the page's primary button.
+    unitRow.className = 'field-row study-readonly-row';
     const unitLabel = document.createElement('span');
     unitLabel.className = 'field-label';
     unitLabel.textContent = 'Experimental unit (study-wide)';
     unitRow.appendChild(unitLabel);
     const unitValue = document.createElement('span');
-    unitValue.className = 'base-name-value';
+    unitValue.className = 'base-name-value field-readonly-value';
     const experimentalUnit = store.get().studyContext?.experimentalUnit;
     unitValue.textContent =
       typeof experimentalUnit === 'string' && experimentalUnit.trim() ? experimentalUnit.trim() : 'Not decided';

@@ -56,6 +56,7 @@ import {
 import { createAdvicePanel } from '../advice.js';
 import { fluorophorePickerCreate } from '../fluorophorePicker.js';
 import { renderSpectralView, spectralViewCreateState } from '../spectralView.js';
+import { appendStepHeading } from '../stepHeading.js';
 
 const STATE_LABELS = {
   unrecognized: 'Not recognized',
@@ -170,7 +171,7 @@ export function createPanelStep(kb) {
     // -- get decided, after Project and before Outputs. The id stays
     // 'panel' (URL hash, every render() call site) -- label only.
     title: 'Acquisition',
-    render(main, store, { advisor, experience } = {}) {
+    render(main, store, { advisor, experience, embedded = false } = {}) {
       // Commit 1 of the assay tier idiom (naming.js/design.js/describe.js
       // all cache this identically): the active assay never changes for the
       // lifetime of one render/paint -- shared by the interview AND the
@@ -187,15 +188,12 @@ export function createPanelStep(kb) {
       function paint() {
         main.textContent = '';
 
-        const heading = document.createElement('h1');
-        heading.className = 'step-heading';
-        heading.textContent = 'Acquisition';
-        main.appendChild(heading);
-
-        const scope = document.createElement('p');
-        scope.className = 'proposals-empty supporting-description';
-        scope.textContent = `Planning how data will be acquired for: ${activeMeasurementLabel(store.get(), assayId)}.`;
-        main.appendChild(scope);
+        appendStepHeading(main, {
+          title: 'Acquisition',
+          scopeText: `Planning how data will be acquired for: ${activeMeasurementLabel(store.get(), assayId)}.`,
+          embedded,
+          id: 'measurement-section-acquisition',
+        });
 
         const acquisitionSection = createMicroscopySection('Acquisition', true, 'acquisition');
         const fluorophoresSection = createMicroscopySection('Fluorophores and spillover', false, 'fluorophores');

@@ -4864,3 +4864,312 @@ td, th { border-color: var(--line); }
   .study-map-measurement { display: block; width: 100%; box-shadow: none; }
   .study-map-measurement + .study-map-measurement { margin-top: 10px; }
 }
+
+/* ==========================================================================
+   Measurements registry and the measurement page
+   --------------------------------------------------------------------------
+   The registry is a list of things, not a form: rows are scannable, the name
+   is the control that opens one, and one status badge carries state. The
+   measurement page then puts that measurement's three sections on one scroll.
+   Both use the existing tokens rather than introducing a second palette.
+   ========================================================================== */
+
+.measurement-registry-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.measurement-registry-search {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.measurement-registry-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.measurement-registry-filter-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.measurement-registry-select {
+  min-height: 44px;
+}
+
+.measurement-registry-add {
+  min-height: 44px;
+  margin-left: auto;
+}
+
+.measurement-registry {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--panel);
+}
+
+.measurement-registry-row {
+  display: grid;
+  /* Name takes the slack; the rest are content-sized and wrap on narrow
+     viewports via the media query below rather than scrolling sideways. */
+  grid-template-columns: minmax(200px, 2fr) auto minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.measurement-registry-row:first-child {
+  border-top: none;
+}
+
+.measurement-registry-row[data-active="true"] {
+  background: var(--accent-soft);
+}
+
+.measurement-registry-cell {
+  min-width: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.measurement-registry-open {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.measurement-registry-open:hover,
+.measurement-registry-open:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.measurement-registry-readout {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 2px 0 0;
+}
+
+.measurement-registry-basename {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* State is carried by the text, never by colour alone. */
+.measurement-status-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.measurement-status-badge[data-status="needs-decision"] {
+  border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.measurement-status-badge[data-status="ready"] {
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--line));
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.field-readonly-value {
+  flex: 1 1 240px;
+  min-width: 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.measurement-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.measurement-header .step-heading {
+  margin: 0;
+}
+
+.measurement-header-readout {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.measurement-anchor-rail {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+  padding: 8px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.measurement-anchor-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.measurement-anchor-link {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: none;
+  min-height: 44px;
+  line-height: 26px;
+  box-sizing: border-box;
+}
+
+.measurement-anchor-link:hover,
+.measurement-anchor-link:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.measurement-section {
+  padding: 20px 0;
+  border-top: 1px solid var(--line);
+  /* The anchor rail is sticky, so a fragment jump must not tuck the section
+     heading underneath it. */
+  scroll-margin-top: 72px;
+}
+
+.measurement-section:first-child {
+  border-top: none;
+  padding-top: 8px;
+}
+
+.measurement-section-heading {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+@media (max-width: 900px) {
+  /* Rows become stacked cards rather than a sideways-scrolling table: the page
+     body must never scroll horizontally. */
+  .measurement-registry-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .measurement-registry-add {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .measurement-registry-basename {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .measurement-anchor-link {
+    transition: none;
+  }
+}
+
+/* A label + its read-only value + the control that goes to its real owner.
+   .field-row is a column flex built for label-over-input, which made the value
+   stretch and the action button span the full width; this lays the value and
+   its action out on one line and lets them wrap together when narrow. */
+.study-readonly-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "label label"
+    "value action";
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.study-readonly-row .field-label {
+  grid-area: label;
+}
+
+.study-readonly-row .field-readonly-value {
+  grid-area: value;
+  flex: initial;
+}
+
+.study-readonly-row .question-answer {
+  grid-area: action;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .study-readonly-row {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "label"
+      "value"
+      "action";
+  }
+
+  .study-readonly-row .question-answer {
+    justify-self: start;
+  }
+}
+
+/* "Decision needed" is a wide pill, and with it next to every item the 244px
+   rail left ~85px for the label -- so "Measurements" and "Measurement 1" both
+   rendered as "Measur…", which is worse than no label at all. Let the label
+   wrap onto a second line instead of truncating: a two-line nav item is
+   ordinary, an ambiguous one is not. */
+.nav-step {
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.nav-step-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+}
+
+.nav-step-icon {
+  margin-top: 2px;
+}
+
+.nav-step-badge {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}

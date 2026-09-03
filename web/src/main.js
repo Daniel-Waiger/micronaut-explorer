@@ -30,12 +30,12 @@ import { createWalkthroughController } from './ui/walkthrough.js';
 import { createFeatureWalkthroughController } from './ui/featureWalkthrough.js';
 import { BASE_TEMPLATE, createNamingStep, NAMING_CONFIG } from './ui/steps/naming.js';
 import { createDescribeStep } from './ui/steps/describe.js';
-import { designStep } from './ui/steps/design.js';
 import { studyStep } from './ui/steps/study.js';
 import { createPanelStep } from './ui/steps/panel.js';
 import { createOverviewStep } from './ui/steps/overview.js';
 import { guideStep } from './ui/steps/guide.js';
 import { homeStep } from './ui/steps/home.js';
+import { createMeasurementStep } from './ui/steps/measurement.js';
 import { feedbackStep } from './ui/steps/feedback.js';
 import { settingsStep } from './ui/steps/settings.js';
 import { loadOnboarding } from './core/onboarding.js';
@@ -130,25 +130,26 @@ function init() {
   const panelStep = createPanelStep(kb);
   const overviewStep = createOverviewStep(kb);
   const namingStep = createNamingStep(kb);
-  // Home FIRST (zen-planner Phase 1's reframe): the router lands on
-  // steps[0] by default, and Home is now the deliberate landing page --
-  // superseding Study's earlier claim to that spot (see the walkthrough
-  // redirect below main.js's step nav order also carries the reframe's
-  // "question before microscope" story: Describe ("Project") moves ahead of
-  // Study/Design so the project-level questioning happens before the study
-  // axes and the microscopy details, and Naming/Overview close out as
-  // Outputs.
-  // Panel ("Microscopy"): it reads naming.fields.markers (Naming is where
-  // that field is entered) plus its own phase-scoped acquisition interview.
-  // See ui/steps/panel.js's module header and
-  // docs/plans/planner-web-color-panel.md, Decision 1.
-  // Overview last: it is a pure READ over every other step's data (the
-  // shareable diagram + deterministic walkthrough), never a place new facts
-  // are entered -- see ui/steps/overview.js's module header.
-  // Guide LAST: stays permanently in the nav so it is always reachable, even
-  // though Home's own "Take the walkthrough" card is now the more prominent
-  // entry point to the same content. See ui/steps/guide.js's header.
-  const steps = [homeStep, describeStep, studyStep, designStep, panelStep, namingStep, overviewStep, guideStep, feedbackStep, settingsStep];
+  // The nav names things a study HAS, not steps to march through:
+  //
+  //   Study map     the shape of the study -- question, system, comparison, unit
+  //   Research brief the narrative and what the exact-text scan found in it
+  //   Measurements  the registry: every measurement, searchable and filterable
+  //   Measurement   the one you opened: samples & design + acquisition + data plan
+  //   Review        a read over everything, plus every export
+  //
+  // Samples & design, Acquisition and Data plan are no longer routes. They are
+  // sections of the measurement page, composed by createMeasurementStep from
+  // the very same step objects -- which is why designStep/panelStep/namingStep
+  // are still constructed here and handed to it rather than being rewritten.
+  // Old #/design, #/panel and #/naming links still resolve; see
+  // core/router.js's ROUTE_ALIASES.
+  //
+  // Guide, Feedback and Settings stay reachable but sit outside the workflow:
+  // they are utilities, and counting them as planning stages was part of what
+  // made the nav read as an exam.
+  const measurementStep = createMeasurementStep({ panelStep, namingStep });
+  const steps = [homeStep, describeStep, studyStep, measurementStep, overviewStep, guideStep, feedbackStep, settingsStep];
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
@@ -248,12 +249,15 @@ function init() {
     return deriveWorkflowProgress(experiment, conformance, kb.questions);
   }
 
+  // The guided walkthrough and the router now share one vocabulary: the
+  // walkthrough's per-measurement stop IS the measurement route. The old
+  // microscopy<->panel translation is gone with the panel route.
   function guidedRouteIdForStep(stepId) {
-    return stepId === 'microscopy' ? 'panel' : stepId;
+    return stepId;
   }
 
   function guidedStepIdForRoute(routeId) {
-    return routeId === 'panel' ? 'microscopy' : routeId;
+    return routeId;
   }
 
   function reportGuidedStorageFailure(error) {
