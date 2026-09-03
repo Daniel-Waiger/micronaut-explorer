@@ -227,9 +227,10 @@ export const guideStep = {
               'derived value). A weaker source never overwrites something you set.',
           ],
           [
-            'LLM is optional',
-            'The planner is deterministic first and fully usable with no model at all. Any ' +
-              'language-model help is opt-in and never invents a domain fact on its own.',
+            'The planner never calls a model',
+            'Everything here is deterministic and works with no model at all. Micronaut can hand ' +
+              'you a prompt to paste into whatever LLM you already use, but nothing a model ' +
+              'replies is read back into your study — you stay the only author of every field.',
           ],
         ]);
       })
@@ -247,12 +248,14 @@ export const guideStep = {
             'channels, controls with their reasons, and two worked filename examples.',
           'A bench schedule (.ics, Data plan) built from your own timing answers — imports into ' +
             'Google Calendar, Outlook, or Apple Calendar with no login.',
-          'A copy-paste prompt for your own LLM (Review) — the study as JSON plus ground rules ' +
-            'that keep the model from inventing a domain fact.',
-          'Research brief review first finds exact supported text in your description. You can optionally ' +
-            'use a local Ollama model or copy and paste a model reply in place; every interpretation ' +
-            'shows quoted evidence from your description, and nothing becomes a structured field until ' +
-            'you explicitly accept it.',
+          'A copy-paste prompt for your own LLM (Review) — the study as JSON, ground rules that keep ' +
+            'the model from inventing a domain fact, and the decisions Micronaut can tell you have ' +
+            'not been made yet, so the model reviews your real gaps. It is one-way: read the reply ' +
+            'and act on it yourself.',
+          'Research brief review finds exact supported text in your description — marker names, ' +
+            'replicate counts, magnification, unambiguous dates — and quotes the text it matched. ' +
+            'Everything else stays narrative, and nothing becomes a structured field until you ' +
+            'explicitly accept it.',
         ]);
       })
     );

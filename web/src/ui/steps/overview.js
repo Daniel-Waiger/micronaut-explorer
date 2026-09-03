@@ -626,7 +626,15 @@ export function createOverviewStep(kb) {
         'Copies an instruction preamble + this study as JSON + suggested questions. Paste it into your own LLM -- nothing is sent from this app.';
       copyLlmBtn.addEventListener('click', async () => {
         const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
-        const ok = await copyToClipboard(renderLlmPrompt(freshDoc));
+        // Recomputed rather than reusing the render-time triage: the study may
+        // have changed since this page rendered, and a prompt naming decisions
+        // the researcher has since made is worse than one naming none.
+        const freshConformance = checkConformance(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
+        const freshTriage = decisionTriage(
+          buildExperimentMap(store.get(), { conformance: freshConformance }),
+          freshConformance
+        );
+        const ok = await copyToClipboard(renderLlmPrompt(freshDoc, freshTriage));
         if (showToast) showToast(ok
           ? 'Copied the prompt -- paste it into your own LLM. Nothing was sent from this app.'
           : 'Could not copy automatically -- use Export study → Study data (.json) instead.');
