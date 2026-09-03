@@ -140,13 +140,32 @@ export function createFeatureWalkthroughController({ router, stops = FEATURE_TOU
       const gap = 16;
       const dialogWidth = Math.min(360, Math.max(260, width - 32));
       const dialogHeight = dialog.offsetHeight || 180;
+      // The shell's own sticky footer (the per-step Back/Continue bar) lives at
+      // the bottom of the viewport and is never part of `currentTarget`, so the
+      // math below had no reason to leave it any room. Against a target taller
+      // than the viewport minus the dialog -- routine on a phone, and common on
+      // desktop for a multi-question card like the Study map -- every fallback
+      // clamped the dialog flush against the target's bottom edge, exactly
+      // where that footer sits. The result read as one broken modal with the
+      // tour's own Back/Next/Close stacked directly against the app's own
+      // Back/Continue, indistinguishable at a glance. Reserving this space
+      // keeps the two apart in every layout, not just the one this was caught
+      // in.
+      const footerClearance = 96;
+      const usableHeight = Math.max(dialogHeight + 32, height - footerClearance);
       let dialogLeft = right + gap;
-      let dialogTop = Math.max(16, Math.min(rect.top, height - dialogHeight - 16));
+      let dialogTop = Math.max(16, Math.min(rect.top, usableHeight - dialogHeight - 16));
       if (dialogLeft + dialogWidth > width - 16) dialogLeft = left - gap - dialogWidth;
       if (dialogLeft < 16) {
         dialogLeft = Math.max(16, Math.min(left, width - dialogWidth - 16));
         dialogTop = bottom + gap;
-        if (dialogTop + dialogHeight > height - 16) dialogTop = Math.max(16, top - gap - dialogHeight);
+        if (dialogTop + dialogHeight > usableHeight - 16) dialogTop = Math.max(16, top - gap - dialogHeight);
+        // Neither above nor below the target left room within the cleared
+        // area -- the target itself is taller than the viewport can spare.
+        // Docking to the top of the viewport, clear of the target's own
+        // upper edge where relevant, beats clamping into the footer zone a
+        // second time.
+        if (dialogTop + dialogHeight > usableHeight - 16) dialogTop = 16;
       }
       dialog.style.width = `${dialogWidth}px`;
       dialog.style.left = `${dialogLeft}px`;
