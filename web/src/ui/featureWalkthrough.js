@@ -76,6 +76,7 @@ export function createFeatureWalkthroughController({ router, stops = FEATURE_TOU
   let launcher = null;
   let shell = null;
   let raf = null;
+  let inertedNodes = [];
 
   const backdrop = tourNode(doc, 'div', 'feature-tour-backdrop');
   backdrop.setAttribute('aria-hidden', 'true');
@@ -224,6 +225,22 @@ export function createFeatureWalkthroughController({ router, stops = FEATURE_TOU
     stop();
   }
 
+  // The highlighted target sits in a cutout the shades deliberately don't
+  // cover, so clicks and keystrokes still reach it -- and everything else on
+  // the page remains focusable by Tab even while dimmed. Marking every other
+  // top-level node inert removes it from hit-testing, tab order, and the
+  // accessibility tree in one step, so a person cannot accidentally type into
+  // or click a field mid-tour; the tour dialog itself is left untouched.
+  function setInert() {
+    inertedNodes = [...doc.body.children].filter((node) => node !== backdrop && node !== dialog);
+    for (const node of inertedNodes) node.inert = true;
+  }
+
+  function clearInert() {
+    for (const node of inertedNodes) node.inert = false;
+    inertedNodes = [];
+  }
+
   function start(trigger) {
     if (items.length === 0) return;
     const ElementConstructor = doc.defaultView?.HTMLElement;
@@ -231,6 +248,7 @@ export function createFeatureWalkthroughController({ router, stops = FEATURE_TOU
     active = true;
     doc.body.classList.add('feature-tour-active');
     doc.body.append(backdrop, dialog);
+    setInert();
     show(0);
   }
 
@@ -241,6 +259,7 @@ export function createFeatureWalkthroughController({ router, stops = FEATURE_TOU
     raf = null;
     removeTarget();
     restoreDisclosure();
+    clearInert();
     backdrop.remove();
     dialog.remove();
     doc.body.classList.remove('feature-tour-active');
