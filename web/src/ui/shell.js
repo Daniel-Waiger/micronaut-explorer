@@ -43,7 +43,7 @@ export function saveLabel(saveState) {
 export function renderShell(root, store, router, options = {}) {
   const {
     onReset, onNewBlank, onAdoptExample, onExportProject, onImportProject,
-    onRestoreRecovery, onResetOnboarding, kbIssueCount,
+    onRestoreRecovery, kbIssueCount,
   } = options;
   // Missing lifecycle state must degrade conservatively. Only main can know
   // that a recovery slot was actually loaded or a save completed.
@@ -196,7 +196,6 @@ export function renderShell(root, store, router, options = {}) {
     });
   }
   renderRecoveryEntries();
-  if (onResetOnboarding) utilityMenu.appendChild(action('Show onboarding again', onResetOnboarding));
   utilityMenu.appendChild(action('Copy feedback report', () => {
     const report = buildFeedbackReport({ currentStepId: router.current(), kbIssueCount, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined, experiment: store.get() });
     handoffFeedback({ report, channel: 'copy' });

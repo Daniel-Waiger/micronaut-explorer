@@ -1,6 +1,6 @@
 import { buildFeedbackReport } from '../../core/feedbackReport.js';
 import { downloadTextFile } from '../../core/persist.js';
-import { githubFeedbackUrl, handoffFeedback } from '../feedbackHandoff.js';
+import { feedbackEmailAvailable, githubFeedbackUrl, handoffFeedback } from '../feedbackHandoff.js';
 
 function feedbackButton(label, onClick) {
   const node = document.createElement('button');
@@ -31,10 +31,15 @@ export const feedbackStep = {
           report: packageText, channel: 'download',
           download: () => downloadTextFile(packageText, 'micronaut-feedback.txt', 'text/plain;charset=utf-8'),
         });
-      }),
-      feedbackButton('Email feedback', () => handoffFeedback({ report: report(), channel: 'email' })),
-      feedbackButton('Open GitHub issue', () => handoffFeedback({ report: report(), channel: 'github' }))
+      })
     );
+    // Only offered when a real recipient is configured. A mailto: with no
+    // address opens an empty compose window, so an unconfigured Email button
+    // would look like it works while quietly dropping the message.
+    if (feedbackEmailAvailable()) {
+      actions.appendChild(feedbackButton('Email feedback', () => handoffFeedback({ report: report(), channel: 'email' })));
+    }
+    actions.appendChild(feedbackButton('Open GitHub issue', () => handoffFeedback({ report: report(), channel: 'github' })));
     main.append(title, intro, form, context, actions);
   },
 };
