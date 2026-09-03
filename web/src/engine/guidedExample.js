@@ -26,9 +26,28 @@ const EMPTY_ASSAY = Object.freeze({
 });
 
 const EMPTY_DOCUMENT = Object.freeze({
-  study: Object.freeze({ title: '', researchQuestion: '', groupVocabulary: Object.freeze([]) }),
+  study: Object.freeze({ title: '', researchQuestion: '' }),
   assays: Object.freeze([]),
 });
+
+// The groups "in use" across the whole study: the deduped union of every
+// measurement's own design.groups -- there is no separate study-level group
+// list any more (each measurement types its own, on Samples & design), so
+// this is built fresh from the measurements rather than read off a field
+// that could disagree with them.
+function unionOfGroups(assays) {
+  const seen = new Set();
+  const union = [];
+  for (const assay of Array.isArray(assays) ? assays : []) {
+    for (const level of (assay && assay.design && assay.design.groups) || []) {
+      const key = String(level).toLocaleLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      union.push(level);
+    }
+  }
+  return union;
+}
 
 const EMPTY_CONFORMANCE = Object.freeze({
   readiness: 'needs-review',
@@ -112,13 +131,13 @@ function templateFor(stepId, facts) {
       };
     case 'study':
       return {
-        outcome: 'Keep the study’s measurements and comparison labels coherent.',
-        what: 'Measurements lists the observations or analyses in the study and offers reusable comparison labels when helpful.',
-        why: 'Reusable labels keep applicable measurement plans and filenames aligned without overwriting a custom design.',
+        outcome: 'Keep the study’s measurements coherent.',
+        what: 'Measurements lists the observations or analyses in the study; each one defines its own groups on Samples & design.',
+        why: 'A shared registry view keeps every measurement plan and filename aligned without one measurement silently overwriting another.',
         when: 'Use it when adding or naming measurements, or when the study’s comparison structure changes.',
-        how: 'State the research question, then name each measurement and add comparison labels only when they apply.',
-        tryThis: 'Read the question, then check that the comparison labels match your planned comparison or observational study.',
-        exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Comparison labels: ${list(facts.study.groupVocabulary, 'none yet')}.`,
+        how: 'State the research question, then name each measurement and copy groups to the others only when they apply.',
+        tryThis: 'Read the question, then check that each measurement’s groups match your planned comparison or observational study.',
+        exampleSummary: `${text(facts.study.researchQuestion, 'No research question is recorded yet.')} Groups in use: ${list(facts.groupsInUse, 'none yet')}.`,
       };
     // One case, because Samples & design, Acquisition and Data plan are one
     // page now (ui/steps/measurement.js). Splitting the walkthrough across
@@ -181,6 +200,7 @@ export function buildGuidedExampleContent(experiment, options = {}) {
     study: document.study || EMPTY_DOCUMENT.study,
     assay,
     assayCount: Array.isArray(document.assays) ? document.assays.length : 0,
+    groupsInUse: unionOfGroups(document.assays),
     controlCount: (Array.isArray(assay.controls && assay.controls.panel) ? assay.controls.panel.length : 0) +
       (Array.isArray(assay.controls && assay.controls.readout) ? assay.controls.readout.length : 0),
     conformance,

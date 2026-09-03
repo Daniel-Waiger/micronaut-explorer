@@ -2,7 +2,9 @@
 //
 // v3 introduced the ASSAY TIER; v4 completes the user-facing terminology
 // migration from the legacy treatment-axis wording to "groups" in the study vocabulary;
-// v5 adds the study-level orientation context.
+// v5 adds the study-level orientation context; v6 retires that study-level
+// vocabulary entirely -- groups are now typed exactly once, per measurement,
+// on that measurement's own design (see core/assay.js's module header).
 // A study (still called Experiment, for
 // continuity with everything already written against that name) holds one
 // or more assays, each an almost-complete v2 slice
@@ -17,8 +19,9 @@
 
 import { emptyAssay, isAssayScopedPath } from './assay.js';
 import { shortId } from './ids.js';
+import { canOverwrite } from './provenance.js';
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 // `origin` is intentionally descriptive rather than a permission or
 // provenance mechanism. It answers the UI's ownership question ("is this
@@ -29,9 +32,9 @@ export const SCHEMA_VERSION = 5;
 export const STUDY_ORIGINS = new Set(['blank', 'example', 'imported', 'draft', 'template', 'user']);
 
 // These values describe the study's comparison structure. They deliberately
-// do not duplicate group labels (groupVocabulary) or any assay-level design
-// fields: `observational` makes an empty group vocabulary intentional rather
-// than an omitted comparison decision.
+// do not duplicate group labels or any other assay-level design field:
+// `observational` makes an empty group axis intentional rather than an
+// omitted comparison decision.
 export const STUDY_COMPARISON_MODES = new Set(['not-decided', 'groups', 'observational']);
 
 const EMPTY_STUDY_CONTEXT = Object.freeze({
@@ -92,12 +95,6 @@ export function emptyExperiment() {
       text: '',
       history: [],
     },
-    // A SEEDING TEMPLATE for new assays' design.groups, not a live axis --
-    // see core/assay.js's module header on why groups live per-assay instead
-    // of being composed from a shared study-level axis (a composed axis
-    // could never be MISSING from an assay, which would make "flag an
-    // assay with no groups" uncomputable).
-    groupVocabulary: { levels: [] },
     // INVARIANT: length is always >= 1. A study with zero assays is not a
     // study; every consumer (assayView, the UI) may assume at least one.
     assays: [emptyAssay(firstId)],
@@ -208,7 +205,6 @@ function migrateV2toV3(obj) {
     ...rest,
     schemaVersion: 3,
     researchQuestion: typeof src.researchQuestion === 'string' ? src.researchQuestion : '',
-    groupVocabulary: { levels: [] },
     assays: [assay],
     activeAssayId: id,
     naming: {
@@ -299,11 +295,60 @@ function migrateV4toV5(obj) {
   };
 }
 
+/**
+ * v5 -> v6: retire the study-level `groupVocabulary` field. Groups are now
+ * typed exactly once, per measurement, on that measurement's own Samples &
+ * design -- see core/assay.js's module header and ui/steps/design.js. The
+ * vocabulary was only ever a SEEDING template for brand-new assays (never a
+ * live axis any code read at plan/render time -- see engine/plan.js), so
+ * dropping it changes no filename and no planned condition row.
+ *
+ * Any assay that never got seeded from it (an empty design.groups.levels
+ * with no STRONG user edit on record) is seeded now, so a study whose
+ * vocabulary WAS its only record of the intended groups does not silently
+ * lose them. canOverwrite mirrors the exact refuse-if-STRONG rule
+ * core/store.js's setValueAtPath already applies to a live 'kb-default'
+ * write -- see provenance.js -- so this migration can never clobber a real
+ * user edit, including a deliberately-cleared (STRONG-tagged, empty) axis.
+ */
+function migrateV5toV6(obj) {
+  const src = obj && typeof obj === 'object' ? obj : {};
+  const { groupVocabulary, ...rest } = src;
+  const vocabLevels =
+    groupVocabulary && Array.isArray(groupVocabulary.levels) ? groupVocabulary.levels : [];
+
+  const provenance = src.provenance && typeof src.provenance === 'object' ? src.provenance : {};
+  const { groupVocabulary: droppedSlot, ...slots } = provenance.slots && typeof provenance.slots === 'object' ? provenance.slots : {};
+
+  const assays = Array.isArray(src.assays) ? src.assays : [];
+  const nextAssays =
+    vocabLevels.length === 0
+      ? assays
+      : assays.map((assay) => {
+          const design = assay && typeof assay === 'object' && assay.design && typeof assay.design === 'object' ? assay.design : {};
+          const levels = design.groups && Array.isArray(design.groups.levels) ? design.groups.levels : [];
+          if (levels.length > 0) return assay;
+          const slotKey = `assay:${assay && assay.id}.design.groups`;
+          const existingTag = slots[slotKey] && slots[slotKey].tag;
+          if (!canOverwrite(existingTag, 'kb-default')) return assay;
+          slots[slotKey] = { tag: 'kb-default', detail: null };
+          return { ...assay, design: { ...design, groups: { levels: [...vocabLevels] } } };
+        });
+
+  return {
+    ...rest,
+    schemaVersion: 6,
+    assays: nextAssays,
+    provenance: { ...provenance, slots },
+  };
+}
+
 const MIGRATIONS = {
   1: migrateV1toV2,
   2: migrateV2toV3,
   3: migrateV3toV4,
   4: migrateV4toV5,
+  5: migrateV5toV6,
 };
 
 // v5 saves can have been written by an interrupted or older client. Normalize

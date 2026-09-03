@@ -14,9 +14,10 @@
 // each assay? Tried and rejected -- see docs/plans (Advisor... the assay
 // tier plan), Decision 1. A composed axis can never be MISSING from an
 // assay, which makes "flag an assay with no groups" uncomputable. Per-assay
-// data, seeded from a study-level VOCABULARY at creation time as a real,
-// weak-tagged write, keeps that check possible while still making the
-// common case (every assay uses the same groups) a one-click "apply to all".
+// data, seeded from an EXISTING assay's groups at creation time as a real,
+// weak-tagged write (see groupSeedLevels/seedAssayGroups below), keeps that
+// check possible while still making the common case (every assay uses the
+// same groups) a one-click "copy to measurements that have none".
 //
 // Pure module: no DOM, no store, no imports at all -- a true leaf.
 
@@ -247,10 +248,10 @@ export function scopeWrite(experiment, path, assayId) {
 }
 
 /**
- * Build a fresh assay whose group axis is seeded from the study's vocabulary,
- * tagged 'kb-default' (WEAK) -- see the module header, Decision 1: a
- * composed/shared axis was rejected because it can never be MISSING; a
- * per-assay axis SEEDED from a vocabulary keeps "flag an assay with no
+ * Build a fresh assay whose group axis is seeded from `levels`, tagged
+ * 'kb-default' (WEAK) -- see the module header, Decision 1: a composed/shared
+ * axis was rejected because it can never be MISSING; a per-assay axis SEEDED
+ * with a copy of another measurement's groups keeps "flag an assay with no
  * groups" computable while still making the common case (every assay uses
  * the same groups) a one-write copy. WEAK is what lets a later real user edit
  * to this assay's groups always win over the seed, never the reverse.
@@ -263,16 +264,35 @@ export function scopeWrite(experiment, path, assayId) {
  * be silently misjudged as overwriting nothing when it is actually
  * overwriting an untagged seed.
  */
-export function seedAssayFromVocabulary(groupVocabulary, id) {
+export function seedAssayGroups(levels, id) {
   const assay = emptyAssay(id);
-  const levels =
-    groupVocabulary && Array.isArray(groupVocabulary.levels) ? [...groupVocabulary.levels] : [];
-  assay.design = { ...assay.design, groups: { levels } };
+  assay.design = { ...assay.design, groups: { levels: Array.isArray(levels) ? [...levels] : [] } };
   return {
     assay,
     provenanceSlotKey: `assay:${id}.design.groups`,
     provenanceEntry: { tag: 'kb-default', detail: null },
   };
+}
+
+/**
+ * The group levels a brand-new measurement should start from: there is no
+ * study-level group vocabulary any more (Samples & design on each measurement
+ * is the one place groups are typed -- see ui/steps/design.js), so a new
+ * measurement seeds from whichever EXISTING measurement already has groups,
+ * preferring the active one. Returns [] when nothing in the study has groups
+ * yet, which is exactly what seedAssayGroups already treats as "no seed".
+ */
+export function groupSeedLevels(experiment) {
+  const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];
+  const active = assayById(experiment, experiment && experiment.activeAssayId);
+  const activeLevels = active && active.design && active.design.groups && active.design.groups.levels;
+  if (Array.isArray(activeLevels) && activeLevels.length > 0) return activeLevels;
+
+  for (const assay of assays) {
+    const levels = assay && assay.design && assay.design.groups && assay.design.groups.levels;
+    if (Array.isArray(levels) && levels.length > 0) return levels;
+  }
+  return [];
 }
 
 /**
@@ -292,7 +312,7 @@ export function seedAssayFromVocabulary(groupVocabulary, id) {
  * above for a different case.
  *
  * Pure: never mutates `experiment`; the caller writes the result via
- * store.patch, same as seedAssayFromVocabulary above.
+ * store.patch, same as seedAssayGroups above.
  */
 export function removeAssay(experiment, assayId) {
   const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];

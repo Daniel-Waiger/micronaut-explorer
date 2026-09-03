@@ -11,7 +11,6 @@ function orient(study, values = {}) {
     experimentalUnit: values.experimentalUnit ?? 'one independently grown seedling',
     comparisonMode: values.comparisonMode ?? 'groups',
   };
-  study.groupVocabulary = { levels: values.groups ?? ['well-watered', 'drought'] };
   return study;
 }
 
@@ -89,15 +88,12 @@ test('the seeded oregano example projects a fully oriented measurement map', () 
   assertRealRoutes(map);
 });
 
-test('groups require shared labels and per-measurement group definitions, while observational does not', () => {
-  const study = orient(emptyExperiment(), { groups: [] });
+test('groups require a per-measurement group definition, while observational does not', () => {
+  const study = orient(emptyExperiment());
   defineMeasurement(study.assays[0], { assayGroups: [] });
 
   let map = buildExperimentMap(study);
-  assert.deepEqual(decisionIds(map), [
-    'comparison-groups',
-    `measurement-groups:${study.assays[0].id}`,
-  ]);
+  assert.deepEqual(decisionIds(map), [`measurement-groups:${study.assays[0].id}`]);
 
   study.studyContext.comparisonMode = 'observational';
   map = buildExperimentMap(study);

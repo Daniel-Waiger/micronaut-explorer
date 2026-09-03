@@ -48,11 +48,13 @@ test('createDefaultStudy returns a current-version study with 4 assays', () => {
   assert.equal(study.meta.origin, 'example');
 });
 
-test('the research question and group vocabulary are the real oregano-study values', () => {
+test('the research question is the real oregano-study value, and every assay is seeded with its CTL/OPP groups', () => {
   const study = createDefaultStudy();
   assert.match(study.researchQuestion, /RF-PECVD/);
   assert.match(study.researchQuestion, /oregano/);
-  assert.deepEqual(study.groupVocabulary.levels, ['CTL', 'OPP']);
+  for (const assay of study.assays) {
+    assert.deepEqual(assay.design.groups.levels, ['CTL', 'OPP']);
+  }
 });
 
 test('only the shipped oregano example seeds an explicit, weakly tagged study context', () => {
@@ -155,10 +157,9 @@ test('every seeded assay field has a matching provenance slot at assay:<id>.<pat
   }
 });
 
-test('researchQuestion and groupVocabulary have their own study-level provenance slots', () => {
+test('researchQuestion has its own study-level provenance slot', () => {
   const study = createDefaultStudy();
   assert.equal(study.provenance.slots.researchQuestion.tag, 'kb-default');
-  assert.equal(study.provenance.slots.groupVocabulary.tag, 'kb-default');
 });
 
 test('adding study context leaves the serialized four-assay seed and previous provenance entries unchanged', () => {
@@ -193,7 +194,6 @@ test('adding study context leaves the serialized four-assay seed and previous pr
   );
   const expectedExistingSlotKeys = [
     'researchQuestion',
-    'groupVocabulary',
     ...study.assays.flatMap((assay) => {
       const paths = [
         'design.groups',

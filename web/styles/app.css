@@ -1423,12 +1423,6 @@ button:focus-visible {
   cursor: not-allowed;
 }
 
-.study-divergence {
-  color: var(--muted);
-  font-size: 13px;
-  margin: 4px 0 12px;
-}
-
 .study-assay-row {
   align-items: center;
 }
@@ -2584,95 +2578,11 @@ td, th { border-color: var(--line); }
   font-weight: 650;
 }
 
-.study-group-token-field {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 7px;
-  min-height: 48px;
-  padding: 7px 9px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  color: var(--ink);
-  background: var(--panel);
-  cursor: text;
-}
-
-.study-group-token-field:focus-within {
-  border-color: var(--accent);
-  outline: 3px solid color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
-.study-group-token-list {
-  display: contents;
-}
-
-.study-group-token {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  min-height: 40px;
-  padding: 3px 4px 3px 11px;
-  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line));
-  border-radius: 999px;
-  color: var(--accent-ink);
-  background: var(--accent-soft);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.study-group-token-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.study-group-token-remove {
-  display: inline-grid;
-  place-items: center;
-  flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  color: currentColor;
-  background: transparent;
-  font: inherit;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
 .field-commit-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-}
-
-.study-group-token-remove:hover {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-.study-group-token-remove:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.study-group-token-input {
-  flex: 1 1 220px;
-  min-width: min(220px, 100%);
-  min-height: 32px;
-  padding: 4px 6px;
-  border: 0;
-  outline: 0;
-  color: var(--ink);
-  background: transparent;
-  font: inherit;
-  font-size: 14px;
 }
 
 .shell-new-study,

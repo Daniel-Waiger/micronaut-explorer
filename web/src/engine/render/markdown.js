@@ -115,10 +115,6 @@ export function renderMarkdown(doc) {
     sections.push(heading(2, 'Research question'));
     sections.push(doc.study.researchQuestion);
   }
-  if (doc.study.groupVocabulary.length > 0) {
-    sections.push(`**Study-wide group vocabulary:** ${doc.study.groupVocabulary.join(', ')}`);
-  }
-
   sections.push(heading(2, 'Study diagram'));
   sections.push('```mermaid\n' + renderMermaid(doc) + '\n```');
 

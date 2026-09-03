@@ -31,7 +31,6 @@ function orient(study, comparisonMode = 'groups') {
     experimentalUnit: 'one independently grown seedling',
     comparisonMode,
   };
-  study.groupVocabulary.levels = comparisonMode === 'groups' ? ['well-watered', 'drought'] : [];
   study.assays[0].label = 'Root architecture';
   study.assays[0].readout = 'root-architecture';
   study.assays[0].readoutText = 'Root architecture';
@@ -119,7 +118,7 @@ test('Measurements progress keeps its existing study-wide content and cross-assa
   study.researchQuestion = 'Does the coating reduce bacterial load?';
   assert.equal(primaryStep(progress(study), 'study').state, 'in-progress');
 
-  study.groupVocabulary.levels = ['CTL', 'OPP'];
+  study.assays[0].design.groups.levels = ['CTL', 'OPP'];
   study.assays[0].label = 'Bacterial viability';
   assert.equal(primaryStep(progress(study), 'study').state, 'complete');
 });

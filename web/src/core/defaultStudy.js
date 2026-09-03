@@ -7,8 +7,8 @@
 // Every field this module populates is tagged 'kb-default' (WEAK) in
 // provenance, at the exact assay:<id>.<path> slot key scopeWrite would
 // produce for a live write -- the same convention core/assay.js's
-// seedAssayFromVocabulary already established, so a real user edit to ANY
-// of these fields always wins, never the reverse.
+// seedAssayGroups already established, so a real user edit to ANY of these
+// fields always wins, never the reverse.
 //
 // Deliberately narrow: only fields that actually drive the app's core
 // output (design table + filenames) are seeded --
@@ -21,7 +21,7 @@
 // Pure: no DOM, no store -- same leaf discipline as core/assay.js.
 
 import { emptyExperiment } from './schema.js';
-import { seedAssayFromVocabulary } from './assay.js';
+import { seedAssayGroups } from './assay.js';
 import { setPath } from './paths.js';
 import { shortId } from './ids.js';
 
@@ -125,8 +125,8 @@ export function createDefaultStudy() {
 
   const assays = ASSAY_SEEDS.map((seed) => {
     const id = shortId();
-    const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(
-      GROUP_VOCABULARY,
+    const { assay, provenanceSlotKey, provenanceEntry } = seedAssayGroups(
+      GROUP_VOCABULARY.levels,
       id
     );
     provenanceSlots[provenanceSlotKey] = provenanceEntry;
@@ -145,7 +145,6 @@ export function createDefaultStudy() {
     meta: { ...study.meta, origin: 'example' },
     researchQuestion: RESEARCH_QUESTION,
     studyContext: { ...STUDY_CONTEXT },
-    groupVocabulary: { levels: [...GROUP_VOCABULARY.levels] },
     assays,
     activeAssayId: assays[0].id,
     provenance: {
@@ -156,7 +155,6 @@ export function createDefaultStudy() {
         'studyContext.system': { tag: 'kb-default', detail: null },
         'studyContext.experimentalUnit': { tag: 'kb-default', detail: null },
         'studyContext.comparisonMode': { tag: 'kb-default', detail: null },
-        groupVocabulary: { tag: 'kb-default', detail: null },
         ...provenanceSlots,
       },
     },

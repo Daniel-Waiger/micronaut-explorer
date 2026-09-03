@@ -13,19 +13,19 @@ import {
   assayView,
   emptyAssay,
   firstAssayId,
+  groupSeedLevels,
   isAssayScopedPath,
   removeAssay,
   scopeWrite,
-  seedAssayFromVocabulary,
+  seedAssayGroups,
 } from '../src/core/assay.js';
 
 function studyWith(overrides = {}) {
   return {
-    schemaVersion: 4,
+    schemaVersion: 6,
     meta: { id: null, createdAt: null, updatedAt: null, title: '' },
     researchQuestion: '',
     narrative: { text: '', history: [] },
-    groupVocabulary: { levels: [] },
     assays: [emptyAssay('a1'), emptyAssay('a2')],
     activeAssayId: 'a1',
     naming: { template: '{date}{ext}', plannedNames: [] },
@@ -239,38 +239,56 @@ test('an unrelated bare study-level field (researchQuestion) is NOT swept up by 
   });
 });
 
-// --- seedAssayFromVocabulary -----------------------------------------------
+// --- seedAssayGroups ---------------------------------------------------
 
-test('seedAssayFromVocabulary copies the vocabulary levels into a fresh assay, tagged kb-default', () => {
-  const { assay, provenanceSlotKey, provenanceEntry } = seedAssayFromVocabulary(
-    { levels: ['CT', 'NAM25MM'] },
-    'newid'
-  );
+test('seedAssayGroups copies the given levels into a fresh assay, tagged kb-default', () => {
+  const { assay, provenanceSlotKey, provenanceEntry } = seedAssayGroups(['CT', 'NAM25MM'], 'newid');
   assert.equal(assay.id, 'newid');
   assert.deepEqual(assay.design.groups.levels, ['CT', 'NAM25MM']);
   assert.equal(provenanceSlotKey, 'assay:newid.design.groups');
   assert.deepEqual(provenanceEntry, { tag: 'kb-default', detail: null });
 });
 
-test('seedAssayFromVocabulary degrades to empty groups for a missing/malformed vocabulary, never throws', () => {
-  assert.deepEqual(seedAssayFromVocabulary(undefined, 'x').assay.design.groups.levels, []);
-  assert.deepEqual(seedAssayFromVocabulary({}, 'x').assay.design.groups.levels, []);
-  assert.deepEqual(seedAssayFromVocabulary({ levels: null }, 'x').assay.design.groups.levels, []);
+test('seedAssayGroups degrades to empty groups for missing/malformed levels, never throws', () => {
+  assert.deepEqual(seedAssayGroups(undefined, 'x').assay.design.groups.levels, []);
+  assert.deepEqual(seedAssayGroups(null, 'x').assay.design.groups.levels, []);
+  assert.deepEqual(seedAssayGroups('not-an-array', 'x').assay.design.groups.levels, []);
 });
 
-test('seedAssayFromVocabulary copies the levels array -- mutating the seeded assay must not reach back into the vocabulary', () => {
-  const vocab = { levels: ['CT'] };
-  const { assay } = seedAssayFromVocabulary(vocab, 'x');
+test('seedAssayGroups copies the levels array -- mutating the seeded assay must not reach back into the source', () => {
+  const levels = ['CT'];
+  const { assay } = seedAssayGroups(levels, 'x');
   assay.design.groups.levels.push('NEW');
-  assert.deepEqual(vocab.levels, ['CT']);
+  assert.deepEqual(levels, ['CT']);
 });
 
-test('seedAssayFromVocabulary otherwise mirrors emptyAssay -- specimen/panel/etc. untouched', () => {
-  const { assay } = seedAssayFromVocabulary({ levels: [] }, 'x');
+test('seedAssayGroups otherwise mirrors emptyAssay -- specimen/panel/etc. untouched', () => {
+  const { assay } = seedAssayGroups([], 'x');
   const blank = emptyAssay('x');
   assert.deepEqual(assay.specimen, blank.specimen);
   assert.deepEqual(assay.panel, blank.panel);
   assert.deepEqual(assay.naming, blank.naming);
+});
+
+// --- groupSeedLevels ---------------------------------------------------
+
+test('groupSeedLevels prefers the active assay\'s own groups', () => {
+  const active = { ...emptyAssay('a1'), design: { ...emptyAssay('a1').design, groups: { levels: ['ACTIVE'] } } };
+  const other = { ...emptyAssay('a2'), design: { ...emptyAssay('a2').design, groups: { levels: ['OTHER'] } } };
+  const study = studyWith({ assays: [active, other], activeAssayId: 'a1' });
+  assert.deepEqual(groupSeedLevels(study), ['ACTIVE']);
+});
+
+test('groupSeedLevels falls back to the first OTHER assay with groups when the active one has none', () => {
+  const active = emptyAssay('a1');
+  const other = { ...emptyAssay('a2'), design: { ...emptyAssay('a2').design, groups: { levels: ['OTHER'] } } };
+  const study = studyWith({ assays: [active, other], activeAssayId: 'a1' });
+  assert.deepEqual(groupSeedLevels(study), ['OTHER']);
+});
+
+test('groupSeedLevels returns [] when no assay in the study has groups yet', () => {
+  const study = studyWith({ assays: [emptyAssay('a1'), emptyAssay('a2')], activeAssayId: 'a1' });
+  assert.deepEqual(groupSeedLevels(study), []);
 });
 
 // --- removeAssay ------------------------------------------------------------

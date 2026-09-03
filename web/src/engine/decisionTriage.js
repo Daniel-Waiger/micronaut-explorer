@@ -22,8 +22,6 @@ const STUDY_SHAPE_FIELDS = new Set([
   'studyContext.system',
   'comparisonMode',
   'comparison-mode',
-  'groupVocabulary',
-  'groupVocabulary.levels',
   'assays',
   'readout',
   'readoutText',
