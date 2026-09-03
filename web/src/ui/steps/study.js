@@ -384,8 +384,9 @@ export const studyStep = {
           removeBtn.textContent = 'Delete';
           removeBtn.setAttribute('aria-label', `Delete ${assay.label || `Measurement ${index + 1}`}`);
           removeBtn.addEventListener('click', () => {
+            const deletedLabel = assay.label || `Measurement ${index + 1}`;
             const ok = window.confirm(
-              `Delete "${assay.label || `Measurement ${index + 1}`}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
+              `Delete "${deletedLabel}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
             );
             if (!ok) return;
             const result = removeAssay(store.get(), assay.id);
@@ -393,6 +394,7 @@ export const studyStep = {
               store.patch(result);
               renderAssayList();
               renderIssues();
+              if (showToast) showToast(`Deleted "${deletedLabel}" and its design, panel, and naming data.`);
             }
           });
           actions.appendChild(removeBtn);

@@ -141,7 +141,7 @@ export function createNamingStep(kb) {
   return {
   id: 'naming',
   title: 'Data plan',
-  render(main, store, { advisor, experience, embedded = false } = {}) {
+  render(main, store, { advisor, experience, embedded = false, showToast } = {}) {
     main.textContent = '';
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
@@ -260,12 +260,18 @@ export function createNamingStep(kb) {
     copyBtn.addEventListener('click', async () => {
       // One name per line: the shape that pastes straight into a lab
       // notebook, a spreadsheet column, or a shell loop.
-      const ok = await copyToClipboard(currentFilenames().join('\n'));
+      const names = currentFilenames();
+      const ok = await copyToClipboard(names.join('\n'));
       const original = copyBtn.textContent;
       copyBtn.textContent = ok ? 'Copied!' : 'Copy failed';
       window.setTimeout(() => {
         copyBtn.textContent = original;
       }, 1500);
+      if (showToast) {
+        showToast(ok
+          ? `Copied ${names.length} file name${names.length === 1 ? '' : 's'} to the clipboard.`
+          : 'Could not copy the file names — select them in the list and copy manually.');
+      }
     });
     plannedHead.appendChild(copyBtn);
     plannedBox.appendChild(plannedHead);
@@ -350,6 +356,7 @@ export function createNamingStep(kb) {
         return;
       }
       downloadTextFile(renderIcs(events), 'micronaut-schedule.ics', 'text/calendar');
+      if (showToast) showToast('Downloaded micronaut-schedule.ics — import it into your calendar app.');
     });
     main.appendChild(downloadScheduleBtn);
 

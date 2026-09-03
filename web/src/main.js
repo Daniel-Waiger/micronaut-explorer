@@ -260,8 +260,17 @@ function init() {
     return routeId;
   }
 
+  let guidedStorageFailureAnnounced = false;
   function reportGuidedStorageFailure(error) {
     console.error('Could not persist guided walkthrough progress:', error);
+    // Guarded rather than calling showToast directly: this can fire before
+    // `shell` exists (the initial loadGuidedProgress call below runs ahead of
+    // renderShell), and repeatedly on every step transition once storage is
+    // broken -- announce the failure once, the first time a toast surface is
+    // actually available.
+    if (guidedStorageFailureAnnounced || !shell || typeof shell.showToast !== 'function') return;
+    guidedStorageFailureAnnounced = true;
+    shell.showToast('Walkthrough progress could not be saved — it will restart if you reload.');
   }
 
   let guidedProgressState = loadGuidedProgress(PRIMARY_WORKFLOW, {

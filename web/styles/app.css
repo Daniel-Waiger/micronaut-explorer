@@ -321,7 +321,15 @@ button:focus-visible {
 .shell-status {
   position: fixed;
   right: 20px;
-  bottom: 20px;
+  /* Clears the sticky .workflow-footer, whose measured height JS publishes
+     as --workflow-footer-height (shell.js). The 68px fallback is the
+     footer's own approximate height so the toast is still clear of it
+     before that JS runs. */
+  bottom: calc(var(--workflow-footer-height, 68px) + 16px);
+  /* Above .workflow-footer (z-index: 3) and the feature-tour dialog
+     (z-index: 1001) -- pointer-events: none below keeps it from blocking
+     clicks on whatever it happens to sit over. */
+  z-index: 1200;
   padding: 10px 16px;
   border-radius: 8px;
   background: var(--panel-2);
@@ -2330,7 +2338,7 @@ textarea:focus-visible {
 
 .shell-status {
   right: 24px;
-  bottom: 24px;
+  bottom: calc(var(--workflow-footer-height, 68px) + 16px);
   max-width: min(420px, calc(100vw - 32px));
   border-radius: 11px;
   color: var(--ink);
@@ -2990,7 +2998,6 @@ td, th { border-color: var(--line); }
   .shell-mobile-controls label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
   .mobile-assay-select,
   .mobile-step-select { width: 100%; min-width: 0; padding: 7px 9px; }
-  .shell-main { padding-bottom: 36px; }
   .workflow-footer { gap: 8px; padding: 9px 14px; }
   .workflow-back,
   .workflow-continue { min-width: 0; flex: 1 1 0; }
@@ -5095,13 +5102,13 @@ td, th { border-color: var(--line); }
 }
 
 .shell-main {
-  padding-bottom: 96px;
-  scroll-padding-bottom: 96px;
+  padding-bottom: calc(var(--workflow-footer-height, 68px) + 28px);
+  scroll-padding-bottom: calc(var(--workflow-footer-height, 68px) + 28px);
 }
 
 @media (max-width: 620px) {
   .shell-main {
-    padding-bottom: 112px;
-    scroll-padding-bottom: 112px;
+    padding-bottom: calc(var(--workflow-footer-height, 68px) + 44px);
+    scroll-padding-bottom: calc(var(--workflow-footer-height, 68px) + 44px);
   }
 }

@@ -152,7 +152,14 @@ export function createFeatureWalkthroughController({ router, stops = FEATURE_TOU
       // Back/Continue, indistinguishable at a glance. Reserving this space
       // keeps the two apart in every layout, not just the one this was caught
       // in.
-      const footerClearance = 96;
+      // Reads the same --workflow-footer-height shell.js publishes (app.css
+      // uses it too), rather than duplicating its own guess at the footer's
+      // height. The +28 slack and 96 fallback match app.css's .shell-main
+      // clearance for a footer this size.
+      const measuredFooterHeight = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--workflow-footer-height')
+      );
+      const footerClearance = Number.isFinite(measuredFooterHeight) ? measuredFooterHeight + 28 : 96;
       const usableHeight = Math.max(dialogHeight + 32, height - footerClearance);
       let dialogLeft = right + gap;
       let dialogTop = Math.max(16, Math.min(rect.top, usableHeight - dialogHeight - 16));

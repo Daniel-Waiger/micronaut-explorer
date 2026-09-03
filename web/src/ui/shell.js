@@ -15,7 +15,7 @@ function readPreference(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 function savePreference(key, value) {
-  try { localStorage.setItem(key, value); } catch { /* convenience only */ }
+  try { localStorage.setItem(key, value); return true; } catch { return false; }
 }
 function routeForWorkflow(id) { return id === 'microscopy' ? 'panel' : id; }
 function workflowForRoute(id) { return id === 'panel' ? 'microscopy' : id; }
@@ -219,7 +219,7 @@ export function renderShell(root, store, router, options = {}) {
   function applyTheme() {
     if (theme === 'system') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.setAttribute('data-theme', theme);
-    savePreference(THEME_KEY, theme);
+    const saved = savePreference(THEME_KEY, theme);
     themeActions.forEach((button, mode) => {
       const selected = mode === theme;
       button.setAttribute('aria-checked', String(selected));
@@ -245,12 +245,13 @@ export function renderShell(root, store, router, options = {}) {
       themeNavButton.setAttribute('aria-label', `Switch to ${label} theme.`);
       themeNavButton.title = `Light bulb ${bulbState}. Switch to ${label} theme.`;
     }
+    return saved;
   }
   ['dark', 'light', 'system'].forEach((mode) => {
     const label = mode === 'system' ? 'System' : `${mode[0].toUpperCase()}${mode.slice(1)} mode`;
     const modeAction = action(label, () => {
       theme = mode;
-      applyTheme();
+      if (!applyTheme()) showToast('Could not save that preference — it will reset when you reload.');
     }, 'shell-theme-action', 'menuitemradio');
     modeAction.setAttribute('aria-checked', 'false');
     themeActions.set(mode, modeAction);
@@ -467,9 +468,13 @@ export function renderShell(root, store, router, options = {}) {
         remove.setAttribute('aria-label', `Delete measurement ${assay.label || `Measurement ${index + 1}`}`);
         remove.addEventListener('click', (event) => {
           event.stopPropagation();
-          if (!window.confirm(`Delete measurement "${assay.label || `Measurement ${index + 1}`}"?`)) return;
+          const deletedLabel = assay.label || `Measurement ${index + 1}`;
+          if (!window.confirm(`Delete measurement "${deletedLabel}"?`)) return;
           const next = removeAssay(store.get(), assay.id);
-          if (next) store.patch(next);
+          if (next) {
+            store.patch(next);
+            showToast(`Deleted "${deletedLabel}" and its design, panel, and naming data.`);
+          }
         });
         pill.appendChild(remove);
       }
@@ -507,7 +512,13 @@ export function renderShell(root, store, router, options = {}) {
     navToggle.setAttribute('aria-label', navCollapsed ? 'Expand step navigation' : 'Collapse step navigation');
     navToggle.setAttribute('aria-expanded', String(!navCollapsed));
   }
-  navToggle.addEventListener('click', () => { navCollapsed = !navCollapsed; savePreference(NAV_COLLAPSED_KEY, navCollapsed ? '1' : '0'); body.classList.toggle('shell-nav-collapsed', navCollapsed); renderNavToggle(); });
+  navToggle.addEventListener('click', () => {
+    navCollapsed = !navCollapsed;
+    const saved = savePreference(NAV_COLLAPSED_KEY, navCollapsed ? '1' : '0');
+    body.classList.toggle('shell-nav-collapsed', navCollapsed);
+    renderNavToggle();
+    if (!saved) showToast('Could not save that preference — it will reset when you reload.');
+  });
   renderNavToggle();
   const navSteps = document.createElement('div');
   navSteps.className = 'nav-steps';
@@ -521,7 +532,7 @@ export function renderShell(root, store, router, options = {}) {
       ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
       : theme;
     theme = effectiveTheme === 'dark' ? 'light' : 'dark';
-    applyTheme();
+    if (!applyTheme()) showToast('Could not save that preference — it will reset when you reload.');
   });
   applyTheme();
   sticky.append(navToggle, navSteps, navUtilities);
@@ -557,6 +568,24 @@ export function renderShell(root, store, router, options = {}) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   root.append(header, workflowStrip, mobileControls, switcher, body, footer, status);
+
+  // Publishes the footer's real, current height so .shell-status and
+  // .shell-main (app.css) can clear it exactly instead of duplicating a
+  // guessed magic number in three places. A hidden/zero-height footer
+  // naturally publishes 0px, which is the correct clearance for that case.
+  // Guarded for environments without ResizeObserver (e.g. the Node test
+  // runner that imports this module without a browser) -- the CSS fallback
+  // value covers those.
+  if (typeof ResizeObserver === 'function') {
+    const publishFooterHeight = () => {
+      document.documentElement.style.setProperty(
+        '--workflow-footer-height',
+        `${Math.ceil(footer.getBoundingClientRect().height)}px`
+      );
+    };
+    new ResizeObserver(publishFooterHeight).observe(footer);
+    publishFooterHeight();
+  }
 
   function renderWorkflowStrip() {
     const steps = primarySteps();
