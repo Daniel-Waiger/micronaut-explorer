@@ -1,109 +1,73 @@
 # Open tasks — Micronaut Planner
 
-Last updated: 2026-08-13
+Last updated: 2026-09-03
 
-> **Draft — Claude-authored from ROADMAP + git history; Daniel to confirm/reprioritize.**
-> Authoritative scope for any listed item lives in its plan doc under `docs/plans/`.
-> `ROADMAP.md` holds the long-range "why"; this file is just the near-term worklist.
->
-> The old contents of this file (the Classic "Review Remediation" execution plan) are
-> **done** — that work shipped. Micronaut Classic (`src/`, `app_streamlit.py`) is now
-> **parked: not going forward in the near term**; all work is on the web Planner. The old
-> plan is archived at `_archive/docs/TASKS-classic-review-remediation.md` if needed.
+> Near-term worklist. `ROADMAP.md` holds the long-range "why"; authoritative
+> scope for any listed item lives in its plan doc under `docs/plans/`.
 
-## Near-term
+## The one blocker only Daniel can clear
 
-- **Alpha-pilot-readiness is done, minus two loose ends only Daniel can close:**
-  1. Fill in `FEEDBACK_FORM_URL` / `FEEDBACK_EMAIL` in `web/src/ui/shell.js` (a Google
-     Form and a non-personal email — **not** a GitHub `@users.noreply` address, which
-     discards incoming mail) so the two feedback links actually appear in the header.
-     The "Copy feedback report" button and the GitHub issues link already work with no
-     setup.
-  2. Everything under "Content authoring" below (the `web/kb/spectra.json` review in
-     particular — it grew substantially this pass).
-- Once those are set, the app is ready to widen the pilot. Nothing else is queued —
-  the entire roadmap is shipped except the in-app LLM seam, which is deliberately last
-  (see ROADMAP.md's "Next").
+**`FEEDBACK_EMAIL` in `web/src/ui/feedbackHandoff.js` is blank.** Fill it in with
+a non-personal shared inbox — **not** a GitHub `@users.noreply` address, which
+discards incoming mail — and the Email action appears in Feedback.
 
-## Recently shipped (2026-08-12 – 2026-08-13, alpha-pilot-readiness, Waves 0–2)
+Until then the Email action is not rendered at all. It previously built a
+`mailto:` with no recipient, which opened an empty compose window: a button that
+looked like it worked and silently dropped every message sent through it. Copy,
+Download and the GitHub issue path all work with no setup.
 
-### Wave 0 — review fixes
-- **Color panel engine fixes** (`engine/spectra.js`): two different colors of the same
-  fluorophore family (e.g. MitoTracker Green + Deep Red) no longer collapse into one
-  entry; hyphenated aliases (`calcein-am`, `fura-2`, `texas-red`, …) are now reachable via
-  a rejoin pass over `splitMarkers`'s output; the app's own "no markers" sentinels
-  (`NONE`, `N/A`, `unstained`, …) render as a declaration, not a typo; spillover flags sort
-  severity-first; a peak-plausibility guard (300–900 nm, emission > excitation) catches a
-  hand-edit typo in `spectra.json` before it ships.
-- **Color panel UI**: per-state row coloring; "not yet reviewed by Daniel" → "by a
-  microscopy specialist" (the app is public).
-- **KB content**: `SYTO`/`DCFDA` families added (the default study's own `SYTO9`/`DCF`
-  markers were previously unrecognized); `BODIPY`/`CELLMASK`/`ER-TRACKER` converted to
-  real per-color families; `SOX`/`SOX2` reclassified from the `dye` default to a new
-  `target` class (antibody targets, not dyes); a ~20-entry common-dye sweep; `ARL`/`RFP`/
-  `FURA2` deliberately left as honest content gaps (unclear identity / heterogeneous /
-  ratiometric — not oversights).
-- **Controls engine fix** (`engine/controls.js` + `web/kb/controls.json`): every
-  panel-kind control rule used to share one predicate, so isotype-control and
-  secondary-antibody-only-control fired on every panel regardless of whether an antibody
-  was involved. `engine/spectra.js`'s `derivePanelFacts` computes
-  `panel.derived.{fluorophoreCount,hasAntibody,hasTag,hasMarkersDeclared}`; a new
-  biological-specificity-control rule and a new FMO rule (fires at `fluorophoreCount >=
-  3`) were added. Verified against the real default study: no assay gets an antibody
-  control it shouldn't.
-- **Ship integrity**: `deploy.yml` now runs the build pipeline's own pytest suite and a
-  post-build artifact smoke check before publishing. `tools/serve_dir.py` regenerates a
-  stale `web/kb.dev.js` on startup, and now sends `Cache-Control: no-store` — a stale
-  browser-cached ES module produced two false "export not found" scares during this pass.
-- **Cleanups**: CSV formula-injection guard; four download buttons collapsed to one
-  helper; `web/tests/fixtures.js` extracted.
+This matters more than it looks. A pilot whose goal is "does the flow make
+sense?" needs a return channel, or the silence that comes back is
+indistinguishable from success.
 
-### Wave 1 — feedback path
-- "Copy feedback report" header button (`core/feedbackReport.js` + `ui/clipboard.js`,
-  extracted from `ui/steps/naming.js`'s copy-button so there's one clipboard
-  implementation, not two): step, browser, KB issue count, full study as text.
-- A GitHub issues link; a Google Form / email link, wired but blank pending Daniel (see
-  "Near-term" above).
+## Pilot-readiness restructure (2026-09-03) — shipped
 
-### Wave 2 — the rest of the roadmap, minus the LLM seam
-- **Structured panel assembly** (`engine/panelAssembly.js`, `ui/steps/panel.js`): the
-  long-reserved `panel.channels` is now a real editor — target, fluorophore, conjugation
-  mode (antibody-direct / antibody-indirect / genetically-encoded / direct-probe /
-  tag-ligand). A "Seed from markers field" button bootstraps it from the free-text field
-  once. `engine/studydoc.js` prefers a filled-in `panel.channels` over the free-text
-  derivation once any channel exists — verified live: switching one channel to
-  antibody-indirect on the default study adds 3 controls on Overview.
-- **Bench card export** (`engine/render/benchcard.js`): a compact, print-oriented
-  single-assay Markdown summary — channels (with resolved ex/em), controls with their
-  reasons, condition count, two worked filenames. One button per assay on Overview.
-  `engine/studydoc.js` grew a `panelRows` array (per-assay channel list, structured-or-
-  free-text, same precedence as above) to back it.
-- **Conformance check** (`engine/conformance.js`): one pass/fail verdict for the whole
-  study, composed from `conditionIssues`, `validateFields` (against a profile now shared
-  with `ui/steps/naming.js` via `engine/validation.js`'s exported `DEFAULT_PROFILE`,
-  rather than two copies), `validateTargetPath`, `flagPanelOverlaps`, and
-  `studyNameIssues`. Deliberately does NOT use Classic's `profiles/facsi_default.json` —
-  that's a separate Python-side, per-lab content surface, not something to port into the
-  Planner uninvited. Splits "answered but invalid" (fails the gate) from "not answered
-  yet" (a warning, does not fail) — an early version conflated the two and failed the
-  shipped default study on its own placeholder text. Surfaced on Overview above the
-  per-assay tree.
-- **"Export for your own LLM"** (`engine/render/llmprompt.js`): a "Copy prompt for your
-  own LLM" button on Overview — ground rules (never invent a marker/setting, say what's
-  missing) + the study as JSON (byte-identical to the "Download raw data" export) +
-  suggested questions. Zero network calls, no API key — the model is on the other side of
-  a copy-paste, so it cannot write back into the study.
-- A real duplicate-top-level-symbol build break (`assayLabel` in two files) surfaced by
-  the Wave 0 deploy-gate addition, fixed by exporting one copy from `studydoc.js`.
+Three commits, each green. See each commit message for the full reasoning.
+
+### One front door
+The app had five explanatory surfaces, three able to start themselves on load,
+arbitrated by a priority chain in `main.js`. Which one a visitor met depended on
+whether they were new, returning, returning after a day, in a fresh tab, or had
+pressed Escape — so no two testers would have been describing the same app.
+
+- The onboarding modal is deleted; Home already offered the same two choices in
+  the page, and the modal turned Escape into a silent "explore the example".
+- The feature tour no longer starts itself (it ran on a first visit and again
+  after 24h away). It stays on the header's **Walkthrough** button.
+- A first run starts **blank**. It used to start inside the shipped oregano
+  study, and an ownership subsystem — banners, read-only exploration, "make a
+  copy" — existed only to walk that back. Opening the example is now an explicit
+  choice that hands over ordinary editable work.
+
+### The model path is one-way
+~2,500 lines of source and ~1,160 of tests went. Nothing a model produces is
+parsed back into the study, so the guardrail is now the architecture rather than
+a validator. That also removed four of the review's eight lifecycle states, and
+with them every abort controller, request generation, and in-flight race.
+
+Kept: the deterministic exact-text scan, and **Review → Copy prompt for your own
+LLM** — which now also names the decisions `conformance` and `decisionTriage`
+already know are open, so a model reviews the real gaps.
+
+### Nouns, a registry, one page per measurement
+Ten routes became five plus three utilities. Samples & design, Acquisition and
+Data plan are sections of one measurement page — composed from the existing step
+objects, not rewritten. Measurements became a searchable registry. The research
+question has one owner again (the Study map). One status vocabulary reaches the
+user: **Draft · Needs a decision · Ready to acquire**.
+
+Old `#/design`, `#/panel`, `#/naming` links still resolve.
 
 ## Content authoring (owned by Daniel, not code)
 
-Lives in the knowledge pack (`web/kb/`); see the K-1…K-7 list and the parked review of
-`web/kb/advisor.json` wording in [ROADMAP.md](ROADMAP.md). `web/kb/spectra.json` grew
-substantially across Wave 0 (still Claude-drafted, still flagged unreviewed in-app) —
-now the highest-priority review target given how much of it is new.
+Lives in the knowledge pack (`web/kb/`); see the K-1…K-7 list and the parked
+review of `web/kb/advisor.json` wording in [ROADMAP.md](ROADMAP.md).
+`web/kb/spectra.json` remains the highest-priority review target — it is
+Claude-drafted, still flagged unreviewed in-app, and grew substantially.
 
-## Later (see ROADMAP for full phase list)
+## Known and deliberately not fixed
 
-- LLM seam (in-app providers): manual-paste, then opt-in Ollama + diagnostics — explicitly
-  last, after the pilot.
+- The browser's automatic `/favicon.ico` request 404s when served from a plain
+  static server. Cosmetic, console-only, pre-existing.
+- `core/onboarding.js`'s `completed` key is now vestigial (the modal it gated is
+  gone). The module still serves `experience`, so it stays.

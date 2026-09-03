@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-08-12
+Last updated: 2026-09-03
 
 Near-term worklist: [TASKS.md](TASKS.md). This file is the high-level direction.
 
@@ -60,7 +60,8 @@ ideas that were on its backlog, all now deferred.
 - **Alpha-pilot-readiness (Wave 1 — feedback path):** a "Copy feedback report" header
   button (build-independent: step, browser, KB health, full study as text) plus a GitHub
   issues link; a Google Form / non-GitHub-email link is wired but left for Daniel to fill
-  in (`FEEDBACK_FORM_URL`/`FEEDBACK_EMAIL` in `ui/shell.js`).
+  in. (Superseded 2026-09-03: the feedback path moved to a Feedback page, and the one
+  constant to fill in is now `FEEDBACK_EMAIL` in `ui/feedbackHandoff.js`. See TASKS.md.)
 - **Alpha-pilot-readiness (Wave 2 — the rest of the roadmap, minus the LLM seam):**
   - **Structured panel assembly:** the long-reserved `panel.channels` is now a real editor
     (target, fluorophore, conjugation mode) — more precise than the free-text markers
@@ -82,12 +83,36 @@ ideas that were on its backlog, all now deferred.
 Scope decisions and the use-case map behind the above:
 [docs/plans/planner-web-mvp-usecases.md](docs/plans/planner-web-mvp-usecases.md).
 
-### Next
-- The **LLM seam** (in-app providers: manual-paste, then opt-in local Ollama +
-  diagnostics) — the only item left from the original roadmap, explicitly deferred until
-  after the alpha pilot. See docs/plans (or ask Daniel) for the connection options if
-  "how would this even work without an API key" comes up — local Ollama needs no key,
-  since `http://localhost` is a secure origin browsers already trust.
+### Pilot-readiness restructure (2026-09-03)
+Three changes, driven by one finding: the app could not be tested for "does the flow
+make sense?" because it did not have one flow. Full detail in TASKS.md and the commit
+messages.
+
+- **One front door.** The onboarding modal is gone (Home already offered the same
+  choices), the feature tour no longer starts itself, and a first run starts blank
+  rather than inside the shipped example.
+- **Nouns, not steps.** Ten routes became five plus three utilities: Study map,
+  Research brief, Measurements (a searchable registry), the measurement you opened,
+  and Review. Samples & design, Acquisition and Data plan are sections of one
+  measurement page, composed from the existing step objects rather than rewritten.
+- **One status vocabulary** reaches the user — Draft · Needs a decision · Ready to
+  acquire — while `conformance` remains the sole export gate.
+
+### The LLM seam: closed, not deferred
+**The in-app model path has been removed rather than finished.** Micronaut never calls
+a model. The remaining path is one-way: Review's "Copy prompt for your own LLM" hands
+the researcher a block for whatever model they already use, and nothing that model
+produces is parsed back into the study.
+
+The reasoning, since this reverses the earlier plan: the local-Ollama seam only worked
+for people who had Ollama installed, and it spent ~2,500 lines of source plus ~1,160 of
+tests guarding a write path whose payoff was saving a few seconds of typing the
+researcher still had to check. Naming the questions worth asking about a design is the
+part a bench scientist cannot do alone; filling in their fields was not. With no write
+path there is nothing left to guard, which is a stronger guarantee than any validator.
+
+The deterministic exact-text scan on Research brief stays — it is honest, cheap, and
+quotes what it matched.
 
 **⚠ Parked review — `web/kb/spectra.json` content.** Every fluorophore's excitation/
 emission peak values are Claude-drafted from common published references (same "Claude
