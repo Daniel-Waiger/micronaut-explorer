@@ -646,7 +646,7 @@ export function renderShell(root, store, router, options = {}) {
     releaseNotesLink.dataset.stepId = 'release-notes';
     releaseNotesLink.href = 'release-notes/';
     releaseNotesLink.target = '_blank';
-    releaseNotesLink.rel = 'noopener';
+    releaseNotesLink.rel = 'noopener noreferrer';
     releaseNotesLink.setAttribute('aria-label', 'Release notes (opens in a new tab)');
     releaseNotesLink.title = 'Release notes (opens in a new tab)';
     releaseNotesLink.appendChild(createIcon('template', 'nav-step-icon'));

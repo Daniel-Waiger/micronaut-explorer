@@ -129,7 +129,7 @@
   <div class="wrap">
     <div class="callout">
       <h3>Looking for the day-to-day worklist?</h3>
-      <p><a href="https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/ROADMAP.md" target="_blank" rel="noopener">ROADMAP.md</a> and <a href="https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/TASKS.md" target="_blank" rel="noopener">TASKS.md</a> track what's being built right now; this page and its changelog track what's actually shipped, by version.</p>
+      <p><a href="https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/ROADMAP.md" target="_blank" rel="noopener noreferrer">ROADMAP.md</a> and <a href="https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/TASKS.md" target="_blank" rel="noopener noreferrer">TASKS.md</a> track what's being built right now; this page and its changelog track what's actually shipped, by version.</p>
     </div>
   </div>
 </section>
@@ -160,13 +160,21 @@
 <script>
   (function () {
     var CL_GH = 'https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/web/release-notes/CHANGELOG.md';
-    function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    // Only http(s)/mailto and same-site-relative links are ever emitted as a
+    // real href -- anything else (javascript:, data:, etc.) degrades to '#'
+    // rather than being rendered, since this string reaches the page via
+    // innerHTML.
+    var SAFE_HREF_RE = /^(https?:|mailto:|#|\.{0,2}\/)/i;
+    function safeHref(url){ return SAFE_HREF_RE.test(url) ? url : '#'; }
     function inline(s){
       return esc(s)
         .replace(/`([^`]+)`/g, '<code>$1</code>')
         .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
         .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
-        .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+        .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, text, url) {
+          return '<a href="' + safeHref(url) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
+        });
     }
     function render(md){
       var out = '', inList = false;
@@ -192,7 +200,7 @@
         var m = md.match(/^##\s+\[(?!Unreleased\])([^\]]+)\]/m);
         if (m) document.getElementById('footer-version').textContent = 'v' + m[1];
       })
-      .catch(function (){ body.innerHTML = '<p>Couldn’t load the changelog here — <a href="' + CL_GH + '" target="_blank" rel="noopener">read it on GitHub</a>.</p>'; });
+      .catch(function (){ body.innerHTML = '<p>Couldn’t load the changelog here — <a href="' + CL_GH + '" target="_blank" rel="noopener noreferrer">read it on GitHub</a>.</p>'; });
   })();
 </script>
 
