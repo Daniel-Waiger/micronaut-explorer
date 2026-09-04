@@ -1,3 +1,5 @@
+import { APP_VERSION } from '../../core/version.js';
+
 function settingsButton(label, onClick, className = 'copy-button') { const node = document.createElement('button'); node.type = 'button'; node.className = className; node.textContent = label; node.addEventListener('click', onClick); return node; }
 export const settingsStep = {
   id: 'settings', title: 'Settings', utility: true,
@@ -10,6 +12,9 @@ export const settingsStep = {
     const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.addEventListener('change', () => { const selected = file.files?.[0]; file.value = ''; if (selected) Promise.resolve(options.onImportProject?.(selected)); });
     actions.append(settingsButton('Import project backup', () => file.click()), file);
     actions.append(settingsButton('Start a blank study', () => { if (window.confirm('Start a blank study? Your current work remains available in Restore.')) options.onNewBlank?.(); }));
-    main.append(title, intro, actions);
+    const version = document.createElement('p');
+    version.className = 'proposals-empty supporting-description';
+    version.textContent = `Version ${APP_VERSION}`;
+    main.append(title, intro, actions, version);
   },
 };

@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > **Scope:** this changelog covers **Micronaut Classic** (the Python renamer), which is
 > now **parked — not going forward in the near term** (see [ROADMAP.md](ROADMAP.md)). The
 > entries below record what shipped before it was parked. The active web Planner tracks
-> its status in [ROADMAP.md](ROADMAP.md) and [TASKS.md](TASKS.md), not here.
+> its day-to-day status in [ROADMAP.md](ROADMAP.md) and [TASKS.md](TASKS.md), and its
+> releases in [web/release-notes/CHANGELOG.md](web/release-notes/CHANGELOG.md), not here.
 
 ## [Unreleased]
 

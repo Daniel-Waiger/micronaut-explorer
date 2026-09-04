@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Micronaut Planner — Release Notes</title>
+<meta name="description" content="Release notes and version history for the Micronaut Planner.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%234f46e5'/%3E%3Cstop offset='1' stop-color='%237c3aed'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f1f3f9; --border:#e4e7ef;
+    --text:#1f2430; --muted:#5b6472; --faint:#8a93a4;
+    --primary:#4f46e5; --primary-soft:#eef2ff;
+    --mint:#10b981; --mint-soft:#d1fae5; --mint-ink:#04241a;
+    --shadow:0 1px 3px rgba(17,24,39,.06), 0 8px 24px rgba(17,24,39,.06);
+    --radius:14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0b0f17; --surface:#121826; --surface-2:#0f1420; --border:#222b3b;
+      --text:#e9edf5; --muted:#a3adbf; --faint:#71809a;
+      --primary:#818cf8; --primary-soft:#1e1b4b;
+      --mint:#34d399; --mint-soft:#04302c; --mint-ink:#04241a;
+      --shadow:0 1px 3px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--primary); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:960px; margin:0 auto; padding:0 20px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.86em;
+       background:var(--surface-2); border:1px solid var(--border); border-radius:6px; padding:1px 6px}
+
+  /* Hero */
+  header.hero{padding:56px 0 40px; border-bottom:1px solid var(--border); background:
+     radial-gradient(1200px 400px at 20% -10%, var(--primary-soft), transparent 60%);}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700;
+     letter-spacing:.06em; text-transform:uppercase; color:var(--primary);
+     background:var(--primary-soft); border:1px solid color-mix(in srgb,var(--primary) 25%,transparent);
+     padding:5px 11px; border-radius:999px}
+  h1{font-size:clamp(30px,5vw,46px); line-height:1.1; margin:16px 0 10px; letter-spacing:-.02em}
+  .lede{font-size:clamp(16px,2.3vw,19px); color:var(--muted); max-width:60ch; margin:0 0 24px}
+  .cta{display:flex; flex-wrap:wrap; gap:10px}
+  .btn{display:inline-flex; align-items:center; gap:8px; font-weight:600; font-size:14.5px;
+     padding:10px 16px; border-radius:10px; border:1px solid transparent; cursor:pointer}
+  .btn-primary{background:var(--primary); color:#fff}
+  .btn-primary:hover{filter:brightness(1.06); text-decoration:none}
+  .btn-ghost{background:var(--surface); color:var(--text); border-color:var(--border)}
+  .btn-ghost:hover{background:var(--surface-2); text-decoration:none}
+  .meta{margin-top:18px; color:var(--faint); font-size:13px}
+
+  /* Highlights grid */
+  section{padding:44px 0}
+  h2{font-size:clamp(22px,3.2vw,28px); letter-spacing:-.01em; margin:0 0 6px}
+  .section-sub{color:var(--muted); margin:0 0 26px}
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+     padding:18px; box-shadow:var(--shadow)}
+  .card .ic{width:38px; height:38px; border-radius:10px; display:grid; place-items:center;
+     background:var(--primary-soft); color:var(--primary); margin-bottom:12px; font-size:20px}
+  .card h3{margin:0 0 6px; font-size:16px}
+  .card p{margin:0; color:var(--muted); font-size:14px}
+
+  /* Callout */
+  .callout{background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--mint);
+     border-radius:12px; padding:20px 22px; box-shadow:var(--shadow)}
+  .callout h3{margin:0 0 6px}
+  .callout p{margin:0; color:var(--muted)}
+
+  footer{border-top:1px solid var(--border); padding:34px 0 60px; color:var(--faint); font-size:13.5px}
+  footer .row{display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; justify-content:space-between}
+  hr.soft{border:0; border-top:1px solid var(--border); margin:0}
+
+  /* Changelog (rendered from CHANGELOG.md) */
+  .changelog{max-width:760px}
+  .changelog .cl-ver{font-size:18px; letter-spacing:-.01em; margin:30px 0 4px; padding-top:20px;
+     border-top:1px solid var(--border)}
+  .changelog .cl-ver:first-child{border-top:0; padding-top:0; margin-top:6px}
+  .changelog .cl-cat{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.07em;
+     color:var(--muted); margin:16px 0 6px}
+  .changelog ul{margin:0 0 4px; padding-left:20px}
+  .changelog li{margin:6px 0; color:var(--muted); line-height:1.55}
+  .changelog li strong{color:var(--text)}
+  .changelog p{color:var(--faint); font-size:13.5px; margin:6px 0}
+  .changelog code{font-size:.85em}
+</style>
+</head>
+<body>
+
+<!--
+  The hero and Highlights cards below are hand-written, not derived from
+  CHANGELOG.md -- see the note right before the changelog-rendering script
+  near the bottom of this file for why. Update them on each release worth a
+  headline.
+-->
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Release 0.16.0 · 04 Sep 2026</span>
+    <h1>Micronaut Planner — what's new</h1>
+    <p class="lede">This release gives the app a version number for the first time. The Settings page now shows it, and every release from here on gets an entry below -- the seventeen versions below 0.16.0 are a retroactive reconstruction of the app's real history, one tag per milestone already recorded in the project's roadmap.</p>
+    <div class="cta">
+      <a class="btn btn-primary" href="../index.html">▶ Open the app</a>
+      <a class="btn btn-ghost" href="#changelog">Full changelog</a>
+      <a class="btn btn-ghost" href="https://github.com/Daniel-Waiger/micronaut-explorer">GitHub repo</a>
+    </div>
+    <div class="meta">Runs from a single HTML file · no install, no account, no server.</div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Highlights</h2>
+    <p class="section-sub">What 0.16.0 changes.</p>
+    <div class="cards">
+      <div class="card"><div class="ic">🏷️</div><h3>A real version number</h3><p>Settings now shows <code>Version 0.16.0</code> instead of nothing at all -- the same number whether you're running the app unbuilt or from the built single-file artifact.</p></div>
+      <div class="card"><div class="ic">📜</div><h3>This page</h3><p>Release notes, published alongside the app on GitHub Pages and linked from Settings.</p></div>
+      <div class="card"><div class="ic">🕰️</div><h3>17 versions of history, reconstructed</h3><p>Every milestone the roadmap already recorded -- P0 through the pilot-readiness restructure -- now has a version number and an annotated git tag.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="callout">
+      <h3>Looking for the day-to-day worklist?</h3>
+      <p><a href="https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/ROADMAP.md" target="_blank" rel="noopener noreferrer">ROADMAP.md</a> and <a href="https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/TASKS.md" target="_blank" rel="noopener noreferrer">TASKS.md</a> track what's being built right now; this page and its changelog track what's actually shipped, by version.</p>
+    </div>
+  </div>
+</section>
+
+<!--
+  This is the one section that IS mechanical: it fetches ./CHANGELOG.md and
+  reformats its Markdown headings/bullets as HTML below, so it never goes
+  stale on its own. The hero and Highlights cards above it can't work the
+  same way -- CHANGELOG.md is a flat list of bullets with no signal for
+  which entries deserve a headline card, so that content stays hand-
+  maintained; bump it on any release worth a highlight.
+-->
+<section id="changelog">
+  <div class="wrap">
+    <h2>Full changelog</h2>
+    <p class="section-sub">Every version, newest first.</p>
+    <div class="changelog" id="cl-body"><p>Loading…</p></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap row">
+    <div>Micronaut Planner · <span id="footer-version">v0.16.0</span></div>
+    <div><a href="../index.html">Open the app</a> · <a href="#changelog">Changelog</a> · <a href="https://github.com/Daniel-Waiger/micronaut-explorer">Source</a></div>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var CL_GH = 'https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/web/release-notes/CHANGELOG.md';
+    function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+    // Only http(s)/mailto and same-site-relative links are ever emitted as a
+    // real href -- anything else (javascript:, data:, etc.) degrades to '#'
+    // rather than being rendered, since this string reaches the page via
+    // innerHTML.
+    var SAFE_HREF_RE = /^(https?:|mailto:|#|\.{0,2}\/)/i;
+    function safeHref(url){ return SAFE_HREF_RE.test(url) ? url : '#'; }
+    function inline(s){
+      return esc(s)
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
+        .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, text, url) {
+          return '<a href="' + safeHref(url) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
+        });
+    }
+    function render(md){
+      var out = '', inList = false;
+      function closeList(){ if (inList){ out += '</ul>'; inList = false; } }
+      md.replace(/\r/g, '').split('\n').forEach(function (raw){
+        var line = raw.replace(/\s+$/, '');
+        if (/^#\s+/.test(line)) { closeList(); return; }                    // drop the "# Changelog" title
+        if (/^##\s+/.test(line)) { closeList(); out += '<h3 class="cl-ver">' + inline(line.replace(/^##\s+/, '')) + '</h3>'; return; }
+        if (/^###\s+/.test(line)) { closeList(); out += '<h4 class="cl-cat">' + inline(line.replace(/^###\s+/, '')) + '</h4>'; return; }
+        if (/^[-*]\s+/.test(line)) { if (!inList){ out += '<ul>'; inList = true; } out += '<li>' + inline(line.replace(/^[-*]\s+/, '')) + '</li>'; return; }
+        closeList();
+        if (!line.trim()) return;
+        if (/documented here|Semantic Versioning|Reconstructed retroactively/i.test(line)) return; // skip the intro boilerplate
+        out += '<p>' + inline(line) + '</p>';
+      });
+      closeList();
+      return out;
+    }
+    var body = document.getElementById('cl-body');
+    fetch('./CHANGELOG.md').then(function (r){ if (!r.ok) throw 0; return r.text(); })
+      .then(function (md){
+        body.innerHTML = render(md);
+        var m = md.match(/^##\s+\[(?!Unreleased\])([^\]]+)\]/m);
+        if (m) document.getElementById('footer-version').textContent = 'v' + m[1];
+      })
+      .catch(function (){ body.innerHTML = '<p>Couldn’t load the changelog here — <a href="' + CL_GH + '" target="_blank" rel="noopener noreferrer">read it on GitHub</a>.</p>'; });
+  })();
+</script>
+
+</body>
+</html>
