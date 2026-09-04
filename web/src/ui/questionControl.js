@@ -4,12 +4,13 @@
 // ui/steps/panel.js (phase 'microscopy'), and ui/steps/naming.js (phase
 // 'timing').
 //
-// A leaf module (zen-planner Phase 1), not a describe.js export: describe.js
-// itself imports naming.js's NAMING_CONFIG/BASE_TEMPLATE, so once naming.js
-// also needed this control builder, importing it FROM describe.js would
-// have closed an import cycle (naming.js -> describe.js -> naming.js) --
+// A leaf module (zen-planner Phase 1), not a describe.js export: both
+// describe.js and naming.js need this control builder, so importing it FROM
+// either step file would have closed an import cycle between them --
 // tools/build_single_file.py's inliner refuses to build a cycle. A module
 // both step files import FROM, importing nothing itself, has no such cycle.
+// (NAMING_CONFIG/BASE_TEMPLATE, once the reason naming.js and describe.js
+// imported from each other, now live in their own leaf, engine/namingConfig.js.)
 
 // Sentinel <option> value meaning "the user picked Other" -- internal only,
 // never written to the store (getValue() below always resolves it to the

@@ -43,7 +43,7 @@ export function saveLabel(saveState) {
 export function renderShell(root, store, router, options = {}) {
   const {
     onReset, onNewBlank, onAdoptExample, onExportProject, onImportProject,
-    onRestoreRecovery, kbIssueCount,
+    onRestoreRecovery, onDeleteRecovery, kbIssueCount,
   } = options;
   // Missing lifecycle state must degrade conservatively. Only main can know
   // that a recovery slot was actually loaded or a save completed.
@@ -196,13 +196,34 @@ export function renderShell(root, store, router, options = {}) {
       return;
     }
     recoveryEntries.forEach((entry, index) => {
-      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entry.title || 'Untitled study'}`, () => {
+      const entryTitle = entry.title || 'Untitled study';
+      const row = document.createElement('div');
+      row.className = 'shell-restore-row';
+      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entryTitle}`, () => {
         if (window.confirm('Restore this saved version? Your current work remains available in Restore.')) {
           onRestoreRecovery(entry.id);
         }
       }, 'shell-restore-action');
       restore.title = 'Restore this saved version';
-      restoreList.appendChild(restore);
+      row.appendChild(restore);
+      if (onDeleteRecovery) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'shell-restore-delete';
+        remove.setAttribute('role', 'menuitem');
+        remove.setAttribute('aria-label', `Permanently delete the saved version "${entryTitle}"`);
+        remove.title = 'Permanently delete this saved version';
+        remove.appendChild(createIcon('close', 'button-icon'));
+        remove.addEventListener('click', (event) => {
+          event.stopPropagation();
+          if (window.confirm(`Permanently delete the saved version "${entryTitle}"? This cannot be undone.`)) {
+            closeMenu();
+            onDeleteRecovery(entry.id);
+          }
+        });
+        row.appendChild(remove);
+      }
+      restoreList.appendChild(row);
     });
   }
   renderRecoveryEntries();

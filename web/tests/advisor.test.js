@@ -20,6 +20,7 @@ import { compileFullMatch } from '../src/engine/validation.js';
 import { emptyExperiment } from '../src/core/schema.js';
 import { assayView, firstAssayId } from '../src/core/assay.js';
 import { getPath } from '../src/core/paths.js';
+import { NAMING_CONFIG } from '../src/engine/namingConfig.js';
 
 function validRule(overrides = {}) {
   return {
@@ -391,8 +392,10 @@ const realQuestionsRaw = JSON.parse(readFileSync(questionsPath, 'utf-8'));
 // a local literal rather than imported, for the same reason plan.test.js
 // duplicates NAMING_CONFIG: naming.js is a UI module that touches
 // `document`, and this test file must stay importable without a DOM.
-const REAL_NAMING_TEMPLATE =
-  '{date}_{modality}_{exptype}_{markers}_{magnification}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}';
+// Sourced from engine/namingConfig.js (the app's own naming-template
+// constants) rather than a hand-copied duplicate literal, so this test can
+// never drift from what the app actually renders -- see that module's header.
+const REAL_NAMING_TEMPLATE = NAMING_CONFIG.template;
 
 /** Every path (leaf AND container, so `exists`/`empty` on a mid-level path is legal too) reachable inside `obj`, dot/bracket-joined like core/paths.js expects. */
 function collectPaths(obj, prefix, out) {

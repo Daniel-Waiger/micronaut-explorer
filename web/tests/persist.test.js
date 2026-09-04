@@ -122,8 +122,9 @@ test('serializeExperiment/deserializeExperiment round-trip to a deeply-equal obj
 test('parseAndMigrateExperiment accepts current and older project backups without storage side effects', () => {
   const current = emptyExperiment();
   current.meta.title = 'Current backup';
-  const migratedCurrent = parseAndMigrateExperiment(serializeExperiment(current));
+  const { experiment: migratedCurrent, issues: currentIssues } = parseAndMigrateExperiment(serializeExperiment(current));
   assert.deepEqual(migratedCurrent, current);
+  assert.deepEqual(currentIssues, []);
 
   const v1 = {
     schemaVersion: 1, meta: {}, narrative: {}, specimen: {},
@@ -132,9 +133,10 @@ test('parseAndMigrateExperiment accepts current and older project backups withou
     naming: { template: 't', fields: {}, plannedNames: [] },
     provenance: { slots: {}, unanswered: [], skipped: [] }, derived: {}, interview: {}, conformance: {},
   };
-  const migratedV1 = parseAndMigrateExperiment(JSON.stringify(v1));
+  const { experiment: migratedV1, issues: v1Issues } = parseAndMigrateExperiment(JSON.stringify(v1));
   assert.equal(migratedV1.schemaVersion, SCHEMA_VERSION);
   assert.equal(migratedV1.assays[0].design.biologicalReplicates, 2);
+  assert.deepEqual(v1Issues, []);
 });
 
 test('parseAndMigrateExperiment rejects invalid JSON and unsupported future schemas', () => {
@@ -143,6 +145,96 @@ test('parseAndMigrateExperiment rejects invalid JSON and unsupported future sche
     () => parseAndMigrateExperiment(JSON.stringify({ schemaVersion: 999 })),
     /newer than this app supports/
   );
+});
+
+// --- shape validation (core/importValidate.js), wired in via
+// parseAndMigrateExperiment ------------------------------------------------
+// These specifically target files whose schemaVersion is ALREADY current --
+// migrate()'s `while (version < SCHEMA_VERSION)` loop runs zero migration
+// steps for those, so none of migrateV2toV3/etc.'s own defensive
+// `{...base, ...(src.field || {})}` merging ever runs on them.
+
+test('parseAndMigrateExperiment rejects a current-schema file whose assays is not an array', () => {
+  const bad = { ...emptyExperiment(), assays: 'not-an-array' };
+  assert.throws(
+    () => parseAndMigrateExperiment(JSON.stringify(bad)),
+    /no assays/
+  );
+});
+
+test('parseAndMigrateExperiment rejects a current-schema file whose assay has no id', () => {
+  const bad = emptyExperiment();
+  bad.assays = [{ ...bad.assays[0], id: undefined }];
+  assert.throws(
+    () => parseAndMigrateExperiment(JSON.stringify(bad)),
+    /missing a valid id/
+  );
+});
+
+test('parseAndMigrateExperiment sanitizes (does not reject) an assay whose container fields are the wrong type, resetting them to defaults', () => {
+  const source = emptyExperiment();
+  const assayId = source.activeAssayId;
+  source.assays = [{ ...source.assays[0], specimen: 'not-an-object', design: ['also', 'wrong'] }];
+  const { experiment, issues } = parseAndMigrateExperiment(JSON.stringify(source));
+
+  assert.deepEqual(experiment.assays[0].specimen, { organism: '', sampleType: '', preparation: '', notes: '' });
+  assert.deepEqual(experiment.assays[0].design.groups, { levels: [] });
+  assert.equal(experiment.assays[0].id, assayId);
+  assert.ok(issues.length >= 2);
+  assert.ok(issues.every((issue) => issue.severity === 'error'));
+});
+
+test('parseAndMigrateExperiment drops a malformed provenance slot entry rather than rejecting the whole file', () => {
+  const source = emptyExperiment();
+  const assayId = source.activeAssayId;
+  const goodKey = `assay:${assayId}.naming.fields.sample`;
+  source.assays[0].naming.fields.sample = 'E02';
+  source.provenance.slots = {
+    [goodKey]: { tag: 'user', detail: null },
+    'not-an-object': 'boom',
+    'unrecognized-tag': { tag: 'totally-made-up-tag', detail: null },
+  };
+  const { experiment, issues } = parseAndMigrateExperiment(JSON.stringify(source));
+
+  assert.deepEqual(Object.keys(experiment.provenance.slots), [goodKey]);
+  assert.equal(experiment.provenance.slots[goodKey].tag, 'user');
+  assert.equal(issues.length, 2);
+  assert.ok(issues.every((issue) => issue.severity === 'error'));
+});
+
+test('parseAndMigrateExperiment drops a STRONG-tag flood of provenance slots addressed at assay ids that do not exist in the file', () => {
+  const source = emptyExperiment();
+  const realAssayId = source.activeAssayId;
+  const realKey = `assay:${realAssayId}.design.groups`;
+  source.provenance.slots = { [realKey]: { tag: 'user', detail: null } };
+  // Flood: a hundred STRONG tags on assay ids this file does not have.
+  for (let i = 0; i < 100; i += 1) {
+    source.provenance.slots[`assay:fake-${i}.acquisition.modality`] = { tag: 'imported', detail: null };
+  }
+  const { experiment, issues } = parseAndMigrateExperiment(JSON.stringify(source));
+
+  assert.deepEqual(Object.keys(experiment.provenance.slots), [realKey]);
+  assert.equal(issues.length, 100);
+  assert.ok(issues.every((issue) => /does not exist/.test(issue.message)));
+});
+
+test('parseAndMigrateExperiment resets an activeAssayId that does not name a real assay', () => {
+  const source = emptyExperiment();
+  source.activeAssayId = 'nonexistent-assay-id';
+  const { experiment, issues } = parseAndMigrateExperiment(JSON.stringify(source));
+
+  assert.equal(experiment.activeAssayId, experiment.assays[0].id);
+  assert.ok(issues.some((issue) => /activeAssayId/.test(issue.message)));
+});
+
+test('parseAndMigrateExperiment rejects a non-object root even when it happens to look current-versioned', () => {
+  // A bare JSON scalar can never carry a numeric schemaVersion property, so
+  // migrate() already throws its own "no migration path" error for these --
+  // this asserts the caller-visible behavior (a thrown, catchable error),
+  // not which of the two layers happened to be the one that caught it.
+  assert.throws(() => parseAndMigrateExperiment('"just a string"'));
+  assert.throws(() => parseAndMigrateExperiment('42'));
+  assert.throws(() => parseAndMigrateExperiment('null'));
 });
 
 test('changesSinceExport increments on markChanged and resets on markExported', () => {
