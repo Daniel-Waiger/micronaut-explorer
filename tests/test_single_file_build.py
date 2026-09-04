@@ -356,7 +356,16 @@ def test_script_imports_only_stdlib() -> None:
         for line in text.splitlines()
         if line.strip().startswith("import ") or line.strip().startswith("from ")
     ]
-    stdlib_modules = {"argparse", "hashlib", "json", "re", "sys", "pathlib", "__future__"}
+    stdlib_modules = {
+        "argparse",
+        "hashlib",
+        "json",
+        "re",
+        "subprocess",
+        "sys",
+        "pathlib",
+        "__future__",
+    }
     for line in import_lines:
         tokens = line.replace(",", " ").split()
         # tokens like: ['from', 'pathlib', 'import', 'Path'] or ['import', 'sys']
@@ -406,3 +415,43 @@ def test_surviving_static_import_fails_the_build(tmp_path: Path) -> None:
     with pytest.raises(Exception) as excinfo:
         build(web_dir, tmp_path / "dist")
     assert "import" in str(excinfo.value).lower()
+
+
+VERSION_INDEX = MINIMAL_INDEX.replace(
+    "<!-- BUILD:KB -->",
+    "<!-- BUILD:VERSION -->\n"
+    "<script>globalThis.__MICRONAUT_VERSION__ = null;</script>\n"
+    "<!-- /BUILD:VERSION -->\n"
+    "<!-- BUILD:KB -->",
+)
+
+
+def test_missing_version_marker_is_not_an_error(tmp_path: Path) -> None:
+    """BUILD:VERSION is optional, unlike STYLE/KB/SCRIPT: MINIMAL_INDEX (used
+    by every other test in this file) has no VERSION marker at all, and the
+    build must still succeed rather than treating it as a missing-marker
+    BuildError.
+    """
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"})
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "__MICRONAUT_VERSION__" not in output
+
+
+def test_explicit_version_is_embedded(tmp_path: Path) -> None:
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"}, index_html=VERSION_INDEX)
+    output = build(web_dir, tmp_path / "dist", version="abc1234").decode("utf-8")
+    assert 'globalThis.__MICRONAUT_VERSION__ = "abc1234";' in output
+
+
+def test_no_version_available_leaves_marker_default_in_place(tmp_path: Path) -> None:
+    """No --version given and web_dir isn't a git checkout (tmp_path has no
+    .git): _get_git_version must fail closed (return None, never raise), and
+    the marker's own default (`null`) is left untouched rather than being
+    replaced by a fabricated placeholder.
+    """
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"}, index_html=VERSION_INDEX)
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "globalThis.__MICRONAUT_VERSION__ = null;" in output

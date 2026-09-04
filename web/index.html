@@ -8,7 +8,7 @@
   No favicon was ever declared, so browsers fell back to their own default
   tab/bookmark placeholder (a plain circle in most). This is an inline SVG
   data URI rather than a separate favicon.svg file: the build only substitutes
-  the three BUILD: marker regions above and copies everything else in this
+  the BUILD: marker regions above and copies everything else in this
   file verbatim (see tools/build_single_file.py's `_replace_marker` calls), so
   a second file would need its own build-step wiring to reach dist/ and would
   break file:// use, where an app can only ever open the one HTML file a user
@@ -27,6 +27,9 @@
 </head>
 <body>
 <div id="app"></div>
+<!-- BUILD:VERSION -->
+<script>globalThis.__MICRONAUT_VERSION__ = null;</script>
+<!-- /BUILD:VERSION -->
 <!-- BUILD:KB -->
 <script src="./kb.dev.js"></script>
 <!-- /BUILD:KB -->

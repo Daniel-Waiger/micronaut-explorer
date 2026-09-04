@@ -73,7 +73,7 @@ jobs:
           python -m pytest -q tests/test_single_file_build.py
 
       - name: Build single-file app
-        run: python tools/build_single_file.py --web-dir web --out dist
+        run: python tools/build_single_file.py --web-dir web --out dist --version "${GITHUB_SHA::7}"
 
       # A public URL should never receive an artifact this workflow hasn't
       # actually looked at. The pytest gate above proves the BUILDER is

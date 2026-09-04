@@ -32,6 +32,7 @@ import argparse
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -394,7 +395,42 @@ def _replace_marker(html: str, marker: str, replacement: str) -> str:
     return pattern.sub(lambda _m: replacement, html, count=1)
 
 
-def build(web_dir: Path, out_dir: Path) -> bytes:
+def _replace_marker_if_present(html: str, marker: str, replacement: str) -> str:
+    """Like `_replace_marker`, but a no-op (instead of a BuildError) when the
+    marker pair is absent -- used for BUILD:VERSION, which is optional so
+    that the test fixtures in tests/test_single_file_build.py (built from a
+    minimal index.html with no VERSION marker) don't all need updating.
+    """
+    pattern = re.compile(
+        r"<!--\s*BUILD:" + marker + r"\s*-->.*?<!--\s*/BUILD:" + marker + r"\s*-->",
+        re.DOTALL,
+    )
+    if not pattern.search(html):
+        return html
+    return pattern.sub(lambda _m: replacement, html, count=1)
+
+
+def _get_git_version(web_dir: Path) -> str | None:
+    """Best-effort short git commit SHA for the checkout containing `web_dir`,
+    or None if git isn't installed or web_dir isn't inside a git repo (e.g.
+    a bare tmp_path in the pytest fixtures). Never raises: an unrecoverable
+    version is surfaced honestly as no version tag at all (see
+    web/src/ui/steps/settings.js), never a fabricated placeholder.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(web_dir), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    version = result.stdout.strip()
+    return version or None
+
+
+def build(web_dir: Path, out_dir: Path, version: str | None = None) -> bytes:
     web_dir = web_dir.resolve()
     out_dir = out_dir.resolve()
     index_path = web_dir / "index.html"
@@ -406,6 +442,7 @@ def build(web_dir: Path, out_dir: Path) -> bytes:
     css_body = _load_css(web_dir)
     kb = _load_kb(web_dir)
     kb_json = json.dumps(kb, sort_keys=True, separators=(",", ":"))
+    resolved_version = version if version is not None else _get_git_version(web_dir)
 
     html = index_path.read_text(encoding="utf-8")
     html = _replace_marker(html, "STYLE", f"<style>\n{css_body}\n</style>")
@@ -413,6 +450,12 @@ def build(web_dir: Path, out_dir: Path) -> bytes:
         html, "KB", f"<script>\nglobalThis.__MICRONAUT_KB__ = {kb_json};\n</script>"
     )
     html = _replace_marker(html, "SCRIPT", f"<script>\n{script_body}\n</script>")
+    if resolved_version:
+        html = _replace_marker_if_present(
+            html,
+            "VERSION",
+            f"<script>\nglobalThis.__MICRONAUT_VERSION__ = {json.dumps(resolved_version)};\n</script>",
+        )
 
     for pattern, label in FORBIDDEN_IN_OUTPUT:
         if pattern.search(html):
@@ -439,9 +482,16 @@ def main(argv: list[str] | None = None) -> int:
         "--web-dir", type=Path, default=Path("web"), help="root containing src/ and index.html"
     )
     parser.add_argument("--out", type=Path, default=Path("dist"), help="output directory")
+    parser.add_argument(
+        "--version",
+        type=str,
+        default=None,
+        help="version tag embedded as globalThis.__MICRONAUT_VERSION__ "
+        "(defaults to the checkout's short git commit SHA, or no tag if git is unavailable)",
+    )
     args = parser.parse_args(argv)
     try:
-        build(args.web_dir, args.out)
+        build(args.web_dir, args.out, version=args.version)
     except BuildError as exc:
         print(f"build failed: {exc}", file=sys.stderr)
         return 1
