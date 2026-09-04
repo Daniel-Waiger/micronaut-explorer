@@ -413,8 +413,13 @@ button:focus-visible {
 .nav-utilities .nav-step[data-step-id] { justify-content: center; color: #fff; text-align: center; border-color: transparent; }
 .nav-utilities .nav-step[data-step-id="feedback"] { background: #d95f02; }
 .nav-utilities .nav-step[data-step-id="settings"] { background: #c62828; }
-.nav-utilities .nav-step[data-step-id="release-notes"] { background: #0a707c; }
 .nav-utilities .nav-step[data-step-id]:hover, .nav-utilities .nav-step[data-step-id].active { color: #fff; filter: brightness(1.08); box-shadow: none; }
+/* Release Notes follows the semantic accent (unlike its fixed-color siblings)
+   so dark mode gets the dark-theme accent with its dark ink for contrast;
+   placed after the generic hover/active rule so the ink color wins there too. */
+.nav-utilities .nav-step[data-step-id="release-notes"],
+.nav-utilities .nav-step[data-step-id="release-notes"]:hover,
+.nav-utilities .nav-step[data-step-id="release-notes"].active { background: var(--accent); color: var(--accent-ink); }
 .shell-utilities { display: none; }
 
 .nav-action {
