@@ -231,6 +231,7 @@ button:focus-visible {
   padding: 10px 12px;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 /* Icon-only when collapsed, text-only when expanded (never both at once) --
@@ -405,6 +406,7 @@ button:focus-visible {
 .nav-utilities .nav-step { justify-content: center; color: #fff; text-align: center; border-color: transparent; }
 .nav-utilities .nav-step[data-step-id="feedback"] { background: #d95f02; }
 .nav-utilities .nav-step[data-step-id="settings"] { background: #c62828; }
+.nav-utilities .nav-step[data-step-id="release-notes"] { background: #4f46e5; }
 .nav-utilities .nav-step:hover, .nav-utilities .nav-step.active { color: #fff; filter: brightness(1.08); box-shadow: none; }
 .shell-utilities { display: none; }
 

@@ -1,3 +1,5 @@
+import { APP_VERSION } from '../../core/version.js';
+
 function settingsButton(label, onClick, className = 'copy-button') { const node = document.createElement('button'); node.type = 'button'; node.className = className; node.textContent = label; node.addEventListener('click', onClick); return node; }
 export const settingsStep = {
   id: 'settings', title: 'Settings', utility: true,
@@ -12,14 +14,7 @@ export const settingsStep = {
     actions.append(settingsButton('Start a blank study', () => { if (window.confirm('Start a blank study? Your current work remains available in Restore.')) options.onNewBlank?.(); }));
     const version = document.createElement('p');
     version.className = 'proposals-empty supporting-description';
-    // globalThis.__MICRONAUT_VERSION__ is set at build time (see
-    // tools/build_single_file.py, BUILD:VERSION marker in index.html) to the
-    // short git commit SHA of the build. Running unbuilt (plain index.html,
-    // no build step) there is no real version to report, so this says so
-    // honestly rather than showing a fabricated placeholder.
-    version.textContent = globalThis.__MICRONAUT_VERSION__
-      ? `Version ${globalThis.__MICRONAUT_VERSION__}`
-      : 'Version: development build (untagged)';
+    version.textContent = `Version ${APP_VERSION}`;
     main.append(title, intro, actions, version);
   },
 };

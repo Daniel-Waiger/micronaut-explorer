@@ -641,6 +641,20 @@ export function renderShell(root, store, router, options = {}) {
       button.addEventListener('click', () => router.navigate(step.id));
       (step.utility ? navUtilities : navSteps).appendChild(button);
     });
+    const releaseNotesLink = document.createElement('a');
+    releaseNotesLink.className = 'nav-step';
+    releaseNotesLink.dataset.stepId = 'release-notes';
+    releaseNotesLink.href = 'release-notes/';
+    releaseNotesLink.target = '_blank';
+    releaseNotesLink.rel = 'noopener';
+    releaseNotesLink.setAttribute('aria-label', 'Release notes (opens in a new tab)');
+    releaseNotesLink.title = 'Release notes (opens in a new tab)';
+    releaseNotesLink.appendChild(createIcon('template', 'nav-step-icon'));
+    const releaseNotesLabel = document.createElement('span');
+    releaseNotesLabel.className = 'nav-step-label';
+    releaseNotesLabel.textContent = 'Release notes';
+    releaseNotesLink.appendChild(releaseNotesLabel);
+    navUtilities.appendChild(releaseNotesLink);
     navUtilities.appendChild(themeNavButton);
   }
   function renderMobileControls(activeId = router.current()) {

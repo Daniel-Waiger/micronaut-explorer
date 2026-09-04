@@ -73,7 +73,7 @@ jobs:
           python -m pytest -q tests/test_single_file_build.py
 
       - name: Build single-file app
-        run: python tools/build_single_file.py --web-dir web --out dist --version "${GITHUB_SHA::7}"
+        run: python tools/build_single_file.py --web-dir web --out dist
 
       # A public URL should never receive an artifact this workflow hasn't
       # actually looked at. The pytest gate above proves the BUILDER is
@@ -114,6 +114,8 @@ jobs:
           work="$(mktemp -d)"
           git clone --depth 1 "https://x-access-token:${DEPLOY_TOKEN}@github.com/Daniel-Waiger/micronaut-planner.git" "$work"
           cp dist/index.html "$work/index.html"
+          rm -rf "$work/release-notes"
+          cp -r web/release-notes "$work/release-notes"
           cd "$work"
           touch .nojekyll
           git add -A
