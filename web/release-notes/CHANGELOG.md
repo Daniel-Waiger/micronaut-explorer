@@ -12,6 +12,10 @@ that existing history, not a scheme that was tracked from day one.
 ## [0.17.0] - 2026-09-04
 
 ### Fixed
+- The step rail's New study and Walkthrough labels were rendering in muted
+  grey on their own accent fills -- Walkthrough's was about 1.4:1 against its
+  solid teal, effectively invisible until hovered. Both now use their
+  intended ink (at least 5.1:1 in light, 6.0:1 in dark).
 - The step navigation rail no longer disappears or scrolls out of reach at
   high browser zoom. Below 900px it now narrows to an icon-only column
   (matching every other width) instead of turning into a horizontal strip

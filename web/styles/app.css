@@ -513,6 +513,29 @@ button:focus-visible {
 .nav-utilities .nav-step[data-step-id="release-notes"].active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .shell-utilities { display: none; }
 
+/* Scoped under .nav-utilities so these two beat `.nav-step { color:
+   var(--muted) }`, which sits later in the file at equal specificity and was
+   therefore winning: New study and Walkthrough are the only control-panel
+   buttons without a [data-step-id] (the selector that gave Settings et al.
+   their color), so both were rendering muted grey on their accent fills --
+   about 1.4:1 on Walkthrough's solid teal, i.e. near-invisible. Only their
+   :hover rules were specific enough to land, so the label appeared to show
+   up on hover. Their intended inks are ~5.1:1 (New study) and ~5.7:1
+   (Walkthrough) in light, ~6.0:1 and ~8.0:1 in dark. */
+.nav-utilities .nav-action {
+  justify-content: center;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.nav-utilities .nav-walkthrough {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
 .nav-action {
   justify-content: center;
   text-align: center;
