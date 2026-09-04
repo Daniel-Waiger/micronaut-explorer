@@ -409,12 +409,14 @@ button:focus-visible {
 .shell-utilities { display: none; }
 
 .nav-action {
+  justify-content: center;
+  text-align: center;
   border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
   color: var(--accent);
   background: var(--accent-soft);
 }
 
-.nav-action:hover {
+.nav-action:hover:not(.nav-walkthrough) {
   border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 15%, var(--panel));
@@ -427,6 +429,9 @@ button:focus-visible {
 }
 
 .nav-walkthrough:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  color: var(--accent-ink);
+  background: var(--accent);
   filter: brightness(.95);
 }
 
