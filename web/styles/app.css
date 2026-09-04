@@ -347,7 +347,7 @@ button:focus-visible {
   opacity: 0;
   transform: translateY(6px);
   pointer-events: none;
-  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  transition: opacity var(--dur-move) var(--ease), transform var(--dur-move) var(--ease);
 }
 
 .shell-status.visible {
@@ -2170,7 +2170,7 @@ textarea {
   border-radius: 11px;
   color: #fff;
   background: linear-gradient(135deg, #0a707c, #14a3b0);
-  box-shadow: 0 5px 12px rgb(79 70 229 / 22%);
+  box-shadow: 0 5px 12px rgb(10 112 124 / 22%);
 }
 
 .shell-title {
@@ -5108,7 +5108,9 @@ td, th { border-color: var(--line); }
   *::before,
   *::after {
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
