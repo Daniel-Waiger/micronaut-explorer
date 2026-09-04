@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(timeout 240 .venv/Scripts/python.exe -X utf8 -)"
+      "Bash(python3 -m pytest -q tests/)",
+      "Bash(node --test web/tests/*.test.js)"
     ]
   }
 }

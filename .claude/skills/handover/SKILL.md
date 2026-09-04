@@ -5,9 +5,14 @@ description: End-of-session carry-forward for micronaut-explorer. Extends the us
 
 # /handover — micronaut-explorer
 
-**First: read `C:\Users\Owner\.claude\skills\handover\SKILL.md` and follow its procedure.**
+**First: read `~/.claude/skills/handover/SKILL.md` and follow its procedure.**
 That file owns the survey → filter → persist → ask-before-commit → print flow. This file
 only adds what is specific to this project. Do not restate the base procedure here.
+
+That user-level base skill lives outside this repo (under the user's home directory) and
+may simply be absent on CI or a fresh remote/sandboxed session — if so, skip it and fall
+back to the conventions below plus the generic flow implied by their names; don't block on
+a missing file.
 
 ## Additional survey inputs (step 1)
 
@@ -36,13 +41,9 @@ Surface these in the note when the session touched them:
 - **Planning-doc drift.** `ROADMAP.md` / `TASKS.md` are updated by hand and go stale. When
   they contradict what actually shipped, flag it — a future session that trusts them will
   plan against a fiction.
-- **Python environment.** Always `.venv/Scripts/python.exe`. The global/Anaconda Python
-  lacks the bioio reader plugins, `tifffile`, and `readlif`, and fails in confusing ways.
-- **Never load pixel data.** On real microscopy files, do not call `.data`,
-  `.get_image_data`, or `.xarray_data` — these pull gigabytes. Metadata only.
-- **The rename safety invariant.** `BatchResult.planned` must stay strictly 1:1 with real
-  files: `apply_batch` does an unguarded `src.rename(dst)` in a loop, so two entries sharing
-  one source path raise `FileNotFoundError` on the second iteration *and* skip
-  `save_manifest`, leaving the first rename unrollbackable.
 - **Test markers.** `integration` is deselected by default; `smoke` is not. Default-run
   green is not full coverage — name the marked run explicitly when it matters.
+- Classic-era invariants (the `.venv/Scripts/python.exe` requirement, the pixel-data-loading
+  ban, the `BatchResult.planned`/`apply_batch` rename-safety invariant) were retired along
+  with the Classic app itself, archived at tag `classic-final` — they no longer apply to
+  this (web-only) codebase.

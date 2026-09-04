@@ -26,7 +26,7 @@ test('validateFields happy path has no issues', () => {
     exptype: 'CT',
     sample: 'E02',
     magnification: 'X90',
-    markers: 'ARL-DAPI',
+    markers: 'GFP-DAPI',
     notes: 'OK_01',
   };
   assert.deepEqual(validateFields(fields, profile), []);
@@ -38,7 +38,7 @@ test('validateFields allows mixed-case notes', () => {
     exptype: 'CT',
     sample: 'E02',
     magnification: 'X90',
-    markers: 'ARL-DAPI',
+    markers: 'GFP-DAPI',
     notes: 'Trial-1b',
   };
   const issues = validateFields(fields, profile);
@@ -52,7 +52,7 @@ test('validateFields reports pattern and allow-list errors on a restrictive prof
   const profile = {
     name: 'restrictive',
     allowedExperimentTypes: ['CT'],
-    allowedMarkers: ['ARL'],
+    allowedMarkers: ['GFP'],
     samplePattern: '^E\\d{2}$',
     magnificationPattern: '^X\\d{2,3}$',
     notesPattern: '^[A-Za-z0-9_-]+$',
@@ -62,7 +62,7 @@ test('validateFields reports pattern and allow-list errors on a restrictive prof
     exptype: 'BAD',
     sample: 'sample-02',
     magnification: '90x',
-    markers: 'ARL-UNKNOWN',
+    markers: 'GFP-UNKNOWN',
     notes: 'bad note',
   };
   const issues = validateFields(fields, profile);
@@ -92,7 +92,7 @@ test('default profile empty allow-lists mean unrestricted', () => {
     ...profile,
     name: 'restrictive',
     allowedExperimentTypes: ['CT'],
-    allowedMarkers: ['ARL'],
+    allowedMarkers: ['GFP'],
   };
   const restrictedIssues = validateFields(fields, restrictive);
   const byField = Object.fromEntries(restrictedIssues.map((issue) => [issue.field, issue]));
@@ -104,21 +104,21 @@ test('unknownMarkerPolicy warn and allow', () => {
   const profileWarn = {
     name: 'warn',
     allowedExperimentTypes: ['CT'],
-    allowedMarkers: ['ARL'],
+    allowedMarkers: ['GFP'],
     samplePattern: '^E\\d{2}$',
     magnificationPattern: '^X\\d{2,3}$',
     notesPattern: '^[A-Z0-9_-]+$',
     unknownMarkerPolicy: 'warn',
   };
   const warnIssues = validateFields(
-    { exptype: 'CT', sample: 'E01', magnification: 'X90', markers: 'ARL-XYZ', notes: 'OK' },
+    { exptype: 'CT', sample: 'E01', magnification: 'X90', markers: 'GFP-XYZ', notes: 'OK' },
     profileWarn
   );
   assert.ok(warnIssues.some((i) => i.field === 'markers' && i.severity === 'warning'));
 
   const profileAllow = { ...profileWarn, name: 'allow', unknownMarkerPolicy: 'allow' };
   const allowIssues = validateFields(
-    { exptype: 'CT', sample: 'E01', magnification: 'X90', markers: 'ARL-XYZ', notes: 'OK' },
+    { exptype: 'CT', sample: 'E01', magnification: 'X90', markers: 'GFP-XYZ', notes: 'OK' },
     profileAllow
   );
   assert.ok(!allowIssues.some((i) => i.field === 'markers'));

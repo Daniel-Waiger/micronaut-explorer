@@ -597,12 +597,11 @@ const SOURCE_VARIANT_KEYS = {
 //   - RFP: heterogeneous, "RFP" is not one protein.
 //   - FURA2: ratiometric (two excitation peaks by Ca2+ state) -- does not
 //     fit this app's single-peak model at all.
-//   - ARL: identity is not confidently known -- drafting a peak for an
-//     unidentified marker would be actively misleading, not merely
-//     incomplete.
 // Named explicitly so an accidental future omission (rather than a
 // deliberate one) fails this guard loudly.
-const DELIBERATELY_UNCOVERED = new Set(['RFP', 'FURA2', 'ARL', 'HALO', 'SNAP', 'CLIP', 'PHALLOIDIN', 'WGA']);
+// (ARL was removed from markers.json entirely as an unidentified leftover
+// example value, so it no longer needs a guard entry here.)
+const DELIBERATELY_UNCOVERED = new Set(['RFP', 'FURA2', 'HALO', 'SNAP', 'CLIP', 'PHALLOIDIN', 'WGA']);
 
 test('the real web/kb/spectra.json loads with zero issues', () => {
   const { issues } = loadSpectraKb(realSpectraRaw);
