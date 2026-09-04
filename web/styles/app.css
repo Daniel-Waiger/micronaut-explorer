@@ -114,6 +114,10 @@
 html,
 body {
   height: 100%;
+  /* Matches the CRM (css/app.css:60): guarantees no width can ever produce a
+     horizontal page scrollbar, regardless of what a narrow viewport does to
+     the rail or any other flex/grid content below it. */
+  overflow-x: clip;
 }
 
 body {
@@ -190,12 +194,35 @@ button:focus-visible {
 
 .nav-sticky {
   position: sticky;
-  top: 0;
+  /* Stacks below the header + workflow strip + measurement switcher (all
+     three now sticky -- see .shell-header). Was `top: 0; max-height: 100vh`,
+     which budgeted the FULL viewport height for a box that starts
+     --shell-chrome-height down the page: the budget overshot by exactly that
+     much, so overflow-y never engaged, .nav-utilities' `margin-top: auto`
+     (below) had no free space to push into, and the control panel sat
+     wherever content happened to end -- 22px past the fold at the reference
+     1512x945 size, instead of the ~12px CRM-style inset a correct budget
+     produces. `height` (not just `max-height`) is required: a cap alone
+     still lets the box shrink to its content and leaves the same dangling
+     panel; only a fixed height forces overflow-y to engage and pins
+     .nav-utilities flush against the actual bottom, matching the CRM's
+     .sidebar-foot inside its 100vh sidebar. */
+  top: var(--shell-chrome-height, 210px);
+  height: calc(100vh - var(--shell-chrome-height, 210px));
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 16px 10px;
-  max-height: 100vh;
+  /* .workflow-footer is a separate, full-width sticky-bottom bar (a sibling
+     of .shell-body, not scoped to .shell-main) that already overlaps
+     whatever sits at the very bottom of a short viewport -- .shell-main
+     already compensates with this same --workflow-footer-height variable
+     (below). Only a genuinely short viewport (a narrow, heavily-zoomed
+     window) makes this rail's own content tall enough to need scrolling far
+     enough to reach that overlap, but without this the last control-panel
+     button would scroll to right behind the footer, present in the DOM and
+     reported as on-screen by geometry, yet actually covered and unclickable. */
+  padding-bottom: calc(var(--workflow-footer-height, 68px) + 16px);
   overflow-y: auto;
 }
 
@@ -410,16 +437,37 @@ button:focus-visible {
 }
 
 .nav-utilities { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
-.nav-utilities .nav-step[data-step-id] { justify-content: center; color: #fff; text-align: center; border-color: transparent; }
-.nav-utilities .nav-step[data-step-id="feedback"] { background: #d95f02; }
-.nav-utilities .nav-step[data-step-id="settings"] { background: #c62828; }
-.nav-utilities .nav-step[data-step-id]:hover, .nav-utilities .nav-step[data-step-id].active { color: #fff; filter: brightness(1.08); box-shadow: none; }
-/* Release Notes follows the semantic accent (unlike its fixed-color siblings)
-   so dark mode gets the dark-theme accent with its dark ink for contrast;
-   placed after the generic hover/active rule so the ink color wins there too. */
+/* Was two hardcoded saturated fills (#c62828 Settings, #d95f02 Feedback) with
+   forced white text -- theme-blind, and the main reason this panel read
+   differently from the CRM's, whose equivalent footer buttons (.btn-secondary)
+   are a neutral bordered surface with the accent reserved for the active
+   page. Settings and Feedback now follow that: a plain panel/line surface at
+   rest, and the same --accent-soft/--accent treatment every other nav item
+   already uses for .active (see .nav-step.active above), rather than
+   inventing a second, differently-colored "selected" state just for these. */
+.nav-utilities .nav-step[data-step-id] {
+  justify-content: center;
+  text-align: center;
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--panel);
+}
+.nav-utilities .nav-step[data-step-id]:hover {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+.nav-utilities .nav-step[data-step-id].active {
+  border-color: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+/* Release Notes follows the semantic accent (unlike its neutral siblings
+   above) so dark mode gets the dark-theme accent with its dark ink for
+   contrast; placed after the generic hover/active rule so it wins there too. */
 .nav-utilities .nav-step[data-step-id="release-notes"],
 .nav-utilities .nav-step[data-step-id="release-notes"]:hover,
-.nav-utilities .nav-step[data-step-id="release-notes"].active { background: var(--accent); color: var(--accent-ink); }
+.nav-utilities .nav-step[data-step-id="release-notes"].active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
 .shell-utilities { display: none; }
 
 .nav-action {
@@ -454,7 +502,12 @@ button:focus-visible {
   cursor: wait;
 }
 
-.nav-theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; border: 2px solid; border-radius: 9px; padding: 8px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(23 39 43 / 18%); }
+/* min-height/border-width/font-size aligned to .nav-step's own metrics
+   (44px / 1px / 13.5px) -- this was the one control-panel button with its
+   own slightly different size (42px, a 2px border, 12px text), which is why
+   it was also the one that ended up dangling below the fold in the height
+   fix above: every other button in the panel already matched .nav-step. */
+.nav-theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border: 1px solid; border-radius: 9px; padding: 8px; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(23 39 43 / 18%); }
 .nav-theme-toggle[data-theme-mode="light"] { color: #17272b; background: #fff; border-color: #17272b; }
 .nav-theme-toggle[data-theme-mode="dark"] { color: #e8eeef; background: #101a1d; border-color: #96a8ad; }
 .nav-theme-icon { display: none; flex: 0 0 auto; width: 24px; height: 24px; }
@@ -2134,7 +2187,12 @@ textarea {
 }
 
 .shell-header {
-  position: relative;
+  /* Sticky (not just relative) so .nav-sticky's own `top`/`height` -- which
+     assume this bar (and the two below it) stay pinned at the same vertical
+     position regardless of page scroll -- are actually correct at every
+     scroll offset, not just at scroll-top. See .nav-sticky. */
+  position: sticky;
+  top: 0;
   z-index: 4;
   min-height: 70px;
   padding: 12px 28px;
@@ -2271,6 +2329,11 @@ textarea:focus-visible {
   background: var(--panel);
   overflow-x: auto;
   scrollbar-width: thin;
+  /* Stacks directly below the sticky header + workflow strip -- see
+     .shell-header. */
+  position: sticky;
+  top: calc(var(--shell-header-height, 70px) + var(--shell-workflow-strip-height, 69px));
+  z-index: 2;
 }
 
 .assay-switcher-label {
@@ -2328,7 +2391,7 @@ textarea:focus-visible {
   background: var(--panel);
 }
 
-.nav-sticky { padding: 20px 14px; gap: 16px; }
+.nav-sticky { padding: 20px 14px; padding-bottom: calc(var(--workflow-footer-height, 68px) + 16px); gap: 16px; }
 
 .nav-toggle {
   display: grid;
@@ -2541,16 +2604,34 @@ table { border-collapse: separate; border-spacing: 0; }
 th { color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
 td, th { border-color: var(--line); }
 
+/* 900px is the compact-navigation breakpoint, and its strategy matches the
+   CRM's (css/app.css:207-213): narrow the rail to an icon-only column and
+   hide labels, rather than flattening it into a horizontal strip or removing
+   it. A vertical rail stays a vertical rail at every width -- no button is
+   ever reflowed sideways or scrolled out of reach, which is what broke at
+   175% zoom (a strip 1415px of content wide inside a 900px box left 9 of 13
+   items past the right edge, with the control panel among them). Values
+   below intentionally match .shell-body.shell-nav-collapsed's own
+   icon/label/theme-toggle rules -- this reaches the same visual state by a
+   different selector rather than inventing new numbers. */
 @media (max-width: 900px) {
   .shell-header { padding-inline: 18px; }
   .assay-switcher-bar { padding-inline: 18px; }
   .shell-body,
-  .shell-body.shell-nav-collapsed { display: flex; flex-direction: column; }
-  .shell-nav { order: -1; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; }
-  .nav-sticky { position: static; flex-direction: row; align-items: center; min-width: max-content; padding: 9px 18px; }
-  .nav-steps { flex-direction: row; }
-  .nav-step, .shell-body.shell-nav-collapsed .nav-step { justify-content: flex-start; padding: 8px 9px; }
-  .shell-body.shell-nav-collapsed .nav-step-label { display: block; }
+  .shell-body.shell-nav-collapsed { grid-template-columns: 68px minmax(0, 1fr); }
+  /* Scoped under .shell-nav (not just the bare class) so this reliably beats
+     .nav-step-badge's own unconditional `display: inline-flex` rule further
+     down the file -- same specificity, later in source, would otherwise win
+     the tie and leave "Not started"/"Decision needed" badge text bleeding
+     out of the 68px icon column into the page. */
+  .shell-nav .nav-step-label,
+  .shell-nav .nav-step-badge,
+  .shell-nav .nav-theme-label { display: none; }
+  .nav-step { justify-content: center; padding: 10px; }
+  .nav-step-icon { display: block; width: 20px; height: 20px; }
+  .nav-theme-toggle { display: grid; place-items: center; min-height: 44px; padding: 8px; }
+  .nav-theme-icon { display: block; }
+  .nav-toggle { display: none; }
   .shell-main { padding-top: 28px; }
 }
 
@@ -2734,6 +2815,10 @@ td, th { border-color: var(--line); }
   padding: 10px 28px;
   border-bottom: 1px solid var(--line);
   background: var(--panel-2);
+  /* Stacks directly below the sticky header -- see .shell-header. */
+  position: sticky;
+  top: var(--shell-header-height, 70px);
+  z-index: 3;
 }
 
 .workflow-summary {
@@ -2811,8 +2896,6 @@ td, th { border-color: var(--line); }
 .workflow-back:disabled,
 .workflow-continue:disabled { opacity: .48; cursor: not-allowed; }
 .workflow-position { min-width: 96px; color: var(--muted); font-size: 12px; font-weight: 700; text-align: center; }
-
-.shell-mobile-controls { display: none; }
 
 .home-study-ownership {
   max-width: 900px;
@@ -2976,52 +3059,20 @@ td, th { border-color: var(--line); }
   .shell-save-indicator { max-width: none; }
 }
 
-/* 760px is the compact-navigation breakpoint. Desktop pill and rail
-   containers are removed rather than merely made scrollable, leaving one
-   assay select and one step select as the only navigation controls. */
+/* 760px used to be the compact-navigation breakpoint where the desktop rail
+   was removed outright (display: none) in favor of a mobile strip with two
+   <select>s that only covered New study and Walkthrough -- Settings,
+   Feedback, Release notes and Theme had no mobile equivalent and became
+   completely unreachable below this width (and via zoom, below it at any
+   window size). The rail now stays a vertical icon-only column all the way
+   down (see the max-width: 900px block above), so nothing here removes it
+   any more, and the mobile strip is gone. */
 @media (max-width: 760px) {
   .shell-header { padding: 12px 14px; }
   .header-actions { width: 100%; justify-content: flex-start; }
   .shell-save-indicator { flex: 1 1 160px; max-width: none; }
   .shell-utility-menu { right: auto; left: 0; width: min(360px, calc(100vw - 28px)); }
-  .workflow-strip,
-  .assay-switcher-bar,
-  .shell-nav { display: none; }
-  .shell-body,
-  .shell-body.shell-nav-collapsed { display: block; }
-  .shell-mobile-controls {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 6px 10px;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--line);
-    background: var(--panel);
-  }
-  .shell-mobile-controls label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
-  .mobile-assay-select,
-  .mobile-step-select { width: 100%; min-width: 0; padding: 7px 9px; }
-  .shell-mobile-actions { display: flex; gap: 8px; }
-  .shell-mobile-action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    flex: 1 1 0;
-    min-height: 44px;
-    min-width: 0;
-    padding: 7px 12px;
-    border-radius: 9px;
-    font: inherit;
-    font-weight: 650;
-    cursor: pointer;
-  }
-  .shell-mobile-action-label {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  .assay-switcher-bar { display: none; }
   .workflow-footer { gap: 8px; padding: 9px 14px; }
   .workflow-back,
   .workflow-continue { min-width: 0; flex: 1 1 0; }
@@ -3038,8 +3089,6 @@ td, th { border-color: var(--line); }
   .header-actions { gap: 6px; }
   .shell-save-indicator { order: 3; flex-basis: 100%; }
   .shell-utility-toggle { flex: 1 1 auto; }
-  .shell-mobile-controls { grid-template-columns: 1fr; gap: 3px; }
-  .shell-mobile-controls label { margin-top: 4px; }
   .field-commit-row { flex-direction: column; }
   .field-commit { width: 100%; }
   .home-study-ownership-actions { display: grid; grid-template-columns: 1fr; }
@@ -3050,7 +3099,6 @@ td, th { border-color: var(--line); }
 @media print {
   .shell-header,
   .workflow-strip,
-  .shell-mobile-controls,
   .assay-switcher-bar,
   .shell-nav,
   .workflow-footer,
@@ -4155,9 +4203,7 @@ td, th { border-color: var(--line); }
 .experiment-compass-title,
 .experiment-compass-scope,
 .experiment-compass-detail,
-.experiment-compass-next,
-.shell-mobile-compass-title,
-.shell-mobile-compass-scope {
+.experiment-compass-next {
   min-width: 0;
   overflow-wrap: anywhere;
 }
@@ -4598,7 +4644,6 @@ td, th { border-color: var(--line); }
   .experiment-compass-scope { grid-column: 1 / -1; margin-left: 0; font-size: 11.5px; }
   .experiment-compass-next { grid-column: 1 / -1; }
   .experiment-compass-next-action { min-height: 44px; }
-  .shell-mobile-compass { display: none; }
 
   .study-map-editor { gap: 14px; }
   .study-map-intake,

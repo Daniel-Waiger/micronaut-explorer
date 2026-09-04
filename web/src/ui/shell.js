@@ -289,67 +289,6 @@ export function renderShell(root, store, router, options = {}) {
   compassNext.className = 'experiment-compass-next';
   workflowStrip.append(workflowSummary, compassDetails, compassScope, compassNext);
 
-  const mobileControls = document.createElement('section');
-  mobileControls.className = 'shell-mobile-controls';
-  mobileControls.setAttribute('aria-label', 'Workflow navigation');
-  const mobileCompass = document.createElement('div');
-  mobileCompass.className = 'shell-mobile-compass';
-  // This is deliberately kept in the existing mobile navigation surface so
-  // title and scope survive the desktop compass being collapsed at narrow
-  // widths. ORI-17 owns its final responsive styling.
-  mobileCompass.style.gridColumn = '1 / -1';
-  const mobileCompassTitle = document.createElement('span');
-  mobileCompassTitle.className = 'shell-mobile-compass-title';
-  const mobileCompassScope = document.createElement('span');
-  mobileCompassScope.className = 'shell-mobile-compass-scope';
-  mobileCompass.append(mobileCompassTitle, mobileCompassScope);
-  // The desktop New study/Walkthrough buttons live in the nav rail's control
-  // panel (.nav-utilities), but .shell-nav itself is hidden below 760px in
-  // favor of this mobile strip -- without their own compact copies here,
-  // narrow screens would lose access to both actions entirely.
-  const mobileActions = document.createElement('div');
-  mobileActions.className = 'shell-mobile-actions';
-  mobileActions.style.gridColumn = '1 / -1';
-  let mobileNewStudy = null;
-  if (onNewBlank) {
-    mobileNewStudy = document.createElement('button');
-    mobileNewStudy.type = 'button';
-    mobileNewStudy.className = 'nav-action shell-mobile-action';
-    const mobileNewStudyLabel = document.createElement('span');
-    mobileNewStudyLabel.className = 'shell-mobile-action-label';
-    mobileNewStudyLabel.textContent = 'New study';
-    mobileNewStudy.append(createIcon('add', 'button-icon'), mobileNewStudyLabel);
-    mobileNewStudy.title = 'Start a blank study. Previous versions remain available in Restore.';
-    mobileNewStudy.addEventListener('click', () => {
-      if (window.confirm('Start a blank study? Your current work remains available in Restore.')) onNewBlank();
-    });
-    mobileActions.appendChild(mobileNewStudy);
-  }
-  const mobileWalkthrough = document.createElement('button');
-  mobileWalkthrough.type = 'button';
-  mobileWalkthrough.className = 'nav-action nav-walkthrough shell-mobile-action';
-  const mobileWalkthroughLabel = document.createElement('span');
-  mobileWalkthroughLabel.className = 'shell-mobile-action-label';
-  mobileWalkthroughLabel.textContent = 'Walkthrough';
-  mobileWalkthrough.append(createIcon('walkthrough', 'button-icon'), mobileWalkthroughLabel);
-  mobileWalkthrough.title = 'Take a focused tour of the app’s feature areas.';
-  mobileWalkthrough.setAttribute('aria-label', 'Start feature walkthrough');
-  mobileWalkthrough.disabled = true;
-  mobileWalkthrough.addEventListener('click', () => featureWalkthroughHandler?.(mobileWalkthrough));
-  mobileActions.appendChild(mobileWalkthrough);
-  const assayLabel = document.createElement('label');
-  assayLabel.htmlFor = 'mobile-active-assay';
-  assayLabel.textContent = 'Measurement';
-  const assaySelect = document.createElement('select');
-  assaySelect.id = 'mobile-active-assay';
-  assaySelect.className = 'mobile-assay-select';
-  const stepLabel = document.createElement('label');
-  stepLabel.htmlFor = 'mobile-workflow-step';
-  const stepSelect = document.createElement('select');
-  stepSelect.id = 'mobile-workflow-step';
-  stepSelect.className = 'mobile-step-select';
-  mobileControls.append(mobileCompass, mobileActions, assayLabel, assaySelect, stepLabel, stepSelect);
-
   const switcher = document.createElement('div');
   switcher.className = 'assay-switcher-bar';
   switcher.setAttribute('role', 'tablist');
@@ -415,12 +354,6 @@ export function renderShell(root, store, router, options = {}) {
     compassScope.textContent = compassDisplayText(scopeLine);
     compassScope.title = scopeLine;
     compassScope.setAttribute('aria-label', scopeLine);
-    mobileCompassTitle.textContent = compassDisplayText(titleText);
-    mobileCompassTitle.title = titleText;
-    mobileCompassTitle.setAttribute('aria-label', titleText);
-    mobileCompassScope.textContent = compassDisplayText(scopeText);
-    mobileCompassScope.title = scopeText;
-    mobileCompassScope.setAttribute('aria-label', scopeText);
 
     compassDetails.textContent = '';
     const comparisonText = comparisonSummary(map);
@@ -603,7 +536,7 @@ export function renderShell(root, store, router, options = {}) {
   status.className = 'shell-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  root.append(header, workflowStrip, mobileControls, switcher, body, footer, status);
+  root.append(header, workflowStrip, switcher, body, footer, status);
 
   // Publishes the footer's real, current height so .shell-status and
   // .shell-main (app.css) can clear it exactly instead of duplicating a
@@ -621,6 +554,37 @@ export function renderShell(root, store, router, options = {}) {
     };
     new ResizeObserver(publishFooterHeight).observe(footer);
     publishFooterHeight();
+  }
+
+  // Publishes the header, study compass and measurement switcher's own
+  // heights (each becomes sticky in app.css, stacked in this order) plus
+  // their combined total, so .nav-sticky can size itself to exactly the
+  // remaining viewport instead of assuming a fixed 210px and either
+  // overshooting (control panel dangles past the fold) or undershooting
+  // (rail clipped). Individual heights -- not just the total -- are needed
+  // because each bar's own `top` offset in a sticky stack is the sum of the
+  // bars above it, and any bar's rendered height can change independently
+  // (a long brand/study title wraps, a badge appears). Any bar reporting 0
+  // (e.g. hidden by a future change) is naturally the correct contribution.
+  // Same guard/pattern as publishFooterHeight above.
+  if (typeof ResizeObserver === 'function') {
+    const chromeBars = [
+      ['--shell-header-height', header],
+      ['--shell-workflow-strip-height', workflowStrip],
+      ['--shell-switcher-height', switcher],
+    ];
+    const publishChromeHeight = () => {
+      let total = 0;
+      chromeBars.forEach(([varName, el]) => {
+        const h = el.getBoundingClientRect().height;
+        total += h;
+        document.documentElement.style.setProperty(varName, `${Math.ceil(h)}px`);
+      });
+      document.documentElement.style.setProperty('--shell-chrome-height', `${Math.ceil(total)}px`);
+    };
+    const chromeObserver = new ResizeObserver(publishChromeHeight);
+    chromeBars.forEach(([, el]) => chromeObserver.observe(el));
+    publishChromeHeight();
   }
 
   function renderWorkflowStrip() {
@@ -656,8 +620,13 @@ export function renderShell(root, store, router, options = {}) {
       const accessibleLabel = current ? `${label} — ${stateLabel(current.state)}` : label;
       button.setAttribute('aria-label', accessibleLabel);
       // Native hover text cannot be clipped by the narrow collapsed rail.
-      // It also leaves the expanded badge as the visible status authority.
-      if (current) button.title = accessibleLabel;
+      // Set unconditionally -- not just when `current` (a workflow-progress
+      // state) exists -- because utility steps like Settings and Feedback
+      // have no workflow state at all, and the icon-only rail at <=900px
+      // width is otherwise their only label. When `current` does exist, the
+      // expanded badge remains the visible status authority; the title just
+      // mirrors it for the collapsed/narrow states.
+      button.title = accessibleLabel;
       button.appendChild(createIcon(step.id === 'panel' ? 'microscope' : step.id, 'nav-step-icon'));
       const copy = document.createElement('span'); copy.className = 'nav-step-label'; copy.textContent = label;
       button.appendChild(copy);
@@ -695,22 +664,6 @@ export function renderShell(root, store, router, options = {}) {
     navUtilities.appendChild(releaseNotesLink);
     navUtilities.appendChild(themeNavButton);
   }
-  function renderMobileControls(activeId = router.current()) {
-    const experiment = store.get();
-    assaySelect.textContent = '';
-    (Array.isArray(experiment.assays) ? experiment.assays : []).forEach((assay, index) => {
-      const option = document.createElement('option'); option.value = assay.id; option.textContent = assay.label || `Measurement ${index + 1}`; option.selected = assay.id === experiment.activeAssayId; assaySelect.appendChild(option);
-    });
-    const steps = primarySteps();
-    stepSelect.textContent = '';
-    steps.forEach((step, index) => {
-      const option = document.createElement('option'); option.value = step.routeId; option.textContent = `Step ${index + 1} of ${steps.length}: ${step.label}`; option.selected = step.routeId === activeId; stepSelect.appendChild(option);
-    });
-    const current = steps.findIndex((step) => step.routeId === activeId);
-    stepLabel.textContent = `Step ${Math.max(1, current + 1)} of ${steps.length || 7}`;
-  }
-  assaySelect.addEventListener('change', () => { if (assaySelect.value && assaySelect.value !== store.get().activeAssayId) store.patch({ activeAssayId: assaySelect.value }); });
-  stepSelect.addEventListener('change', () => router.navigate(stepSelect.value));
   let explainStepHandler = null;
   function renderFooter(activeId = router.current()) {
     const steps = primarySteps();
@@ -757,12 +710,11 @@ export function renderShell(root, store, router, options = {}) {
       if (currentStep && typeof explainStepHandler === 'function') explainStepHandler(currentStep.id);
     };
   }
-  router.onChange((id) => { renderCompass(id); renderNav(id); renderMobileControls(id); renderFooter(id); });
-  store.subscribe((state) => { renderCompass(router.current()); renderSwitcher(state); renderMobileControls(router.current()); });
+  router.onChange((id) => { renderCompass(id); renderNav(id); renderFooter(id); });
+  store.subscribe((state) => { renderCompass(router.current()); renderSwitcher(state); });
   renderSwitcher(store.get());
   renderWorkflowStrip();
   renderNav(router.current());
-  renderMobileControls(router.current());
   renderFooter(router.current());
 
   let toastTimer = null;
@@ -779,7 +731,7 @@ export function renderShell(root, store, router, options = {}) {
     setRecoveryEntries(entries) { recoveryEntries = Array.isArray(entries) ? entries : []; renderRecoveryEntries(); },
     setWorkflowProgress(progress) {
       workflowProgress = progress || { primary: [], assays: [], summary: {} };
-      renderWorkflowStrip(); renderSwitcher(store.get()); renderNav(router.current()); renderMobileControls(router.current()); renderFooter(router.current());
+      renderWorkflowStrip(); renderSwitcher(store.get()); renderNav(router.current()); renderFooter(router.current());
     },
     guidedAsideHost,
     setExplainStepHandler(handler) {
@@ -789,7 +741,6 @@ export function renderShell(root, store, router, options = {}) {
     setFeatureWalkthroughHandler(handler) {
       featureWalkthroughHandler = typeof handler === 'function' ? handler : null;
       featureWalkthrough.disabled = !featureWalkthroughHandler;
-      mobileWalkthrough.disabled = !featureWalkthroughHandler;
     },
     setGuidedAsideVisible(visible) {
       const isVisible = Boolean(visible);

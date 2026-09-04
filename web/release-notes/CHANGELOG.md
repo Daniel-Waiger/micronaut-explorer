@@ -9,6 +9,26 @@ that existing history, not a scheme that was tracked from day one.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-09-04
+
+### Fixed
+- The step navigation rail no longer disappears or scrolls out of reach at
+  high browser zoom. Below 900px it now narrows to an icon-only column
+  (matching every other width) instead of turning into a horizontal strip
+  that pushed Settings, Feedback, Release notes and Theme off-screen; below
+  760px it no longer removes the rail outright, which had made those same
+  four controls completely unreachable on narrow screens or heavy zoom.
+- Settings, Feedback, Release notes and Theme now sit flush against the
+  bottom of the screen, instead of hanging up to 22px below the fold.
+
+### Changed
+- Settings and Feedback in the step rail's control panel switched from fixed
+  saturated colors to the same neutral surface (accent-highlighted only when
+  open) as every other step button.
+- The narrow-screen navigation strip (with its own New study/Walkthrough
+  buttons and measurement/step dropdowns) is removed; the icon-only rail
+  above now covers every width down to a phone screen.
+
 ## [0.16.0] - 2026-09-04
 
 ### Added
