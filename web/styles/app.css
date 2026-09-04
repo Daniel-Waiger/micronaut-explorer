@@ -116,7 +116,13 @@ body {
   height: 100%;
   /* Matches the CRM (css/app.css:60): guarantees no width can ever produce a
      horizontal page scrollbar, regardless of what a narrow viewport does to
-     the rail or any other flex/grid content below it. */
+     the rail or any other flex/grid content below it. `hidden` first as a
+     fallback -- caught in review: an engine that doesn't recognize `clip`
+     ignores that whole declaration (an unsupported value invalidates just
+     that one line, not the rule) and falls back to `hidden`, so the
+     no-horizontal-scroll guarantee holds either way; one that does
+     recognize `clip` uses it, since the later declaration wins. */
+  overflow-x: hidden;
   overflow-x: clip;
 }
 
@@ -208,7 +214,16 @@ button:focus-visible {
      .nav-utilities flush against the actual bottom, matching the CRM's
      .sidebar-foot inside its 100vh sidebar. */
   top: var(--shell-chrome-height, 210px);
-  height: calc(100vh - var(--shell-chrome-height, 210px));
+  /* max(0px, ...) -- caught in review: if the sticky chrome above (header +
+     compass + switcher) is ever taller than the viewport itself (an
+     extremely short window at heavy zoom), the subtraction goes negative.
+     Modern engines already treat a negative computed `height` as 0 per the
+     CSS Values spec, but that's implicit and version-dependent; clamping
+     explicitly means the rail collapses to a well-defined empty box instead
+     of relying on that fallback, and stays correct if a future change
+     (e.g. a taller chrome bar) pushes this same case into an engine that
+     doesn't clamp it the same way. */
+  height: max(0px, calc(100vh - var(--shell-chrome-height, 210px)));
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3072,7 +3087,14 @@ td, th { border-color: var(--line); }
   .header-actions { width: 100%; justify-content: flex-start; }
   .shell-save-indicator { flex: 1 1 160px; max-width: none; }
   .shell-utility-menu { right: auto; left: 0; width: min(360px, calc(100vw - 28px)); }
-  .assay-switcher-bar { display: none; }
+  /* Was `display: none`, inherited from the old ≤760px block that removed
+     the whole desktop nav in favor of a mobile strip with its own
+     measurement <select> (see the block comment above). That strip is gone,
+     so hiding this too left narrow/zoomed viewports with no way to switch,
+     add, or delete a measurement at all -- caught in review. The switcher
+     already tolerates narrow widths on its own (overflow-x: auto on
+     .assay-switcher-bar, tightened padding from the 900px/620px rules
+     above), so keeping it visible is enough; no new layout needed. */
   .workflow-footer { gap: 8px; padding: 9px 14px; }
   .workflow-back,
   .workflow-continue { min-width: 0; flex: 1 1 0; }
