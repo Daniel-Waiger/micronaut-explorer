@@ -416,10 +416,12 @@ button:focus-visible {
 .nav-utilities .nav-step[data-step-id]:hover, .nav-utilities .nav-step[data-step-id].active { color: #fff; filter: brightness(1.08); box-shadow: none; }
 /* Release Notes follows the semantic accent (unlike its fixed-color siblings)
    so dark mode gets the dark-theme accent with its dark ink for contrast;
-   placed after the generic hover/active rule so the ink color wins there too. */
+   placed after the generic hover/active rule so the ink color wins there too,
+   and filter is reset so the token colors aren't brightness-shifted. */
 .nav-utilities .nav-step[data-step-id="release-notes"],
 .nav-utilities .nav-step[data-step-id="release-notes"]:hover,
-.nav-utilities .nav-step[data-step-id="release-notes"].active { background: var(--accent); color: var(--accent-ink); }
+.nav-utilities .nav-step[data-step-id="release-notes"].active { background: var(--accent); color: var(--accent-ink); filter: none; }
+.nav-utilities .nav-step[data-step-id="release-notes"]:hover { background: color-mix(in srgb, var(--accent) 88%, var(--panel)); }
 .shell-utilities { display: none; }
 
 .nav-action {
@@ -5106,8 +5108,9 @@ td, th { border-color: var(--line); }
 }
 
 /* Facility Design Language motion guard: honor the OS-level reduced-motion
-   preference globally (the earlier component-scoped guards remain and are
-   simply subsumed by this one). */
+   preference globally. The earlier component-scoped guards remain on purpose:
+   they cover extras this global block doesn't (e.g. the feature tour also
+   disables backdrop-filter). */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
