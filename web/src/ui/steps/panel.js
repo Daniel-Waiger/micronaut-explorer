@@ -108,7 +108,10 @@ function appendRow(list, entry) {
 
     const badge = document.createElement('span');
     badge.className = 'panel-badge';
-    badge.title = 'Spectral value drafted by Claude from common published references -- not yet reviewed by a microscopy specialist.';
+    badge.title =
+      entry.reviewStatus === 'source-cited'
+        ? 'Spectral value matches a cited vendor/publication source -- not yet reviewed by a microscopy specialist.'
+        : 'Spectral value drafted by Claude from common published references -- not yet reviewed by a microscopy specialist.';
     badge.textContent = entry.reviewStatus === 'claude-drafted' ? 'unreviewed' : entry.reviewStatus;
     row.appendChild(badge);
   }

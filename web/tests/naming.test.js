@@ -157,12 +157,12 @@ test('renderName strips separator before extension', () => {
     exptype: 'CT',
     sample: 'E03',
     magnification: 'X90',
-    markers: 'ARL',
+    markers: 'GFP',
     notes: '',
     ext: '.tif',
   };
 
-  assert.equal(renderName(fields, config), '2026-07-22_CT_E03_X90_ARL.tif');
+  assert.equal(renderName(fields, config), '2026-07-22_CT_E03_X90_GFP.tif');
 });
 
 test('isReservedWindowsStem matches device names case-insensitively', () => {

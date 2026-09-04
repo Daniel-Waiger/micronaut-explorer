@@ -597,12 +597,11 @@ const SOURCE_VARIANT_KEYS = {
 //   - RFP: heterogeneous, "RFP" is not one protein.
 //   - FURA2: ratiometric (two excitation peaks by Ca2+ state) -- does not
 //     fit this app's single-peak model at all.
-//   - ARL: identity is not confidently known -- drafting a peak for an
-//     unidentified marker would be actively misleading, not merely
-//     incomplete.
 // Named explicitly so an accidental future omission (rather than a
 // deliberate one) fails this guard loudly.
-const DELIBERATELY_UNCOVERED = new Set(['RFP', 'FURA2', 'ARL', 'HALO', 'SNAP', 'CLIP', 'PHALLOIDIN', 'WGA']);
+// (ARL was removed from markers.json entirely as an unidentified leftover
+// example value, so it no longer needs a guard entry here.)
+const DELIBERATELY_UNCOVERED = new Set(['RFP', 'FURA2', 'HALO', 'SNAP', 'CLIP', 'PHALLOIDIN', 'WGA']);
 
 test('the real web/kb/spectra.json loads with zero issues', () => {
   const { issues } = loadSpectraKb(realSpectraRaw);
@@ -635,7 +634,15 @@ test('all 72 direct and 11 family additions exactly match the source ledger and 
     assert.equal(entry.excitationPeakNm, row.excitationPeakNm, `${row.id}: excitation`);
     assert.equal(entry.emissionPeakNm, row.emissionPeakNm, `${row.id}: emission`);
     assert.equal(entry.note, row.measurementContext, `${row.id}: condition note`);
-    assert.equal(entry.reviewStatus, 'claude-drafted', `${row.id}: review status`);
+    // Every direct record's numeric peaks (and note) match this ledger row
+    // exactly (checked above), so its reviewStatus has been upgraded from
+    // the default 'claude-drafted' to 'source-cited' -- see
+    // docs/references/planner-fluorophore-sources.json's sourceUrl/
+    // retrievalDate for the citation. Family records (below) stay
+    // 'claude-drafted': reviewStatus lives on the whole family entry, and
+    // these families have sibling variants the ledger does not cover, so
+    // upgrading the family-level status would falsely certify those too.
+    assert.equal(entry.reviewStatus, 'source-cited', `${row.id}: review status`);
     assert.ok(realMarkersRaw.markers[row.id], `${row.id}: missing marker canonical`);
     assert.ok(
       300 <= entry.excitationPeakNm &&

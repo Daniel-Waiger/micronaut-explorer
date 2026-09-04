@@ -1,8 +1,8 @@
-# web/kb/markers.json is a GENERATED artifact (tools/export_markers_kb.py
-# writes it with LF) and tests/test_markers_kb_export.py asserts a fresh
-# export matches the committed file BYTE FOR BYTE, per repo lesson 40. With
-# no .gitattributes, Windows checkouts under core.autocrlf=true silently
-# rewrite it to CRLF on checkout, failing that test for a reason that has
-# nothing to do with markers.py -- force LF so the byte comparison is stable
-# on every platform.
+# web/kb/markers.json is a hand-edited, canonical source file (see
+# web/kb/markers.README.md and README.md's "marker/fluorophore dictionary" note --
+# there is no generator; it is edited directly). It still needs stable line
+# endings: with no .gitattributes, Windows checkouts under core.autocrlf=true
+# silently rewrite it to CRLF on checkout, which would make hand-edits noisy
+# diffs and could confuse any future byte-for-byte tooling -- force LF so the
+# file's bytes are stable on every platform.
 web/kb/*.json text eol=lf

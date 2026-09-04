@@ -4,7 +4,7 @@ import { validateTargetPath } from '../../engine/validation.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 import { createAdvicePanel } from '../advice.js';
 import { assayView, scopeWrite } from '../../core/assay.js';
-import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
+import { BASE_TEMPLATE, NAMING_CONFIG } from '../../engine/namingConfig.js';
 import { appendStepHeading } from '../stepHeading.js';
 
 // Exported so ui/steps/study.js's group-vocabulary input parses its

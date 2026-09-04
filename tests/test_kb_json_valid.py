@@ -1,16 +1,15 @@
 """Every web/kb/*.json file parses, and web/kb/advisor.json matches its
 documented shape.
 
-Why this exists as a PYTHON test: the actual loader logic for advisor.json
-(web/src/engine/advisor.js, tested thoroughly in web/tests/advisor.test.js)
-runs under `node --test`, which this repo's CI does NOT currently invoke --
-.github/workflows/ci.yml runs ruff/black/mypy/pytest only. Without this
-file, a malformed web/kb/*.json (a trailing comma, a rule missing a required
-key) would pass every check that actually runs on push and only be caught
-the next time a developer happens to run the JS suite locally. This test
-does not replace web/tests/advisor.test.js's thorough field-by-field
-validation -- it is a much shallower shape check whose only job is to be
-something CI genuinely runs.
+Why this exists as a PYTHON test even though CI's web-test job already runs
+`node --test web/tests/*.test.js` (which includes web/tests/advisor.test.js's
+much more thorough field-by-field validation of advisor.json's loader,
+web/src/engine/advisor.js): CI's `test` job (the one this file lives under)
+runs only `pytest` against a short explicit list of files
+(.github/workflows/ci.yml), so this shallow shape check is what makes a
+malformed web/kb/*.json (a trailing comma, a rule missing a required key)
+fail fast in that job specifically, rather than only in web-test -- belt and
+suspenders across the two jobs, not a substitute for either.
 """
 
 from __future__ import annotations

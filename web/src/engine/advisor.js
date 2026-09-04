@@ -168,15 +168,22 @@ function normalizeAdvisorRule(entry, index, issues, seenIds) {
  *
  * `raw` is the parsed contents of web/kb/advisor.json: `{version, rules}`.
  * An absent pack (raw is undefined/null) is reported as its own issue rather
- * than degrading silently to an empty rule set -- a developer who edits
- * advisor.json and forgets to re-run tools/export_markers_kb.py sees a toast
- * naming the fix, not a blank panel with no clue why.
+ * than degrading silently to an empty rule set -- a developer serving web/
+ * unbuilt without web/kb.dev.js present (see tools/serve_dir.py, which
+ * generates it) sees a toast naming the fix, not a blank panel with no clue
+ * why.
  */
 export function loadAdvisorRules(raw) {
   const issues = [];
 
   if (raw === undefined || raw === null) {
-    issues.push(advisorIssue('advisor', 'advisor pack is missing -- run tools/export_markers_kb.py'));
+    issues.push(
+      advisorIssue(
+        'advisor',
+        'advisor pack is missing -- web/kb/advisor.json was not found in the build. ' +
+          'For dev, serve web/ via tools/serve_dir.py (it generates web/kb.dev.js).',
+      ),
+    );
     return { rules: [], issues };
   }
   if (typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray(raw.rules)) {

@@ -1,60 +1,25 @@
 {
-  "run": "Run — safe renaming · describer · open-weights",
-  "orchestrator": "Claude Fable 5",
-  "active_model": "Paused",
-  "active_status": "paused",
-  "phase": "Stalled mid-round",
-  "state_note": "5-HOUR WINDOW ENDED MID-ROUND",
+  "run": "No active run",
+  "orchestrator": "none",
+  "active_model": "Idle",
+  "active_status": "idle",
+  "phase": "Idle",
+  "state_note": "No CMA run is currently active. Latest repo activity: Classic-era scaffolding cleanup (skills dedup, dead scripts/docs removed, dashboard snapshot refreshed).",
   "current_task": null,
-  "crit_title": "Live data-safety defects — proven, unfixed, now committed",
+  "crit_title": "Open defects",
   "stats": [
-    { "k": "Orchestrator", "v": "Fable 5" },
-    { "k": "Test suite", "v": "239 passed", "tone": "ok" },
-    { "k": "Live defects", "v": "2 committed", "tone": "bad" },
-    { "k": "Branch", "v": "feat/safe-renaming…", "tone": "sm" }
-  ],
-  "defects": [
     {
-      "id": "A11",
-      "title": "Ledger exclusion is case-sensitive on a case-insensitive filesystem",
-      "location": "service.py:323",
-      "body": "A ledger whose directory entry reads .ORIGINAL_NAMES.JSON bypasses `p.name != LEDGER_FILENAME`, gets renamed away, and update_ledger then writes a fresh empty ledger — permanently orphaning every prior batch's original-filename mapping. Same flaw on the .manifests check. The module already has _casefold_key for exactly this.",
-      "repro": "was the case-variant ledger PLANNED for rename? True\nHISTORY LOST: True"
-    },
-    {
-      "id": "B3",
-      "title": "Marker scan drops a real second fluorophore",
-      "location": "metadata.py:419",
-      "body": "re.search yields one candidate per alias. When that candidate is nested inside a longer alias's span the overlap rule discards it, leaving none for the alias's own later occurrence — so a genuine dye vanishes from the filename, depending on channel order. Fix is re.finditer.",
-      "repro": "'ch1 ATTO 647-N ch2 ATTO 647' → ATTO647N        (channel 2 lost)\n'ch1 ATTO 647 ch2 ATTO 647-N' → ATTO647-ATTO647N (correct)"
+      "k": "Status",
+      "v": "Idle",
+      "tone": "sm"
     }
   ],
-  "tasks": [
-    { "id": "FM", "phase": "Stalled mid-task", "title": "field_map round — uncommitted: field_map.py, pyproject.toml, 3 new test files", "status": "running", "by": "interrupted" },
-    { "id": "A11", "phase": "Stalled mid-task", "title": "Casefold ledger + .manifests exclusions", "status": "pending", "by": "queued" },
-    { "id": "B3", "phase": "Stalled mid-task", "title": "re.finditer for alias candidates", "status": "pending", "by": "queued" },
-    { "id": "A1", "phase": "Verified pass", "title": "Transactional apply — manifest as intent journal, rollback on failure", "status": "done", "by": "live→dead proven" },
-    { "id": "A3", "phase": "Verified pass", "title": "Locked / cloud-synced warnings — never blocks", "status": "done", "by": "0.08 ms/file" },
-    { "id": "A4", "phase": "Verified pass", "title": "Reserved names, case collisions, MAX_PATH, distinguishing suffix", "status": "done", "by": "pass" },
-    { "id": "A7", "phase": "Verified pass", "title": "Rollback masking — key on target.exists()", "status": "done", "by": "mutation-proven" },
-    { "id": "A9", "phase": "Verified pass", "title": "Case-only rename reverts cleanly (samefile guard)", "status": "done", "by": "pass" },
-    { "id": "A10", "phase": "Verified pass", "title": "Lock probe gated on ERROR_SHARING_VIOLATION only", "status": "done", "by": "pass" },
-    { "id": "D1", "phase": "Verified pass", "title": "Open-weights ranking, VRAM-aware, override wins", "status": "done", "by": "40 attacks, 0 raised" },
-    { "id": "A5", "phase": "Verified pass", "title": "Date provenance — mtime vs real acquisition date", "status": "done", "by": "committed" },
-    { "id": "C1", "phase": "Verified pass", "title": "Free-text describer → provisional fields", "status": "done", "by": "committed" },
-    { "id": "C2", "phase": "Verified pass", "title": "Describer + provisional flags in UI/CLI", "status": "done", "by": "committed" },
-    { "id": "B1", "phase": "Failed then fixed", "title": "Marker dictionary 27 → 76 — wrong-dye bug fixed by B2", "status": "resolved", "by": "B2" },
-    { "id": "A2", "phase": "Failed then fixed", "title": "Original-name ledger + opt-in TIFF embed — fixed by A8", "status": "resolved", "by": "A8" },
-    { "id": "A8", "phase": "Failed — fix still pending", "title": "Ledger exclusion — case-variant bypass still live", "status": "failed", "by": "→ A11" },
-    { "id": "B2", "phase": "Failed — fix still pending", "title": "Marker tie-break — introduced silent marker loss", "status": "failed", "by": "→ B3" },
-    { "id": "CZI", "phase": "Deferred", "title": "CZI + ND2 key maps and vendor fixture tests", "status": "pending", "by": "awaiting samples" }
-  ],
+  "defects": [],
+  "tasks": [],
   "log": [
-    { "time": "commit", "msg": "9c9fa13 — transactional rollback, sidecar/embed, safety warnings, markers, VRAM ranking" },
-    { "time": "commit", "msg": "30dc8a7 — date provenance, describer, provisional surfacing" },
-    { "time": "commit", "msg": "31a1069 — lessons distilled from the A5/C1/C2 resume run" },
-    { "time": "commit", "msg": "8709940 — magnification parser + AppTest smoke suite" },
-    { "time": "note", "msg": "Adversarial verification caught 9 real defects a green suite had missed — 4 introduced by fix tasks." },
-    { "time": "note", "msg": "PR held: opening one now would ship both live defects above." }
+    {
+      "time": "17:40:58",
+      "msg": "Dashboard snapshot reset to neutral state as part of Classic-era scaffolding cleanup."
+    }
   ]
 }

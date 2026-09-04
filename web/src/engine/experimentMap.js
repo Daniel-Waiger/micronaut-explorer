@@ -4,13 +4,6 @@
 
 import { classifyConformanceIssue } from './decisionTriage.js';
 
-export const MAP_STATES = Object.freeze([
-  'missing',
-  'provisional',
-  'answered',
-  'needs-attention',
-]);
-
 const EXPERIMENT_MAP_DECISION_TIERS = Object.freeze([
   'study-shape',
   'measurement-design',

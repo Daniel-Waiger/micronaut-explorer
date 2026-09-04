@@ -1,5 +1,13 @@
 # Server contract + self-host recipe — zen-planner Phase 2 (remote inference)
 
+> **Historical / superseded.** The `web/src/llm/*` modules this document
+> describes (`ollama.js`, `config.js`) have since been removed from the repo
+> -- the local-model/Ollama integration was pulled out entirely (see
+> README.md's "Earlier versions could call a local Ollama endpoint..." note).
+> Nothing here describes a live code path or an active plan; it is kept for
+> historical reference only, in case a future remote-inference gateway effort
+> wants the original server contract as a starting point.
+
 This is the canonical copy of the "Server contract" section from the zen-planner
 plan (`gentle-knitting-lark.md`), plus a concrete self-host recipe. It exists so
 whoever stands up the gateway — FACSI IT, or Daniel self-hosting — has one

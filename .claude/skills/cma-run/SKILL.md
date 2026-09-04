@@ -5,12 +5,18 @@ description: micronaut-explorer's CMA multi-agent scheme — extends the user-le
 
 # /cma-run — micronaut-explorer
 
-**First: read `C:\Users\dwaig\.claude\skills\cma-run\SKILL.md` and follow its
+**First: read `~/.claude/skills/cma-run/SKILL.md` and follow its
 procedure.** That file owns the role/model assignment (Opus or Fable
 orchestrates depending on availability/need, Sonnet executes, Opus verifies,
-Haiku for quick/short-context ops), the token-economy rules, and the
+Haiku for quick/short-context ops), the master decision rule, warm-context-
+first policy, verification gate, token-economy rules, and the
 dashboard/lessons-file requirements. This file only adds what is specific to
 this project. Do not restate the base procedure here.
+
+That user-level base skill lives outside this repo (under the user's home
+directory) and may simply be absent on CI or a fresh remote/sandboxed
+session — if so, skip it and fall back to the conventions in this file plus
+ordinary judgment; don't block on a missing file.
 
 ## This repo's dashboard
 
@@ -47,10 +53,15 @@ scope + verification text (read the JSON, not the prose `.md`, when driving
 execution — the `.md` is lossy). See `ROADMAP.md` / `TASKS.md` for the
 longer-range backlog these plans draw from.
 
+Status vocabulary: `pending running verifying done resolved failed paused
+idle`. `resolved` means "failed, then fixed" — never relabel a repaired
+failure as plain `done`.
+
 ## Standing preferences this project has already set
 
 - **Always** use this scheme and **always** show the dashboard for
   substantial multi-task work (user directive, 2026-07-26).
 - Never push or open a PR without explicit confirmation, even mid-run.
-- Python: always `.venv/Scripts/python.exe` for anything touching bioio
-  readers — the global/Anaconda Python fails in confusing ways.
+- Classic-era invariants (bioio/tifffile/readlif environment requirements,
+  the pixel-data-loading ban, the batch-rename 1:1 safety invariant) were
+  retired along with the Classic app itself, archived at tag `classic-final`.

@@ -356,7 +356,7 @@ def test_script_imports_only_stdlib() -> None:
         for line in text.splitlines()
         if line.strip().startswith("import ") or line.strip().startswith("from ")
     ]
-    stdlib_modules = {"argparse", "hashlib", "json", "re", "sys", "pathlib", "__future__"}
+    stdlib_modules = {"argparse", "hashlib", "json", "re", "shutil", "sys", "pathlib", "__future__"}
     for line in import_lines:
         tokens = line.replace(",", " ").split()
         # tokens like: ['from', 'pathlib', 'import', 'Path'] or ['import', 'sys']
@@ -406,3 +406,90 @@ def test_surviving_static_import_fails_the_build(tmp_path: Path) -> None:
     with pytest.raises(Exception) as excinfo:
         build(web_dir, tmp_path / "dist")
     assert "import" in str(excinfo.value).lower()
+
+
+@pytest.mark.parametrize(
+    "snippet",
+    [
+        "export function load() { return fetch('/x'); }\n",
+        "export function load() { return new XMLHttpRequest(); }\n",
+        "export function load() { return new WebSocket('wss://x'); }\n",
+        "export function ping() { navigator.sendBeacon('/x', 'y'); }\n",
+        "export function sub() { return new EventSource('/x'); }\n",
+    ],
+)
+def test_network_primitive_in_source_fails_the_build(tmp_path: Path, snippet: str) -> None:
+    """The no-network promise (README) is a build gate, not just a review
+    habit: any of the five network primitives available to plain browser JS
+    must fail the build if it survives into the bundled output."""
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": snippet})
+    with pytest.raises(BuildError, match="forbidden"):
+        build(web_dir, tmp_path / "dist")
+
+
+def test_network_words_in_comments_do_not_false_positive(tmp_path: Path) -> None:
+    """Prose mentioning these words (without an actual call) must not trip
+    the gate -- it checks the assembled output verbatim, comments included,
+    so the patterns require the callable form (a following "(") rather than
+    a bare substring match. Mirrors this repo's real comments, e.g.
+    core/persist.js's "no fetch, no server, no permission prompt"."""
+    web_dir = tmp_path / "web"
+    _write_fixture(
+        web_dir,
+        {
+            "a.js": (
+                "// Works under file:// (no fetch, no server, no permission "
+                "prompt). Also: no XMLHttpRequests, WebSockets, sendBeacon "
+                "or EventSource calls anywhere in this file.\n"
+                "export const FOO = 1;\n"
+            )
+        },
+    )
+    output = build(web_dir, tmp_path / "dist").decode("utf-8")
+    assert "const FOO = 1;" in output
+
+
+def test_real_web_source_has_no_network_primitives() -> None:
+    """The actual app must currently pass the new gate (not just the
+    synthetic fixtures above)."""
+    output = build(ROOT / "web", ROOT / "dist")
+    assert len(output) > 0
+
+
+def test_release_notes_folder_is_copied_into_dist(tmp_path: Path) -> None:
+    """shell.js's Release notes nav link is a relative `release-notes/` URL,
+    so dist/ must carry that folder itself -- otherwise the link 404s
+    whenever dist/ is served (or opened via file://) without a separate,
+    easy-to-forget copy step outside this script."""
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"})
+    release_notes_dir = web_dir / "release-notes"
+    release_notes_dir.mkdir()
+    (release_notes_dir / "index.html").write_text("<p>notes</p>", encoding="utf-8")
+    (release_notes_dir / "CHANGELOG.md").write_text("## [1.0.0]\n", encoding="utf-8")
+
+    out_dir = tmp_path / "dist"
+    build(web_dir, out_dir)
+
+    copied = out_dir / "release-notes"
+    assert (copied / "index.html").read_text(encoding="utf-8") == "<p>notes</p>"
+    assert (copied / "CHANGELOG.md").read_text(encoding="utf-8") == "## [1.0.0]\n"
+
+
+def test_missing_release_notes_folder_does_not_fail_the_build(tmp_path: Path) -> None:
+    """A web/ tree with no release-notes/ folder (as most of this test
+    file's synthetic fixtures are) must build successfully and just skip the
+    copy, not raise."""
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"})
+    out_dir = tmp_path / "dist"
+    build(web_dir, out_dir)
+    assert not (out_dir / "release-notes").exists()
+
+
+def test_real_web_release_notes_folder_is_copied_into_dist() -> None:
+    """The actual app's dist/ output must carry the real release-notes/
+    folder, not just a synthetic one."""
+    build(ROOT / "web", ROOT / "dist")
+    assert (ROOT / "dist" / "release-notes" / "index.html").exists()

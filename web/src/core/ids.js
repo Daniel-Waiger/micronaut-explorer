@@ -1,15 +1,5 @@
-// Identifier helpers: slugs, short ids, and UUIDs safe for file:// contexts
+// Identifier helpers: short ids and UUIDs safe for file:// contexts
 // (some browsers restrict crypto.randomUUID() to secure contexts only).
-
-export function slugify(s) {
-  return String(s)
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 export function shortId() {
   return Math.random().toString(36).slice(2, 10);

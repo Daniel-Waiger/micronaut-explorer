@@ -725,6 +725,16 @@ button:focus-visible {
   filter: none;
 }
 
+.settings-danger-button {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.settings-danger-button.is-armed {
+  background: var(--danger);
+  color: var(--danger-soft);
+}
+
 /* The advice panel -- deliberately its OWN vocabulary, not a reuse of
    .issue/.issue-warning/.issue-error. Those are validation output; this is
    guidance. --danger/--warn stay reserved for validation alone, so a
@@ -2874,6 +2884,22 @@ td, th { border-color: var(--line); }
 
 .shell-restore-list { display: grid; gap: 2px; }
 .shell-restore-action { font-size: 12.5px; }
+.shell-restore-row { display: flex; align-items: center; gap: 2px; }
+.shell-restore-row .shell-restore-action { flex: 1; min-width: 0; }
+.shell-restore-delete {
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 6px 10px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.shell-restore-delete:hover {
+  color: var(--ink);
+}
 .shell-restore-empty {
   margin: 0;
   padding: 6px 10px 9px;

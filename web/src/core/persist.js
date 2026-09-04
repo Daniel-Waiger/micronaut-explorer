@@ -1,5 +1,6 @@
 import { uuid } from './ids.js';
 import { migrate } from './schema.js';
+import { validateImportedExperiment } from './importValidate.js';
 
 // localStorage is a CONVENIENCE, never the record of truth: two users on a
 // shared-scope PC share one storage bucket under file://, IT can clear
@@ -223,13 +224,33 @@ export function deserializeExperiment(text) {
 }
 
 /**
- * Parse a portable project backup and migrate it to the current schema.
- * This function deliberately has no storage side effects: main owns the
- * replace/autosave lifecycle, so an invalid or future-schema import cannot
- * partially overwrite either the current study or the recovery ring.
+ * Parse a portable project backup, migrate it to the current schema, and
+ * shape-validate the result (core/importValidate.js) before it is allowed
+ * anywhere near store.replace(). This function deliberately has no storage
+ * side effects: main owns the replace/autosave lifecycle, so an invalid or
+ * future-schema import cannot partially overwrite either the current study
+ * or the recovery ring.
+ *
+ * Returns `{ experiment, issues }` -- `issues` is normally empty, but can
+ * list non-fatal shape problems that were sanitized rather than rejected
+ * (a malformed provenance slot, an assay container reset to defaults);
+ * callers should surface a non-empty `issues` to the person importing
+ * (main.js's importProjectBackup does), not merely proceed silently.
+ *
+ * Throws (same as migrate() already does for an unsupported future
+ * schemaVersion, and JSON.parse already does for invalid JSON) when the
+ * file is damaged badly enough that validateImportedExperiment rejects it
+ * outright -- callers that already catch those two cases need no new
+ * error-handling path for this one.
  */
 export function parseAndMigrateExperiment(text) {
-  return migrate(deserializeExperiment(text));
+  const migrated = migrate(deserializeExperiment(text));
+  const { experiment, issues } = validateImportedExperiment(migrated);
+  if (!experiment) {
+    const fatal = issues.find((issue) => issue.severity === 'fatal');
+    throw new Error(fatal ? fatal.message : 'That file is not a valid project backup.');
+  }
+  return { experiment, issues };
 }
 
 /**

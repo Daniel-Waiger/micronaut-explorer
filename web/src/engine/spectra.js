@@ -256,7 +256,13 @@ export function loadSpectraKb(raw) {
   const source = isPlainObject ? raw : {};
 
   if (!isPlainObject) {
-    issues.push(spectraIssue('spectra', 'spectra pack is missing -- run tools/export_markers_kb.py'));
+    issues.push(
+      spectraIssue(
+        'spectra',
+        'spectra pack is missing -- web/kb/spectra.json was not found in the build. ' +
+          'For dev, serve web/ via tools/serve_dir.py (it generates web/kb.dev.js).',
+      ),
+    );
   } else if (source.version !== 1) {
     issues.push(spectraIssue('spectra', `spectra pack version is ${JSON.stringify(source.version ?? null)}, expected 1`));
   }
@@ -363,7 +369,7 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
   // secondary-antibody-control rules need to tell 'target' apart from
   // 'moiety' precisely (an isotype control makes no sense for a
   // phalloidin/WGA/Annexin V panel -- no antibody is involved) -- see
-  // derivePanelFacts below and export_markers_kb.py's TARGET_MARKERS.
+  // derivePanelFacts below and web/kb/markers.json's per-marker `class` field.
   if (markerClass === 'tag' || markerClass === 'moiety' || markerClass === 'target') {
     return { token, canonical, state: 'no-intrinsic-spectrum' };
   }

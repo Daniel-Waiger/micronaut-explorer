@@ -41,13 +41,13 @@ test('a well-formed pack loads with zero issues, stages sorted by order', () => 
   assert.deepEqual(rules, []);
 });
 
-test('an absent pack (undefined/null) reports the "run the exporter" issue, never throws', () => {
+test('an absent pack (undefined/null) reports the "pack is missing" issue, never throws', () => {
   for (const raw of [undefined, null]) {
     const { stages, rules, issues } = loadStages(raw);
     assert.deepEqual(stages, []);
     assert.deepEqual(rules, []);
     assert.equal(issues.length, 1);
-    assert.match(issues[0].message, /export_markers_kb\.py/);
+    assert.match(issues[0].message, /stages pack is missing/);
   }
 });
 

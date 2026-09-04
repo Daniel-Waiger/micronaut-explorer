@@ -32,13 +32,6 @@ export const OPTIONAL_WORKFLOW = Object.freeze([
   Object.freeze({ id: 'guide', label: 'Guide' }),
 ]);
 
-export const WORKFLOW_STATES = Object.freeze([
-  'not-started',
-  'in-progress',
-  'needs-attention',
-  'complete',
-]);
-
 function hasValue(value) {
   return value !== null && value !== undefined && (typeof value !== 'string' || value.trim() !== '');
 }
