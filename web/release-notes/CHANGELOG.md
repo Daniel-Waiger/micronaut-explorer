@@ -22,6 +22,12 @@ that existing history, not a scheme that was tracked from day one.
   bottom of the screen, instead of hanging up to 22px below the fold.
 
 ### Changed
+- The step rail's buttons are smaller and less boxy. Step items lost their
+  44px floor and now size to their own content, and the control panel's six
+  buttons (New study, Walkthrough, Settings, Feedback, Release notes, Theme)
+  are a compact cluster rather than six more full-size step rows — so the
+  whole rail now fits an ordinary laptop screen without scrolling. Touch
+  devices keep the larger 44px targets.
 - Settings and Feedback in the step rail's control panel switched from fixed
   saturated colors to the same neutral surface (accent-highlighted only when
   open) as every other step button.

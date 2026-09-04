@@ -452,6 +452,34 @@ button:focus-visible {
 }
 
 .nav-utilities { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
+/* The control panel's buttons are the CRM's .sidebar-foot .btn.btn-sm, whose
+   metrics are deliberately smaller than its nav items': 5px 9px padding and
+   12px text (~27px tall) against the nav items' 9px 12px / 13.5px (~37px).
+   These previously inherited .nav-step wholesale, so all six rendered at the
+   same 44px as a nav item -- the panel read as six more nav rows rather than
+   a compact utility cluster the way the CRM's does. Icons drop to 15px to
+   match the CRM's .btn svg (its .nav-item svg stays 18px). */
+.nav-utilities .nav-step,
+.nav-utilities .nav-theme-toggle {
+  gap: 8px;
+  padding: 5px 9px;
+  font-size: 12px;
+  /* Pinned rather than inherited: this app's body font is 15px/1.55 against
+     the CRM's 14px/1.5, so the same padding and font-size still landed ~3.6px
+     taller than the CRM's button. 1.25 puts the text's line box at the same
+     15px as the icon beside it, which is what makes the CRM's land at 27px. */
+  line-height: 1.25;
+}
+.nav-utilities .nav-step .nav-step-icon,
+.nav-utilities .nav-theme-toggle .nav-theme-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  /* .nav-step-icon carries margin-top: 2px to sit level with the first line
+     of a nav label that wraps to two lines. These buttons are single-line and
+     center-aligned, so that offset only made them 2px taller than the CRM's. */
+  margin-top: 0;
+}
 /* Was two hardcoded saturated fills (#c62828 Settings, #d95f02 Feedback) with
    forced white text -- theme-blind, and the main reason this panel read
    differently from the CRM's, whose equivalent footer buttons (.btn-secondary)
@@ -517,12 +545,12 @@ button:focus-visible {
   cursor: wait;
 }
 
-/* min-height/border-width/font-size aligned to .nav-step's own metrics
-   (44px / 1px / 13.5px) -- this was the one control-panel button with its
-   own slightly different size (42px, a 2px border, 12px text), which is why
-   it was also the one that ended up dangling below the fold in the height
-   fix above: every other button in the panel already matched .nav-step. */
-.nav-theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; border: 1px solid; border-radius: 9px; padding: 8px; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(23 39 43 / 18%); }
+/* Border width and radius aligned to the CRM's .btn (1px / 8px); the
+   padding/font-size/gap come from the .nav-utilities .btn-sm block above, so
+   this sits at the same ~27px as its five siblings. Was a 2px border, a 9px
+   radius and its own 42px min-height -- the one button in the panel with
+   bespoke metrics. */
+.nav-theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid; border-radius: 8px; padding: 5px 9px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(23 39 43 / 18%); }
 .nav-theme-toggle[data-theme-mode="light"] { color: #17272b; background: #fff; border-color: #17272b; }
 .nav-theme-toggle[data-theme-mode="dark"] { color: #e8eeef; background: #101a1d; border-color: #96a8ad; }
 .nav-theme-icon { display: none; flex: 0 0 auto; width: 24px; height: 24px; }
@@ -2420,14 +2448,18 @@ textarea:focus-visible {
 
 .nav-steps { gap: 4px; }
 
+/* Metrics matched to the CRM's .nav-item (css/app.css:143-150): 9px 12px
+   padding, an 8px radius, 10px gap, 13.5px/500 text, an 18px icon. Was
+   10px 11px / 9px / 625, which with the 44px min-height further down read as
+   a noticeably chunkier button than the CRM's. */
 .nav-step {
   gap: 10px;
   border: 1px solid transparent;
-  border-radius: 9px;
-  padding: 10px 11px;
+  border-radius: 8px;
+  padding: 9px 12px;
   color: var(--muted);
   font-size: 13.5px;
-  font-weight: 625;
+  font-weight: 500;
 }
 
 .nav-step-icon {
@@ -2448,6 +2480,9 @@ textarea:focus-visible {
   color: var(--accent);
   background: var(--accent-soft);
   box-shadow: none;
+  /* Matches the CRM's .nav-item.active, which leans on weight (500 -> 600)
+     rather than size for the selected state. */
+  font-weight: 600;
 }
 
 .shell-body.shell-nav-collapsed .nav-step { padding: 10px; }
@@ -4592,9 +4627,23 @@ td, th { border-color: var(--line); }
 
 .assay-pill-label,
 .assay-pill-delete,
-.assay-pill-add,
-.nav-step {
+.assay-pill-add {
   min-height: 44px;
+}
+
+/* .nav-step used to be in the group above, which pinned every rail button --
+   nav items and the control panel alike -- to 44px and overrode the
+   CRM-matched padding/font-size set earlier. The CRM has no such floor (its
+   nav items land ~37px and its footer buttons ~27px), so matching it means
+   letting these size to their own content. The 44px target still matters on
+   an actual touch device, though, and this repo cares about tablets -- so it
+   is kept there rather than dropped outright: a coarse pointer has no hover
+   to compensate for a small target, a mouse does. */
+@media (pointer: coarse) {
+  .nav-step,
+  .nav-theme-toggle {
+    min-height: 44px;
+  }
 }
 
 .assay-pill-label { padding-block: 8px; }
