@@ -238,6 +238,7 @@ button:focus-visible {
   padding: 10px 12px;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 /* Icon-only when collapsed, text-only when expanded (never both at once) --
@@ -409,11 +410,44 @@ button:focus-visible {
 }
 
 .nav-utilities { display: flex; flex-direction: column; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line); }
-.nav-utilities .nav-step { justify-content: center; color: #fff; text-align: center; border-color: transparent; }
+.nav-utilities .nav-step[data-step-id] { justify-content: center; color: #fff; text-align: center; border-color: transparent; }
 .nav-utilities .nav-step[data-step-id="feedback"] { background: #d95f02; }
 .nav-utilities .nav-step[data-step-id="settings"] { background: #c62828; }
-.nav-utilities .nav-step:hover, .nav-utilities .nav-step.active { color: #fff; filter: brightness(1.08); box-shadow: none; }
+.nav-utilities .nav-step[data-step-id="release-notes"] { background: #0a707c; }
+.nav-utilities .nav-step[data-step-id]:hover, .nav-utilities .nav-step[data-step-id].active { color: #fff; filter: brightness(1.08); box-shadow: none; }
 .shell-utilities { display: none; }
+
+.nav-action {
+  justify-content: center;
+  text-align: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.nav-action:hover:not(.nav-walkthrough) {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+}
+
+.nav-walkthrough {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+
+.nav-walkthrough:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
+  color: var(--accent-ink);
+  background: var(--accent);
+  filter: brightness(.95);
+}
+
+.nav-walkthrough:disabled {
+  opacity: .55;
+  cursor: wait;
+}
 
 .nav-theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px; border: 2px solid; border-radius: 9px; padding: 8px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 1px 0 rgb(23 39 43 / 18%); }
 .nav-theme-toggle[data-theme-mode="light"] { color: #17272b; background: #fff; border-color: #17272b; }
@@ -2576,8 +2610,6 @@ td, th { border-color: var(--line); }
 
 .shell-utilities { position: relative; }
 
-.shell-new-study,
-.shell-feature-walkthrough,
 .shell-utility-toggle,
 .shell-utility-action,
 .mobile-assay-select,
@@ -2600,8 +2632,6 @@ td, th { border-color: var(--line); }
   gap: 8px;
 }
 
-.shell-new-study,
-.shell-feature-walkthrough,
 .shell-utility-toggle {
   display: inline-flex;
   align-items: center;
@@ -2609,33 +2639,6 @@ td, th { border-color: var(--line); }
   gap: 7px;
   padding: 7px 12px;
   cursor: pointer;
-}
-
-.shell-new-study {
-  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.shell-new-study:hover {
-  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
-}
-
-.shell-feature-walkthrough {
-  border-color: color-mix(in srgb, var(--accent) 46%, var(--line));
-  color: var(--accent-ink);
-  background: var(--accent);
-}
-
-.shell-feature-walkthrough:hover:not(:disabled) {
-  filter: brightness(.95);
-}
-
-.shell-feature-walkthrough:disabled {
-  opacity: .55;
-  cursor: wait;
 }
 
 .shell-utility-toggle:hover,
@@ -2736,14 +2739,6 @@ td, th { border-color: var(--line); }
   font-weight: 750;
 }
 
-.workflow-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  min-width: 0;
-}
-
-.workflow-badge,
 .assay-progress-badge,
 .nav-step-badge {
   display: inline-flex;
@@ -2761,16 +2756,12 @@ td, th { border-color: var(--line); }
   white-space: nowrap;
 }
 
-.workflow-badge.is-complete,
 .assay-progress-badge.is-complete,
 .nav-step-badge.is-complete { border-color: color-mix(in srgb, var(--ok) 42%, var(--line)); color: var(--ok); background: var(--ok-soft); }
-.workflow-badge.is-in-progress,
 .assay-progress-badge.is-in-progress,
 .nav-step-badge.is-in-progress { border-color: color-mix(in srgb, var(--accent) 40%, var(--line)); color: var(--accent); background: var(--accent-soft); }
-.workflow-badge.is-needs-attention,
 .assay-progress-badge.is-needs-attention,
 .nav-step-badge.is-needs-attention { border-color: color-mix(in srgb, var(--warn) 46%, var(--line)); color: var(--warn); background: var(--warn-soft); }
-.workflow-badge.is-not-started,
 .assay-progress-badge.is-not-started,
 .nav-step-badge.is-not-started { color: var(--muted); background: var(--surface-muted); }
 
@@ -3005,6 +2996,27 @@ td, th { border-color: var(--line); }
   .shell-mobile-controls label { color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
   .mobile-assay-select,
   .mobile-step-select { width: 100%; min-width: 0; padding: 7px 9px; }
+  .shell-mobile-actions { display: flex; gap: 8px; }
+  .shell-mobile-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    flex: 1 1 0;
+    min-height: 44px;
+    min-width: 0;
+    padding: 7px 12px;
+    border-radius: 9px;
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+  }
+  .shell-mobile-action-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .workflow-footer { gap: 8px; padding: 9px 14px; }
   .workflow-back,
   .workflow-continue { min-width: 0; flex: 1 1 0; }
@@ -3020,8 +3032,6 @@ td, th { border-color: var(--line); }
   .shell-brand { width: 100%; }
   .header-actions { gap: 6px; }
   .shell-save-indicator { order: 3; flex-basis: 100%; }
-  .shell-new-study,
-  .shell-feature-walkthrough,
   .shell-utility-toggle { flex: 1 1 auto; }
   .shell-mobile-controls { grid-template-columns: 1fr; gap: 3px; }
   .shell-mobile-controls label { margin-top: 4px; }
@@ -3041,7 +3051,6 @@ td, th { border-color: var(--line); }
   .workflow-footer,
   .shell-status,
   .shell-utilities,
-  .shell-new-study,
   .overview-export-menu,
   .overview-secondary-actions,
   .overview-assay-benchcard-btn,
@@ -4126,13 +4135,14 @@ td, th { border-color: var(--line); }
    ------------------------------------------------------------------------- */
 
 /* The compass stays an orientation aid rather than a second dashboard: title,
-   current scope, and the one consequential action lead; factual detail and
-   status badges occupy a quiet second row on wide screens. */
+   current scope, and the one consequential action lead. It is a wrapping row
+   rather than a fixed grid so that facts which have no settled value yet (and
+   so render nothing) collapse their space instead of leaving a visible gap. */
 .experiment-compass {
-  display: grid;
-  grid-template-columns: minmax(180px, .9fr) minmax(280px, 1.45fr) minmax(190px, 1fr) minmax(220px, 1.15fr);
-  gap: 8px 16px;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 8px 16px;
   padding: 12px clamp(18px, 2.4vw, 28px);
   background: var(--panel);
 }
@@ -4161,6 +4171,8 @@ td, th { border-color: var(--line); }
   min-width: 0;
 }
 
+.experiment-compass-details:empty { display: none; }
+
 .experiment-compass-detail,
 .experiment-compass-example {
   display: inline-flex;
@@ -4185,6 +4197,7 @@ td, th { border-color: var(--line); }
 
 .experiment-compass-scope {
   display: block;
+  margin-left: auto;
   color: var(--accent);
   font-size: 12px;
   font-weight: 760;
@@ -4229,11 +4242,6 @@ td, th { border-color: var(--line); }
 .experiment-compass-next-action:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent);
   outline-offset: 2px;
-}
-
-.experiment-compass .workflow-badges {
-  grid-column: 1 / -1;
-  padding-top: 2px;
 }
 
 /* Scope copy has the same restrained, high-contrast treatment across the
@@ -4567,12 +4575,7 @@ td, th { border-color: var(--line); }
 .conformance .conformance-issue-link:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent); outline-offset: 3px; }
 
 @media (max-width: 1200px) {
-  .experiment-compass {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 1.1fr);
-  }
-
-  .experiment-compass-details,
-  .experiment-compass .workflow-badges { display: none; }
+  .experiment-compass-details { display: none; }
 }
 
 @media (max-width: 760px) {
@@ -4587,7 +4590,7 @@ td, th { border-color: var(--line); }
   }
 
   .experiment-compass-title { font-size: 13px; }
-  .experiment-compass-scope { grid-column: 1 / -1; font-size: 11.5px; }
+  .experiment-compass-scope { grid-column: 1 / -1; margin-left: 0; font-size: 11.5px; }
   .experiment-compass-next { grid-column: 1 / -1; }
   .experiment-compass-next-action { min-height: 44px; }
   .shell-mobile-compass { display: none; }
@@ -4625,8 +4628,6 @@ td, th { border-color: var(--line); }
 /* Shell controls remain comfortably touchable at every breakpoint. The
    compact rail still has a 76px track, so its 44px toggle preserves the
    original density without reducing the usable main column. */
-.shell-new-study,
-.shell-feature-walkthrough,
 .shell-utility-toggle,
 .shell-utility-action,
 .mobile-assay-select,
@@ -4644,32 +4645,15 @@ td, th { border-color: var(--line); }
 }
 
 @media (max-width: 430px) {
-  /* Flex shrink previously clipped the Utilities label at 320px. A bounded
-     two-column grid gives both header actions a real minimum track, while
-     the save state deliberately occupies its own row. */
+  /* New study and Walkthrough have moved into the nav rail's control panel,
+     so the save indicator (and the already-hidden Utilities toggle) are the
+     header's only remaining content. */
   .header-actions {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
-    gap: 6px;
-  }
-
-  .shell-new-study,
-  .shell-feature-walkthrough,
-  .shell-utilities,
-  .shell-utility-toggle {
-    min-width: 0;
-    width: 100%;
-  }
-
-  .shell-utility-toggle {
-    justify-content: center;
-    overflow-wrap: anywhere;
-    white-space: normal;
   }
 
   .shell-save-indicator {
-    grid-column: 1 / -1;
+    width: 100%;
     min-width: 0;
   }
 
@@ -4677,10 +4661,6 @@ td, th { border-color: var(--line); }
     right: 0;
     left: auto;
   }
-}
-
-@media (max-width: 340px) {
-  .header-actions { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

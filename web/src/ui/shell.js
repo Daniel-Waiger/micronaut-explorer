@@ -87,27 +87,37 @@ export function renderShell(root, store, router, options = {}) {
   }
   renderSaveState();
   headerActions.appendChild(saveIndicator);
+  // New study and Walkthrough live in the nav rail's control panel
+  // (navUtilities, alongside Settings/Feedback) rather than the header --
+  // they are appended there in renderNav so they survive its re-render.
+  let newStudy = null;
   if (onNewBlank) {
-    const newStudy = document.createElement('button');
+    newStudy = document.createElement('button');
     newStudy.type = 'button';
-    newStudy.className = 'shell-new-study';
-    newStudy.append(createIcon('add', 'button-icon'), document.createTextNode('New study'));
+    newStudy.className = 'nav-step nav-action nav-new-study';
+    newStudy.appendChild(createIcon('add', 'nav-step-icon'));
+    const newStudyLabel = document.createElement('span');
+    newStudyLabel.className = 'nav-step-label';
+    newStudyLabel.textContent = 'New study';
+    newStudy.appendChild(newStudyLabel);
     newStudy.title = 'Start a blank study. Previous versions remain available in Restore.';
     newStudy.addEventListener('click', () => {
       if (window.confirm('Start a blank study? Your current work remains available in Restore.')) onNewBlank();
     });
-    headerActions.appendChild(newStudy);
   }
 
   const featureWalkthrough = document.createElement('button');
   featureWalkthrough.type = 'button';
-  featureWalkthrough.className = 'shell-feature-walkthrough';
-  featureWalkthrough.append(createIcon('walkthrough', 'button-icon'), document.createTextNode('Walkthrough'));
+  featureWalkthrough.className = 'nav-step nav-action nav-walkthrough';
+  featureWalkthrough.appendChild(createIcon('walkthrough', 'nav-step-icon'));
+  const featureWalkthroughLabel = document.createElement('span');
+  featureWalkthroughLabel.className = 'nav-step-label';
+  featureWalkthroughLabel.textContent = 'Walkthrough';
+  featureWalkthrough.appendChild(featureWalkthroughLabel);
   featureWalkthrough.title = 'Take a focused tour of the app’s feature areas.';
   featureWalkthrough.setAttribute('aria-label', 'Start feature walkthrough');
   featureWalkthrough.disabled = true;
   featureWalkthrough.addEventListener('click', () => featureWalkthroughHandler?.(featureWalkthrough));
-  headerActions.appendChild(featureWalkthrough);
 
   const utilities = document.createElement('div');
   utilities.className = 'shell-utilities';
@@ -277,9 +287,7 @@ export function renderShell(root, store, router, options = {}) {
   compassScope.className = 'experiment-compass-scope';
   const compassNext = document.createElement('div');
   compassNext.className = 'experiment-compass-next';
-  const workflowBadges = document.createElement('div');
-  workflowBadges.className = 'workflow-badges';
-  workflowStrip.append(workflowSummary, compassDetails, compassScope, compassNext, workflowBadges);
+  workflowStrip.append(workflowSummary, compassDetails, compassScope, compassNext);
 
   const mobileControls = document.createElement('section');
   mobileControls.className = 'shell-mobile-controls';
@@ -295,6 +303,40 @@ export function renderShell(root, store, router, options = {}) {
   const mobileCompassScope = document.createElement('span');
   mobileCompassScope.className = 'shell-mobile-compass-scope';
   mobileCompass.append(mobileCompassTitle, mobileCompassScope);
+  // The desktop New study/Walkthrough buttons live in the nav rail's control
+  // panel (.nav-utilities), but .shell-nav itself is hidden below 760px in
+  // favor of this mobile strip -- without their own compact copies here,
+  // narrow screens would lose access to both actions entirely.
+  const mobileActions = document.createElement('div');
+  mobileActions.className = 'shell-mobile-actions';
+  mobileActions.style.gridColumn = '1 / -1';
+  let mobileNewStudy = null;
+  if (onNewBlank) {
+    mobileNewStudy = document.createElement('button');
+    mobileNewStudy.type = 'button';
+    mobileNewStudy.className = 'nav-action shell-mobile-action';
+    const mobileNewStudyLabel = document.createElement('span');
+    mobileNewStudyLabel.className = 'shell-mobile-action-label';
+    mobileNewStudyLabel.textContent = 'New study';
+    mobileNewStudy.append(createIcon('add', 'button-icon'), mobileNewStudyLabel);
+    mobileNewStudy.title = 'Start a blank study. Previous versions remain available in Restore.';
+    mobileNewStudy.addEventListener('click', () => {
+      if (window.confirm('Start a blank study? Your current work remains available in Restore.')) onNewBlank();
+    });
+    mobileActions.appendChild(mobileNewStudy);
+  }
+  const mobileWalkthrough = document.createElement('button');
+  mobileWalkthrough.type = 'button';
+  mobileWalkthrough.className = 'nav-action nav-walkthrough shell-mobile-action';
+  const mobileWalkthroughLabel = document.createElement('span');
+  mobileWalkthroughLabel.className = 'shell-mobile-action-label';
+  mobileWalkthroughLabel.textContent = 'Walkthrough';
+  mobileWalkthrough.append(createIcon('walkthrough', 'button-icon'), mobileWalkthroughLabel);
+  mobileWalkthrough.title = 'Take a focused tour of the app’s feature areas.';
+  mobileWalkthrough.setAttribute('aria-label', 'Start feature walkthrough');
+  mobileWalkthrough.disabled = true;
+  mobileWalkthrough.addEventListener('click', () => featureWalkthroughHandler?.(mobileWalkthrough));
+  mobileActions.appendChild(mobileWalkthrough);
   const assayLabel = document.createElement('label');
   assayLabel.htmlFor = 'mobile-active-assay';
   assayLabel.textContent = 'Measurement';
@@ -306,7 +348,7 @@ export function renderShell(root, store, router, options = {}) {
   const stepSelect = document.createElement('select');
   stepSelect.id = 'mobile-workflow-step';
   stepSelect.className = 'mobile-step-select';
-  mobileControls.append(mobileCompass, assayLabel, assaySelect, stepLabel, stepSelect);
+  mobileControls.append(mobileCompass, mobileActions, assayLabel, assaySelect, stepLabel, stepSelect);
 
   const switcher = document.createElement('div');
   switcher.className = 'assay-switcher-bar';
@@ -337,8 +379,8 @@ export function renderShell(root, store, router, options = {}) {
       ? comparison.groups.filter((group) => typeof group === 'string' && group.trim()).map((group) => group.trim())
       : [];
     if (comparison.mode === 'observational') return 'Observational study';
-    if (comparison.mode === 'groups') return groups.length > 0 ? groups.join(' vs ') : 'Groups not decided';
-    return 'Not decided';
+    if (comparison.mode === 'groups' && groups.length > 0) return groups.join(' vs ');
+    return '';
   }
   function measurementScope(experiment, map, routeId) {
     // Research brief accepts measurement-scoped details, and the measurement
@@ -362,21 +404,14 @@ export function renderShell(root, store, router, options = {}) {
     const map = workflowProgress.map && typeof workflowProgress.map === 'object' ? workflowProgress.map : {};
     const measurements = Array.isArray(map.measurements) ? map.measurements : [];
     const titleText = compassText(experiment.meta?.title, compassText(map.question?.value, 'Untitled study'));
-    const questionText = compassText(map.question?.value, 'Not decided');
-    const systemText = compassText(map.system?.value, 'Not decided');
-    const countText = `${measurements.length} measurement${measurements.length === 1 ? '' : 's'}`;
+    const questionText = compassText(map.question?.value, '');
+    const systemText = compassText(map.system?.value, '');
     const scopeText = measurementScope(experiment, map, activeId);
-    const routeLabel = workflowStep(activeId)?.label || (activeId === 'guide' ? 'Guide' : 'Workspace');
 
     workflowSummary.textContent = compassDisplayText(titleText);
     workflowSummary.title = titleText;
     workflowSummary.setAttribute('aria-label', titleText);
-    // On the measurement page the scope already names the measurement, so
-    // appending the route label repeated the word three times over
-    // ("Measurement: Measurement 1 → Measurement").
-    const scopeLine = scopeText === `Measurement: ${routeLabel}` || routeLabel === 'Measurement'
-      ? `Now editing: ${scopeText}`
-      : `Now editing: ${scopeText} → ${routeLabel}`;
+    const scopeLine = `Now editing: ${scopeText}`;
     compassScope.textContent = compassDisplayText(scopeLine);
     compassScope.title = scopeLine;
     compassScope.setAttribute('aria-label', scopeLine);
@@ -388,12 +423,13 @@ export function renderShell(root, store, router, options = {}) {
     mobileCompassScope.setAttribute('aria-label', scopeText);
 
     compassDetails.textContent = '';
+    const comparisonText = comparisonSummary(map);
     [
-      `Question: ${questionText}`,
-      `System: ${systemText}`,
-      `Comparison: ${comparisonSummary(map)}`,
-      countText,
-    ].forEach((text) => {
+      questionText && `Question: ${questionText}`,
+      systemText && `System: ${systemText}`,
+      comparisonText && `Comparison: ${comparisonText}`,
+      measurements.length !== 1 && `${measurements.length} measurement${measurements.length === 1 ? '' : 's'}`,
+    ].filter(Boolean).forEach((text) => {
       const detail = document.createElement('span');
       detail.className = 'experiment-compass-detail';
       detail.textContent = compassDisplayText(text);
@@ -588,15 +624,7 @@ export function renderShell(root, store, router, options = {}) {
   }
 
   function renderWorkflowStrip() {
-    const steps = primarySteps();
     renderCompass();
-    workflowBadges.textContent = '';
-    steps.forEach((step) => {
-      const badge = document.createElement('span');
-      badge.className = `workflow-badge is-${step.state || 'not-started'}`;
-      badge.textContent = `${step.label}: ${stateLabel(step.state)}`;
-      workflowBadges.appendChild(badge);
-    });
   }
   // Falls back to the generic word when nothing is selected yet, so the nav
   // never renders an empty item.
@@ -612,6 +640,7 @@ export function renderShell(root, store, router, options = {}) {
   function renderNav(activeId) {
     navSteps.textContent = '';
     navUtilities.textContent = '';
+    const utilityButtons = new Map();
     router.steps.forEach((step) => {
       const current = workflowStep(step.id);
       const button = document.createElement('button');
@@ -639,8 +668,31 @@ export function renderShell(root, store, router, options = {}) {
         button.appendChild(badge);
       }
       button.addEventListener('click', () => router.navigate(step.id));
-      (step.utility ? navUtilities : navSteps).appendChild(button);
+      if (step.utility) utilityButtons.set(step.id, button); else navSteps.appendChild(button);
     });
+    if (newStudy) navUtilities.appendChild(newStudy);
+    navUtilities.appendChild(featureWalkthrough);
+    // Settings sits above Feedback in the control panel; any other utility
+    // step keeps the order router.steps already defines.
+    const orderedUtilityIds = ['settings', 'feedback', ...[...utilityButtons.keys()].filter((id) => id !== 'settings' && id !== 'feedback')];
+    orderedUtilityIds.forEach((id) => {
+      const button = utilityButtons.get(id);
+      if (button) navUtilities.appendChild(button);
+    });
+    const releaseNotesLink = document.createElement('a');
+    releaseNotesLink.className = 'nav-step';
+    releaseNotesLink.dataset.stepId = 'release-notes';
+    releaseNotesLink.href = 'release-notes/';
+    releaseNotesLink.target = '_blank';
+    releaseNotesLink.rel = 'noopener noreferrer';
+    releaseNotesLink.setAttribute('aria-label', 'Release notes (opens in a new tab)');
+    releaseNotesLink.title = 'Release notes (opens in a new tab)';
+    releaseNotesLink.appendChild(createIcon('template', 'nav-step-icon'));
+    const releaseNotesLabel = document.createElement('span');
+    releaseNotesLabel.className = 'nav-step-label';
+    releaseNotesLabel.textContent = 'Release notes';
+    releaseNotesLink.appendChild(releaseNotesLabel);
+    navUtilities.appendChild(releaseNotesLink);
     navUtilities.appendChild(themeNavButton);
   }
   function renderMobileControls(activeId = router.current()) {
@@ -737,6 +789,7 @@ export function renderShell(root, store, router, options = {}) {
     setFeatureWalkthroughHandler(handler) {
       featureWalkthroughHandler = typeof handler === 'function' ? handler : null;
       featureWalkthrough.disabled = !featureWalkthroughHandler;
+      mobileWalkthrough.disabled = !featureWalkthroughHandler;
     },
     setGuidedAsideVisible(visible) {
       const isVisible = Boolean(visible);

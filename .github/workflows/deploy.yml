@@ -114,6 +114,8 @@ jobs:
           work="$(mktemp -d)"
           git clone --depth 1 "https://x-access-token:${DEPLOY_TOKEN}@github.com/Daniel-Waiger/micronaut-planner.git" "$work"
           cp dist/index.html "$work/index.html"
+          rm -rf "$work/release-notes"
+          cp -r web/release-notes "$work/release-notes"
           cd "$work"
           touch .nojekyll
           git add -A
