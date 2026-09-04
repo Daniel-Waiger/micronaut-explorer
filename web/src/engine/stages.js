@@ -145,7 +145,13 @@ export function loadStages(raw) {
   const issues = [];
 
   if (raw === undefined || raw === null) {
-    issues.push(stageIssue('stages', 'stages pack is missing -- run tools/export_markers_kb.py'));
+    issues.push(
+      stageIssue(
+        'stages',
+        'stages pack is missing -- web/kb/stages.json was not found in the build. ' +
+          'For dev, serve web/ via tools/serve_dir.py (it generates web/kb.dev.js).',
+      ),
+    );
     return { stages: [], rules: [], issues };
   }
   if (typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray(raw.stages) || !Array.isArray(raw.rules)) {

@@ -1,4 +1,5 @@
 import { finalizeFields } from '../../engine/naming.js';
+import { BASE_TEMPLATE, NAMING_CONFIG } from '../../engine/namingConfig.js';
 import { DEFAULT_PROFILE, validateFields, validateTargetPath } from '../../engine/validation.js';
 import { editTagFor } from '../../core/provenance.js';
 import { formatReplicateToken } from '../../engine/conditions.js';
@@ -13,43 +14,10 @@ import { buildIcsSchedule, renderIcs } from '../../engine/render/ics.js';
 import { downloadTextFile } from '../../core/persist.js';
 import { appendStepHeading } from '../stepHeading.js';
 
-// Interim defaults until the P1 knowledge pack supplies a real profile and
-// per-lab naming config -- mirrors microscopy_naming_assistant's
-// default_config()/default_profile() so behaviour matches Classic today.
-//
-// Stage 1 (the base name, shared by every file in the experiment) is the
-// leading {date}_{modality}_{exptype}_{markers}_{magnification}. Stage 2 is
-// what distinguishes THIS file: {group}_{sample}_{biorep}_{techrep}. {notes}
-// stays trailing. Kept byte-identical to schema.js's DEFAULT_NAMING_TEMPLATE
-// -- see BASE_TEMPLATE below for the split point the Design step uses.
-//
-// {group}/{biorep}/{techrep}/{notes} are OPTIONAL: an experiment with no
-// groups, or no technical replicates (common for SEM/TEM/Raman), omits that
-// token entirely rather than padding the name with a placeholder -- see
-// engine/naming.js's optionalFields handling.
-export const NAMING_CONFIG = {
-  template:
-    '{date}_{modality}_{exptype}_{markers}_{magnification}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}',
-  defaults: {
-    date: '1970-01-01',
-    modality: 'UNKNOWN',
-    exptype: 'UNKNOWN',
-    markers: 'UNKNOWN',
-    magnification: 'UNKNOWN',
-    sample: 'UNKNOWN',
-  },
-  optionalFields: ['group', 'biorep', 'techrep', 'notes'],
-  uppercaseFields: ['modality', 'exptype', 'sample', 'magnification', 'markers', 'group'],
-  safeCharPattern: '[^A-Za-z0-9_-]+',
-};
-
-// Stage 1 on its own: NAMING_CONFIG.template up to (not including) the
-// {group} slot, and without {ext}. The Design step renders this ONCE above
-// the condition table -- it is the stem every file in the experiment shares
-// -- so each row only has to show the part that actually distinguishes it.
-// Rendering it through renderName with this template yields no extension
-// (fields.ext won't match the tail), which is what we want for a stem.
-export const BASE_TEMPLATE = '{date}_{modality}_{exptype}_{markers}_{magnification}';
+// NAMING_CONFIG and BASE_TEMPLATE themselves now live in
+// engine/namingConfig.js (imported above) -- see its own comment for why
+// (engine-layer modules like conformance.js/studydoc.js/plan.js need them
+// too, and this module touches `document` so they can't stay defined here).
 
 // DEFAULT_PROFILE itself now lives in engine/validation.js -- see its own
 // comment there for why (one profile shared with engine/conformance.js,

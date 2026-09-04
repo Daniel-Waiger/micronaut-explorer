@@ -180,7 +180,3 @@ export function decisionTriage(experimentMap, conformance) {
 
   return { groups, counts };
 }
-
-// A descriptive alias keeps call sites readable without creating a second
-// classifier or an alternative result contract.
-export const triageDecisions = decisionTriage;

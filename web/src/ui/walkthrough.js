@@ -392,14 +392,3 @@ export function createWalkthroughController({
     },
   };
 }
-
-// Transitional export for callers updated in later guided-example tasks. It
-// never creates a second host or a modal surface; main should create and
-// retain the controller above after the shell renders.
-export function startWalkthrough(options = {}) {
-  const host = options.host || (typeof document !== 'undefined' && document.querySelector('[data-guided-walkthrough-host]'));
-  if (!host) return null;
-  const controller = createWalkthroughController({ ...options, host });
-  controller.start();
-  return controller;
-}

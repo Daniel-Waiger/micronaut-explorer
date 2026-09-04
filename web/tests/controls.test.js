@@ -46,12 +46,12 @@ test('a well-formed pack loads with zero issues', () => {
   assert.equal(rules[0].id, 'panel-unstained-control');
 });
 
-test('an absent pack (undefined/null) reports the "run the exporter" issue, never throws', () => {
+test('an absent pack (undefined/null) reports the "pack is missing" issue, never throws', () => {
   for (const raw of [undefined, null]) {
     const { rules, issues } = loadControlRules(raw);
     assert.deepEqual(rules, []);
     assert.equal(issues.length, 1);
-    assert.match(issues[0].message, /export_markers_kb\.py/);
+    assert.match(issues[0].message, /controls pack is missing/);
   }
 });
 

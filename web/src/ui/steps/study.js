@@ -30,7 +30,7 @@ import { finalizeFields, renderName } from '../../engine/naming.js';
 import { shortId } from '../../core/ids.js';
 import { buildExperimentMap } from '../../engine/experimentMap.js';
 import { MEASUREMENT_STATUSES, measurementStatus, measurementStatusLabel } from '../../engine/measurementStatus.js';
-import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
+import { BASE_TEMPLATE, NAMING_CONFIG } from '../../engine/namingConfig.js';
 
 // One row matches a query when any of the things a person would actually
 // search by contains it. Deliberately not fuzzy: a surprising near-match in a

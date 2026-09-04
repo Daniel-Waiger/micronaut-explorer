@@ -635,7 +635,15 @@ test('all 72 direct and 11 family additions exactly match the source ledger and 
     assert.equal(entry.excitationPeakNm, row.excitationPeakNm, `${row.id}: excitation`);
     assert.equal(entry.emissionPeakNm, row.emissionPeakNm, `${row.id}: emission`);
     assert.equal(entry.note, row.measurementContext, `${row.id}: condition note`);
-    assert.equal(entry.reviewStatus, 'claude-drafted', `${row.id}: review status`);
+    // Every direct record's numeric peaks (and note) match this ledger row
+    // exactly (checked above), so its reviewStatus has been upgraded from
+    // the default 'claude-drafted' to 'source-cited' -- see
+    // docs/references/planner-fluorophore-sources.json's sourceUrl/
+    // retrievalDate for the citation. Family records (below) stay
+    // 'claude-drafted': reviewStatus lives on the whole family entry, and
+    // these families have sibling variants the ledger does not cover, so
+    // upgrading the family-level status would falsely certify those too.
+    assert.equal(entry.reviewStatus, 'source-cited', `${row.id}: review status`);
     assert.ok(realMarkersRaw.markers[row.id], `${row.id}: missing marker canonical`);
     assert.ok(
       300 <= entry.excitationPeakNm &&

@@ -32,6 +32,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -73,6 +74,20 @@ FORBIDDEN_IN_OUTPUT = [
         re.compile(r"""(?m)^\s*import\s+[{*'"A-Za-z_$]"""),
         "a static import statement",
     ),
+    # No-network-promise gates (README's "the build gates fetch()" claim):
+    # these five are the network primitives available to plain JS in a
+    # browser. Each pattern requires the callable ones' opening "(" (or, for
+    # XMLHttpRequest, a following word boundary) so prose that merely
+    # mentions the bare word -- e.g. a comment saying "no fetch, no server"
+    # -- does not trip the gate; only an actual call/constructor use does.
+    # This mirrors the dynamic-import() gate above rather than a blind
+    # substring match, for the same reason: the check runs over the fully
+    # assembled output, which still contains every source comment verbatim.
+    (re.compile(r"\bfetch\s*\("), "a fetch() call"),
+    (re.compile(r"\bXMLHttpRequest\b"), "XMLHttpRequest"),
+    (re.compile(r"\bWebSocket\s*\("), "a WebSocket() call"),
+    (re.compile(r"\bnavigator\s*\.\s*sendBeacon\b"), "navigator.sendBeacon"),
+    (re.compile(r"\bEventSource\s*\("), "an EventSource() call"),
 ]
 
 
@@ -430,6 +445,25 @@ def build(web_dir: Path, out_dir: Path) -> bytes:
     out_path.write_bytes(output_bytes)
     digest = hashlib.sha256(output_bytes).hexdigest()
     print(f"wrote {out_path} ({len(output_bytes)} bytes, sha256={digest})")
+
+    # shell.js's "Release notes" nav link points at a relative `release-notes/`
+    # URL, but this build only ever wrote index.html -- so the link 404ed
+    # whenever dist/ was served (or opened via file://) without a separate,
+    # easy-to-forget copy step. The deploy workflow already does its own
+    # `cp -r web/release-notes` into the deployed tree; mirroring that here
+    # makes `dist/` self-contained (matching what this script's own README
+    # section promises: "a single, self-contained page you can host anywhere")
+    # for every caller of this build, not only the one deploy workflow that
+    # remembered the extra step. Harmless alongside that workflow's copy --
+    # both just place the same folder at the same path.
+    release_notes_src = web_dir / "release-notes"
+    if release_notes_src.exists():
+        release_notes_dst = out_dir / "release-notes"
+        if release_notes_dst.exists():
+            shutil.rmtree(release_notes_dst)
+        shutil.copytree(release_notes_src, release_notes_dst)
+        print(f"copied {release_notes_src} -> {release_notes_dst}")
+
     return output_bytes
 
 

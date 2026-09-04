@@ -1,8 +1,9 @@
 // Persisted onboarding state: which walkthrough stage the user is on, their
 // self-reported microscopy experience level, and whether onboarding has
-// been completed. Same idiom as llm/config.js's loadLlmConfig/saveLlmConfig
-// -- localStorage read/written through a try/catch so a disabled/unavailable
-// localStorage degrades to defaults (unset) rather than throwing.
+// been completed. Same localStorage-read/written-through-a-try/catch idiom
+// the removed llm/config.js's loadLlmConfig/saveLlmConfig once used, so a
+// disabled/unavailable localStorage degrades to defaults (unset) rather
+// than throwing.
 //
 // `completed` is the gate contract: a normal completion or dismissal means
 // the visitor should not be interrupted again on later loads. The utility

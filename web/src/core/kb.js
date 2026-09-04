@@ -1,8 +1,8 @@
-// Pure loader/validator/indexer for the generated marker knowledge pack
-// (web/kb/markers.json, produced by tools/export_markers_kb.py -- see
-// docs/plans/planner-web-p1.md, "the marker KB is generated, never
-// retyped"). Nothing here reads globalThis -- wiring the real
-// __MICRONAUT_KB__ global into these functions is main.js's job (C1-6).
+// Pure loader/validator/indexer for the marker knowledge pack
+// (web/kb/markers.json -- hand-edited and canonical, see
+// web/kb/markers.README.md and README.md). Nothing here reads globalThis --
+// wiring the real __MICRONAUT_KB__ global into these functions is main.js's
+// job (C1-6).
 //
 // Leaf module: import nothing.
 

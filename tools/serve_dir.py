@@ -12,24 +12,42 @@ Usage: python tools/serve_dir.py <directory>
 from __future__ import annotations
 
 import http.server
+import json
 import os
 import sys
 from functools import partial
 from pathlib import Path
 
 
+def _write_kb_dev_js(kb_dir: Path, out_path: Path) -> None:
+    """Aggregate every `web/kb/*.json` by filename stem, the same shape and
+    aggregation rule tools/build_single_file.py's `_load_kb` uses for the
+    built artifact's embedded KB, and write it as a script assigning
+    `globalThis.__MICRONAUT_KB__` -- the exact global main.js's loadAppKb()
+    reads (see web/src/main.js, web/src/core/kb.js).
+    """
+    kb: dict = {}
+    for f in sorted(kb_dir.glob("*.json")):
+        key = f.stem
+        kb[key] = json.loads(f.read_text(encoding="utf-8"))
+    kb_json = json.dumps(kb, sort_keys=True, separators=(",", ":"))
+    out_path.write_text(
+        f"globalThis.__MICRONAUT_KB__ = {kb_json};\n", encoding="utf-8"
+    )
+
+
 def _regenerate_stale_kb_dev_js(directory: str) -> None:
     """When serving `web/` unbuilt, `web/kb.dev.js` (the dev-mode aggregate
-    of every web/kb/*.json, see export_markers_kb.py) is git-ignored
-    generated output -- nothing regenerates it automatically, so a `web/kb/
-    *.json` edit with no matching `python tools/export_markers_kb.py` run
-    left the unbuilt page silently serving a stale KB (verified: a real
-    session shipped `web/kb/spectra.json` with kb.dev.js never rebuilt,
-    so every dev-mode Color panel row read 'spectrum not yet available'
-    while the BUILT dist/index.html, which embeds the KB fresh at build
-    time, was fine). Only fires for a directory literally named `web` --
-    `dist` has no `kb/` subdirectory to regenerate from and embeds its KB at
-    build time instead.
+    of every web/kb/*.json) is git-ignored generated output -- nothing else
+    regenerates it, so a `web/kb/*.json` edit with no rebuild left the
+    unbuilt page silently serving a stale KB (verified: a real session
+    shipped `web/kb/spectra.json` with kb.dev.js never rebuilt, so every
+    dev-mode Color panel row read 'spectrum not yet available' while the
+    BUILT dist/index.html, which embeds the KB fresh at build time, was
+    fine). This function regenerates it itself (stdlib-only, no separate
+    export script) whenever it's missing or stale. Only fires for a
+    directory literally named `web` -- `dist` has no `kb/` subdirectory to
+    regenerate from and embeds its KB at build time instead.
     """
     web_dir = Path(directory).resolve()
     if web_dir.name != "web":
@@ -41,12 +59,7 @@ def _regenerate_stale_kb_dev_js(directory: str) -> None:
     newest_source = max((f.stat().st_mtime for f in kb_dir.glob("*.json")), default=0)
     if kb_dev_js.exists() and kb_dev_js.stat().st_mtime >= newest_source:
         return
-    tools_dir = Path(__file__).resolve().parent
-    if str(tools_dir) not in sys.path:
-        sys.path.insert(0, str(tools_dir))
-    import export_markers_kb  # noqa: E402  (path must be set up first)
-
-    export_markers_kb.write_kb_dev_js(kb_dir=kb_dir, out_path=kb_dev_js)
+    _write_kb_dev_js(kb_dir=kb_dir, out_path=kb_dev_js)
     print(f"[serve_dir] {kb_dev_js} was stale relative to {kb_dir}/*.json -- regenerated it.")
 
 

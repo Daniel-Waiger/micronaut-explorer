@@ -88,7 +88,7 @@ test('missing raw.readouts/raw.controls degrade to empty shapes plus issues, nev
   assert.deepEqual(readouts, {});
   assert.deepEqual(controlRules, []);
   assert.ok(issues.some((i) => /readouts pack is missing/.test(i.message)));
-  assert.ok(issues.some((i) => /controls pack is missing/.test(i.message) || /export_markers_kb\.py/.test(i.message)));
+  assert.ok(issues.some((i) => /controls pack is missing/.test(i.message)));
 });
 
 test('raw.stages reaches the returned stages/stageRules -- the same wiring gap advisor once had', () => {
@@ -262,7 +262,7 @@ test('a genuinely empty raw object ({}) reports BOTH sub-packs missing, not sile
   assert.deepEqual(questions, []);
   assert.deepEqual(advisor, []);
   assert.ok(issues.some((i) => /knowledge pack is missing/.test(i.message)));
-  assert.ok(issues.some((i) => /export_markers_kb\.py/.test(i.message)));
+  assert.ok(issues.some((i) => /advisor pack is missing/.test(i.message)));
 });
 
 test('undefined/null/non-object raw never throws and degrades to the same empty shape', () => {
@@ -276,10 +276,10 @@ test('undefined/null/non-object raw never throws and degrades to the same empty 
   }
 });
 
-test('a missing raw.advisor key reports the advisor "run the exporter" issue, not silence', () => {
+test('a missing raw.advisor key reports the advisor "pack is missing" issue, not silence', () => {
   const { advisor, issues } = shapeAppKb({ markers: { version: 1, markers: {}, ambiguousInFreeText: [] } });
   assert.deepEqual(advisor, []);
-  assert.ok(issues.some((i) => /export_markers_kb\.py/.test(i.message)));
+  assert.ok(issues.some((i) => /advisor pack is missing/.test(i.message)));
 });
 
 // --- issues merges both sub-packs into one list for a single caller count --

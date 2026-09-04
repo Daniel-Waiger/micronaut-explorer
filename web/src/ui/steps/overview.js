@@ -31,7 +31,7 @@ import { copyToClipboard } from '../clipboard.js';
 import { buildDiagramLayout } from '../../engine/render/svgDiagram.js';
 import { downloadTextFile } from '../../core/persist.js';
 import { assayById } from '../../core/assay.js';
-import { BASE_TEMPLATE, NAMING_CONFIG } from './naming.js';
+import { BASE_TEMPLATE, NAMING_CONFIG } from '../../engine/namingConfig.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
