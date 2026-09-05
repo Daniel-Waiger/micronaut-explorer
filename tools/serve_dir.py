@@ -83,6 +83,27 @@ class _NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
+    def translate_path(self, path: str) -> str:
+        # web/release-notes/images/ no longer exists on disk -- like
+        # tools/build_single_file.py does for dist/release-notes/images/,
+        # the release-notes page's screenshots are assembled from
+        # docs/images/ instead of duplicated. The build step performs that
+        # assembly for dist/, but this dev server has no build step, so it
+        # maps the request path directly instead. Only fires when serving a
+        # directory literally named `web` (mirroring
+        # _regenerate_stale_kb_dev_js's guard) -- `dist` already has real
+        # files on disk at this path, and other directories have no
+        # release-notes/ page to serve at all.
+        if Path(self.directory).resolve().name == "web":
+            parsed = path.split("?", 1)[0].split("#", 1)[0]
+            if parsed.startswith("/release-notes/images/"):
+                name = parsed[len("/release-notes/images/"):]
+                if name and "/" not in name:
+                    docs_image = Path(self.directory).resolve().parent / "docs" / "images" / name
+                    if docs_image.is_file():
+                        return str(docs_image)
+        return super().translate_path(path)
+
 
 def main() -> None:
     directory = sys.argv[1] if len(sys.argv) > 1 else "."

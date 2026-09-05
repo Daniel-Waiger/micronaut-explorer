@@ -350,13 +350,16 @@ export function createStudyMap({ store, router, getMap, document: suppliedDocume
   }
 
   function appendSummary(host, map) {
-    const heading = doc.createElement('h2');
-    heading.className = 'design-subheading';
-    heading.textContent = 'Study map';
+    // No heading here: this section renders inside ui/steps/home.js, directly
+    // below that step's own "Study map" <h1> (and the "Plan my study" card).
+    // A second "Study map" heading right above this one's own content used to
+    // repeat the step title verbatim with nothing distinguishing the two --
+    // this component isn't used standalone anywhere else (see createStudyMap
+    // call sites), so there is no other page relying on it for its own title.
     const intro = doc.createElement('p');
     intro.className = 'proposals-empty';
     intro.textContent = `${map.orientation?.answered || 0} of ${map.orientation?.total || 5} orientation decisions are answered. Edit any value here; detailed planning remains directly available in every workspace.`;
-    host.append(heading, intro);
+    host.append(intro);
 
     const facts = doc.createElement('div');
     facts.className = 'study-map-summary';

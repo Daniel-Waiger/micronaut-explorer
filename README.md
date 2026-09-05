@@ -50,7 +50,9 @@ not steps to march through — jump to any of them in any order:
     advice (STED / confocal / widefield / light-sheet / SEM-TEM / Raman) from a
     rules knowledge base (`web/kb/advisor.json`).
   - *Data plan* — the filename convention built from the finished design, reusing
-    Classic's naming/validation logic ported to JS.
+    Classic's naming/validation logic ported to JS, plus a one-click **Download
+    schedule (.ics)** export of the measurement's timing (built from the same
+    timing interview) that imports into any calendar app.
 - **Color panel** — a qualitative spectral-spillover advisor over the active measurement's
   fluorophores: excitation/emission peak-proximity flags, not a spectral-overlap
   integral. Content is Claude-drafted and flagged unreviewed (`web/kb/spectra.json`).
@@ -75,6 +77,22 @@ to a GitHub issue. The GitHub issue path pre-applies the `feedback` label
 feedback opened from the app is one filterable group inside the repo — no
 server or credential involved. Nothing is sent anywhere unless you choose one
 of those actions.
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/images/01-study-map.png" width="420" alt="Study map screen: the research question, system, comparison groups, and four measurements for the shipped example study."><br>
+  <sub>Study map — the shape of a study at a glance.</sub>
+</p>
+<p align="center">
+  <img src="docs/images/03-measurements-registry.png" width="420" alt="Measurements registry: a searchable, filterable list of the study's measurements with their status, modality, and comparison groups."><br>
+  <sub>Measurements — a searchable registry, filterable by status and modality.</sub>
+</p>
+
+More screens (Research brief, Acquisition, Review, Guide, and dark theme) are
+in [`docs/images/`](docs/images/) and on the
+[release notes page](https://daniel-waiger.github.io/micronaut-planner/release-notes/#screenshots).
+Regenerate them with `python3 tools/capture_screenshots.py`.
 
 ## On language models
 
