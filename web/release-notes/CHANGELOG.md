@@ -9,6 +9,48 @@ that existing history, not a scheme that was tracked from day one.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-05
+
+### Fixed
+- 26 fluorophores were storing the wrong peak wavelengths, and are now
+  corrected against the manufacturer's own published figures. The two that
+  mattered most: Alexa Fluor 488 was stored as 490/525 nm where Thermo's
+  spectral table gives 495/519, and DRAQ5's emission was stored 16 nm low
+  (681 nm against BioStatus's 697 nm for the DNA-bound dye). Nine ATTO dyes
+  were out by 1-6 nm, and Calcein, CFSE, FITC, Nile Red, propidium iodide,
+  TMRE, TMRM, Texas Red, DyLight 650, SYTO 9 and SYTO 85 were each out by a
+  few nm. If you planned a panel around one of these, its spillover flags
+  and spectral-view curves will shift slightly.
+
+### Changed
+- 143 of the pack's 157 fluorophore entries now cite a source, up from 72.
+  Every remaining drafted entry was checked against a vendor or curator
+  page, and each corrected or confirmed value is recorded in
+  docs/references/planner-fluorophore-sources.json with the URL it came
+  from and the date it was read.
+- Seven probe families -- MitoTracker, LysoTracker, SYTOX, BODIPY,
+  CellMask, LIVE/DEAD and SYTO -- had every one of their variants sourced,
+  so the family is no longer marked as drafted. ER-Tracker still is: its
+  Blue-White DPX variant has an emission range rather than a peak, and a
+  family is only as cited as its least-documented member.
+
+### Known gaps
+- 14 entries are deliberately still marked as drafted rather than being
+  quietly upgraded. Cy2, Cy7 and TRITC had no primary source worth citing
+  (and TRITC is not one defined compound); H2DCFDA's source gives a range
+  instead of a peak.
+- The other ten are ambiguous names rather than wrong numbers. CFP stores
+  the values of ECFP, GFP stores EGFP's, IRFP stores iRFP713's, and mRuby
+  stores the original rather than the mRuby2 in wider use today; BFP,
+  YFP, GCaMP, miRFP and Hoechst are similarly generic, and ER-Tracker's
+  ambiguous variant is the eighth family's blocker. The keys are left as
+  they are for now, since renaming one would break studies that already
+  use it.
+- A cited entry means its two peak values match a source that was fetched
+  and recorded. It does not mean a microscopy specialist has reviewed it,
+  and the Gaussian curve widths used by the spectral view are still
+  estimates for every entry in the pack, cited or not.
+
 ## [0.18.0] - 2026-09-05
 
 ### Added

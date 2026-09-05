@@ -585,6 +585,35 @@ const SOURCE_VARIANT_KEYS = {
   SYTO42: 'syto 42',
   SYTO45: 'syto 45',
   SYTORNASELECT: 'syto rnaselect',
+  MITOTRACKERGREEN: 'mitotracker green',
+  MITOTRACKERORANGE: 'mitotracker orange',
+  MITOTRACKERRED: 'mitotracker red',
+  MITOTRACKERDEEPRED: 'mitotracker deep red',
+  LYSOTRACKERGREEN: 'lysotracker green',
+  LYSOTRACKERRED: 'lysotracker red',
+  SYTOXBLUE: 'sytox blue',
+  SYTOXGREEN: 'sytox green',
+  SYTOXORANGE: 'sytox orange',
+  SYTOXRED: 'sytox red',
+  BODIPYFL: 'bodipy fl',
+  BODIPYTMR: 'bodipy tmr',
+  BODIPYTR: 'bodipy tr',
+  BODIPY630: 'bodipy 630',
+  CELLMASKGREEN: 'cellmask green',
+  CELLMASKORANGE: 'cellmask orange',
+  CELLMASKDEEPRED: 'cellmask deep red',
+  ERTRACKERGREEN: 'er-tracker green',
+  ERTRACKERRED: 'er-tracker red',
+  SYTO9: 'syto9',
+  SYTO13: 'syto13',
+  SYTO60: 'syto60',
+  SYTO82: 'syto82',
+  SYTO85: 'syto85',
+  LIVEDEADBLUE: 'livedead blue',
+  LIVEDEADGREEN: 'livedead green',
+  LIVEDEADVIOLET: 'livedead violet',
+  LIVEDEADRED: 'livedead red',
+  LIVEDEADFARRED: 'livedead far red',
 };
 
 // The canonicals deliberately excluded from spectra.json as honest content
@@ -608,9 +637,9 @@ test('the real web/kb/spectra.json loads with zero issues', () => {
   assert.deepEqual(issues, []);
 });
 
-test('all 72 direct and 11 family additions exactly match the source ledger and runtime whitelist', () => {
-  assert.equal(sourceLedgerRaw.directRecords.length, 72);
-  assert.equal(sourceLedgerRaw.familyVariantRecords.length, 11);
+test('all 136 direct and 40 family additions exactly match the source ledger and runtime whitelist', () => {
+  assert.equal(sourceLedgerRaw.directRecords.length, 136);
+  assert.equal(sourceLedgerRaw.familyVariantRecords.length, 40);
   const directFields = new Set([
     'excitationPeakNm',
     'emissionPeakNm',
@@ -638,10 +667,16 @@ test('all 72 direct and 11 family additions exactly match the source ledger and 
     // exactly (checked above), so its reviewStatus has been upgraded from
     // the default 'claude-drafted' to 'source-cited' -- see
     // docs/references/planner-fluorophore-sources.json's sourceUrl/
-    // retrievalDate for the citation. Family records (below) stay
-    // 'claude-drafted': reviewStatus lives on the whole family entry, and
-    // these families have sibling variants the ledger does not cover, so
-    // upgrading the family-level status would falsely certify those too.
+    // retrievalDate for the citation. Family records (below) are different:
+    // reviewStatus lives on the whole family entry, not per variant, so a
+    // family may only be upgraded once EVERY variant it declares has a
+    // ledger row -- otherwise the upgrade would falsely certify whichever
+    // sibling variants remain unsourced. Most families here now clear that
+    // bar (MITOTRACKER, LYSOTRACKER, SYTOX, BODIPY, CELLMASK, SYTO, LIVEDEAD);
+    // ERTRACKER doesn't (its 'blue-white dpx' variant's emission is a range,
+    // not a point value) and so stays 'claude-drafted' despite having two of
+    // its three variants ledgered. See the fullyCovered computation below,
+    // which is data-driven rather than a hardcoded family list.
     assert.equal(entry.reviewStatus, 'source-cited', `${row.id}: review status`);
     assert.ok(realMarkersRaw.markers[row.id], `${row.id}: missing marker canonical`);
     assert.ok(
@@ -652,9 +687,24 @@ test('all 72 direct and 11 family additions exactly match the source ledger and 
     );
   }
 
+  // Group ledger rows by family so we can tell, PER FAMILY and computed from
+  // the data (not a hardcoded family list), whether every variant that
+  // family's spectra.json entry declares has a corresponding ledger row. Only
+  // when that coverage is total may the family's single, whole-entry
+  // reviewStatus be 'source-cited' -- a family with any uncited sibling
+  // variant must stay 'claude-drafted', because upgrading it would falsely
+  // certify those siblings too (see ERTRACKER: 2 of its 3 variants are
+  // ledgered, its 'blue-white dpx' variant is not, so it stays drafted).
+  const ledgerVariantKeysByFamily = new Map();
   for (const row of sourceLedgerRaw.familyVariantRecords) {
     const variantKey = SOURCE_VARIANT_KEYS[row.id];
     assert.ok(variantKey, `${row.id}: missing runtime variant-key mapping`);
+    if (!ledgerVariantKeysByFamily.has(row.family)) ledgerVariantKeysByFamily.set(row.family, new Set());
+    ledgerVariantKeysByFamily.get(row.family).add(variantKey);
+  }
+
+  for (const row of sourceLedgerRaw.familyVariantRecords) {
+    const variantKey = SOURCE_VARIANT_KEYS[row.id];
     const familyEntry = realSpectraRaw.fluorophores[row.family];
     const variant = familyEntry?.variants?.[variantKey];
     assert.ok(variant, `${row.id}: missing '${row.family}' variant '${variantKey}'`);
@@ -668,7 +718,15 @@ test('all 72 direct and 11 family additions exactly match the source ledger and 
     );
     assert.equal(variant.excitationPeakNm, row.excitationPeakNm, `${row.id}: excitation`);
     assert.equal(variant.emissionPeakNm, row.emissionPeakNm, `${row.id}: emission`);
-    assert.equal(familyEntry.reviewStatus, 'claude-drafted', `${row.family}: review status`);
+
+    const allVariantKeys = Object.keys(familyEntry.variants);
+    const ledgerKeys = ledgerVariantKeysByFamily.get(row.family);
+    const fullyCovered = allVariantKeys.every((k) => ledgerKeys.has(k));
+    assert.equal(
+      familyEntry.reviewStatus,
+      fullyCovered ? 'source-cited' : 'claude-drafted',
+      `${row.family}: review status (${ledgerKeys.size}/${allVariantKeys.length} variants ledgered)`
+    );
     assert.ok(
       realMarkersRaw.markers[row.family].variants.includes(variantKey),
       `${row.id}: variant missing from markers.json`
