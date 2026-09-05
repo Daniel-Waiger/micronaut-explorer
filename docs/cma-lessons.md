@@ -342,6 +342,21 @@ Format per lesson: **practice — evidence — why it matters.**
     about forever. Grep the producer's path against the consumer's before trusting that data
     flows; and when a feature spans screens, walk it end-to-end at least once.
 
+51. **A second, parallel agent pipeline built beside this one earns its keep only if
+    something actually calls it — otherwise it is pure carrying cost.**
+    `tools/antigravity-multi-agent/` (a Gemini-based plan/execute/verify/learn CLI, one-way
+    wired to shell out into `tools/cma-dashboard/update.py`) was built as a competing
+    implementation of the same plan-gate-verify-learn shape this file already describes, but
+    no skill or doc ever pointed to it, it was never run, and it pulled in this repo's only
+    third-party dependencies (`google-genai`, `pydantic`, `rich`, `python-dotenv`) into an
+    otherwise dependency-free codebase. Retired unread, 2026-09-05. — Building a second
+    orchestrator instead of extending the first one splits future lessons across two places
+    that don't talk to each other (note its `ama_learn.py` re-derived its own "practice —
+    evidence — why it matters" format and an `[ama-run]` signature convention, independently
+    of this file) and leaves an unreviewed dependency list and unverified code sitting in the
+    tree; if a second pipeline is ever worth trying, fold its findings into this file instead
+    of letting it accumulate its own.
+
 ## E. This repo's invariants (microscopy-naming-assistant)
 
 Proven 2026-07-26/27/28 against the real 1.02GB LIF unless noted. When an E lesson proves
