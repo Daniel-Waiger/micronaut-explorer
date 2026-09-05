@@ -233,17 +233,34 @@ export function createPanelStep(kb) {
         'A qualitative check for spectral spillover across this measurement’s fluorophores -- excitation/emission peak proximity only, not a spectral-overlap integral.';
       fluorophoresSection.appendChild(explainer);
 
-      const banner = document.createElement('div');
-      banner.className = 'panel-review-banner';
-      banner.textContent =
-        'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by a microscopy specialist -- treat exact peak numbers as approximate until reviewed.';
-      fluorophoresSection.appendChild(banner);
-
       // assayId is already cached above (shared with the interview section).
       const view = assayView(store.get(), assayId);
       const markersText = (view.naming && view.naming.fields && view.naming.fields.markers) || '';
 
       const { panelState, entries } = resolvePanel(markersText, kb.index, kb.markersKb, kb.spectra);
+
+      // The banner has to describe THIS panel's fluorophores, not the pack as a
+      // whole: part of spectra.json is now matched against cited vendor sources,
+      // so a blanket "drafted by Claude" claim is wrong for a panel that happens
+      // to be entirely source-cited. Rendered after resolvePanel so it can read
+      // the resolved entries; no entry with a spectrum means nothing to caveat.
+      const knownEntries = entries.filter((entry) => entry.state === 'known');
+      const draftedCount = knownEntries.filter((entry) => entry.reviewStatus === 'claude-drafted').length;
+      if (knownEntries.length > 0) {
+        const banner = document.createElement('div');
+        banner.className = 'panel-review-banner';
+        if (draftedCount === 0) {
+          banner.textContent =
+            'Spectral values below match cited vendor or publication sources, but have not been reviewed by a microscopy specialist -- confirm exact peak numbers against your own filter sets.';
+        } else if (draftedCount === knownEntries.length) {
+          banner.textContent =
+            'Spectral values below are drafted by Claude from common published references and have not yet been reviewed by a microscopy specialist -- treat exact peak numbers as approximate until reviewed.';
+        } else {
+          banner.textContent =
+            'Spectral values below are a mix of cited vendor or publication sources and values drafted by Claude from common published references (see each fluorophore’s badge). None has been reviewed by a microscopy specialist -- treat exact peak numbers as approximate.';
+        }
+        fluorophoresSection.appendChild(banner);
+      }
 
       if (panelState === 'unanswered') {
         const empty = document.createElement('p');
