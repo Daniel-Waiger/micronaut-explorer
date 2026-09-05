@@ -9,6 +9,63 @@ that existing history, not a scheme that was tracked from day one.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-05
+
+### Added
+- Imported project files are now shape-validated after migration, not just
+  schema-migrated. A file that already claimed the current schema version
+  used to skip every migration check and reach the app completely
+  unvalidated; now it is checked either way. Files too damaged to use are
+  rejected with the existing import error, and recoverable ones are
+  sanitized -- the app tells you what was dropped. Malformed provenance
+  entries, and entries that name a measurement the file doesn't actually
+  have, are discarded, so a hand-edited file can no longer silently lock
+  fields against later edits.
+- The Restore menu can delete an individual saved recovery slot, and
+  Settings has a two-click "Clear all stored data" action. Previously, a
+  user whose browser storage was full was told so with no in-app way to
+  free space -- the storage-full message now points at both.
+
+### Changed
+- 72 of the spectral pack's 157 fluorophore entries were checked against
+  their cited vendor or publication sources and now carry a
+  "source-cited" badge in place of "unreviewed" -- the remaining 85 are
+  still the real review target. Family entries (LysoTracker, LIVE/DEAD,
+  SYTO) stay claude-drafted on purpose: their uncovered sibling variants
+  must not be certified by a family-level flag.
+- The Fluorophores panel's review banner now describes that panel's own
+  fluorophores instead of making a blanket claim -- a panel made up
+  entirely of source-cited fluorophores no longer says it's unreviewed.
+- Development: the documented `python3 tools/serve_dir.py web` command
+  works again (it now generates `web/kb.dev.js` itself instead of
+  importing a deleted script); the single-file build now refuses to
+  bundle network primitives (fetch/XMLHttpRequest/WebSocket/sendBeacon/
+  EventSource), so the app's no-network guarantee is enforced by the
+  build rather than by convention; the naming template config moved to
+  the engine layer so tests exercise the real one instead of a copy; and
+  a new `tools/capture_screenshots.py` regenerates the app screenshots in
+  `docs/images/`.
+
+### Fixed
+- The step rail's "Measurements" label no longer breaks mid-word when the
+  status badge next to it leaves too little room -- it now wraps at a
+  word boundary, or gives the badge its own line, instead.
+- Review's Study map summary no longer shows a duplicated "Study map"
+  heading directly above its own content.
+- A measurement named the same as its own readout (e.g. "Bacterial
+  viability") no longer echoes itself on Review's Study map summary --
+  the readout is only shown when it adds information the label doesn't
+  already give.
+- The Release notes link now works when running the built single-file
+  app or straight from disk, not only on the hosted site.
+
+### Removed
+- An unused, parallel Gemini-based agent pipeline
+  (`tools/antigravity-multi-agent/`) and the repo's only third-party
+  dependency list; leftover files from the archived Streamlit-era app;
+  six dead exports; and ARL, a placeholder marker with no known
+  identity.
+
 ## [0.17.0] - 2026-09-04
 
 ### Fixed

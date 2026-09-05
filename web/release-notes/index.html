@@ -67,6 +67,14 @@
   .card h3{margin:0 0 6px; font-size:16px}
   .card p{margin:0; color:var(--muted); font-size:14px}
 
+  /* Screenshots */
+  .shots{display:flex; flex-direction:column; gap:28px; max-width:820px}
+  .shot{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+     box-shadow:var(--shadow); overflow:hidden}
+  .shot img{display:block; width:100%; height:auto}
+  .shot figcaption{padding:12px 18px 16px; color:var(--muted); font-size:13.5px}
+  .shot figcaption strong{color:var(--text)}
+
   /* Callout */
   .callout{background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--mint);
      border-radius:12px; padding:20px 22px; box-shadow:var(--shadow)}
@@ -101,9 +109,9 @@
 -->
 <header class="hero">
   <div class="wrap">
-    <span class="eyebrow">Release 0.16.0 · 04 Sep 2026</span>
+    <span class="eyebrow">Release 0.18.0 · 05 Sep 2026</span>
     <h1>Micronaut Planner — what's new</h1>
-    <p class="lede">This release gives the app a version number for the first time. The Settings page now shows it, and every release from here on gets an entry below -- the seventeen versions below 0.16.0 are a retroactive reconstruction of the app's real history, one tag per milestone already recorded in the project's roadmap.</p>
+    <p class="lede">0.18.0 closes a gap in project-file imports -- a file already at the current schema version used to reach the app unchecked, now it's always validated -- and gives you two ways to recover storage space from inside the app instead of a dead end. Under the hood, 72 of the spectral pack's 157 fluorophores were checked against their cited sources instead of just drafted, and the Release notes link now works from the built single-file app, not only the hosted site.</p>
     <div class="cta">
       <a class="btn btn-primary" href="../index.html">▶ Open the app</a>
       <a class="btn btn-ghost" href="#changelog">Full changelog</a>
@@ -116,11 +124,37 @@
 <section>
   <div class="wrap">
     <h2>Highlights</h2>
-    <p class="section-sub">What 0.16.0 changes.</p>
+    <p class="section-sub">What 0.18.0 changes.</p>
     <div class="cards">
-      <div class="card"><div class="ic">🏷️</div><h3>A real version number</h3><p>Settings now shows <code>Version 0.16.0</code> instead of nothing at all -- the same number whether you're running the app unbuilt or from the built single-file artifact.</p></div>
-      <div class="card"><div class="ic">📜</div><h3>This page</h3><p>Release notes, published alongside the app on GitHub Pages and linked from Settings.</p></div>
-      <div class="card"><div class="ic">🕰️</div><h3>17 versions of history, reconstructed</h3><p>Every milestone the roadmap already recorded -- P0 through the pilot-readiness restructure -- now has a version number and an annotated git tag.</p></div>
+      <div class="card"><div class="ic">🛡️</div><h3>Imports are validated after migration, not just before</h3><p>A file already claiming the current schema version used to skip every migration check and reach the app unchecked. Now every import is shape-validated: unusable files are rejected, recoverable ones are sanitized and you're told what was dropped.</p></div>
+      <div class="card"><div class="ic">🧹</div><h3>Two ways to free up storage</h3><p>Delete a single saved recovery slot from the Restore menu, or clear all stored data from Settings with a two-click confirm -- both are now what the storage-full message points you to.</p></div>
+      <div class="card"><div class="ic">🔬</div><h3>72 of 157 fluorophores now source-cited</h3><p>Verified exactly against their cited vendor or publication sources, with their own badge and tooltip. The other 85 are still the real, unreviewed target -- the panel banner now says so per panel instead of as a blanket claim.</p></div>
+      <div class="card"><div class="ic">🔗</div><h3>Release notes work from the built app</h3><p>The Release notes link now resolves when running the single-file build or straight from disk, not only when hosted.</p></div>
+      <div class="card"><div class="ic">🧽</div><h3>A few rough edges, smoothed</h3><p>The step rail's "Measurements" label no longer splits mid-word, Review's Study map summary no longer shows a duplicated heading, and a measurement named the same as its own readout no longer echoes itself.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="screenshots">
+  <div class="wrap">
+    <h2>See it in action</h2>
+    <p class="section-sub">A few screens from the shipped example study (the oregano-coating wound-healing plan you can open from Study map).</p>
+    <div class="shots">
+      <figure class="shot">
+        <img src="images/01-study-map.png" width="1440" height="900" loading="lazy"
+             alt="Study map screen showing the research question, system, comparison groups, experimental unit, and four measurements for the example wound-healing study.">
+        <figcaption><strong>Study map</strong> — the shape of a study at a glance: question, system, comparison, and every measurement it holds.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="images/02-research-brief.png" width="1440" height="900" loading="lazy"
+             alt="Research brief screen with a free-text study description on the left and, on the right, a Review panel suggesting a structured Magnification field extracted from an exact-text match in that description.">
+        <figcaption><strong>Research brief</strong> — the deterministic free-text parser suggests structured fields from your description; nothing is applied until you accept it.</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="images/04-measurement-acquisition.png" width="1440" height="2500" loading="lazy"
+             alt="Acquisition panel for a measurement, showing fluorophore channels seeded from the markers field, an unreviewed-badge spectral overlap chart, and the structured panel-assembly editor.">
+        <figcaption><strong>Acquisition</strong> — fluorophore channels, the spillover check, and the spectral view, each flagged as source-cited or unreviewed rather than asserted as fact.</figcaption>
+      </figure>
     </div>
   </div>
 </section>
@@ -155,7 +189,7 @@
     <!-- Fallback shown when fetch(./CHANGELOG.md) is blocked (e.g. file://);
          overwritten by the script below when the fetch succeeds. Bump this
          by hand alongside web/src/core/version.js on every release. -->
-    <div>Micronaut Planner · <span id="footer-version">v0.17.0</span></div>
+    <div>Micronaut Planner · <span id="footer-version">v0.18.0</span></div>
     <div><a href="../index.html">Open the app</a> · <a href="#changelog">Changelog</a> · <a href="https://github.com/Daniel-Waiger/micronaut-explorer">Source</a></div>
   </div>
 </footer>
