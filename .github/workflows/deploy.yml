@@ -115,7 +115,12 @@ jobs:
           git clone --depth 1 "https://x-access-token:${DEPLOY_TOKEN}@github.com/Daniel-Waiger/micronaut-planner.git" "$work"
           cp dist/index.html "$work/index.html"
           rm -rf "$work/release-notes"
-          cp -r web/release-notes "$work/release-notes"
+          # dist/release-notes (assembled by tools/build_single_file.py, run
+          # in the "Build single-file app" step above) is the one with
+          # images/ populated from docs/images/ -- web/release-notes/images/
+          # no longer exists on disk, so copying web/release-notes directly
+          # would ship a release-notes page with broken screenshots.
+          cp -r dist/release-notes "$work/release-notes"
           cd "$work"
           touch .nojekyll
           git add -A

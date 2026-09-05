@@ -464,6 +464,42 @@ def build(web_dir: Path, out_dir: Path) -> bytes:
         shutil.copytree(release_notes_src, release_notes_dst)
         print(f"copied {release_notes_src} -> {release_notes_dst}")
 
+        # The release-notes page's screenshots used to live twice in git --
+        # once under docs/images/ (used by the hosted docs/index.html
+        # release-notes viewer) and once byte-copied into
+        # web/release-notes/images/ purely so this same relative
+        # `src="images/<name>.png"` path also resolved for the copy landing
+        # in dist/. That duplication cost ~700KB of repo history for zero
+        # behavioral benefit, so web/release-notes/images/ no longer exists
+        # on disk at all -- this build step is now the ONLY place the two
+        # get reunited, by copying just the images the page actually
+        # references out of docs/images/ into dist/release-notes/images/.
+        # Only the referenced subset is copied (docs/images/ has more
+        # screenshots than the release-notes page uses) since dist/ is the
+        # artifact that actually ships. NOTE: .github/workflows/deploy.yml's
+        # release-notes copy step reads from dist/release-notes (this
+        # script's output), not from web/release-notes directly -- so this
+        # assembly step is load-bearing for the deployed site, not just a
+        # local convenience.
+        release_notes_html = (release_notes_dst / "index.html").read_text(encoding="utf-8")
+        referenced_images = sorted(set(re.findall(r'src="images/([^"]+)"', release_notes_html)))
+        if referenced_images:
+            docs_images_dir = web_dir.parent / "docs" / "images"
+            images_dst = release_notes_dst / "images"
+            images_dst.mkdir(parents=True, exist_ok=True)
+            for name in referenced_images:
+                src_image = docs_images_dir / name
+                if not src_image.is_file():
+                    raise BuildError(
+                        f"release-notes/index.html references images/{name}, "
+                        f"but {src_image} does not exist"
+                    )
+                shutil.copyfile(src_image, images_dst / name)
+            print(
+                f"copied {len(referenced_images)} release-notes screenshot(s) "
+                f"from {docs_images_dir} -> {images_dst}"
+            )
+
     return output_bytes
 
 

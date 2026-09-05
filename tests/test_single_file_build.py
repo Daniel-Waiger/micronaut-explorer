@@ -493,3 +493,76 @@ def test_real_web_release_notes_folder_is_copied_into_dist() -> None:
     folder, not just a synthetic one."""
     build(ROOT / "web", ROOT / "dist")
     assert (ROOT / "dist" / "release-notes" / "index.html").exists()
+
+
+def _write_release_notes_fixture(
+    web_dir: Path, index_html: str, docs_images: dict[str, bytes]
+) -> None:
+    """Set up a web/release-notes/index.html plus sibling docs/images/*,
+    mirroring the real repo layout (web/ and docs/ are siblings)."""
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"})
+    release_notes_dir = web_dir / "release-notes"
+    release_notes_dir.mkdir()
+    (release_notes_dir / "index.html").write_text(index_html, encoding="utf-8")
+    docs_images_dir = web_dir.parent / "docs" / "images"
+    docs_images_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in docs_images.items():
+        (docs_images_dir / name).write_bytes(content)
+
+
+def test_release_notes_images_referenced_by_the_page_are_copied_from_docs(
+    tmp_path: Path,
+) -> None:
+    """Screenshots the release-notes page actually embeds must land in
+    dist/release-notes/images/, sourced from docs/images/ (the single
+    source of truth -- web/release-notes/images/ is no longer duplicated
+    on disk)."""
+    web_dir = tmp_path / "web"
+    _write_release_notes_fixture(
+        web_dir,
+        '<html><body><img src="images/01-study-map.png"></body></html>',
+        {"01-study-map.png": b"fake-png-bytes"},
+    )
+    out_dir = tmp_path / "dist"
+    build(web_dir, out_dir)
+
+    copied = out_dir / "release-notes" / "images" / "01-study-map.png"
+    assert copied.read_bytes() == b"fake-png-bytes"
+
+
+def test_release_notes_image_unreferenced_by_the_page_is_not_copied(
+    tmp_path: Path,
+) -> None:
+    """docs/images/ can hold screenshots the release-notes page doesn't use
+    (e.g. ones only shown in the hosted docs site) -- the build must copy
+    only the referenced subset, not the whole directory."""
+    web_dir = tmp_path / "web"
+    _write_release_notes_fixture(
+        web_dir,
+        '<html><body><img src="images/01-study-map.png"></body></html>',
+        {
+            "01-study-map.png": b"fake-png-bytes",
+            "99-unreferenced.png": b"should-not-be-copied",
+        },
+    )
+    out_dir = tmp_path / "dist"
+    build(web_dir, out_dir)
+
+    images_dir = out_dir / "release-notes" / "images"
+    assert (images_dir / "01-study-map.png").exists()
+    assert not (images_dir / "99-unreferenced.png").exists()
+
+
+def test_release_notes_missing_referenced_image_fails_the_build(tmp_path: Path) -> None:
+    """A referenced-but-missing screenshot must fail the build loudly,
+    naming the missing file -- not silently ship a broken <img> to a public
+    page."""
+    web_dir = tmp_path / "web"
+    _write_release_notes_fixture(
+        web_dir,
+        '<html><body><img src="images/does-not-exist.png"></body></html>',
+        {},
+    )
+    out_dir = tmp_path / "dist"
+    with pytest.raises(BuildError, match="does-not-exist.png"):
+        build(web_dir, out_dir)
