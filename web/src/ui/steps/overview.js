@@ -203,7 +203,15 @@ function renderReviewExperimentMapSummary(parent, map) {
     const item = document.createElement('li');
     const label = reviewMeasurementLabel(measurement?.label, index + 1);
     const readout = reviewMapValue(measurement?.readout, 'Not decided');
-    item.textContent = `${label}: ${readout}`;
+    // The seed/example study (and plenty of real ones) name a measurement
+    // after its readout verbatim -- e.g. label "Bacterial viability" with
+    // readout "Bacterial viability" -- so a naive `${label}: ${readout}`
+    // renders as a stutter ("Bacterial viability: Bacterial viability").
+    // The label is always shown; the readout adds information only when it
+    // says something the label doesn't already say.
+    item.textContent = label.trim().toLowerCase() === readout.trim().toLowerCase()
+      ? label
+      : `${label}: ${readout}`;
     list.appendChild(item);
   }
   if (measurements.length === 0) {

@@ -5225,18 +5225,35 @@ td, th { border-color: var(--line); }
    rail left ~85px for the label -- so "Measurements" and "Measurement 1" both
    rendered as "Measur…", which is worse than no label at all. Let the label
    wrap onto a second line instead of truncating: a two-line nav item is
-   ordinary, an ambiguous one is not. */
+   ordinary, an ambiguous one is not.
+
+   That first fix used overflow-wrap: anywhere, which does keep the label on
+   screen but does not care *where* it breaks -- a single unbreakable word
+   ("Measurements") got split mid-word ("Measureme" / "nts") whenever the
+   badge squeezed the label below the word's own width. The label's
+   min-width: 0 is what let that squeeze happen: a flex-shrink item with no
+   floor will shrink past its content's min-content width rather than push
+   the row to wrap. min-width: min-content puts a floor under the label at
+   the width of its longest unbreakable word, and flex-wrap on the row gives
+   the badge somewhere to go once label + badge no longer both fit: it drops
+   to its own line (still right-aligned there via its existing
+   margin-left: auto) instead of forcing the label to concede width it
+   doesn't have to spare. Multi-word labels ("Bacterial viability") are
+   unaffected -- their min-content width is only their longest word, so they
+   keep wrapping internally at the word boundary exactly as before, on one
+   row alongside the badge, whenever that still fits. */
 .nav-step {
   align-items: flex-start;
+  flex-wrap: wrap;
   white-space: normal;
 }
 
 .nav-step-label {
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: min-content;
   overflow: visible;
   text-overflow: clip;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .nav-step-icon {
