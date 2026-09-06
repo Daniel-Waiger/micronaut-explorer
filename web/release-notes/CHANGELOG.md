@@ -9,6 +9,22 @@ that existing history, not a scheme that was tracked from day one.
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-09-06
+
+### Added
+- A standalone user manual (`web/manual/`), linked from the nav rail as "User
+  manual" (opens in a new tab, next to Release notes). Eleven chapters cover
+  getting started, the app's big ideas, the study map, the research brief,
+  the measurements registry, acquisition and the spectral view, conditions/
+  groups/controls, naming and conformance validation, review and every
+  export format, saving/backups/privacy, and a glossary and FAQ. Same
+  static-site pattern as the release notes page: a hub with search, a
+  sidebar chapter list, and a prev/next pager on every chapter -- no
+  framework, no build step, and no network calls beyond fetching the
+  manual's own pages for its search index. The Guide step in the app links
+  out to the full manual for readers who want more than the in-app
+  reference.
+
 ## [0.18.0] - 2026-09-05
 
 ### Added

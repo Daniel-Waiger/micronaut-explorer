@@ -290,5 +290,16 @@ export const guideStep = {
         );
       })
     );
+
+    const manualPara = document.createElement('p');
+    manualPara.className = 'guide-para';
+    manualPara.append('This page is a quick reference. For a longer, step-by-step walkthrough of every screen, see the ');
+    const manualLink = document.createElement('a');
+    manualLink.href = 'manual/';
+    manualLink.target = '_blank';
+    manualLink.rel = 'noopener noreferrer';
+    manualLink.textContent = 'full user manual';
+    manualPara.append(manualLink, ' (opens in a new tab).');
+    main.appendChild(manualPara);
   },
 };

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review &amp; Exports — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="review-exports.html">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>Review &amp; Exports</span></nav>
+      <header class="ch-head">
+        <p class="ch-kicker">Chapter 9</p>
+        <h1>Review &amp; Exports</h1>
+        <p class="lede">The Review step reads every other step and turns it into one page: a diagram of the whole study, a plain readiness verdict, and every file Micronaut can hand you when the plan is done.</p>
+      </header>
+
+      <section class="learn-box">
+        <h2 id="what-youll-learn">What you'll be able to do</h2>
+        <ul>
+          <li>Read the study map, decisions list, and diagram on the Review step</li>
+          <li>Understand the "Planner checks" readiness verdict and what it does (and doesn't) validate</li>
+          <li>Download each export Micronaut offers, and know which format fits which purpose</li>
+          <li>Understand what happens when you try to export a study that still needs review</li>
+          <li>Copy a ready-made prompt for pasting into your own LLM, and know exactly what it does and doesn't do</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="what-review-is">What Review is</h2>
+        <p>Review is the last step in the nav, and deliberately a read-only one: it enters nothing new into your study. Everything on the page is assembled live from whatever you've already answered on Study map, Research brief, and each measurement's Samples &amp; design, Acquisition, and Data plan. Its own explainer puts it plainly: "a deterministic review of this study, built entirely from what you've entered on the other steps — nothing here is LLM-generated."</p>
+
+        <figure class="shot">
+          <img src="images/05-overview-review.png" alt="Review screen showing the whole study's readiness, its diagram, and its exports in one screen." loading="lazy"
+               onerror="this.closest('.shot').classList.add('pending')">
+          <div class="ph">Snapshot pending — images/05-overview-review.png</div>
+          <figcaption>Review — the whole study's readiness, its diagram, and its exports in one screen.</figcaption>
+        </figure>
+      </section>
+
+      <section>
+        <h2 id="study-map-summary">Study map summary and decisions</h2>
+        <p>At the top of Review, a short text summary restates your study's shape: the research question, the system or material, the comparison (groups, or "observational"), and the experimental unit, followed by a list of every measurement with its readout.</p>
+        <p>Below that, a <strong>Decisions</strong> section groups everything Micronaut thinks still needs a human decision into four tiers: <strong>Study-shape decisions</strong>, <strong>Measurement-design decisions</strong>, <strong>Before acquisition</strong>, and <strong>Can be assigned later</strong>. Each item names the workspace it belongs to — click it and Review switches you straight to the measurement (and step) that owns it, so you never have to hunt for where a flagged decision actually lives.</p>
+      </section>
+
+      <section>
+        <h2 id="study-diagram">The study diagram</h2>
+        <p>A <strong>Study diagram</strong> section draws the study as a small branching chart — the study itself fanning out to each measurement, and each measurement's readout, modality, design, controls, and planned filenames. It's a self-drawn inline diagram (no external diagramming library), so it works with zero network access exactly like the rest of the app, and it scrolls horizontally on its own if a study with many measurements makes it wide.</p>
+      </section>
+
+      <section>
+        <h2 id="planner-checks">Planner checks: the readiness verdict</h2>
+        <p>The <strong>Planner checks</strong> section gives one verdict for the whole study, composed from every validator the app already runs elsewhere (naming format checks, design/condition issues, spectral-overlap flags, path-length warnings, and unanswered required fields):</p>
+        <ul>
+          <li><strong>All planner checks complete</strong> — nothing outstanding.</li>
+          <li><strong>Needs review: N incomplete or provisional item(s) remain</strong> — nothing blocking, but some fields are still placeholders or warnings worth a look.</li>
+          <li><strong>Blocked: N issue(s) need correction before final export</strong> — at least one real error (an invalid naming value, for instance) exists somewhere in the study.</li>
+        </ul>
+        <p>Directly under the verdict, a standing disclaimer keeps the scope honest: <em>"Planner checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability."</em> A clean verdict means Micronaut's own checks passed — nothing more.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> This is the same conformance engine that flags naming errors on <a href="validation-naming.html">Data plan</a> and design issues on <a href="conditions-controls.html">Samples &amp; design</a> — Review doesn't run a second, separate opinion, it just collects the one verdict in one place.</p></div>
+      </section>
+
+      <section>
+        <h2 id="per-measurement">Each measurement, expanded</h2>
+        <p>Below the study-wide sections, every measurement gets its own collapsible entry: its readout, modality, specimen (when set), design summary, any design issues, its controls (grouped as panel-derived and readout-specific — an empty controls list is always labelled, never silently blank), any study-specific notes for its current stage, and its full list of planned filenames. A <strong>Download bench card (.md)</strong> button sits on each measurement's own entry — see <a href="#exports">Exports</a> below.</p>
+        <p>A <strong>"How to run this study"</strong> section further down shows the same fixed five-stage execution ladder for every study (idea → pilot → validate controls → fix acquisition settings → advanced modality), with any measurement-specific notes attached to the relevant stage.</p>
+      </section>
+
+      <section>
+        <h2 id="exports">Exports</h2>
+        <p>An <strong>Export study</strong> menu offers four downloadable files, all built from the exact same study document the rest of the Review page reads — so an exported figure can never disagree with what's on screen:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Export</th><th>What it is</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Markdown (.md)</strong></td><td>The full study write-up as plain-text Markdown — readout, design, controls, filenames, and the ladder, for every measurement.</td></tr>
+              <tr><td><strong>Study map (.svg)</strong></td><td>The study diagram above, saved as a standalone, openable SVG image.</td></tr>
+              <tr><td><strong>File manifest (.csv)</strong></td><td>One row per planned filename, with its group, factors, and replicate numbers — the spreadsheet-ready version of the planned-name lists.</td></tr>
+              <tr><td><strong>Study data (.json)</strong></td><td>A full raw-data dump of the study document used to build everything else on this page.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Two more actions sit alongside the export menu:</p>
+        <ul>
+          <li><strong>Copy prompt for your own LLM</strong> — copies an instruction preamble, ground rules that keep a model from inventing a marker or setting, your study as JSON, and the decisions Micronaut can tell haven't been made yet, all in one block. Paste it into whatever LLM you already use; nothing is sent from the app itself, and nothing the model replies is read back into your study automatically — you read the reply and act on it yourself.</li>
+          <li><strong>Print / Save as PDF</strong> — opens your browser's own print dialog over this page, which any browser can save as a PDF.</li>
+        </ul>
+        <h3 id="bench-card">Bench cards</h3>
+        <p>A per-measurement <strong>Download bench card (.md)</strong> button (on each measurement's own entry above) produces a separate, compact, print-oriented single-measurement summary: channels, controls with their reasons, and two worked filename examples — meant to sit next to you at the bench, not the whole study document.</p>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> The bench-schedule (.ics) calendar file is a different export, generated on each measurement's <strong>Data plan</strong> section from your own timing answers, not from Review. See <a href="validation-naming.html">Validation &amp; Naming</a> for the naming/data-plan page, and this measurement's Data plan section for the Download schedule button itself.</p></div>
+      </section>
+
+      <section>
+        <h2 id="export-gate">What happens when a study still needs review</h2>
+        <p>Every download button above (except Copy prompt for your own LLM) re-checks the study's readiness at the moment you click it, not when the page first loaded — so an export can never silently use a stale snapshot from before your last edit:</p>
+        <ul>
+          <li><strong>Blocked</strong> — the export is refused outright, with a toast telling you how many blocking issues need correcting first.</li>
+          <li><strong>Needs review</strong> — a confirmation dialog lists a few example items and asks whether to export anyway. Confirming proceeds; cancelling stops the export so you can go fix what's listed.</li>
+          <li><strong>Ready</strong> — the download happens immediately, no dialog.</li>
+        </ul>
+        <div class="callout warn"><p><strong>⚠️ Careful.</strong> This gate applies to Markdown, SVG, CSV, JSON, bench cards, and Print/Save as PDF — but not to Copy prompt for your own LLM, which always copies your study as-is so the model can see the real state, unfinished decisions included.</p></div>
+      </section>
+
+      <section class="quiz">
+        <h2 id="self-check">Check yourself</h2>
+        <details class="quiz-q"><summary>A measurement's readiness shows "Needs review." Can you still export a Markdown file?</summary><p>Yes — a confirmation dialog lists example issues and lets you export anyway. Only "Blocked" (a real error, not just an incomplete field) refuses the export outright.</p></details>
+        <details class="quiz-q"><summary>Does a clean "All planner checks complete" verdict mean your experiment design is scientifically sound?</summary><p>No. Review's own disclaimer says planner checks don't validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability — only that Micronaut's own naming/design/panel checks came back clean.</p></details>
+        <details class="quiz-q"><summary>You paste the "Copy prompt for your own LLM" text into a chatbot and it answers. Does that answer get written into your study automatically?</summary><p>No. It's a one-way handoff — you read the model's reply and decide yourself whether and how to act on it; nothing it says is read back into Micronaut.</p></details>
+      </section>
+
+      <nav class="pager" id="pager"></nav>
+    </main>
+  </div>
+  <script src="manual.js?v=1"></script>
+</body>
+</html>

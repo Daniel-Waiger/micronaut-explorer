@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Saving, Backups &amp; Privacy — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="saving-privacy.html">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>Saving, Backups &amp; Privacy</span></nav>
+      <header class="ch-head">
+        <p class="ch-kicker">Chapter 10</p>
+        <h1>Saving, Backups &amp; Privacy</h1>
+        <p class="lede">Where your study actually lives, how to protect and move it, and exactly what leaves your browser when you ask for help.</p>
+      </header>
+
+      <section class="learn-box">
+        <h2 id="what-youll-learn">What you'll be able to do</h2>
+        <ul>
+          <li>Understand that your study lives only in this browser, on this device — with no account or server behind it</li>
+          <li>Read the save indicator and know what each of its states means</li>
+          <li>Use Restore to recover an earlier version of your work</li>
+          <li>Export and import a full project backup, including what happens if the file is invalid</li>
+          <li>Use Clear all stored data safely, and know exactly what it does and doesn't touch</li>
+          <li>Know precisely what the Feedback page shares, and what it never shares automatically</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="where-your-data-lives">Where your data lives</h2>
+        <p>Micronaut Planner is 100% client-side. There is no server, no account, and no sync — your study is autosaved into this browser's own local storage, on this one device. Nothing you type is ever uploaded anywhere, and no language model is ever called by the app itself.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Local storage is a convenience, not a permanent record: it can be cleared by the browser, isn't shared between machines, and is lost entirely in a private/incognito window. Treat it as a working copy, and use <a href="#backups">Download project backup</a> whenever the work matters.</p></div>
+        <div class="callout warn"><p><strong>⚠️ Careful.</strong> Opening Micronaut on a different computer, or a different browser on the same computer, starts you with a blank study — nothing "follows you." Move your work across with a project backup file, covered below.</p></div>
+      </section>
+
+      <section>
+        <h2 id="autosave">Autosave and the save indicator</h2>
+        <p>Every change you make is saved automatically, a short moment (about half a second) after you stop typing — this is deliberate: saving on every keystroke would fill your saved-version history with near-duplicate snapshots of the last few characters typed, rather than a handful of genuinely distinct states. A small indicator near the top of the app always shows the current state:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Indicator text</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Saving locally…</strong></td><td>A change was just made and is about to be written to storage.</td></tr>
+              <tr><td><strong>Saved locally</strong> (with a time)</td><td>Your latest change was written successfully.</td></tr>
+              <tr><td><strong>Not saved locally yet</strong></td><td>Nothing has been saved in this session yet.</td></tr>
+              <tr><td>An error message (e.g. about storage being full)</td><td>The save failed — see <a href="#storage-full">If storage fails</a> below.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2 id="restore">Restore: previous saved versions</h2>
+        <p>Micronaut keeps your last five distinct autosaved versions in a rotating history, oldest dropped automatically as new ones are saved. Open the <strong>Utilities</strong> menu (near the top of the app) to see <strong>Restore previous version</strong>, listing each saved version by the study's own title, newest first (labelled "Latest:").</p>
+        <ol class="steps">
+          <li>Open <strong>Utilities</strong> and find a version under "Restore previous version."</li>
+          <li>Click it, then confirm — restoring replaces your current in-memory study with that saved version. (Your current work is itself autosaved before you'd lose access to it, since restoring is just another change.)</li>
+          <li>To permanently remove one saved version instead of restoring it, click the small close/delete icon next to it, then confirm. This only removes that one entry — the other saved versions, and whatever you currently have open, are untouched.</li>
+        </ol>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> Restore is a safety net, not a substitute for a real backup — it only ever holds your last five distinct autosaves, and <a href="#clear-all">Clear all stored data</a> deletes this history entirely. Export a project backup for anything you'd be upset to lose.</p></div>
+      </section>
+
+      <section>
+        <h2 id="backups">Project backups: export and import</h2>
+        <p>A project backup is a single <code>.json</code> file holding your entire study. It's the one copy that survives clearing your browser's storage, moving to a new computer, or sharing your plan with a collaborator.</p>
+        <ol class="steps">
+          <li>Open <strong>Settings</strong> (or the <strong>Utilities</strong> menu) and click <strong>Download project backup</strong> (Utilities calls it "Export project backup" — same action). This downloads a <code>.json</code> file immediately; there's no dialog to fill in.</li>
+          <li>To bring a backup back in, click <strong>Import project backup</strong> (Settings or Utilities) and choose the file.</li>
+          <li>A successful import replaces your currently open study with the imported one, and that becomes the study now being autosaved.</li>
+        </ol>
+        <h3 id="move-computers">Move your study to another computer</h3>
+        <p>Download a project backup on the first machine, copy the file across by whatever means you'd move any file (email, a USB drive, a shared drive), then import it on the second machine.</p>
+        <div class="callout warn"><p><strong>⚠️ Careful.</strong> Importing replaces your whole current study — there's no merge. If your current work isn't backed up yet, export it first.</p></div>
+        <h3 id="import-validation">What happens with an invalid or damaged file</h3>
+        <p>Every imported file is checked before it's allowed anywhere near your study:</p>
+        <ul>
+          <li>If the file is corrupted or simply isn't a Micronaut project backup at all, the import is refused outright with an error message explaining why, and your current study is left completely unchanged.</li>
+          <li>If the file is a genuine backup but one or more small parts of it are malformed (for example a corrupted internal record), those specific parts are reset to sensible defaults rather than the whole import being thrown away — you're then told how many parts this happened to, with the details logged to the browser's console, so nothing is silently lost or silently changed without you knowing.</li>
+          <li>A backup from a newer, unrecognized version of Micronaut than the one you're running is also refused, rather than risking a partial or incorrect import.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="new-blank-and-reset">Starting over: New study and Reset to example</h2>
+        <p><strong>New study</strong> (in the nav rail) clears the workspace to a blank study, after you confirm — the confirmation itself reminds you that your current work remains available in Restore. <strong>Reset to example study</strong> (Utilities menu) works the same way but replaces your current study with the shipped example instead of a blank one. Neither of these deletes anything from Restore; both are just another change your current work is autosaved through before it happens.</p>
+      </section>
+
+      <section>
+        <h2 id="clear-all">Clear all stored data</h2>
+        <p>Settings also has <strong>Clear all stored data</strong> — the one destructive action in the app, and the only one guarded by a two-click "arm" instead of a single confirmation dialog: the first click changes the button's own label to "Click again to permanently clear all stored data" and arms it for a few seconds; a second click within that window actually clears everything, while letting the arming time out on its own disarms it again with no effect.</p>
+        <ul>
+          <li>It removes every locally saved version (the entire Restore history) — freeing up storage space if it's full or corrupted.</li>
+          <li>It does <strong>not</strong> touch the study currently open in your browser tab. Your open work is safe, and Micronaut immediately writes it into the now-empty history as a fresh save, so autosaving resumes right away.</li>
+        </ul>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> If you want to keep anything from your Restore history, download a project backup of it first — clearing removes that history for good, with no undo.</p></div>
+        <h3 id="storage-full">If storage fails</h3>
+        <p>If your browser's storage is full or otherwise unavailable, the save indicator shows an explicit error rather than failing silently, and suggests exactly this: export a project backup, then either clear all stored data from Settings or delete an old saved version from Restore to free up space.</p>
+      </section>
+
+      <section>
+        <h2 id="feedback-privacy">What "Copy feedback package" actually shares</h2>
+        <p>The Feedback page lets you describe what happened, then package it up to share. Nothing about your study or browser is ever sent anywhere until you actively choose one of its sharing actions — and even then, nothing is sent <em>automatically</em> by the app itself.</p>
+        <p>A feedback package is a plain-text block containing:</p>
+        <ul>
+          <li>Whatever you typed describing what you were trying to do</li>
+          <li>A timestamp, which step/page you were on, and a count of any knowledge-pack issues detected</li>
+          <li>Your browser's user-agent string</li>
+          <li>Your entire study, as JSON — so a real problem can actually be reproduced</li>
+        </ul>
+        <p>Four ways to hand that package off, all reached from the Feedback page:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Action</th><th>What it does</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Copy feedback package</strong></td><td>Copies the whole block to your clipboard, to paste wherever you're sharing feedback.</td></tr>
+              <tr><td><strong>Download feedback package</strong></td><td>Downloads it as <code>micronaut-feedback.txt</code> (and also copies it), so you can attach the file instead of pasting text.</td></tr>
+              <tr><td><strong>Email feedback</strong></td><td>Only appears at all once a real recipient address is configured — currently it is not, so this button is not shown. Even when available, the app never places your feedback or study data into the email link itself; it copies the package and expects you to paste it into the message body yourself, since a pre-filled mail link would get silently cut off after a couple thousand characters.</td></tr>
+              <tr><td><strong>Open GitHub issue</strong></td><td>Copies the package, then opens a prefilled new-issue page (with the "feedback" label already applied) on GitHub. The GitHub link itself carries no feedback text, browser details, or study data — you paste the copied package into the issue body yourself, after signing in if needed.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> There's no server behind Micronaut that could send anything on your behalf, and a link that tried to carry your whole study as a URL parameter would be unreliable and would leak it into browser history and server logs along the way. Copy-then-paste keeps you in control of exactly what gets shared, and to whom.</p></div>
+      </section>
+
+      <section class="quiz">
+        <h2 id="self-check">Check yourself</h2>
+        <details class="quiz-q"><summary>You open Micronaut on your lab's shared computer, then later open it on your laptop. Is your study there too?</summary><p>No — your study lives only in the browser storage of the device (and browser) where you entered it. Move it across with a project backup file (Settings or Utilities → Export/Import project backup).</p></details>
+        <details class="quiz-q"><summary>You click "Clear all stored data" by mistake and confirm. Is the study you currently have open lost?</summary><p>No. Clearing removes your saved-version history (Restore), not the study currently open in your browser tab — that study is immediately re-saved into the now-empty history.</p></details>
+        <details class="quiz-q"><summary>Does clicking "Copy feedback package" send your study to anyone?</summary><p>No. It only copies the package to your clipboard. Nothing is sent until you paste it somewhere yourself — into an email, a form, or a GitHub issue you open separately.</p></details>
+      </section>
+
+      <nav class="pager" id="pager"></nav>
+    </main>
+  </div>
+  <script src="manual.js?v=1"></script>
+</body>
+</html>

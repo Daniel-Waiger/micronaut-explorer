@@ -566,3 +566,95 @@ def test_release_notes_missing_referenced_image_fails_the_build(tmp_path: Path) 
     out_dir = tmp_path / "dist"
     with pytest.raises(BuildError, match="does-not-exist.png"):
         build(web_dir, out_dir)
+
+
+def test_manual_folder_is_copied_into_dist(tmp_path: Path) -> None:
+    """shell.js's "User manual" nav link is a relative `manual/` URL, so
+    dist/ must carry that folder itself, mirroring release-notes/."""
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"})
+    manual_dir = web_dir / "manual"
+    manual_dir.mkdir()
+    (manual_dir / "index.html").write_text("<p>manual hub</p>", encoding="utf-8")
+    (manual_dir / "manual.js").write_text("// manual js\n", encoding="utf-8")
+
+    out_dir = tmp_path / "dist"
+    build(web_dir, out_dir)
+
+    copied = out_dir / "manual"
+    assert (copied / "index.html").read_text(encoding="utf-8") == "<p>manual hub</p>"
+    assert (copied / "manual.js").read_text(encoding="utf-8") == "// manual js\n"
+
+
+def test_missing_manual_folder_does_not_fail_the_build(tmp_path: Path) -> None:
+    """A web/ tree with no manual/ folder (as most of this test file's
+    synthetic fixtures are) must build successfully and just skip the copy,
+    not raise."""
+    web_dir = tmp_path / "web"
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"})
+    out_dir = tmp_path / "dist"
+    build(web_dir, out_dir)
+    assert not (out_dir / "manual").exists()
+
+
+def test_real_web_manual_folder_is_copied_into_dist() -> None:
+    """The actual app's dist/ output must carry the real manual/ folder,
+    including its manual.js, not just a synthetic one."""
+    build(ROOT / "web", ROOT / "dist")
+    assert (ROOT / "dist" / "manual" / "index.html").exists()
+    assert (ROOT / "dist" / "manual" / "manual.js").exists()
+
+
+def _write_manual_fixture(
+    web_dir: Path, html_by_file: dict[str, str], docs_images: dict[str, bytes]
+) -> None:
+    """Set up a web/manual/*.html tree plus sibling docs/images/*, mirroring
+    the real repo layout (web/ and docs/ are siblings)."""
+    _write_fixture(web_dir, {"a.js": "export const FOO = 1;\n"})
+    manual_dir = web_dir / "manual"
+    manual_dir.mkdir()
+    for name, html in html_by_file.items():
+        (manual_dir / name).write_text(html, encoding="utf-8")
+    docs_images_dir = web_dir.parent / "docs" / "images"
+    docs_images_dir.mkdir(parents=True, exist_ok=True)
+    for name, content in docs_images.items():
+        (docs_images_dir / name).write_bytes(content)
+
+
+def test_manual_images_referenced_by_a_chapter_are_copied_from_docs(
+    tmp_path: Path,
+) -> None:
+    """Screenshots a manual chapter actually embeds must land in
+    dist/manual/images/, sourced from docs/images/ (the same single source of
+    truth the release-notes block reads from)."""
+    web_dir = tmp_path / "web"
+    _write_manual_fixture(
+        web_dir,
+        {"index.html": "<html><body>hub</body></html>",
+         "getting-started.html": '<html><body><img src="images/01-study-map.png"></body></html>'},
+        {"01-study-map.png": b"fake-png-bytes"},
+    )
+    out_dir = tmp_path / "dist"
+    build(web_dir, out_dir)
+
+    copied = out_dir / "manual" / "images" / "01-study-map.png"
+    assert copied.read_bytes() == b"fake-png-bytes"
+
+
+def test_manual_missing_referenced_image_is_skipped_not_fatal(tmp_path: Path) -> None:
+    """Unlike release-notes (which hard-fails on a missing referenced image),
+    the manual's chapters are allowed to reference screenshots that have not
+    been captured yet -- each such figure degrades to a "Snapshot pending"
+    placeholder via its onerror handler. The build must succeed and simply
+    not copy the missing file, rather than raising BuildError."""
+    web_dir = tmp_path / "web"
+    _write_manual_fixture(
+        web_dir,
+        {"index.html": "<html><body>hub</body></html>",
+         "getting-started.html": '<html><body><img src="images/does-not-exist.png"></body></html>'},
+        {},
+    )
+    out_dir = tmp_path / "dist"
+    build(web_dir, out_dir)  # must not raise
+
+    assert not (out_dir / "manual" / "images" / "does-not-exist.png").exists()

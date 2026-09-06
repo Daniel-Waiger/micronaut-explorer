@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Glossary &amp; FAQ — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="glossary-faq.html">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>Appendix — Glossary &amp; FAQ</span></nav>
+      <header class="ch-head">
+        <p class="ch-kicker">Chapter 11 · Appendix</p>
+        <h1>Appendix — Glossary &amp; FAQ</h1>
+        <p class="lede">Every term used elsewhere in this manual, in one short list, plus quick answers to the questions people ask most — each one links to where it's explained in full.</p>
+      </header>
+
+      <section class="learn-box">
+        <h2 id="what-youll-learn">What you'll be able to do</h2>
+        <ul>
+          <li>Look up any term used elsewhere in this manual and jump straight to where it's taught</li>
+          <li>Find a quick answer to a common question, with a link to the full explanation</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="glossary">Glossary</h2>
+        <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr id="t-study"><td><strong>Study</strong></td><td>The whole plan you're building: a research question, a system or material, a comparison structure, and one or more measurements. See <a href="study-map.html">Study map</a>.</td></tr>
+            <tr id="t-measurement"><td><strong>Measurement</strong></td><td>One observation or analysis used to answer the study's question — its own readout, panel, specimen, and modality. In some fields this is called an assay. A study can hold several. See <a href="measurements.html">Measurements</a>.</td></tr>
+            <tr id="t-readout"><td><strong>Readout</strong></td><td>What you're actually measuring. Choosing a recognized readout unlocks readout-specific control recommendations; an answer Micronaut doesn't recognize is respected as-is, never silently overridden. See <a href="acquisition.html">Acquisition</a>.</td></tr>
+            <tr id="t-comparison-group"><td><strong>Comparison group</strong></td><td>One of your study's experimental groups (e.g. control vs. treatment), set once per measurement on its Samples &amp; design. An observational study may have none at all. See <a href="conditions-controls.html">Samples &amp; design</a>.</td></tr>
+            <tr id="t-experimental-unit"><td><strong>Experimental unit</strong></td><td>What counts as one independent replicate in your study (an animal, a dish, a field of view) — set once on Study map and used everywhere else that reasons about replication. See <a href="study-map.html">Study map</a>.</td></tr>
+            <tr id="t-condition"><td><strong>Condition</strong></td><td>One concrete combination of group, sample, and replicate — the unit a single planned filename actually represents. A design with groups, factors, and replicates expands into a table of condition rows. See <a href="conditions-controls.html">Samples &amp; design</a>.</td></tr>
+            <tr id="t-control"><td><strong>Control</strong></td><td>A comparison Micronaut proposes based on your panel and readout, each with a stated reason — rules propose, you dispose. A genuinely empty controls list is always labelled as such, never shown as silence. See <a href="conditions-controls.html">Samples &amp; design</a> and <a href="review-exports.html">Review</a>.</td></tr>
+            <tr id="t-spillover"><td><strong>Spillover (spectral overlap)</strong></td><td>A qualitative flag that two fluorophores' excitation or emission peaks sit close enough to risk bleeding into each other's channel — a peak-proximity check, not a full spectral-overlap integral. See <a href="acquisition.html">Acquisition</a>.</td></tr>
+            <tr id="t-provenance"><td><strong>Provenance</strong></td><td>A tag on every field recording where its value came from — your own input, an example default, or a derived/suggested value — so a weaker source (like a free-text suggestion) can never silently overwrite something you typed yourself. See <a href="research-brief.html">Research brief</a>.</td></tr>
+            <tr id="t-conformance"><td><strong>Conformance (planner checks)</strong></td><td>The one composed pass/fail-style verdict — ready, needs review, or blocked — built from every check Micronaut already runs (naming format, design issues, spectral flags, path length, unanswered fields). It checks Micronaut's own rules, not scientific validity. See <a href="review-exports.html#planner-checks">Planner checks</a>.</td></tr>
+            <tr id="t-stage"><td><strong>Stage</strong></td><td>One rung of the fixed five-step execution ladder every study sees on Review — idea, pilot, validate controls, fix acquisition settings, advanced modality — with any study-specific notes attached to the relevant rung. See <a href="review-exports.html">Review</a>.</td></tr>
+            <tr id="t-modality"><td><strong>Modality</strong></td><td>The type of microscope or imaging method used — confocal, widefield, STED, light-sheet, SEM/TEM, Raman, and so on. Drives which modality-specific advice Micronaut shows. See <a href="acquisition.html">Acquisition</a>.</td></tr>
+            <tr id="t-panel"><td><strong>Panel</strong></td><td>The structured list of fluorophore channels in a measurement — each with a target and how it's conjugated (direct antibody, indirect, genetically encoded, a direct-binding probe, or a self-labeling tag) — the fact-precise alternative to typing markers as free text. See <a href="acquisition.html">Acquisition</a>.</td></tr>
+            <tr id="t-restore"><td><strong>Restore</strong></td><td>The rolling history of your last five distinct autosaved versions, reachable from the Utilities menu. Not a substitute for a real backup. See <a href="saving-privacy.html#restore">Restore</a>.</td></tr>
+            <tr id="t-project-backup"><td><strong>Project backup</strong></td><td>A single downloadable <code>.json</code> file holding your entire study — the only copy that survives clearing browser storage or moving to a new computer. See <a href="saving-privacy.html#backups">Project backups</a>.</td></tr>
+            <tr id="t-bench-card"><td><strong>Bench card</strong></td><td>A compact, print-oriented single-measurement summary (channels, controls with reasons, two worked filename examples) — meant to sit next to you at the bench. See <a href="review-exports.html">Review</a>.</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </section>
+
+      <section>
+        <h2 id="faq">Frequently asked questions</h2>
+
+        <details class="quiz-q"><summary>Is my study data private?</summary><p>Yes. Micronaut Planner has no server, no account, and no sync — your study lives only in this browser's local storage on this device, and nothing you type is ever uploaded anywhere. See <a href="saving-privacy.html#where-your-data-lives">Where your data lives</a>.</p></details>
+
+        <details class="quiz-q"><summary>Does Micronaut use AI?</summary><p>Micronaut never calls a model itself — every result in the app is deterministic. Two features use a model's help, both one-way: Research brief's description review is a deterministic exact-text scan (marker aliases, replicate counts, magnification, unambiguous dates), and Review's "Copy prompt for your own LLM" hands you a block to paste into whatever LLM you already use — nothing it replies is read back into your study automatically. See <a href="research-brief.html">Research brief</a> and <a href="review-exports.html">Review</a>.</p></details>
+
+        <details class="quiz-q"><summary>How do I move my study to another computer?</summary><p>Download a project backup on the first computer (Settings or Utilities → Download/Export project backup), copy the file across by whatever means you'd move any file, then import it (Import project backup) on the second computer. See <a href="saving-privacy.html#backups">Project backups</a>.</p></details>
+
+        <details class="quiz-q"><summary>Why can't Micronaut email or sync my study for me?</summary><p>There's no server behind the app that could send or sync anything on your behalf — everything runs locally in your browser. Feedback and backups are handed off through copy/paste and file downloads instead, which you control explicitly every time. See <a href="saving-privacy.html#feedback-privacy">What "Copy feedback package" actually shares</a>.</p></details>
+
+        <details class="quiz-q"><summary>What does "alpha" mean here?</summary><p>Micronaut Planner is an early preview shared for feedback. It's a planning aid, not a validated instrument model — always confirm real acquisition settings at the microscope, and treat the built-in modality guidance as provisional while it's still being reviewed by a microscopy specialist.</p></details>
+
+        <details class="quiz-q"><summary>My filename preview shows "UNKNOWN" in several places. Is that an error?</summary><p>No — it's a generated placeholder for a required field you haven't answered yet, not something Micronaut is rejecting. Fill in the field and the placeholder disappears from the preview. See <a href="validation-naming.html#reading-the-preview">Reading generated placeholders</a>.</p></details>
+
+        <details class="quiz-q"><summary>An unrecognized marker shows a warning on Data plan. Does this block my study?</summary><p>No. Unless a lab-specific approved-marker list exists (there is none by default), any marker is accepted; even with a list, an unrecognized marker is a warning, not a blocking error, by default. See <a href="validation-naming.html#the-naming-rules">The naming rules</a>.</p></details>
+
+        <details class="quiz-q"><summary>Why does Review sometimes stop me from exporting?</summary><p>Only a "Blocked" verdict (a real error somewhere in the study) refuses an export outright. A "Needs review" verdict just asks you to confirm before proceeding. See <a href="review-exports.html#export-gate">What happens when a study still needs review</a>.</p></details>
+      </section>
+
+      <nav class="pager" id="pager"></nav>
+    </main>
+  </div>
+  <script src="manual.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Getting Started — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="getting-started.html">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>Getting Started</span></nav>
+      <header class="ch-head">
+        <p class="ch-kicker">Chapter 1</p>
+        <h1>Getting Started</h1>
+        <p class="lede">Open Micronaut Planner for the first time, see a finished plan without touching your own work, and get comfortable with the controls you'll use every session.</p>
+      </header>
+
+      <section class="learn-box">
+        <h2 id="what-youll-learn">What you'll be able to do</h2>
+        <ul>
+          <li>Know what greets you the first time you open the Planner</li>
+          <li>Open the shipped example study to see a finished plan, without it becoming your data</li>
+          <li>Take the feature Walkthrough to see where everything lives</li>
+          <li>Tell the feature Walkthrough apart from the guided example walkthrough and the in-app Guide</li>
+          <li>Switch color theme and collapse the step navigation rail</li>
+          <li>Know when to reach for the in-app Guide instead of this manual, and back</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="first-launch">What you see on first launch</h2>
+        <p>There is no welcome screen, no sign-up, and no choice to make before you can type. Open the Planner and you land straight on <strong>Study map</strong> with a completely blank study — your own workspace, empty, waiting for a research question. This is deliberate: Micronaut Planner used to seed a first visit with a finished four-measurement example, and then had to explain, banner by banner, that the example wasn't really theirs. It's simpler to start empty and let you ask for the example only if you want to see one.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> A first workspace that already belongs to someone else's study needs a whole "is this mine?" apparatus — read-only exploration, a "make a copy" step, ownership banners. Starting blank means every study you ever see in your own workspace is actually yours, from the first keystroke.</p></div>
+      </section>
+
+      <section>
+        <h2 id="example-study">Opening the example study</h2>
+        <p>Study map carries a quiet link near the bottom: <strong>"Want to see a finished plan? Open the example study."</strong> Click it and Micronaut replaces your current workspace with a real, fully worked plan — an oregano-plasma-coating wound-healing study with four measurements already defined, so you can see what a completed Study map, Research brief, and Measurement page actually look like.</p>
+        <ol class="steps">
+          <li>From Study map, click <strong>"Open the example study"</strong> under the map.</li>
+          <li>The same link is also offered from Settings, if you want it again later.</li>
+          <li>Once it's open, the example is ordinary, editable work — nothing marks it read-only, and nothing stops you from typing into it.</li>
+        </ol>
+        <figure class="shot">
+          <img src="images/06-guide.png" alt="The Guide step: a searchable in-app reference with a search box and definition-style sections for every term and workspace." loading="lazy"
+               onerror="this.closest('.shot').classList.add('pending')">
+          <div class="ph">Snapshot pending — images/06-guide.png</div>
+          <figcaption>The Guide step — a searchable in-app reference for every term and workspace, reachable any time from the step navigation.</figcaption>
+        </figure>
+        <div class="callout warn"><p><strong>⚠️ Careful.</strong> Opening the example <em>replaces</em> whatever is currently in your workspace — it doesn't add alongside it. Nothing is destroyed forever: your previous work stays reachable from the header's <strong>Utilities → Restore previous version</strong> menu, but it does leave the screen the moment you click the link. If you're partway through a real plan, that's worth knowing before you click.</p></div>
+        <div class="callout try"><p><strong>🧪 Try it.</strong> Open the example study now, then open <strong>Measurements</strong> from the step navigation. You'll see four measurements already sitting in the registry, each with its own status badge. Nothing you do here can affect a study you start fresh later — Study map's "New study" action (in the header's Utilities menu, or the nav rail) gives you a blank workspace again whenever you want one, and your example edits stay recoverable in Restore.</p></div>
+      </section>
+
+      <section>
+        <h2 id="feature-walkthrough">The feature Walkthrough</h2>
+        <p>Click the <strong>Walkthrough</strong> button, in the control panel below the step navigation, for a short, spotlighted tour of the app's own layout — not your study's content. It highlights a handful of on-screen regions in turn — the step navigation, the Study map, how to find and open a measurement, the measurement's own page, and the Review step's export menu — with a short caption for each, and dims everything else so you can't lose your place.</p>
+        <ol class="steps">
+          <li>Click <strong>Walkthrough</strong> in the nav rail's control panel (below the step buttons) at any time.</li>
+          <li>Use <strong>Next</strong> and <strong>Back</strong> to move between stops, or the arrow keys.</li>
+          <li>Press <kbd>Esc</kbd>, or click <strong>Close</strong>, to leave it early.</li>
+        </ol>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> This tour used to start itself on a first visit — and again on any return after being away — which meant a returning researcher opening a new tab was met with an uninvited tour. It now only ever opens when you click the button, precisely so it stops feeling like an interruption.</p></div>
+      </section>
+
+      <section>
+        <h2 id="guided-walkthrough-vs-feature-tour">Two different "walkthroughs" — and the in-app Guide makes three</h2>
+        <p>Micronaut Planner uses the word "walkthrough" for two genuinely different things, and it's worth telling them apart before you go looking for either:</p>
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>Name</th><th>What it shows</th><th>Where you start it</th></tr></thead>
+          <tbody>
+            <tr><td>Feature Walkthrough</td><td>A short, one-time spotlight tour of the app's own layout — where things are, not what your study says.</td><td>The <strong>Walkthrough</strong> button in the nav rail's control panel (see above).</td></tr>
+            <tr><td>Guided example walkthrough</td><td>A persistent side panel that steps through your actual study, one workspace at a time — Study map, Research brief, Measurements, Measurement, then Review — explaining what each one is for and letting you try it on the study currently open.</td><td>The card on Study map itself, offering <strong>Start example walkthrough</strong>, <strong>Resume walkthrough</strong>, or <strong>Restart walkthrough</strong> depending on where you left off; once you're past it, the same card offers <strong>Explain Study map</strong> instead.</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p>Either kind of walkthrough is optional, and you're never required to run one before you can use the app for real. And distinct from both: every step's footer carries an <strong>Explain this step</strong> button, which opens that same side panel with a plain-language explanation of just the step you're currently on, without touching your walkthrough progress or your data.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> "See where things are" and "walk me through my own study" are different requests, made at different moments — one when you've never opened the app, the other when you're partway through planning and want a refresher. Two separate, purpose-built tools serve each better than one tour trying to do both.</p></div>
+      </section>
+
+      <section>
+        <h2 id="in-app-guide-vs-manual">The in-app Guide vs. this manual</h2>
+        <p>The Planner's own <strong>Guide</strong> step (reachable from the step navigation, and outside the linear workflow — it doesn't count toward any progress badge) is a searchable, plain-text reference: a short definition list of every step and every key term (measurement, groups, readout, controls, provenance), plus what the app produces and a reminder that it's still an alpha. It's built to answer "what does this word mean?" in a few seconds, without leaving the app.</p>
+        <p>This manual is the longer read: it walks through each screen in more depth, with worked examples and the reasoning behind design choices you'll notice while you use the app. Reach for the Guide when you need a quick, in-context reminder; come back here when you want the fuller explanation of <em>why</em> the app behaves the way it does.</p>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> The Guide has its own search box, filtering by whatever text is already rendered on the page — so searching "controls" or "provenance" there jumps straight to the relevant definition. This manual's own sidebar search works the same way across every chapter.</p></div>
+      </section>
+
+      <section>
+        <h2 id="theme-and-nav">Theme and the step navigation rail</h2>
+        <p>Two small controls make the workspace more comfortable to live in, and neither one changes your data.</p>
+        <ol class="steps">
+          <li>Click the <strong>«</strong> button at the top of the step navigation rail to collapse it to a narrow icon-only strip, freeing up room for the workspace — click the same button (now showing <strong>»</strong>) to expand it back.</li>
+          <li>Click the light-bulb <strong>Theme</strong> button at the bottom of the nav rail to flip straight between light and dark. For a third option — following your system's own light/dark setting automatically — open the header's <strong>Utilities</strong> menu and choose <strong>System</strong> under "Color mode" instead.</li>
+          <li>Either choice is remembered in this browser for next time you open the Planner.</li>
+        </ol>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> The quick nav-rail button and the Utilities menu's three-way choice (Dark / Light / System) both write the same preference — use whichever is closer at hand. Choosing System removes any explicit override, so the app's appearance then tracks your operating system's own setting as it changes.</p></div>
+      </section>
+
+      <section class="quiz">
+        <h2 id="self-check">Check yourself</h2>
+        <details class="quiz-q"><summary>You open Micronaut Planner for the very first time. What's on screen?</summary><p>A blank Study map — no seeded example, no welcome dialog to dismiss. The example study is one click away from a link on that same page, but you have to ask for it.</p></details>
+        <details class="quiz-q"><summary>You click "Open the example study" while you already have a real plan open. What happens to your real plan?</summary><p>It's replaced on screen, not deleted — it stays reachable afterward from the header's Utilities menu under "Restore previous version." Still, it leaves the screen the moment you click the link, so it's worth knowing before you do.</p></details>
+        <details class="quiz-q"><summary>You want a fast reminder of what "provenance" means without leaving the app. Do you open this manual or the in-app Guide?</summary><p>The in-app Guide — it's built for exactly that: a searchable, short definition, reachable without navigating away from your study. Come back to this manual when you want the longer explanation.</p></details>
+      </section>
+
+      <nav class="pager" id="pager"></nav>
+    </main>
+  </div>
+  <script src="manual.js?v=1"></script>
+</body>
+</html>
