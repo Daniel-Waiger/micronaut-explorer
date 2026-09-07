@@ -24,6 +24,20 @@ that existing history, not a scheme that was tracked from day one.
   manual's own pages for its search index. The Guide step in the app links
   out to the full manual for readers who want more than the in-app
   reference.
+- Four reference screenshots (Samples & design, Data plan, Settings, and a
+  measurement's suggested controls on Review), so the manual's chapters on
+  conditions/controls, naming and backups illustrate the screens they
+  describe instead of only naming them.
+
+### Fixed
+- `tools/capture_screenshots.py` positioned a scrolled-to section behind the
+  app's own header. The header is a stack of sticky bars, each pinned below
+  the one above, and only the topmost was measured -- so a capture aimed at a
+  section heading cut off the heading and the first ~200px under it. It now
+  measures the whole pinned stack, and takes its scroll targets as CSS
+  selectors so a target with no id (Review's Controls block) can be captured.
+  This also un-clips the existing Acquisition screenshot.
+
 ## [0.19.0] - 2026-09-05
 
 ### Fixed

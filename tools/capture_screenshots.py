@@ -56,7 +56,13 @@ DEFAULT_CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
 #               has rendered and before the screenshot is taken -- used to
 #               reveal state that requires a click (e.g. "Seed from markers
 #               field" to populate the structured fluorophore-channel table)
-#   scroll_to   optional element id to scroll into view before capture
+#   scroll_to   optional CSS selector to scroll into view before capture.
+#               The app's header and measurement switcher are sticky at the
+#               top of the viewport, so scrolling an element to y=0 would
+#               park it *behind* them; SCROLL_INTO_VIEW_JS measures that
+#               pinned chrome and backs off by its height, which is why this
+#               is a selector rather than a bare id (some targets, like the
+#               Review screen's Controls block, have a class but no id).
 #   caption     suggested one-line caption for docs/images/README.md
 # ---------------------------------------------------------------------------
 SEED_FROM_MARKERS_JS = """
@@ -66,6 +72,55 @@ SEED_FROM_MARKERS_JS = """
   if (btn) btn.click();
   return Boolean(btn);
 })()
+"""
+
+# scrollIntoView aligns the target to y=0, but .shell-header and the
+# measurement switcher are sticky at the top and would then sit on top of it
+# -- the captured shot loses exactly the section heading it was aimed at. So
+# measure whatever is actually pinned to the top right now (rather than
+# hard-coding a header height that silently rots when the chrome changes) and
+# scroll back by it.
+SCROLL_INTO_VIEW_JS = """
+((selector) => {
+  const target = document.querySelector(selector);
+  if (!target) return false;
+  const scroller = document.scrollingElement || document.documentElement;
+  // Measure the pinned chrome before moving: it is sticky, so its height is
+  // the same at any scroll offset, and reading it first keeps this one
+  // deterministic measure-then-set rather than a scroll-then-correct dance
+  // (which drifts when opening a <details> reflows the page underneath it).
+  let pinnedBottom = 0;
+  for (const node of document.querySelectorAll('body *')) {
+    const pos = getComputedStyle(node).position;
+    if (pos !== 'sticky' && pos !== 'fixed') continue;
+    const rect = node.getBoundingClientRect();
+    // Real chrome, not a full-height overlay.
+    if (rect.height <= 0 || rect.height > window.innerHeight / 2) continue;
+    // The chrome is a STACK of sticky bars (header, study summary, the
+    // measurement switcher), each pinned at its own `top:` offset below the
+    // one above it -- so only the first has top ~0. Testing for top ~0 would
+    // measure just that one and park the target behind all the rest, which is
+    // the bug this comment exists to prevent a re-introduction of. Take the
+    // lowest edge of anything pinned in the upper third instead.
+    if (rect.top < -4 || rect.top > window.innerHeight / 3) continue;
+    if (rect.bottom > pinnedBottom) pinnedBottom = rect.bottom;
+  }
+  const desiredTop = pinnedBottom + 12;
+  const pageY = target.getBoundingClientRect().top + scroller.scrollTop;
+  scroller.scrollTop = Math.max(0, pageY - desiredTop);
+  // Opening a <details> above the target reflows the page, so the position
+  // measured a moment ago can already be stale. Re-measure and correct until
+  // the target actually sits just below the chrome (a couple of passes is
+  // always enough; the bound just stops a pathological loop).
+  for (let i = 0; i < 5; i += 1) {
+    const drift = target.getBoundingClientRect().top - desiredTop;
+    if (Math.abs(drift) <= 2) break;
+    const before = scroller.scrollTop;
+    scroller.scrollTop = Math.max(0, before + drift);
+    if (scroller.scrollTop === before) break;  // already at a scroll limit
+  }
+  return true;
+})(%s)
 """
 
 SCREENS = [
@@ -137,7 +192,7 @@ SCREENS = [
             """,
             SEED_FROM_MARKERS_JS,
         ],
-        scroll_to="measurement-section-acquisition",
+        scroll_to="#measurement-section-acquisition",
         caption="Measurement -- Acquisition panel with fluorophore channels seeded from the markers field, and the spectral overlap view.",
     ),
     dict(
@@ -166,6 +221,60 @@ SCREENS = [
         actions=[],
         scroll_to=None,
         caption="Review screen in dark theme.",
+    ),
+    # 08-10 back the user manual's chapters that had no screenshot of their
+    # own (web/manual/conditions-controls.html, validation-naming.html and
+    # saving-privacy.html). Nothing here is manual-specific -- they are just
+    # the three app screens those chapters describe.
+    dict(
+        name="08-measurement-design",
+        hash="measurement",
+        viewport=(1440, 1800),
+        theme="light",
+        actions=[],
+        scroll_to="#measurement-section-design",
+        caption="Measurement -- Samples & design: the comparison groups, the conditions derived from them, and the controls the planner suggests with its reason for each.",
+    ),
+    dict(
+        name="09-measurement-dataplan",
+        hash="measurement",
+        viewport=(1440, 1800),
+        theme="light",
+        actions=[],
+        scroll_to="#measurement-section-dataplan",
+        caption="Measurement -- Data plan: the filename convention, its generated preview names, and the planner checks that guard them.",
+    ),
+    dict(
+        name="10-settings-storage",
+        hash="settings",
+        viewport=(1440, 900),
+        theme="light",
+        actions=[],
+        scroll_to=None,
+        caption="Settings -- project backup download/import and the storage controls that manage locally saved versions.",
+    ),
+    dict(
+        # The controls the planner suggests are rendered on Review, not in the
+        # measurement's own design section (overview.js's renderControlsNode),
+        # so the manual's Conditions/Groups/Controls chapter needs this second
+        # shot to show the controls half of its own subject.
+        name="11-overview-controls",
+        hash="overview",
+        viewport=(1440, 1100),
+        theme="light",
+        actions=[
+            # Each measurement's Review entry is a <details class="overview-assay">
+            # collapsed by default, and the Controls block lives inside one --
+            # without this it is display:none and there is nothing to scroll to.
+            """
+            (() => {
+              document.querySelectorAll('details.overview-assay').forEach((d) => { d.open = true; });
+              return true;
+            })()
+            """
+        ],
+        scroll_to=".overview-controls",
+        caption="Review -- the controls the planner suggests for a measurement, split into panel-derived and readout-specific, each with the reason it is suggested.",
     ),
 ]
 
@@ -545,10 +654,19 @@ def main() -> int:
                 session.evaluate(action_js)
                 time.sleep(0.3)
             if screen["scroll_to"]:
-                session.evaluate(
-                    f"document.getElementById('{screen['scroll_to']}')?.scrollIntoView({{block:'start'}})"
-                )
-                time.sleep(0.3)
+                scroll_js = SCROLL_INTO_VIEW_JS % json.dumps(screen["scroll_to"])
+                # Run it, let the page settle, then run it again: expanding a
+                # section pushes content around for a beat after the scroll, so
+                # a single pass lands the target and then drifts out of frame.
+                # The scroll is idempotent, so the second pass is a no-op when
+                # nothing moved and a correction when it did.
+                for _ in range(2):
+                    scrolled = session.evaluate(scroll_js)
+                    if not scrolled:
+                        raise RuntimeError(
+                            f"{screen['name']}: scroll_to selector {screen['scroll_to']!r} matched nothing"
+                        )
+                    time.sleep(0.4)
             # Let any chart/canvas redraw settle after scroll/theme/DOM churn.
             time.sleep(0.3)
             # Deliberately NOT passing captureBeyondViewport+clip: that pair

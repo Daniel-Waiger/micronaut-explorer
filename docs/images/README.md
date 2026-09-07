@@ -26,6 +26,10 @@ python3 tools/capture_screenshots.py
 | `05-overview-review.png` | Review (`#/overview`) | Review -- the whole study's readiness, its diagram, and its exports in one screen. |
 | `06-guide.png` | Guide (`#/guide`) | Guide -- searchable in-app reference for every term and step. |
 | `07-overview-dark.png` | Review (`#/overview`), dark theme | Review screen in dark theme. |
+| `08-measurement-design.png` | Measurement → Samples & design (`#/measurement`) | Measurement -- Samples & design: the comparison groups, the conditions derived from them, and the controls the planner suggests with its reason for each. |
+| `09-measurement-dataplan.png` | Measurement → Data plan (`#/measurement`) | Measurement -- Data plan: the filename convention, its generated preview names, and the planner checks that guard them. |
+| `10-settings-storage.png` | Settings (`#/settings`) | Settings -- project backup download/import and the storage controls that manage locally saved versions. |
+| `11-overview-controls.png` | Review → a measurement's Controls (`#/overview`) | Review -- the controls the planner suggests for a measurement, split into panel-derived and readout-specific, each with the reason it is suggested. |
 
 ## How the study is seeded
 
@@ -43,6 +47,18 @@ the seeded "Bacterial viability" measurement (its real organism, marker, and
 magnification values) before clicking "Review description" -- this
 demonstrates the deterministic free-text parser without inventing any new
 scientific claim.
+
+`11-overview-controls.png` needs the same treatment for a different reason:
+each measurement's entry on Review is a collapsed `<details>`, and the
+Controls block lives inside one, so the script opens them before scrolling --
+otherwise the target is `display: none` and there is nothing to capture.
+
+Anything with a `scroll_to` selector is positioned by measuring the app's
+sticky chrome and scrolling the target just below it. That chrome is a *stack*
+of sticky bars (header, study summary, measurement switcher), each pinned at
+its own offset below the one above, so the measurement takes the lowest edge
+of everything pinned near the top -- measuring only the topmost bar parks the
+target behind the other two.
 
 For `04-measurement-acquisition.png`, the script expands the Acquisition
 section's collapsed accordions (Fluorophores and spillover, Spectral view,

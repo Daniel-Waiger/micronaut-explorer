@@ -36,6 +36,13 @@
     </section>
 
     <section>
+      <figure class="shot">
+        <img src="images/08-measurement-design.png" alt="The Samples &amp; design section of a measurement, showing the study-wide experimental unit, the organism field, the CTL and OPP groups, and a species factor with two levels." loading="lazy"
+             onerror="this.closest('.shot').classList.add('pending')">
+        <div class="ph">Snapshot pending — the Samples &amp; design section with its groups, factors and replicate fields.</div>
+        <figcaption>Everything on this page starts here: <strong>Samples &amp; design</strong> holds the experimental unit, the groups (CTL and OPP), and any factors that cross them.</figcaption>
+      </figure>
+
       <h2 id="groups">Groups: mutually exclusive alternatives</h2>
       <p><strong>Groups</strong> are your experimental groups — a control group and one or more treatment groups, for example. Every sample belongs to exactly <strong>one</strong> group; groups are, by construction, mutually exclusive alternatives, never something that crosses with itself. You set them on a measurement's own Samples &amp; design page (see <a href="measurements.html#registry-groups">Measurements Registry</a> for how a new measurement seeds its groups from an existing one, and the "copy to measurements that have none" shortcut).</p>
       <p>Add a group with <strong>Add group</strong>; each one gets its own name box and a <strong>Remove</strong> button. An observational study — one that isn't comparing groups at all — may legitimately have none.</p>
@@ -71,6 +78,13 @@
     <section id="panel-controls">
       <h2 id="controls-overview">Where controls come from</h2>
       <p>On <strong>Review</strong>, each measurement gets a list of suggested controls — panel-derived and readout-specific — with a stated reason attached to every one. These are not typed in by hand: they come from a rules knowledge base, evaluated against facts your measurement's Acquisition and readout answers already establish. Micronaut never assumes "no controls needed" from silence — an empty controls list is always shown as its own explicit sentence, never left blank.</p>
+      <figure class="shot">
+        <img src="images/11-overview-controls.png" alt="The Controls block on the Review screen, listing panel-derived controls (unstained/autofluorescence, single-stain) and a readout-specific heat-killed control, each followed by the reason it is suggested." loading="lazy"
+             onerror="this.closest('.shot').classList.add('pending')">
+        <div class="ph">Snapshot pending — the Controls block on Review, split into panel-derived and readout-specific.</div>
+        <figcaption>Suggested controls as they appear on <strong>Review</strong>: panel-derived first, then readout-specific, each with the reason it was suggested spelled out after the dash.</figcaption>
+      </figure>
+
       <p>Two kinds of control rule exist, and both key off facts your Acquisition panel already derives (see <a href="acquisition.html">Acquisition &amp; the Spectral View</a>):</p>
       <div class="table-wrap">
       <table>
