@@ -109,9 +109,9 @@
 -->
 <header class="hero">
   <div class="wrap">
-    <span class="eyebrow">Release 0.18.0 · 05 Sep 2026</span>
+    <span class="eyebrow">Release 0.19.0 · 05 Sep 2026</span>
     <h1>Micronaut Planner — what's new</h1>
-    <p class="lede">0.18.0 closes a gap in project-file imports -- a file already at the current schema version used to reach the app unchecked, now it's always validated -- and gives you two ways to recover storage space from inside the app instead of a dead end. Under the hood, 72 of the spectral pack's 157 fluorophores were checked against their cited sources instead of just drafted, and the Release notes link now works from the built single-file app, not only the hosted site.</p>
+    <p class="lede">0.19.0 is a spectral-data release. Every one of the 85 fluorophores that had only ever been drafted was checked against a manufacturer or curator source, and 26 of them turned out to be wrong -- including Alexa Fluor 488 and DRAQ5, whose stored emission was off by 16 nm. Those values are corrected and cited. 143 of the pack’s 157 entries now carry a source; the 14 that do not are named below, because an honest gap is more useful than a confident guess.</p>
     <div class="cta">
       <a class="btn btn-primary" href="../index.html">▶ Open the app</a>
       <a class="btn btn-ghost" href="#changelog">Full changelog</a>
@@ -124,13 +124,13 @@
 <section>
   <div class="wrap">
     <h2>Highlights</h2>
-    <p class="section-sub">What 0.18.0 changes.</p>
+    <p class="section-sub">What 0.19.0 changes.</p>
     <div class="cards">
-      <div class="card"><div class="ic">🛡️</div><h3>Imports are validated after migration, not just before</h3><p>A file already claiming the current schema version used to skip every migration check and reach the app unchecked. Now every import is shape-validated: unusable files are rejected, recoverable ones are sanitized and you're told what was dropped.</p></div>
-      <div class="card"><div class="ic">🧹</div><h3>Two ways to free up storage</h3><p>Delete a single saved recovery slot from the Restore menu, or clear all stored data from Settings with a two-click confirm -- both are now what the storage-full message points you to.</p></div>
-      <div class="card"><div class="ic">🔬</div><h3>72 of 157 fluorophores now source-cited</h3><p>Verified exactly against their cited vendor or publication sources, with their own badge and tooltip. The other 85 are still the real, unreviewed target -- the panel banner now says so per panel instead of as a blanket claim.</p></div>
-      <div class="card"><div class="ic">🔗</div><h3>Release notes work from the built app</h3><p>The Release notes link now resolves when running the single-file build or straight from disk, not only when hosted.</p></div>
-      <div class="card"><div class="ic">🧽</div><h3>A few rough edges, smoothed</h3><p>The step rail's "Measurements" label no longer splits mid-word, Review's Study map summary no longer shows a duplicated heading, and a measurement named the same as its own readout no longer echoes itself.</p></div>
+      <div class="card"><div class="ic">🔬</div><h3>26 spectral values were wrong, and are now fixed</h3><p>Alexa Fluor 488 was stored as 490/525 nm; Thermo’s own table says 495/519. DRAQ5’s emission was 16 nm low. ATTO 633 was 6 nm out. Each corrected value now carries the manufacturer page it came from, with the date it was read.</p></div>
+      <div class="card"><div class="ic">📖</div><h3>143 of 157 entries now cite a source</h3><p>Up from 72. Seven whole probe families -- MitoTracker, LysoTracker, SYTOX, BODIPY, CellMask, LIVE/DEAD and SYTO -- had every variant sourced, so the family can finally be marked as cited rather than drafted.</p></div>
+      <div class="card"><div class="ic">🚧</div><h3>14 entries deliberately stay uncited</h3><p>Cy2, Cy7 and TRITC had no primary source worth citing; DCFDA’s source gives a range, not a peak. Nine more are ambiguous names rather than bad numbers -- see below.</p></div>
+      <div class="card"><div class="ic">🏷️</div><h3>Some names mean more than one dye</h3><p><code>CFP</code> stores the values of ECFP; <code>GFP</code> stores EGFP’s; <code>IRFP</code> stores iRFP713’s; <code>mRuby</code> stores the original, not mRuby2. The numbers are real, but the key doesn’t say which variant it means. Left alone for now, because renaming a key would break saved studies.</p></div>
+      <div class="card"><div class="ic">⚠️</div><h3>Cited still isn’t specialist-reviewed</h3><p>A cited entry means its two peak values match a source we fetched and recorded. It does not mean a microscopist checked it, and the Gaussian curve widths in the spectral view remain estimates throughout.</p></div>
     </div>
   </div>
 </section>
@@ -189,7 +189,7 @@
     <!-- Fallback shown when fetch(./CHANGELOG.md) is blocked (e.g. file://);
          overwritten by the script below when the fetch succeeds. Bump this
          by hand alongside web/src/core/version.js on every release. -->
-    <div>Micronaut Planner · <span id="footer-version">v0.18.0</span></div>
+    <div>Micronaut Planner · <span id="footer-version">v0.19.0</span></div>
     <div><a href="../index.html">Open the app</a> · <a href="#changelog">Changelog</a> · <a href="https://github.com/Daniel-Waiger/micronaut-explorer">Source</a></div>
   </div>
 </footer>
