@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Measurements Registry — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="measurements.html">
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="content">
+    <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>Measurements Registry</span></nav>
+    <header class="ch-head">
+      <p class="ch-kicker">Chapter 5</p>
+      <h1>Measurements Registry</h1>
+      <p class="lede">A study can hold several measurements. This chapter is about the registry that lists them all, and about the badges and switcher that tell you, at a glance, which ones are actually done.</p>
+    </header>
+
+    <section class="learn-box">
+      <h2 id="what-youll-learn">What you'll be able to do</h2>
+      <ul>
+        <li>Understand what one "measurement" is, and why a study can hold more than one.</li>
+        <li>Create a new measurement, and know what it does and doesn't inherit from the ones you already have.</li>
+        <li>Search and filter the registry by name, readout, modality, specimen, group, or status.</li>
+        <li>Read a registry row's columns, including its planned base filename.</li>
+        <li>Tell apart a measurement's registry <strong>status</strong> and its switcher-bar <strong>progress badge</strong> — two different things, on purpose.</li>
+        <li>Switch which measurement is active, from either the registry or the switcher bar in the app's chrome.</li>
+        <li>Delete a measurement you no longer need, and know exactly what that removes.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 id="what-is-a-measurement">What a measurement is</h2>
+      <p>A <strong>measurement</strong> is one observation or analysis used to answer your study's research question — its own readout, panel, specimen, and modality. In some disciplines this is called an <strong>assay</strong>; Micronaut uses "measurement" throughout its own interface. A study can hold several of them at once — for example, a bacterial-viability stain and a separate ROS readout on the same wound-healing study — each with its own Samples &amp; design, Acquisition, and Data plan, all reachable from one measurement page (see <a href="research-brief.html">Research Brief</a> and the next chapter, <a href="acquisition.html">Acquisition &amp; the Spectral View</a>).</p>
+      <p>Two study-level facts sit above every measurement and are <em>not</em> edited here: the research question and the experimental unit. Both are set once on the Study map and only ever shown, read-only, on this page and on Samples &amp; design — each with its own "Edit on Study map" link back. That keeps one fact with one owner, instead of two screens quietly drifting apart on what your research question actually says.</p>
+      <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Samples &amp; design, Acquisition, and Data plan used to be three separate screens for a single implicit measurement. Once a study needed more than one, holding the connection between three screens in your head for each measurement got confusing fast — so they became three sections of one page per measurement, and the registry became the one place to see every measurement at once and jump into any of them.</p></div>
+    </section>
+
+    <section>
+      <h2 id="create-a-measurement">Creating a measurement</h2>
+      <ol class="steps">
+        <li>Open <strong>Measurements</strong> in the step nav.</li>
+        <li>Click <strong>+ New measurement</strong> above the registry list.</li>
+        <li>The app opens that measurement's own page immediately, ready for you to fill in.</li>
+      </ol>
+      <p>A new measurement starts with its own empty design, panel, and naming — nothing copies over automatically except its <strong>groups</strong>. If any existing measurement already has groups defined (the active one first, or else the first one found with any), the new measurement seeds an identical copy of that group list, so you don't have to retype "Control / Treatment" on every measurement of the same study. That seed is a suggestion, not a lock: edit it on the new measurement's own Samples &amp; design page and your edit sticks, exactly like typing it in from scratch.</p>
+      <p>The same <strong>+ Add measurement</strong> control also lives in the switcher bar at the top of the app (see <a href="#switching">Switching the active measurement</a> below) — either one creates a measurement the identical way.</p>
+      <div class="callout warn"><p><strong>⚠️ Careful.</strong> A study is capped at 50 measurements. Past that, <strong>+ New measurement</strong> disables itself and a toast explains why — there is no way to raise this cap from the interface.</p></div>
+    </section>
+
+    <section>
+      <h2 id="registry-groups">Groups belong to each measurement</h2>
+      <p>Groups — your comparison groups, such as a control and one or more treatment groups — are typed exactly once, per measurement, on that measurement's own Samples &amp; design page (see <a href="conditions-controls.html#groups">Conditions, Groups &amp; Controls</a>). The registry only ever <em>shows</em> them, in the Groups column, plus one shortcut:</p>
+      <ol class="steps">
+        <li>Make sure the measurement whose groups you want to reuse is the <strong>active</strong> one (see <a href="#switching">below</a>).</li>
+        <li>Click <strong>Copy groups to measurements that have none</strong>, above the registry list.</li>
+        <li>Every <em>other</em> measurement that has not yet defined its own groups gets a copy of the active measurement's group list. A measurement you already customized by hand is left alone — the toast tells you how many were applied and how many were skipped for that reason.</li>
+      </ol>
+      <div class="callout tip"><p><strong>💡 Tip.</strong> Observational studies may legitimately have no groups at all on any measurement — nothing about this page forces you to invent one.</p></div>
+    </section>
+
+    <section>
+      <h2 id="search-filter">Searching and filtering the registry</h2>
+      <p>Above the list itself sit three controls, all of which act on the list live as you use them:</p>
+      <ul>
+        <li><strong>Search</strong> — matches against a measurement's name, readout, modality, specimen summary, and group names, all at once. It is a plain substring match, not fuzzy: a near-miss spelling will not surface a row, by design.</li>
+        <li><strong>Status</strong> — filters to one registry status: <em>All statuses</em>, <em>Draft</em>, <em>Needs a decision</em>, or <em>Ready to acquire</em> (see <a href="#statuses">below</a>).</li>
+        <li><strong>Modality</strong> — filters to one modality actually in use in this study (STED, confocal, widefield, light-sheet, SEM/TEM, Raman, or whatever else you've entered on Acquisition). The list of choices rebuilds itself from what your measurements actually contain, so it never offers a modality nothing uses.</li>
+      </ul>
+      <figure class="shot">
+        <img src="images/03-measurements-registry.png" alt="Measurements registry: a searchable, filterable list of the study's measurements with their status, modality, and comparison groups." loading="lazy"
+             onerror="this.closest('.shot').classList.add('pending')">
+        <div class="ph">Snapshot pending — images/03-measurements-registry.png</div>
+        <figcaption>The Measurements registry — search box, status and modality filters, and one row per measurement.</figcaption>
+      </figure>
+      <div class="callout tip"><p><strong>💡 Tip.</strong> The empty-list message tells apart two different situations: "no measurements yet" (add your first one) versus "no measurement matches these filters" (loosen a filter or clear the search box) — so you're never left guessing which one it is.</p></div>
+    </section>
+
+    <section>
+      <h2 id="registry-columns">Reading a row</h2>
+      <p>Each row in the registry carries, left to right:</p>
+      <ul>
+        <li><strong>Name</strong>, as a clickable button — the whole name opens that measurement's page. Under it, a short line showing the readout you've described (or a placeholder if you haven't yet).</li>
+        <li><strong>Status</strong> — the three-word registry badge described below.</li>
+        <li><strong>Modality</strong> — whatever this measurement's Acquisition section has recorded, or an em dash if it's still blank.</li>
+        <li><strong>Groups</strong> — this measurement's own comparison groups, joined as "A vs B", or an em dash if none are set yet.</li>
+        <li><strong>Replicates</strong> — biological and/or technical replicate counts, whichever ones you've entered.</li>
+        <li><strong>Base filename</strong> — the filename stem this measurement's naming convention would currently produce, computed the identical way Samples &amp; design computes it (see <a href="conditions-controls.html">Conditions, Groups &amp; Controls</a> and <a href="validation-naming.html">Validation &amp; Naming</a>), so what you see here can never drift from what the Data plan step actually plans.</li>
+        <li><strong>Delete</strong> — only shown when the study has more than one measurement (see <a href="#delete">below</a>).</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 id="statuses">Measurement statuses</h2>
+      <p>Every row, and the header of the measurement's own page, carries exactly one status badge, in the register of a project tracker rather than a grading scheme:</p>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Badge</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Draft</strong></td><td>Nothing consequential has been decided yet.</td></tr>
+          <tr><td><strong>Needs a decision</strong></td><td>Something is open — an unanswered decision the app can see, or a validator that isn't happy with what's entered so far.</td></tr>
+          <tr><td><strong>Ready to acquire</strong></td><td>Every check the planner itself owns is satisfied.</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="callout warn"><p><strong>⚠️ Careful.</strong> "Ready to acquire" is scoped honestly: it means the planner's own known requirements are met, never that the experiment is correct, well-powered, or approved by anyone. It describes the <em>plan's completeness</em>, not the science — always confirm real acquisition settings at the microscope.</p></div>
+    </section>
+
+    <section>
+      <h2 id="switching">Switching the active measurement</h2>
+      <p>Exactly one measurement is "active" at a time — it's the one Samples &amp; design, Acquisition, and Data plan all show when you visit those sections, and the one Research Brief's measurement-scoped fields apply to. There are two ways to change it:</p>
+      <ul>
+        <li><strong>From the registry</strong> — click a measurement's name to open it, which also makes it the active one.</li>
+        <li><strong>From the switcher bar</strong> — a row of pills near the top of every screen, one per measurement, always visible regardless of which step you're on. Click a pill to make that measurement active without leaving the page you're on.</li>
+      </ul>
+      <p>Each pill in the switcher bar carries its own small badge, separate from the registry's status column: <strong>Not started</strong>, <strong>In progress</strong>, <strong>Decision needed</strong>, or <strong>Ready for now</strong>. This is a genuinely different reading of the same measurement — it comes from the app's whole-study workflow tracker, not from the three-word registry status — so don't be surprised if the two disagree slightly at first glance; they're answering related but distinct questions ("where does this measurement sit in the app's guided workflow" versus "does the plan itself pass its own checks").</p>
+      <div class="callout tip"><p><strong>💡 Tip.</strong> The step nav's own "Measurement" entry always names whichever measurement is currently active, rather than a generic label — so you can tell which one you're editing without opening the page.</p></div>
+    </section>
+
+    <section id="delete">
+      <h2 id="delete-a-measurement">Deleting a measurement</h2>
+      <p>A <strong>Delete</strong> button appears on a registry row (and an <span aria-hidden="true">×</span> on its switcher pill) only when the study has more than one measurement — a study is never allowed to end up with zero. Clicking either asks you to confirm in a plain browser dialog naming exactly what will go: the measurement's design, panel, and naming data, all together, with no undo.</p>
+      <div class="callout warn"><p><strong>⚠️ Careful.</strong> There is no separate "archive" state for a measurement the way there might be for other records — deleting one really does remove its design, panel, and naming data for good. If you might want it back, use Review's exports (Markdown, the raw JSON dump) to keep a copy first — see <a href="review-exports.html">Review &amp; Exports</a>.</p></div>
+      <div class="callout try"><p><strong>🧪 Try it.</strong> Open the example study (Study map's "Open the example study" link), then on Measurements try the Status and Modality filters one at a time — watch the list narrow, and watch the empty-state message change if you filter down to nothing.</p></div>
+    </section>
+
+    <section class="quiz">
+      <h2 id="self-check">Check yourself</h2>
+      <details class="quiz-q"><summary>You create a second measurement on a study that already has one with groups "Control" and "Treatment." Do the new measurement's groups come along automatically?</summary><p>Yes — a brand-new measurement seeds its groups from an existing measurement that already has some (the active one first), so you don't retype them. It's a starting point, not a lock: editing the new measurement's own groups on its Samples &amp; design page overrides the seed just like typing from scratch.</p></details>
+      <details class="quiz-q"><summary>A measurement's switcher-bar pill says "Decision needed" but its registry row says "Ready to acquire." Is that a bug?</summary><p>No. The switcher's badge and the registry's status are two separate readings — one from the app's whole-study workflow tracker, one from the planner's own per-measurement checks — and they are allowed to disagree slightly, since they answer different questions.</p></details>
+      <details class="quiz-q"><summary>You filter the registry to Status = "Draft" and see no rows, even though your study clearly has measurements. What does the empty-state message tell you?</summary><p>It distinguishes "no measurements yet" from "no measurement matches these filters" — since you have measurements, you'll see the second message, telling you to loosen or clear a filter rather than to go add a first measurement.</p></details>
+    </section>
+
+    <nav class="pager" id="pager"></nav>
+  </main>
+</div>
+<script src="manual.js?v=1"></script>
+</body>
+</html>

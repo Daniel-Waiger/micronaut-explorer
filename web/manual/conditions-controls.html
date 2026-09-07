@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conditions, Groups &amp; Controls — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="conditions-controls.html">
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="content">
+    <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>Conditions, Groups &amp; Controls</span></nav>
+    <header class="ch-head">
+      <p class="ch-kicker">Chapter 7</p>
+      <h1>Conditions, Groups &amp; Controls</h1>
+      <p class="lede">How the groups you set up turn into a real table of conditions and filenames, and how Micronaut decides which controls to suggest — and why it suggests each one.</p>
+    </header>
+
+    <section class="learn-box">
+      <h2 id="what-youll-learn">What you'll be able to do</h2>
+      <ul>
+        <li>Tell apart <strong>groups</strong> and <strong>factors</strong>, and know why they behave differently.</li>
+        <li>Read the condition table Samples &amp; design builds from your groups, factors, and replicate counts.</li>
+        <li>Understand replication vocabulary: biological/independent replicates versus technical replicates.</li>
+        <li>See where the controls Micronaut proposes on Review actually come from, and what fact drives each one.</li>
+        <li>Read a suggested control's stated reason, and know that rules propose but never decide for you.</li>
+      </ul>
+    </section>
+
+    <section>
+      <figure class="shot">
+        <img src="images/08-measurement-design.png" alt="The Samples &amp; design section of a measurement, showing the study-wide experimental unit, the organism field, the CTL and OPP groups, and a species factor with two levels." loading="lazy"
+             onerror="this.closest('.shot').classList.add('pending')">
+        <div class="ph">Snapshot pending — the Samples &amp; design section with its groups, factors and replicate fields.</div>
+        <figcaption>Everything on this page starts here: <strong>Samples &amp; design</strong> holds the experimental unit, the groups (CTL and OPP), and any factors that cross them.</figcaption>
+      </figure>
+
+      <h2 id="groups">Groups: mutually exclusive alternatives</h2>
+      <p><strong>Groups</strong> are your experimental groups — a control group and one or more treatment groups, for example. Every sample belongs to exactly <strong>one</strong> group; groups are, by construction, mutually exclusive alternatives, never something that crosses with itself. You set them on a measurement's own Samples &amp; design page (see <a href="measurements.html#registry-groups">Measurements Registry</a> for how a new measurement seeds its groups from an existing one, and the "copy to measurements that have none" shortcut).</p>
+      <p>Add a group with <strong>Add group</strong>; each one gets its own name box and a <strong>Remove</strong> button. An observational study — one that isn't comparing groups at all — may legitimately have none.</p>
+      <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Groups used to be typed as one comma-separated string. Two people editing the same list at different times, or typos in the separator, made it easy to end up with a phantom empty group or a name that silently didn't match what Samples &amp; design expected. Naming each group in its own box, one row at a time, removes that whole class of mistake.</p></div>
+    </section>
+
+    <section>
+      <h2 id="factors">Factors: axes that genuinely cross</h2>
+      <p><strong>Factors</strong> are the other axis: something in your experiment that varies on its own, separate from your groups — genotype or timepoint, for instance. Unlike groups, a factor's levels genuinely <strong>cross</strong> with everything else: a sample really can be both "WT" <em>and</em> "24h," so a genotype factor and a timepoint factor multiply out into every combination. Groups do cross with factors (a 2-group study times a 2-level genotype factor is a legitimate 2×2), but groups never cross with each other — a study either has one group axis or none.</p>
+      <p>Add a factor with <strong>Add factor</strong>: give it a name, then a comma-separated list of levels (e.g. "WT, KO"). Each factor gets its own <strong>Remove</strong> button too.</p>
+      <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Expressing your groups as an ordinary factor is exactly what used to let a filename read as somehow both "control" and "the 50 mM group" at once — nonsense that a genuinely singular group axis makes unrepresentable, rather than merely discouraged by convention.</p></div>
+    </section>
+
+    <section>
+      <h2 id="replicates">Two independent replicate axes</h2>
+      <p>Below groups and factors sit two optional, independent number fields:</p>
+      <ul>
+        <li><strong>Biological / independent replicates</strong> — how many independently assigned or sampled units you have.</li>
+        <li><strong>Technical replicates</strong> — repeat measurements of the <em>same</em> unit.</li>
+      </ul>
+      <p>Leave either blank if it doesn't apply — some modalities (SEM/TEM, Raman) commonly use neither, and a blank field means "not used," never a silent default of 1.</p>
+    </section>
+
+    <section id="conditions">
+      <h2 id="the-condition-table">How conditions are built</h2>
+      <p>Samples &amp; design expands your groups, factors, and replicate counts into a concrete table of <strong>conditions</strong> — every real combination your design implies, one row each. The row order is fixed and meaningful: group outermost (slowest-varying), then each factor in the order you declared it, then biological replicate, then technical replicate innermost (fastest-varying) — so the same design always produces filenames in the same, predictable sequence.</p>
+      <p>Above the table, a box labelled <strong>Every file starts with</strong> shows the base filename stem every row in this measurement shares — the part that doesn't change row to row — so you can see what's common before scanning what differs between rows.</p>
+      <p>Each condition row shows a short summary of that row's group/factor/replicate values, the sample id it resolves to, and the full planned filename, built by the same naming engine the Data plan step itself uses — so a row here can never disagree with what Data plan would actually produce (see <a href="validation-naming.html">Validation &amp; Naming</a>).</p>
+      <div class="callout warn"><p><strong>⚠️ Careful.</strong> The condition table refuses to materialize more than 1,000 rows, and a study is separately capped at 50 measurements — an oversized design (an extra factor added by mistake, a huge replicate count) fails with a visible issue rather than silently hanging on a cartesian product nobody meant to build.</p></div>
+      <div class="callout tip"><p><strong>💡 Tip.</strong> With zero factors and zero group levels, the design still expands to exactly one unconditioned row — so an empty condition table always means a real issue is listed just above it, never "you haven't started yet."</p></div>
+    </section>
+
+    <section id="panel-controls">
+      <h2 id="controls-overview">Where controls come from</h2>
+      <p>On <strong>Review</strong>, each measurement gets a list of suggested controls — panel-derived and readout-specific — with a stated reason attached to every one. These are not typed in by hand: they come from a rules knowledge base, evaluated against facts your measurement's Acquisition and readout answers already establish. Micronaut never assumes "no controls needed" from silence — an empty controls list is always shown as its own explicit sentence, never left blank.</p>
+      <figure class="shot">
+        <img src="images/11-overview-controls.png" alt="The Controls block on the Review screen, listing panel-derived controls (unstained/autofluorescence, single-stain) and a readout-specific heat-killed control, each followed by the reason it is suggested." loading="lazy"
+             onerror="this.closest('.shot').classList.add('pending')">
+        <div class="ph">Snapshot pending — the Controls block on Review, split into panel-derived and readout-specific.</div>
+        <figcaption>Suggested controls as they appear on <strong>Review</strong>: panel-derived first, then readout-specific, each with the reason it was suggested spelled out after the dash.</figcaption>
+      </figure>
+
+      <p>Two kinds of control rule exist, and both key off facts your Acquisition panel already derives (see <a href="acquisition.html">Acquisition &amp; the Spectral View</a>):</p>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Kind</th><th>Keys off</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Panel-derived</strong></td><td>Facts about your fluorophore panel itself — whether any markers are declared, how many resolved fluorophores you have, and whether an antibody is actually involved.</td></tr>
+          <tr><td><strong>Readout-specific</strong></td><td>The specific readout you've described (bacterial viability, ROS, macrophage cytoskeleton, scratch migration, and so on) — a recognized readout unlocks readout-specific controls; an unrecognized free-text answer is respected, not overridden.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="panel-derived-controls">The panel-derived suggestions, and the reasoning behind each</h2>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Suggested control</th><th>Fires when…</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Unstained / autofluorescence control</td>
+            <td>Any markers are declared at all.</td>
+            <td>Fixed tissue and many cell types autofluoresce, especially in the green channel — without an unstained sample imaged at identical settings, you can't tell a dim real signal apart from background.</td>
+          </tr>
+          <tr>
+            <td>Single-stain controls (one channel at a time)</td>
+            <td>More than one fluorophore is declared.</td>
+            <td>Two or more fluorophores imaged together can spectrally spill into each other's channel — a sample stained with only one of them, imaged on every channel, is what lets you tell real co-localization apart from spillover.</td>
+          </tr>
+          <tr>
+            <td>Fluorescence-minus-one (FMO) controls</td>
+            <td>More than two fluorophores are declared.</td>
+            <td>Past about three colors, spillover from every <em>other</em> channel can shift where a real positive/negative boundary sits — an FMO sample (everything except the one you're gating on) reproduces that shifted background so your gate stays honest.</td>
+          </tr>
+          <tr>
+            <td>Secondary-antibody-only control</td>
+            <td>The panel involves an antibody (direct or indirect conjugation).</td>
+            <td>For indirect immunofluorescence, the secondary antibody can bind nonspecifically or the sample can autofluoresce at its wavelength — omitting the primary but keeping the secondary isolates that background.</td>
+          </tr>
+          <tr>
+            <td>Isotype control</td>
+            <td>The panel involves an antibody.</td>
+            <td>A same-species, same-isotype antibody with no specificity for your target tests whether staining reflects real target binding or nonspecific antibody binding (e.g. Fc receptor binding).</td>
+          </tr>
+          <tr>
+            <td>Biological specificity control</td>
+            <td>The panel involves an antibody.</td>
+            <td>An isotype control only rules out nonspecific <em>antibody</em> binding — a blocking-peptide competition, a knockdown/knockout, or a known-negative sample confirms the signal tracks the real biology, not just the reagent.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Every antibody-gated rule above keys specifically on whether an antibody is involved — a fact Panel assembly's conjugation modes make precise (see <a href="acquisition.html#panel-assembly">Acquisition &amp; the Spectral View</a>). A phalloidin-only or genetically-encoded-only panel, with no antibody anywhere in it, will not be told to run an isotype control just because it has markers at all.</p></div>
+    </section>
+
+    <section>
+      <h2 id="readout-controls">The readout-specific suggestions</h2>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Readout</th><th>Suggested control</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Bacterial viability</td>
+            <td>Heat-killed (dead) control</td>
+            <td>SYTO9/PI viability staining reports percent-dead relative to a maximum-death reference — a heat-killed aliquot, imaged the same way, calibrates the PI-positive gate.</td>
+          </tr>
+          <tr>
+            <td>ROS</td>
+            <td>H2O2-treated positive control</td>
+            <td>A hydrogen-peroxide-treated sample gives DCF a known, strong oxidative signal, confirming the probe is loading and responding at all.</td>
+          </tr>
+          <tr>
+            <td>ROS</td>
+            <td>NAC-treated (antioxidant) negative control</td>
+            <td>N-acetylcysteine scavenges reactive oxygen species and should suppress the DCF signal — if it doesn't, the readout may not actually be tracking oxidative stress here.</td>
+          </tr>
+          <tr>
+            <td>Macrophage cytoskeleton</td>
+            <td>Untreated / vehicle reference</td>
+            <td>Phalloidin staining shows the actin architecture at one moment, which only means something compared against an untreated or vehicle-only baseline under identical settings.</td>
+          </tr>
+          <tr>
+            <td>Scratch migration</td>
+            <td>t=0 scratch reference image</td>
+            <td>Closure is measured as a change from a starting wound area, so every scratch needs its own image taken immediately after scratching, before any closure could have begun.</td>
+          </tr>
+          <tr>
+            <td>Scratch migration</td>
+            <td>Mitomycin C proliferation-blocked control</td>
+            <td>A scratch can close by migration <em>or</em> by proliferation into the gap — a mitomycin-C-treated control closing more slowly is what separates the two.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="callout tip"><p><strong>💡 Tip.</strong> Choosing a recognized readout is what unlocks its matching controls — an unrecognized, free-text readout answer is respected exactly as typed, never silently replaced, but it also won't trigger readout-specific suggestions the app has no rule for.</p></div>
+    </section>
+
+    <section>
+      <h2 id="rules-propose">Rules propose, you dispose</h2>
+      <p>Every suggested control on Review carries its own reason, in full sentences — never just a name with nothing to explain it. That reasoning is deliberate: a control the researcher doesn't understand is a control they'll eventually delete from their protocol out of confusion, so each rule's "why" is written to actually be read, not just checked off. Nothing here is applied to your study automatically or blocks you from proceeding — these are suggestions for you to plan into your protocol, not fields Micronaut fills in or a gate it enforces.</p>
+      <div class="callout try"><p><strong>🧪 Try it.</strong> Open the example study, then on its Acquisition step add a second, unrelated fluorophore to a single-marker panel. Reopen Review and watch the Single-stain and (past two) FMO control suggestions appear — each with its own stated reason, keyed to the fact you just changed.</p></div>
+    </section>
+
+    <section class="quiz">
+      <h2 id="self-check">Check yourself</h2>
+      <details class="quiz-q"><summary>Your design has a "Control vs. Treatment" group and a separate "genotype" factor with levels WT and KO. Do these two axes multiply together, or does the app treat them as one combined group?</summary><p>They multiply — groups cross with factors legitimately (here, a 2×2), because a factor's levels genuinely apply to every group. Groups themselves never cross with each other; a study has one group axis or none.</p></details>
+      <details class="quiz-q"><summary>A measurement uses only a genetically-encoded GFP fusion and phalloidin — no antibody anywhere. Will Review suggest an isotype control?</summary><p>No. Isotype, secondary-antibody-only, and biological specificity controls all require an antibody to be involved (direct or indirect conjugation), and neither conjugation mode here qualifies.</p></details>
+      <details class="quiz-q"><summary>You've entered five different fluorophores on one measurement. Which panel-derived controls should you expect to see, beyond the unstained control?</summary><p>Single-stain controls (more than one fluorophore) and fluorescence-minus-one controls (more than two) — both trigger well before five, so both should appear.</p></details>
+    </section>
+
+    <nav class="pager" id="pager"></nav>
+  </main>
+</div>
+<script src="manual.js?v=1"></script>
+</body>
+</html>

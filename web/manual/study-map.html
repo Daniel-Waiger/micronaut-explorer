@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Study Map — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="study-map.html">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>The Study Map</span></nav>
+      <header class="ch-head">
+        <p class="ch-kicker">Chapter 3</p>
+        <h1>The Study Map</h1>
+        <p class="lede">Study map is home — the one screen that shows the shape of your whole study at a glance, and always knows what to ask you next.</p>
+      </header>
+
+      <section class="learn-box">
+        <h2 id="what-youll-learn">What you'll be able to do</h2>
+        <ul>
+          <li>Read the study map summary: question, system, comparison structure, and experimental unit</li>
+          <li>Answer the map's orientation questions one at a time, or edit them directly in the summary</li>
+          <li>Add and name measurements from the map itself</li>
+          <li>Follow "Next decision" to the one thing most worth doing right now</li>
+          <li>Recognize the workflow badges on the nav rail and the measurement pills, and what each state means</li>
+          <li>Use the footer's Continue button to follow the same guidance without leaving the current page</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="reading-the-map">Reading the study map</h2>
+        <p>Study map is both the app's landing page and its first workspace. It shows four orientation facts about the whole study — the <strong>research question</strong> you're trying to answer, the <strong>system or material</strong> you're studying, whether you're comparing <strong>groups or conditions</strong> or running an <strong>observational</strong> study, and what counts as one independent <strong>experimental unit</strong> — plus a card per measurement showing its name and what it will observe.</p>
+        <p>The very first time you fill these in, the map asks them one at a time as a short intake — "What are you trying to find out?", then the system, then the comparison choice, then your first measurement's name and readout, then the experimental unit — with <strong>Back</strong>, <strong>Decide later</strong>, and <strong>Continue</strong> at each step. Once every orientation question has an answer (or you've explicitly deferred it with "Decide later"), the map switches to a single summary view: every field editable in place, with each measurement's own card below it and an "Add another measurement" form beneath those.</p>
+        <figure class="shot">
+          <img src="images/01-study-map.png" alt="Study map screen: the research question, system, comparison groups, and measurements of the shipped example study, each field directly editable." loading="lazy"
+               onerror="this.closest('.shot').classList.add('pending')">
+          <div class="ph">Snapshot pending — images/01-study-map.png</div>
+          <figcaption>Study map's summary view — the shape of the shipped example study at a glance, every field editable in place.</figcaption>
+        </figure>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> "Decide later" doesn't lose your place — it just marks that question as deliberately deferred rather than missing, and moves on to the next one. You can always come back and answer it from the summary view.</p></div>
+      </section>
+
+      <section>
+        <h2 id="comparison-and-groups">Comparison mode and groups</h2>
+        <p>The comparison question is a simple either/or: <strong>"Compare groups or conditions"</strong> or <strong>"Observational study."</strong> If you choose groups, the map shows a read-only summary of whatever group names are already in use across your measurements (for example "CTL vs OPP") — but it isn't where you type them. Groups are named exactly once, per measurement, on that measurement's own Samples &amp; design section; Study map only reflects what's already there. See <a href="measurements.html">Measurements Registry</a> and <a href="conditions-controls.html">Conditions, Groups &amp; Controls</a>.</p>
+      </section>
+
+      <section>
+        <h2 id="next-decision">"Next decision" — one thing at a time</h2>
+        <p>Below the summary, whenever anything about the study still needs attention, a <strong>Next decision</strong> card names exactly one thing worth doing right now — in plain language, with a reason ("The study map needs the question this work will answer," say) and a button carrying its own label straight to wherever that decision belongs. Micronaut works out this single next step from everything it knows about your study: which orientation questions are still open, whether each measurement has a name and a readout, whether a groups study's measurements actually have their groups defined, whether replicate counts and an acquisition method are set, and any outstanding conformance check from Review.</p>
+        <p>These aren't presented as a checklist to work through top to bottom — the app always resolves them to the single highest-priority one, so you're never asked to weigh several open questions against each other yourself.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> A study can have a dozen small gaps at once, and showing all of them together reads as a wall of homework. Naming one — the one that actually blocks the most progress — turns "here's everything wrong" into "here's what to do next," which is a much easier thing to act on.</p></div>
+      </section>
+
+      <section>
+        <h2 id="continue-navigation">Following Continue</h2>
+        <p>The same "next decision" logic drives the <strong>Continue</strong> button in the footer at the bottom of every screen, not just the one on Study map's own card. When the study has an open decision that Continue can reach, its label changes to <strong>"Continue to next decision"</strong> and clicking it — from wherever you currently are — jumps straight to the right workspace, and to the right measurement if the decision belongs to one. If a decision names a different measurement than the one you're currently viewing, Continue switches the active measurement for you first.</p>
+        <p>Once nothing is left needing attention that Continue can reach, it reverts to its plain, linear meaning: moving forward through Study map → Research brief → Measurements → Measurement → Review in order (it's disabled at Review, the last step).</p>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> If Continue is already sitting on the very decision it would otherwise send you to, it quietly falls back to the plain "move to the next workspace" behavior instead of sending you nowhere — so it never looks like it did nothing when you click it.</p></div>
+      </section>
+
+      <section>
+        <h2 id="workflow-badges">Workflow badges</h2>
+        <p>Every step button in the nav rail, and every measurement pill in the switcher bar above the workspace, carries a small colored badge naming its current state:</p>
+        <div class="table-wrap">
+        <table>
+          <thead><tr><th>Badge</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>Not started</td><td>Nothing has been entered for this step or measurement yet.</td></tr>
+            <tr><td>In progress</td><td>Some fields are filled in, but the step isn't finished.</td></tr>
+            <tr><td>Decision needed</td><td>Something here is open, or a planner check is unhappy — this is exactly the kind of thing "Next decision" and Continue surface for you.</td></tr>
+            <tr><td>Ready for now</td><td>Every check this step or measurement owns is currently satisfied.</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div class="callout warn"><p><strong>⚠️ Careful.</strong> "Ready for now" describes the plan's completeness against the app's own checks — it is never a claim that the experiment is scientifically correct, adequately powered, or approved by anyone. Measurements use the same three-word vocabulary under slightly different labels — <strong>Draft</strong>, <strong>Needs a decision</strong>, <strong>Ready to acquire</strong> — for exactly this reason: see <a href="measurements.html">Measurements Registry</a>.</p></div>
+      </section>
+
+      <section class="quiz">
+        <h2 id="self-check">Check yourself</h2>
+        <details class="quiz-q"><summary>You want to name your comparison groups — "irrigated" and "dry," say. Do you type them on Study map?</summary><p>No. Study map only shows a read-only summary of whichever group names your measurements already use. Groups are typed once, per measurement, on that measurement's own Samples &amp; design section.</p></details>
+        <details class="quiz-q"><summary>You're on the Measurement page and click "Continue to next decision." Where does it take you?</summary><p>Wherever the study's single highest-priority open decision actually is — a different workspace, and a different measurement if that's what the decision names, switching the active measurement for you automatically.</p></details>
+        <details class="quiz-q"><summary>A measurement's pill shows "Ready for now." Does that mean the experiment is scientifically sound?</summary><p>No — it only means the planner's own checks for that measurement are currently satisfied. It's a statement about the plan's completeness, not a validation of the science.</p></details>
+      </section>
+
+      <nav class="pager" id="pager"></nav>
+    </main>
+  </div>
+  <script src="manual.js?v=1"></script>
+</body>
+</html>

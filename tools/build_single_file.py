@@ -500,6 +500,57 @@ def build(web_dir: Path, out_dir: Path) -> bytes:
                 f"from {docs_images_dir} -> {images_dst}"
             )
 
+    # web/src/ui/shell.js's nav also carries a "User manual" link at a relative
+    # `manual/` URL, so dist/ must carry that folder too, for the same reason
+    # release-notes/ is copied above: otherwise the link 404s wherever dist/
+    # is served (or opened via file://). Mirrors the release-notes block
+    # immediately above it, with one deliberate divergence in the image step:
+    # the manual's chapter pages are allowed to reference screenshots that
+    # have not been captured yet (each such <figure> has an onerror handler
+    # that swaps in a "Snapshot pending" placeholder -- see web/manual/manual.css's
+    # figure.shot.pending rule), so a missing image here is expected, ongoing
+    # authoring state, not a build defect. Raising BuildError for it the way
+    # the release-notes block does would make it impossible to ship a manual
+    # chapter before its screenshot exists; this block instead copies what it
+    # can and prints a note for what it can't, letting the build succeed either
+    # way while still telling you exactly what's missing.
+    manual_src = web_dir / "manual"
+    if manual_src.exists():
+        manual_dst = out_dir / "manual"
+        if manual_dst.exists():
+            shutil.rmtree(manual_dst)
+        shutil.copytree(manual_src, manual_dst)
+        print(f"copied {manual_src} -> {manual_dst}")
+
+        referenced_manual_images: set[str] = set()
+        for html_path in sorted(manual_dst.glob("*.html")):
+            html_text = html_path.read_text(encoding="utf-8")
+            referenced_manual_images.update(re.findall(r'src="images/([^"]+)"', html_text))
+        if referenced_manual_images:
+            docs_images_dir = web_dir.parent / "docs" / "images"
+            manual_images_dst = manual_dst / "images"
+            copied_count = 0
+            skipped: list[str] = []
+            for name in sorted(referenced_manual_images):
+                src_image = docs_images_dir / name
+                if not src_image.is_file():
+                    skipped.append(name)
+                    continue
+                manual_images_dst.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(src_image, manual_images_dst / name)
+                copied_count += 1
+            if copied_count:
+                print(
+                    f"copied {copied_count} manual screenshot(s) "
+                    f"from {docs_images_dir} -> {manual_images_dst}"
+                )
+            for name in skipped:
+                print(
+                    f"note: manual references images/{name}, but {docs_images_dir / name} "
+                    "does not exist yet -- skipping (the figure's onerror handler shows "
+                    "a 'Snapshot pending' placeholder instead)"
+                )
+
     return output_bytes
 
 

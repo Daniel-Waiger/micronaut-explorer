@@ -121,6 +121,12 @@ jobs:
           # no longer exists on disk, so copying web/release-notes directly
           # would ship a release-notes page with broken screenshots.
           cp -r dist/release-notes "$work/release-notes"
+          # Same reasoning as release-notes above: dist/manual (assembled by
+          # tools/build_single_file.py, run in the "Build single-file app"
+          # step above) is the one with its referenced screenshots copied in
+          # from docs/images/ where they exist.
+          rm -rf "$work/manual"
+          cp -r dist/manual "$work/manual"
           cd "$work"
           touch .nojekyll
           git add -A

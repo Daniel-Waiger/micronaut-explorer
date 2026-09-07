@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Big Ideas — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="big-ideas.html">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>The Big Ideas</span></nav>
+      <header class="ch-head">
+        <p class="ch-kicker">Chapter 2</p>
+        <h1>The Big Ideas</h1>
+        <p class="lede">A handful of ideas that explain almost every design decision in the rest of the app — read this once, before you start planning a real study.</p>
+      </header>
+
+      <section class="learn-box">
+        <h2 id="what-youll-learn">What you'll be able to do</h2>
+        <ul>
+          <li>Explain why nothing you type ever leaves your browser</li>
+          <li>Describe how a study and its measurements relate to each other</li>
+          <li>Recognize what provenance is, and why some fields resist being overwritten</li>
+          <li>Explain why the app's advice is deterministic and rule-based, not AI-generated</li>
+          <li>Know what "alpha" means for how much you should trust this tool</li>
+        </ul>
+      </section>
+
+      <p>Every other chapter in this manual links back here instead of re-explaining these ideas — so it's worth reading the whole thing once, even before you touch your own study.</p>
+
+      <section>
+        <h2 id="local-and-private">Nothing leaves your browser</h2>
+        <p>Micronaut Planner has no server, no account, and no network calls that carry your data anywhere. Everything you type — your research question, your measurements, your whole study — is saved directly inside the browser you're using, on the device you're using it on, and it stays there.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> This is what lets the app run entirely offline, as a single static file you can double-click from your own disk (<code>file://</code>) or host anywhere, with identical behavior either way. There is no upload step to skip and no account to create, because there is nothing on the other end waiting to receive your data.</p></div>
+        <p>The practical result: your study lives only in this one browser, on this one device. Open the Planner in a different browser, or on a different computer, and you'll find it empty — even though it's "the same app." There is no built-in sync between devices; moving a study between them means exporting it as a file and importing that file on the other device (see <a href="saving-privacy.html">Saving, Backups &amp; Privacy</a>).</p>
+      </section>
+
+      <section>
+        <h2 id="study-and-measurements">A study contains measurements</h2>
+        <p>Every plan in Micronaut Planner is one <strong>study</strong>: a research question, the organism or material or system you're studying, whether you're comparing groups or just observing, and what counts as one independent experimental unit. Those few facts are the shape of the whole study, and they live on the <strong>Study map</strong> (see <a href="study-map.html">The Study Map</a>).</p>
+        <p>A study, in turn, holds one or more <strong>measurements</strong> — an observation or analysis used to answer the study's question. In some disciplines a measurement is called an assay. Each measurement has its own readout, its own specimen, its own acquisition method, and its own conditions, and you switch between them using the pill row near the top of the workspace whenever more than one is defined. Everything below the study's own shape — samples and design, acquisition, data plan — belongs to one measurement at a time, not to the whole study.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> A study that compares, say, bacterial viability and biofilm thickness on the same coated samples is really asking two different measurement questions from one shared research question and system. Keeping "study" and "measurement" as separate levels lets each measurement carry its own modality and panel without duplicating the question or the material every time.</p></div>
+      </section>
+
+      <section>
+        <h2 id="provenance">Every field remembers where it came from</h2>
+        <p>Micronaut tags every value you (or the app) writes into a field with a source: something you typed yourself, something imported from a backup, something the app suggested from a description or a knowledge-base default, or something a language model once proposed. That tag is called its <strong>provenance</strong>, and it decides one thing: whether a new value is allowed to overwrite the old one.</p>
+        <p>A value you typed or imported yourself is treated as a strong source. A value the app derived, guessed as a default, or extracted from free text is a weaker source. A weaker source can never silently overwrite a stronger one — so once you've typed a marker name yourself, an automatic suggestion can never quietly replace it. Editing a field you're shown always promotes it to your own strong tag, even if the value underneath started out as a weak guess, so a value you've reviewed is never treated as unreviewed again.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Without this rule, re-running a suggestion (or reopening an older study) could quietly overwrite a fact you'd already confirmed with a stale guess — a subtle, hard-to-notice kind of data loss. Provenance is what makes "the app suggested this" and "you decided this" stay distinguishable, and keeps a stronger fact permanently safe from a weaker one.</p></div>
+        <p>You'll meet this idea most concretely in <a href="research-brief.html">The Research Brief</a>, where a suggestion pulled from your free-text description never becomes a real field value until you explicitly accept it.</p>
+      </section>
+
+      <section>
+        <h2 id="deterministic-advice">The app's advice is deterministic, rule-based — never AI</h2>
+        <p>Micronaut Planner never calls a language model, and no result you see in the app was generated by one. Every piece of guidance — a modality-specific tip on Acquisition, a suggested control with its reason, a marker match found in your description — comes from an explicit, human-authored set of rules and lookup tables shipped with the app (its "knowledge base"), evaluated the same deterministic way every time. Ask the same question twice and you get the same answer twice.</p>
+        <p>Two places in the app do involve a model, and both are deliberately one-way and outside the app itself: <strong>Research brief review</strong> is a plain exact-text scan of your saved description — not a model call — that recognizes marker names, replicate counts, magnification, and unambiguous dates, and quotes back the exact text it matched. And on <strong>Review</strong>, a "Copy prompt for your own LLM" export hands you a block of text — your study as JSON, some ground rules, and the gaps Micronaut can tell are still open — to paste into whatever model you already use, entirely outside the app. Nothing that model replies is ever read back into your study; you act on its answer yourself.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Rule-based advice can be inspected, is exactly reproducible, and never invents a scientific fact that wasn't already in the rule or in your own text. That's a deliberate trade against a model's flexibility: this app would rather tell you nothing than tell you something it can't stand behind.</p></div>
+      </section>
+
+      <section>
+        <h2 id="alpha-status">This is an early preview</h2>
+        <p>Micronaut Planner is shared as an alpha, for feedback. It's a planning aid, not a validated instrument model — always confirm your real acquisition settings at the microscope rather than trusting a number here as final. The built-in modality guidance is still being reviewed by a microscopy specialist, so treat specific wording as provisional, not settled fact.</p>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> Found something wrong, confusing, or missing? The header's <strong>Copy feedback report</strong> action (in Utilities) captures your current step, your browser, and your whole study as text — ready to paste into an email, or into the prefilled <strong>Open GitHub issue</strong> action right next to it. Neither one sends anything anywhere on its own; both hand you something to paste or submit yourself.</p></div>
+      </section>
+
+      <section class="quiz">
+        <h2 id="self-check">Check yourself</h2>
+        <details class="quiz-q"><summary>You plan a study on your laptop, then open the Planner on a colleague's computer using the same URL. Do you see your study there too?</summary><p>No. Your data lives only in the browser and device you saved it on — there's no account and no server-side sync. To move it, export it as a backup file on your laptop and import that file on the other device.</p></details>
+        <details class="quiz-q"><summary>You typed a marker name yourself, then later ran Research brief review and it suggested a different marker from your description. Does the suggestion overwrite what you typed?</summary><p>No — a value you typed is a strong source, and a free-text suggestion is a weaker one. A weaker source can never overwrite a stronger one, and nothing changes until you explicitly review and accept a suggestion anyway.</p></details>
+        <details class="quiz-q"><summary>Does Micronaut Planner ever call a language model to fill in your study for you?</summary><p>No. Every suggestion and every piece of guidance in the app comes from deterministic, human-authored rules. The one place a model appears is an optional, one-way "Copy prompt for your own LLM" export on Review, and nothing it replies is read back into your study.</p></details>
+      </section>
+
+      <nav class="pager" id="pager"></nav>
+    </main>
+  </div>
+  <script src="manual.js?v=1"></script>
+</body>
+</html>

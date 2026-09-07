@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Validation &amp; Naming — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="validation-naming.html">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>Validation &amp; Naming</span></nav>
+      <header class="ch-head">
+        <p class="ch-kicker">Chapter 8</p>
+        <h1>Validation &amp; Naming</h1>
+        <p class="lede">How Micronaut turns your measurement's details into a consistent filename, what the file-naming rules actually check, and how to read (and fix) the warnings it shows you.</p>
+      </header>
+
+      <section class="learn-box">
+        <h2 id="what-youll-learn">What you'll be able to do</h2>
+        <ul>
+          <li>Understand the filename template and which parts of it are required versus optional</li>
+          <li>Fill in the naming fields on a measurement's <strong>Data plan</strong> section</li>
+          <li>Read the difference between an error and a warning in the issues list</li>
+          <li>Fix the most common naming complaints: an invalid sample ID, magnification, notes, or an unrecognized marker</li>
+          <li>Know what happens automatically when a name would collide with a reserved Windows filename, or run too long</li>
+          <li>Understand what "configuration" means here — a fixed set of rules every study currently uses, not a per-lab settings screen</li>
+        </ul>
+      </section>
+
+      <section>
+        <figure class="shot">
+          <img src="images/09-measurement-dataplan.png" alt="The Data plan section, showing the naming fields (date, modality, experiment type, markers, magnification, group, sample), the four planned filenames generated from them, and a note listing UNKNOWN as a generated placeholder." loading="lazy"
+               onerror="this.closest('.shot').classList.add('pending')">
+          <div class="ph">Snapshot pending — the Data plan section with its naming fields and generated filename preview.</div>
+          <figcaption>The <strong>Data plan</strong> section: the fields on top, the filenames they produce underneath, and an explicit note naming every placeholder still standing in for a value you haven't supplied.</figcaption>
+        </figure>
+
+        <h2 id="the-filename-template">The filename template</h2>
+        <p>Every planned filename in Micronaut is built from one template, applied the same way to every measurement in every study:</p>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              <tr><td colspan="2"><code>{date}_{modality}_{exptype}_{markers}_{magnification}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The first five tokens — date, modality, experiment type, markers, and magnification — are the part every file from this measurement shares, sometimes called the <strong>base name</strong>. The remaining tokens are what tells two files from the <em>same</em> measurement apart: which group, which sample, which biological or technical replicate, and any free-text notes.</p>
+        <ul>
+          <li><strong>group</strong>, <strong>biorep</strong>, <strong>techrep</strong>, and <strong>notes</strong> are optional. If your design has no groups, or your modality doesn't use technical replicates (common for SEM/TEM or Raman), that token is simply dropped from the name — you never get a placeholder sitting in for something you don't have.</li>
+          <li>Every other token is required. Until you fill it in, the filename preview shows a clearly generated placeholder (like <code>UNKNOWN</code> for modality, experiment type, markers, or magnification, or <code>1970-01-01</code> for date) so you can still see the shape of the name — see <a href="#reading-the-preview">Reading the preview</a> below.</li>
+        </ul>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> The <strong>Group</strong> box on Data plan is read-only. Groups are typed in exactly one place — the measurement's <a href="conditions-controls.html">Samples &amp; design</a> section — and Data plan just shows what that section already decided, so the group in a planned filename can never disagree with the group you actually set up.</p></div>
+      </section>
+
+      <section>
+        <h2 id="filling-in-the-fields">Filling in the naming fields</h2>
+        <p>Open a measurement and scroll to its <strong>Data plan</strong> section. Each box maps to one token in the template:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Field</th><th>What it means</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Date</strong></td><td>The date you acquired the images. Starts pre-filled with today's date until a real acquisition date is entered.</td></tr>
+              <tr><td><strong>Modality</strong></td><td>The type of microscope or imaging method — confocal, widefield, STED, and so on.</td></tr>
+              <tr><td><strong>Experiment type</strong></td><td>A short label for what kind of experiment this is, so related files group together (e.g. "CT" for a control).</td></tr>
+              <tr><td><strong>Markers</strong></td><td>Stains, dyes, or fluorescent proteins imaged — or, for SEM/TEM with no fluorescence, your contrast agent (e.g. uranyl acetate) instead.</td></tr>
+              <tr><td><strong>Magnification</strong></td><td>The zoom level or objective used, like 40x or 100x.</td></tr>
+              <tr><td><strong>Sample</strong></td><td>A unique ID for this specimen or animal, so two files never get mixed up.</td></tr>
+              <tr><td><strong>Biological replicate #</strong> / <strong>Technical replicate #</strong></td><td>Which repeat this is — a different animal/dish/sample (biological), or a repeat measurement of the same one (technical). Leave blank if it doesn't apply.</td></tr>
+              <tr><td><strong>Notes</strong></td><td>Anything else worth remembering about this specific file. Optional.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>As you type, the <strong>Planned filename(s)</strong> list below the fields updates immediately — one row per file the measurement's design calls for, or a single row if there's no design at all. A <strong>Copy all</strong> (or <strong>Copy filename</strong>, for just one) button copies the whole list, one name per line, ready to paste into a lab notebook or spreadsheet column.</p>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> The naming fields and the planned-name list are two views of the same in-memory snapshot, so the table can never show a name that disagrees with what you just typed — even before anything is saved.</p></div>
+      </section>
+
+      <section>
+        <h2 id="reading-the-preview">Reading generated placeholders</h2>
+        <p>Below the planned-name list, a short status line tells you whether every required value has actually been supplied, or whether the preview is still filling in gaps on your behalf:</p>
+        <ul>
+          <li><strong>"Every required filename value in this preview was supplied"</strong> — nothing is a placeholder any more.</li>
+          <li><strong>"Generated preview placeholders — not supplied values"</strong> followed by a list — each entry names a field (e.g. <code>UNKNOWN is a generated placeholder for Modality</code>) that is still using the naming template's built-in default, not something you typed.</li>
+        </ul>
+        <p>These placeholders keep the filename preview readable at every stage, but they aren't real answers — they're exactly what the Review step's readiness check looks for when it flags a measurement as "needs review." See <a href="review-exports.html#planner-checks">Planner checks</a>.</p>
+      </section>
+
+      <section>
+        <h2 id="the-naming-rules">The naming rules ("configuration")</h2>
+        <p>Micronaut checks each typed value against a fixed set of format rules — the same rules for every study, since there's currently no in-app screen to change them per lab:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Field</th><th>Rule</th><th>Example that passes</th></tr></thead>
+            <tbody>
+              <tr><td>Sample</td><td>Three letters followed by two digits</td><td><code>ABC01</code>, <code>XYZ12</code></td></tr>
+              <tr><td>Magnification</td><td>The letter X followed by 2–3 digits</td><td><code>X40</code>, <code>X100</code></td></tr>
+              <tr><td>Notes</td><td>Letters, numbers, underscores and hyphens only — no spaces</td><td><code>rescan-1</code></td></tr>
+              <tr><td>Experiment type</td><td>Unrestricted by default — any value is accepted</td><td>—</td></tr>
+              <tr><td>Markers</td><td>Unrestricted by default; an unrecognized marker is a warning, not an error, when a list of approved markers exists</td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Because the experiment-type and marker allow-lists are empty by default, nothing in either field is currently rejected on those grounds — Micronaut ships unrestricted and only enforces the sample, magnification, and notes <em>shapes</em> above. The one exception: the naming template's own default placeholder (<code>UNKNOWN</code>, for example) is never flagged as invalid — only a value you actually typed is checked.</p>
+        <div class="callout warn"><p><strong>⚠️ Careful.</strong> An unknown marker is <em>flagged</em>, not <em>blocked</em> — it's a warning you can act on or ignore, not a wall stopping you from typing what you actually used.</p></div>
+      </section>
+
+      <section>
+        <h2 id="reading-issues">Reading the issues list</h2>
+        <p>Below the planned-name list, an issues list shows anything the rules above caught — one line per issue, in the form <code>field: message</code>. Each message is written in plain terms first (what a valid value looks like) with the technical pattern only mentioned afterward for reference. Two severities appear:</p>
+        <ul>
+          <li><strong>Error</strong> — a value you typed doesn't match the expected shape (an invalid sample ID, magnification, or notes value). This blocks the study from being marked "ready" on Review.</li>
+          <li><strong>Warning</strong> — something worth a second look but not necessarily wrong: an unrecognized marker, or a filename that would make the full path too long for classic Windows path limits (260 characters). Warnings never block anything on their own — a long path may still work fine (a modern long-path setting, a non-Windows filesystem, WSL), so Micronaut surfaces the risk rather than silently truncating your filename.</li>
+        </ul>
+        <div class="callout try"><p><strong>🧪 Try it.</strong> Type <code>ab1</code> into the Sample box on any measurement's Data plan. You'll see an error explaining the expected shape (three letters, two digits) rather than a bare regular expression. Fix it to something like <code>ABC01</code> and watch the issue disappear immediately.</p></div>
+      </section>
+
+      <section>
+        <h2 id="reserved-and-long-names">Reserved names and long paths — handled automatically</h2>
+        <p>Two filesystem quirks are handled for you, without any warning cluttering the issues list:</p>
+        <ul>
+          <li><strong>Reserved Windows device names.</strong> Windows treats certain filenames — <code>CON</code>, <code>PRN</code>, <code>AUX</code>, <code>NUL</code>, <code>COM1</code>–<code>COM9</code>, <code>LPT1</code>–<code>LPT9</code> — as unusable, even with an extension attached (<code>CON.tif</code> is just as broken as bare <code>CON</code>). If your naming fields would ever produce one of these as the filename's stem, Micronaut silently appends <code>_FILE</code> so the name stays usable and still recognizably close to what the template produced.</li>
+          <li><strong>Compound extensions.</strong> A file ending in <code>.ome.tif</code> or <code>.ome.tiff</code> keeps that whole compound extension rather than being cut down to just <code>.tif</code> — the <code>.ome</code> part is meaningful (it marks an OME-TIFF) and is never silently dropped.</li>
+        </ul>
+      </section>
+
+      <section class="quiz">
+        <h2 id="self-check">Check yourself</h2>
+        <details class="quiz-q"><summary>You leave Biological replicate # and Technical replicate # blank on a SEM measurement that has no technical replicates. Does the filename get a placeholder for them?</summary><p>No — biorep, techrep, group, and notes are optional tokens. An unanswered optional field is simply dropped from the filename, not padded with a placeholder.</p></details>
+        <details class="quiz-q"><summary>You type a marker that isn't on any approved list. Does this stop you from planning your filenames?</summary><p>No. Unless a lab-specific approved-marker list exists (Micronaut ships with none by default), the marker is accepted outright; even when a list does exist, an unrecognized marker is a warning by default, not a blocking error.</p></details>
+        <details class="quiz-q"><summary>Your planned filename would produce the stem "COM1". What happens?</summary><p>Micronaut automatically repairs it to "COM1_FILE" so the file can actually be created on Windows — you don't need to notice or fix this yourself.</p></details>
+      </section>
+
+      <nav class="pager" id="pager"></nav>
+    </main>
+  </div>
+  <script src="manual.js?v=1"></script>
+</body>
+</html>

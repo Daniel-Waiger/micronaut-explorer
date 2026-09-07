@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Research Brief — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="research-brief.html">
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>The Research Brief</span></nav>
+      <header class="ch-head">
+        <p class="ch-kicker">Chapter 4</p>
+        <h1>The Research Brief</h1>
+        <p class="lede">Describe your study in your own words, then let a deterministic scan of that text suggest structured fields — which stay suggestions until you say otherwise.</p>
+      </header>
+
+      <section class="learn-box">
+        <h2 id="what-youll-learn">What you'll be able to do</h2>
+        <ul>
+          <li>Write and save a free-text study description</li>
+          <li>Run "Review description" and understand exactly what it does and doesn't do</li>
+          <li>Read a suggestion, see the exact text it matched, and Accept or Dismiss it</li>
+          <li>Know which measurement a suggestion will be saved against</li>
+          <li>Recognize when a review goes stale and needs to be re-run</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="the-description">Writing the study description</h2>
+        <p>Research brief opens on one plain-language box: <strong>Study description</strong>. Write the question, organism, groups, samples, and relevant imaging context in your own words — the placeholder text says exactly that. Whatever you type is saved with the study as you go (the page's status line confirms "Description is saved with this study"), and it's shared across the whole study, not scoped to one measurement.</p>
+        <p>This narrative is never rewritten or normalized by the app — it stays exactly what you typed, because it's also the evidence source every suggestion below is checked against.</p>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> Nothing about the description field itself is measurement-specific. If your study has several measurements, write about all of them here; the structured fields further down the page are what's scoped to whichever measurement is currently active.</p></div>
+      </section>
+
+      <section>
+        <h2 id="review-description">Review description: what the scan actually does</h2>
+        <p>Click <strong>Review description</strong> (disabled until you've written something) and Micronaut runs a one-time, synchronous scan of your saved text — not a model call, and nothing that "reads" your description the way a person would. It looks for four specific, exact-text things and nothing else:</p>
+        <ul>
+          <li>Marker or fluorophore names that match an alias in the built-in marker dictionary</li>
+          <li>Biological replicate counts</li>
+          <li>Magnification values</li>
+          <li>Unambiguous ISO dates</li>
+        </ul>
+        <p>Anything in your description that isn't one of those four things stays exactly as narrative — the app never claims to have understood your whole description, only to have found specific, checkable matches within it.</p>
+        <figure class="shot">
+          <img src="images/02-research-brief.png" alt="Research brief screen: the free-text study description box and the deterministic scan's suggestions, each quoting the exact matched text, with Accept and Dismiss actions." loading="lazy"
+               onerror="this.closest('.shot').classList.add('pending')">
+          <div class="ph">Snapshot pending — images/02-research-brief.png</div>
+          <figcaption>Research brief — the study narrative above, and the review panel's suggestions (each quoting the exact text it matched) below.</figcaption>
+        </figure>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> An exact-text scan can be wrong about what you meant, but it can never invent a fact that wasn't already in your own words — every suggestion quotes back the text that produced it, so you can check its reasoning at a glance. That's a deliberate trade against a model that might "understand" more of your description but can't show you exactly why it proposed what it did.</p></div>
+      </section>
+
+      <section>
+        <h2 id="accept-dismiss">Accepting or dismissing a suggestion</h2>
+        <p>Each candidate the review finds sits in the review panel with the exact quoted text it matched, and two actions: <strong>Accept suggestion</strong> writes that value into the matching structured field (promoting it to a value you've reviewed, not a weak guess — see <a href="big-ideas.html#provenance">Every field remembers where it came from</a>), while <strong>Dismiss</strong> sets it aside without touching the field. Nothing is written to any field until you explicitly accept it — the scan finding a match and a field actually changing are two separate, deliberate steps.</p>
+        <ol class="steps">
+          <li>Read the quoted text next to each suggestion — it's exactly what the scan matched in your description.</li>
+          <li>Click <strong>Accept suggestion</strong> to write it into the corresponding field below, or <strong>Dismiss</strong> to leave that field untouched.</li>
+          <li>Continue reviewing the rest of the list; accepting or dismissing one doesn't affect the others.</li>
+        </ol>
+        <div class="callout warn"><p><strong>⚠️ Careful.</strong> Every accepted suggestion applies to <strong>one specific measurement</strong> — whichever was active when you ran the review. The page states this plainly above the field list ("Accepted measurement details will apply only to: ‹measurement name›"). If you switch the active measurement after running a review, accepting a suggestion becomes unavailable until you review again against the newly active one — the panel marks the review stale and asks you to re-run it, rather than silently applying an old match to the wrong measurement.</p></div>
+      </section>
+
+      <section>
+        <h2 id="measurement-details">Measurement details below the review</h2>
+        <p>Below the review panel, a <strong>Measurement details</strong> section shows a plain field-by-field interview for the study-level questions relevant to whichever measurement is currently active — the same fields a review suggestion can fill in. You can also type directly into any of these fields yourself at any time, independent of running a review at all; a direct edit is saved immediately and, like an accepted suggestion, is recorded as your own strong-source input.</p>
+      </section>
+
+      <section>
+        <h2 id="planning-notes">Planning notes alongside the review</h2>
+        <p>Whenever the app's rule-based advisor has something relevant to say about your current answers, a short <strong>planning notes</strong> panel appears alongside the review — the same deterministic, rule-driven guidance described in <a href="big-ideas.html#deterministic-advice">The app's advice is deterministic, rule-based — never AI</a>. It updates automatically as you accept suggestions or edit fields directly.</p>
+      </section>
+
+      <section class="quiz">
+        <h2 id="self-check">Check yourself</h2>
+        <details class="quiz-q"><summary>You describe your organism, a marker name, and "we compared drought-stressed and well-watered plants" in the free-text box. Does Review description turn all of that into structured fields?</summary><p>No. The scan only looks for marker aliases, replicate counts, magnification, and unambiguous dates. Your comparison-groups sentence stays narrative — it isn't one of the four things the scan matches — unless you type the group names into the relevant field yourself.</p></details>
+        <details class="quiz-q"><summary>You run Review description while "Bacterial viability" is your active measurement, then switch to a different measurement before accepting a suggestion. What happens?</summary><p>The review is marked stale for the new active measurement, and accepting is blocked until you re-run Review description against it — a suggestion found for one measurement is never silently applied to a different one.</p></details>
+        <details class="quiz-q"><summary>Does clicking "Accept suggestion" change your saved study description text?</summary><p>No. Accepting only writes the suggested value into its matching structured field; your original narrative text is never rewritten by the review.</p></details>
+      </section>
+
+      <nav class="pager" id="pager"></nav>
+    </main>
+  </div>
+  <script src="manual.js?v=1"></script>
+</body>
+</html>

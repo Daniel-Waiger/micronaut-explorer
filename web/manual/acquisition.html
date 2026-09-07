@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acquisition &amp; the Spectral View — Micronaut Planner Manual</title>
+  <script id="theme-fouc-guard">
+    (function(){ try {
+      var t = localStorage.getItem('micronaut.theme');
+      if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+    } catch (e) {} })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='32' y2='32' gradientUnits='userSpaceOnUse'%3E%3Cstop offset='0' stop-color='%230a707c'/%3E%3Cstop offset='1' stop-color='%2314a3b0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Cg transform='translate(6,6) scale(0.8333)' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 18h8'/%3E%3Cpath d='M3 22h18'/%3E%3Cpath d='M14 22a7 7 0 0 0 0-14h-1'/%3E%3Cpath d='M9 14h2M9 8h2'/%3E%3Cpath d='M10 6v4M5 2l3 3M7 4 4 7'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="manual.css?v=1">
+</head>
+<body data-chapter="acquisition.html">
+<div class="layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <main class="content">
+    <nav class="breadcrumbs"><a href="index.html">Manual</a> <span>/</span> <span>Acquisition &amp; the Spectral View</span></nav>
+    <header class="ch-head">
+      <p class="ch-kicker">Chapter 6</p>
+      <h1>Acquisition &amp; the Spectral View</h1>
+      <p class="lede">Where you decide how a measurement will actually be acquired — modality, magnification, markers — and where Micronaut checks your fluorophores for spectral spillover before you're at the microscope.</p>
+    </header>
+
+    <section class="learn-box">
+      <h2 id="what-youll-learn">What you'll be able to do</h2>
+      <ul>
+        <li>Find the Acquisition section on a measurement's page, and know what its five collapsible parts each cover.</li>
+        <li>Enter your markers/fluorophores and read the qualitative spillover check the app runs over them.</li>
+        <li>Tell apart the five states a single marker can resolve to, and what each one is telling you.</li>
+        <li>Read the Spectral view's plotted curves, including its color swatches and detection-filter overlays.</li>
+        <li>Build a structured channel table with Panel assembly, including the one-time "Seed from markers field" shortcut.</li>
+        <li>Say precisely which conjugation modes count as "an antibody is involved" for the Review step's controls.</li>
+        <li>Know where modality-specific guidance (STED, confocal, widefield, and others) comes from, and that it is unreviewed content.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 id="where-it-lives">Where Acquisition lives</h2>
+      <p>Acquisition is the middle of a measurement's three sections — after Samples &amp; design, before Data plan — all on the one page you land on when you open a measurement from the registry (see <a href="measurements.html">Measurements Registry</a>). The anchor rail at the top of that page jumps straight to it.</p>
+      <p>Acquisition itself opens into five collapsible parts, in this order:</p>
+      <ol class="steps">
+        <li><strong>Acquisition</strong> — instrument, objective, magnification, modality, and smallest resolvable feature: the plain interview fields, open by default.</li>
+        <li><strong>Fluorophores and spillover</strong> — the qualitative check over your markers field, collapsed until you open it.</li>
+        <li><strong>Spectral view</strong> — the plotted excitation/emission curves for those same fluorophores.</li>
+        <li><strong>Panel assembly</strong> — the optional structured channel editor.</li>
+        <li><strong>Guidance</strong> — modality-specific advice, when any applies to what you've entered.</li>
+      </ol>
+    </section>
+
+    <section>
+      <h2 id="markers-field">The markers field and the five-state check</h2>
+      <p>The quick path to a color panel is the plain markers field on the Data plan step (the same field your filenames embed) — type a comma- or slash-separated list, such as "SYTO9, Propidium Iodide," and Fluorophores and spillover reads it live. This check is deliberately <strong>qualitative</strong>: it compares excitation and emission peak wavelengths for closeness, not a true spectral-overlap integral over each dye's whole curve.</p>
+      <p>Each token you typed resolves to one of five states, shown with its own label and sentence — never a blank row that could be misread as "nothing to worry about here":</p>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>State</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Known</strong></td><td>A real spectral record is on file — excitation/emission peaks shown, and this entry participates in the spillover check below.</td></tr>
+          <tr><td><strong>Not recognized</strong></td><td>The app doesn't know this marker name at all — most often a spelling to double-check.</td></tr>
+          <tr><td><strong>Which variant?</strong></td><td>The name matches a multi-color family (e.g. bare "MitoTracker") without saying which color — spell out the specific variant to get a spillover check.</td></tr>
+          <tr><td><strong>No intrinsic spectrum</strong></td><td>This names a tag or a binding target (HaloTag, an antibody's target antigen, phalloidin's ligand), not a dye itself — its color depends on what it's conjugated to.</td></tr>
+          <tr><td><strong>Spectrum not yet available</strong></td><td>A real, recognized fluorophore, just not yet drafted into this app's knowledge pack — an honest content gap, not a silent skip.</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>Typing one of the app's own "nothing to declare" sentinels — <code>NONE</code>, <code>N/A</code>, <code>unstained</code>, <code>label-free</code>, and a few equivalent spellings — is read as a deliberate declaration that this measurement has no fluorophores, and shown as its own sentence rather than run through "not recognized" as if it were a typo.</p>
+      <figure class="shot">
+        <img src="images/04-measurement-acquisition.png" alt="Measurement Acquisition panel with fluorophore channels seeded from the markers field, spillover check, and the spectral overlap view." loading="lazy"
+             onerror="this.closest('.shot').classList.add('pending')">
+        <div class="ph">Snapshot pending — images/04-measurement-acquisition.png</div>
+        <figcaption>Acquisition's Fluorophores and spillover, Spectral view, and Panel assembly sections, expanded.</figcaption>
+      </figure>
+      <div class="callout warn"><p><strong>⚠️ Careful.</strong> This is a peak-proximity check, not a true overlap integral — treat a clean result as "no obvious proximity conflict at these two peaks," not as a guarantee your panel is spillover-free at the microscope.</p></div>
+    </section>
+
+    <section>
+      <h2 id="spillover-flags">Reading the spillover flags</h2>
+      <p>Every pair of "Known" fluorophores is checked twice: once on how close their <strong>emission</strong> peaks sit (an <strong>error</strong>-severity flag — these are likely to co-register in the same detection window), and once on how close their <strong>excitation</strong> peaks sit (a <strong>warning</strong>-severity flag — likely to both be excited by the same laser line). Flags are listed with the worst severity first, then the closest gaps first, so the thing most likely to actually bite you is always at the top.</p>
+      <p>With zero flagged pairs, the section says so explicitly — either "no spectral-proximity conflicts among N recognized fluorophore(s)," or, if nothing has resolved to a real spectrum yet, that there's nothing to check.</p>
+      <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Its own spectral content (excitation/emission peaks) is drafted by Claude from common published references, not yet reviewed by a microscopy specialist — a banner above the check says so, naming exactly how many of your panel's fluorophores are affected. This is deliberately not dismissible: treat exact peak numbers as approximate until it's confirmed, and always check your real filter sets.</p></div>
+    </section>
+
+    <section>
+      <h2 id="spectral-view">The Spectral view</h2>
+      <p>Below the flags, the same resolved entries are plotted as schematic excitation/emission curves — one color per fluorophore, using the same color a "Known" entry's swatch shows (computed from its emission peak, unless you've overridden it in Panel assembly). If you've entered detection filter center/bandwidth values (either from Panel assembly, or the app's own suggested default the moment a fluorophore resolves), those are overlaid on the plot too, so you can see at a glance whether a filter band actually sits where a curve says it should.</p>
+      <div class="callout tip"><p><strong>💡 Tip.</strong> Until you've built any structured channels, the Spectral view still plots something useful straight from your free-text markers field, using a suggested default filter band — you don't have to open Panel assembly just to see the curves.</p></div>
+    </section>
+
+    <section>
+      <h2 id="panel-assembly">Panel assembly: the structured channel editor</h2>
+      <p>The markers field is quick, but it can't say <em>how</em> a fluorophore is attached to its target — and that fact matters for what Review recommends later. Panel assembly is the fact-precise alternative: an optional table where each row is one channel, with:</p>
+      <ul>
+        <li>A <strong>target</strong> — what this channel is imaging (e.g. "F-actin," "Sox2").</li>
+        <li>A <strong>conjugation mode</strong> — how the fluorophore gets onto that target:</li>
+      </ul>
+      <div class="table-wrap">
+      <table>
+        <thead><tr><th>Conjugation mode</th><th>What it means</th></tr></thead>
+        <tbody>
+          <tr><td>Direct-conjugate antibody</td><td>One antibody, already carrying the dye.</td></tr>
+          <tr><td>Indirect (primary + secondary antibody)</td><td>An unlabeled primary antibody, detected by a labeled secondary.</td></tr>
+          <tr><td>Genetically encoded (fusion protein)</td><td>A fluorescent protein fused to the target itself — no antibody at all.</td></tr>
+          <tr><td>Direct-binding probe (dye, peptide, lectin — no antibody)</td><td>A small molecule or probe that binds directly, such as phalloidin or a lectin.</td></tr>
+          <tr><td>Self-labeling tag + dye ligand (HaloTag, SNAP, CLIP)</td><td>A genetically encoded tag labeled afterward with a synthetic dye ligand.</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>Only the first two modes — direct-conjugate and indirect antibody — count as "an antibody is actually involved" anywhere else in the app. That single fact is what lets Review's controls engine recommend an isotype control or a secondary-only control precisely when one makes sense, and skip it for a phalloidin- or fusion-protein-only panel where no antibody exists to control for (see <a href="conditions-controls.html#panel-controls">Conditions, Groups &amp; Controls</a>).</p>
+      <p>Each channel row also offers:</p>
+      <ul>
+        <li>A <strong>fluorophore picker</strong>, drawn from the same spectral library the free-text check uses, plus a custom-name option.</li>
+        <li>A <strong>color swatch</strong>, computed from the resolved emission peak, with a color picker to override it and a reset (<em>auto</em>) link back.</li>
+        <li>A <strong>detection filter</strong> (center + bandwidth, nm), pre-filled with a suggested value the moment a fluorophore resolves — edit it to match your microscope's real filter.</li>
+        <li><strong>Reorder</strong> controls — drag the handle, or use the ↑/↓ buttons — which only ever change the saved channel order, never a fluorophore's actual wavelength.</li>
+      </ul>
+      <div class="callout try"><p><strong>🧪 Try it.</strong> With at least one recognized marker in the free-text field and no channels built yet, open Panel assembly and click <strong>Seed from markers field</strong> — it builds one channel per marker, with a best-guess conjugation mode you can correct. This only appears while the channel table is still empty, so it can never silently overwrite structured edits you've already made.</p></div>
+      <p>Once you have two or more channels, an <strong>Order by emission wavelength</strong> button appears — it sorts every "Known" channel left to right by emission peak, leaving any unresolved channel in its existing relative order at the end.</p>
+    </section>
+
+    <section>
+      <h2 id="guidance">Modality-specific guidance</h2>
+      <p>The Guidance section at the bottom of Acquisition shows notes that key off what you've actually entered — most often the modality (STED, confocal, widefield, light-sheet, SEM/TEM, Raman) — each labelled <strong>Pitfall</strong> or <strong>Tip</strong>, with the concept it's about, the note itself, and the condition that made it appear ("Applies when modality is STED," for instance). It shows nothing at all when no rule matches what you've entered, rather than an empty heading sitting over nothing.</p>
+      <div class="callout why"><p><strong>🔍 Why it works this way.</strong> This guidance is data, not hard-coded prose — the same rules engine surfaces it on Samples &amp; design and Data plan too, wherever a rule names that surface. The content itself is drafted the same way the spectral values are: reviewed for shape and consistency, not yet reviewed line-by-line by a microscopy specialist, so read it as a well-informed starting point, not a validated protocol.</p></div>
+    </section>
+
+    <section class="quiz">
+      <h2 id="self-check">Check yourself</h2>
+      <details class="quiz-q"><summary>You type "MitoTracker" (no color specified) into the markers field. What state does it resolve to, and why can't the app check it for spillover?</summary><p>"Which variant?" — MitoTracker names a whole family of differently-colored dyes, so the app has no single peak to compare until you name the specific variant (e.g. "MitoTracker Deep Red").</p></details>
+      <details class="quiz-q"><summary>Your panel uses phalloidin and a genetically-encoded GFP fusion, nothing else. Should Review recommend an isotype control?</summary><p>No. Neither conjugation mode involves an antibody, so <code>hasAntibody</code> is false for this panel and the antibody-gated controls (isotype, secondary-antibody-only, biological specificity) don't fire — only the ones that don't depend on an antibody being present would apply.</p></details>
+      <details class="quiz-q"><summary>You add a fifth fluorophore and the app flags an emission-proximity conflict with an existing one. Does that mean your panel definitely won't work at the microscope?</summary><p>Not definitely — it's a qualitative peak-proximity flag, not a true spectral-overlap integral, and the underlying peak values are themselves unreviewed. Treat it as a strong reason to double-check your real filter sets, not as a hard failure.</p></details>
+    </section>
+
+    <nav class="pager" id="pager"></nav>
+  </main>
+</div>
+<script src="manual.js?v=1"></script>
+</body>
+</html>
