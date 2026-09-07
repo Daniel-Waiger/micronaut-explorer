@@ -87,7 +87,7 @@ test('panelFluorophoreOptions exposes every spectrum-backed real-library dye and
   assert.ok(values.includes('ALEXA488'));
   assert.ok(values.includes('syto9'));
   assert.ok(values.includes('mitotracker deep red'));
-  assert.match(options.find((option) => option.value === 'syto9').label, /Ex 480 \/ Em 500 nm/);
+  assert.match(options.find((option) => option.value === 'syto9').label, /Ex 485 \/ Em 498 nm/);
   for (const option of options) {
     assert.equal(
       resolveMarkerToken(option.value, kb.index, kb.markersKb, spectra).state,

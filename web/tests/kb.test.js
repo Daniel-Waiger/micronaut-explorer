@@ -210,10 +210,10 @@ test('the real KB marks family markers with isFamily and non-empty variants wher
   assert.equal(kbMarker(kb, 'GFP').class, 'protein');
 });
 
-test('all 72 source-approved canonicals exist once with their editorial classes', () => {
+test('all 136 source-approved canonicals exist once with their editorial classes', () => {
   const { kb, issues } = loadKb(realRaw);
   assert.deepEqual(issues, []);
-  assert.equal(sourceLedger.directRecords.length, 72);
+  assert.equal(sourceLedger.directRecords.length, 136);
 
   const classForCategory = {
     'organic/NIR': 'dye',
@@ -231,7 +231,7 @@ test('all 72 source-approved canonicals exist once with their editorial classes'
     assert.equal(entry.class, classForCategory[row.category], `${row.id} class`);
     assert.equal(entry.isFamily, false, `${row.id} must be a direct canonical`);
   }
-  assert.equal(expected.size, 72);
+  assert.equal(expected.size, 136);
 });
 
 test('the normalized real alias index has one owner per spelling and resolves representative additions', () => {
