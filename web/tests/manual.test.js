@@ -101,6 +101,22 @@ test('every manual page contains the theme pre-paint (FOUC) guard reading micron
   }
 });
 
+// The guard only prevents a flash of the wrong theme if it runs before the
+// browser has a stylesheet to paint with, so its position in <head> is the
+// whole point of it -- a guard placed after the <link> still sets data-theme,
+// but does it too late to matter.
+test('every manual page runs the FOUC guard before the stylesheet link', () => {
+  for (const name of allManualPages()) {
+    const html = readFileSync(path.join(manualDir, name), 'utf-8');
+    const guardAt = html.indexOf('theme-fouc-guard');
+    const cssAt = html.indexOf('rel="stylesheet"');
+    assert.ok(
+      guardAt < cssAt,
+      `${name} links manual.css before the theme guard runs, so the first paint can use the wrong theme`
+    );
+  }
+});
+
 test('every chapter page has body data-chapter equal to its own filename', () => {
   for (const c of CHAPTERS) {
     const p = path.join(manualDir, c.file);
