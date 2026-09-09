@@ -76,7 +76,20 @@ suggestions start genuinely actionable rather than showing "Already
 confirmed" from the first frame (three of the four measurements already
 seed a magnification that matches the demo text's `40x`).
 
-## Set three — generated artefacts (`post-11`, `post-12`)
+## Set three — distinctive mechanics, not generic UI (`post-13` .. `post-15`)
+
+The colour panel and the planner walk-through cover the app's screens. These
+three go after specific things the app itself claims as different from a
+plain notebook or an AI wrapper — not the navbar, not another "here's a
+form" shot.
+
+| File | Shows |
+| --- | --- |
+| `post-13-llm-handoff.png` | The "Copy prompt for your own LLM" button with its own tooltip text ("nothing is sent from this app") drawn as a page callout — headless Chrome never renders a native `title=""` tooltip, so this reads the button's real `title` attribute and redraws it, rather than showing nothing or inventing wording. |
+| `post-14-controls-reasons.png` | A measurement's suggested controls, each with the reason it was suggested (Intracellular ROS: unstained/autofluorescence, single-stain, H2O2-treated positive, NAC-treated negative) — not a bare checklist. |
+| `post-15-five-states.png` | One panel exercising all five outcomes `engine/spectra.js` can resolve a marker to: known (Cy3), ambiguous — which color? (bare "MitoTracker"), no intrinsic spectrum — depends on the conjugate dye (Phalloidin), not yet in the knowledge pack (Fura-2), and genuinely unrecognized (a nonsense token). Verified against the real resolver before use, same as every other seeded panel in this set. |
+
+## Set four — generated artefacts (`post-11`, `post-12`)
 
 Two outputs the app produces but never displays: the bench card downloads as
 a `.md` file, and "Copy prompt for your own LLM" writes straight to the

@@ -267,6 +267,99 @@ def _js(template: str, arg: str) -> str:
     return template % json.dumps(arg)
 
 
+# --- Innovative-mechanics screens -------------------------------------------
+# Three shots of things the app itself calls out as distinctive (see the
+# original post text this whole set illustrates), not generic UI: the
+# LLM-handoff button's own promise, a measurement's suggested controls with
+# their reasons, and the five-state marker resolution refusing to collapse
+# "can't check this" into a single generic error.
+
+# .copy-button is shared by every Export-study action AND Print AND this one
+# -- textContent is the only thing that picks out this specific button.
+CLICK_EXPORT_STUDY_JS = """
+(() => {
+  const details = document.querySelector('details.overview-export-menu');
+  if (!details) return false;
+  details.open = true;
+  return true;
+})()
+"""
+
+# Headless Chrome never renders a native title="" tooltip -- there is no real
+# pointer dwelling to trigger it, so a plain hover simulation would produce
+# an empty screenshot. Rather than fake a browser tooltip bubble with
+# invented wording, this reads the button's OWN real `title` attribute and
+# draws it as a small on-page callout under the button -- the exact string a
+# real hover would show, just rendered as a page element instead of OS
+# chrome so a static screenshot can actually show it. Throws (aborting the
+# capture) if the button's title text ever changes shape, rather than
+# drawing an empty or stale callout.
+ANNOTATE_LLM_TOOLTIP_JS = """
+(() => {
+  const btn = Array.from(document.querySelectorAll('button.copy-button'))
+    .find((b) => b.textContent.trim() === 'Copy prompt for your own LLM');
+  if (!btn || !btn.title) throw new Error('LLM button or its title attribute not found');
+  const rect = btn.getBoundingClientRect();
+  const bubble = document.createElement('div');
+  bubble.textContent = btn.title;
+  bubble.style.cssText = [
+    'position:absolute',
+    `left:${rect.left}px`,
+    `top:${rect.bottom + 10}px`,
+    'max-width:420px',
+    'background:#1f2a24',
+    'color:#eafff0',
+    'font:13px/1.45 -apple-system,Segoe UI,sans-serif',
+    'padding:10px 14px',
+    'border-radius:8px',
+    'box-shadow:0 6px 20px rgba(0,0,0,0.25)',
+    'z-index:99999',
+  ].join(';');
+  const arrow = document.createElement('div');
+  arrow.style.cssText = [
+    'position:absolute', `left:${rect.left + 24}px`, `top:${rect.bottom + 2}px`,
+    'width:0', 'height:0', 'border:7px solid transparent', 'border-bottom-color:#1f2a24',
+  ].join(';');
+  document.body.append(arrow, bubble);
+  btn.style.outline = '2px solid #1f8a5c';
+  btn.style.outlineOffset = '2px';
+  btn.classList.add('js-target-llm-button');
+  return true;
+})()
+"""
+
+# The Review page's per-measurement blocks are <details class="overview-assay">,
+# collapsed by default (overview.js's renderAssayNode) -- open the one whose
+# summary names the target measurement, matched by substring on its own
+# label text rather than the full "Measurement N: <label> · K planned
+# filenames" string, which is brittle to a filename count changing.
+OPEN_OVERVIEW_ASSAY_JS_TEMPLATE = """
+((label) => {
+  const details = Array.from(document.querySelectorAll('details.overview-assay'))
+    .find((d) => d.querySelector('summary').textContent.includes(label));
+  if (!details) return false;
+  details.open = true;
+  return true;
+})(%s)
+"""
+
+
+def _open_overview_assay_js(label):
+    return OPEN_OVERVIEW_ASSAY_JS_TEMPLATE % __import__("json").dumps(label)
+
+
+# A five-marker panel exercising every one of engine/spectra.js's
+# SPECTRAL_STATES in one field -- verified against the real resolver
+# (resolvePanel over the committed markers.json/spectra.json) before use,
+# same discipline as FLAGGED_PANEL/CLEAN_PANEL above:
+#   MITOTRACKER      -> ambiguous-family      (bare family name, no color given)
+#   PHALLOIDIN       -> no-intrinsic-spectrum (a tag/moiety, not a dye itself)
+#   FURA2            -> spectrum-unavailable  (real indicator, no KB entry yet)
+#   CY3               -> known                (fully resolved)
+#   UNOBTAINIUMDYE   -> unrecognized          (not in the KB at all -- a typo stand-in)
+FIVE_STATE_PANEL = "MITOTRACKER-PHALLOIDIN-FURA2-CY3-UNOBTAINIUMDYE"
+
+
 def _seed(panel: str, *, seed_channels: bool) -> list:
     """The action sequence shared by every screen here.
 
@@ -414,6 +507,56 @@ POST_SCREENS = [
         # is the SVG's own horizontal-scroll wrapper and unique to it.
         scroll_to=".study-map-scroll",
         caption="The whole study as a diagram, generated from the same data as everything else.",
+    ),
+    # --- Distinctive mechanics, not generic UI -----------------------------
+    dict(
+        name="post-13-llm-handoff",
+        hash="overview",
+        viewport=(1440, 700),
+        theme="light",
+        actions=[CLICK_EXPORT_STUDY_JS, ANNOTATE_LLM_TOOLTIP_JS],
+        # ANNOTATE_LLM_TOOLTIP_JS tags the LLM button itself with this class
+        # once it has found it by exact text -- '.copy-button' alone matches
+        # every export/print button on the page, so scrolling to that would
+        # be luck-of-DOM-order, not a real target.
+        scroll_to="button.js-target-llm-button",
+        caption=(
+            "\"Copy prompt for your own LLM\" -- structured JSON handed to whatever model you already "
+            "use, in your own account. The callout is the button's own tooltip text, redrawn as a page "
+            "element because headless capture can't show a native browser tooltip."
+        ),
+    ),
+    dict(
+        name="post-14-controls-reasons",
+        hash="overview",
+        viewport=(1440, 700),
+        theme="light",
+        actions=[_open_overview_assay_js("Intracellular ROS")],
+        scroll_to=".overview-controls",
+        caption="Suggested controls, each shown with the reason it was suggested -- not just a checklist.",
+    ),
+    dict(
+        name="post-15-five-states",
+        hash="measurement",
+        viewport=(1440, 1000),
+        theme="light",
+        actions=[
+            _js(SELECT_MEASUREMENT_JS, BRIEF_TARGET_MEASUREMENT),
+            _js(SET_MARKERS_JS, FIVE_STATE_PANEL),
+            _js(SET_MARKERS_JS, FIVE_STATE_PANEL),
+            OPEN_SECTIONS_JS,
+            _js(ASSERT_SEEDED_JS, FIVE_STATE_PANEL),
+        ],
+        # NOT the Acquisition anchor -- that's the top of the field grid.
+        # The five states render inside the Fluorophores/spillover accordion
+        # further down (panel.js's createMicroscopySection tags each with
+        # data-tour-section).
+        scroll_to="details.microscopy-section[data-tour-section='fluorophores']",
+        caption=(
+            "Five honest outcomes for a marker, not two: known, ambiguous (which color?), no spectrum "
+            "of its own, not yet in the knowledge pack, or genuinely unrecognized -- never collapsed "
+            "into a single generic error."
+        ),
     ),
 ]
 
