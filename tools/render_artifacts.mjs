@@ -31,6 +31,12 @@ const { decisionTriage } = await import(path.join(WEB_SRC, 'engine', 'decisionTr
 const { renderBenchCard } = await import(path.join(WEB_SRC, 'engine', 'render', 'benchcard.js'));
 const { renderLlmPrompt } = await import(path.join(WEB_SRC, 'engine', 'render', 'llmprompt.js'));
 const { BASE_TEMPLATE, NAMING_CONFIG } = await import(path.join(WEB_SRC, 'engine', 'namingConfig.js'));
+const { setPath } = await import(path.join(WEB_SRC, 'core', 'paths.js'));
+// Same "today, local calendar day" default ui/steps/naming.js's own date
+// input uses for an unanswered field (ui/questionControl.js) -- reused
+// rather than reimplemented so this stays byte-identical to what typing
+// nothing and accepting the app's own default would produce.
+const { localDateInputValue } = await import(path.join(WEB_SRC, 'ui', 'questionControl.js'));
 
 // Same aggregation rule as tools/serve_dir.py's _write_kb_dev_js and
 // tools/build_single_file.py's _load_kb: every web/kb/*.json keyed by its
@@ -55,25 +61,48 @@ if (!outDir) {
 const kb = loadKbPack();
 const experiment = createDefaultStudy();
 
+// A bench card is single-assay by design (overview.js's own comment on its
+// per-assay download button). Of the example study's four assays, checked
+// all four's real rendered output first (see the commit message): only
+// "Intracellular ROS" has every channel fully resolved (DCF and DAPI both
+// carry real Ex/Em peaks -- Macrophage cytoskeleton's bare "Phalloidin"
+// resolves to state 'no-intrinsic-spectrum' and renders as
+// "_(unresolved)_", Scratch/migration declares no markers at all) and the
+// most complete control set (4, vs. 3 on Bacterial viability) -- the
+// correctly demonstrative one of the four, not an arbitrary pick.
+const BENCH_CARD_ASSAY_LABEL = 'Intracellular ROS';
+const benchCardAssaySeed = experiment.assays.find((a) => a.label === BENCH_CARD_ASSAY_LABEL);
+if (!benchCardAssaySeed) {
+  console.error(`No assay labelled "${BENCH_CARD_ASSAY_LABEL}" in the example study.`);
+  process.exit(1);
+}
+// naming.fields.date is deliberately NOT seeded anywhere in
+// core/defaultStudy.js (see its own header comment: no real value exists
+// without inventing one) -- an unanswered date renders every filename with
+// NAMING_CONFIG's literal placeholder '1970-01-01', correct app behaviour
+// but a jarring one to lead a promotional image with. Filling in today's
+// date, the same default the app's own date input starts an unanswered
+// field on, is what a researcher would do before acquiring -- not
+// fabricated content, and every other field (magnification, markers,
+// sample ID) is left exactly as the app produces it.
+setPath(benchCardAssaySeed, 'naming.fields.date', localDateInputValue());
+
 const doc = buildStudyDocument(experiment, kb, NAMING_CONFIG, BASE_TEMPLATE);
 const conformance = checkConformance(experiment, kb, NAMING_CONFIG, BASE_TEMPLATE);
 const experimentMap = buildExperimentMap(experiment, { conformance });
 const triage = decisionTriage(experimentMap, conformance);
 
-// A bench card is single-assay by design (overview.js's own comment on its
-// per-assay download button) -- render the first assay, same as clicking
-// the button on the first measurement card would.
-const firstAssay = doc.assays[0];
-if (!firstAssay) {
-  console.error('The example study has no assays -- nothing to render a bench card for.');
+const benchCardAssay = doc.assays.find((a) => a.id === benchCardAssaySeed.id);
+if (!benchCardAssay) {
+  console.error(`Assay "${BENCH_CARD_ASSAY_LABEL}" disappeared while building the study document.`);
   process.exit(1);
 }
-const benchCardText = renderBenchCard(firstAssay);
+const benchCardText = renderBenchCard(benchCardAssay);
 const llmPromptText = renderLlmPrompt(doc, triage);
 
 mkdirSync(outDir, { recursive: true });
 writeFileSync(path.join(outDir, 'benchcard.md'), benchCardText, 'utf8');
 writeFileSync(path.join(outDir, 'llmprompt.txt'), llmPromptText, 'utf8');
 
-console.log(`wrote ${path.join(outDir, 'benchcard.md')} (${benchCardText.length} chars, assay "${firstAssay.label}")`);
+console.log(`wrote ${path.join(outDir, 'benchcard.md')} (${benchCardText.length} chars, assay "${benchCardAssay.label}")`);
 console.log(`wrote ${path.join(outDir, 'llmprompt.txt')} (${llmPromptText.length} chars)`);

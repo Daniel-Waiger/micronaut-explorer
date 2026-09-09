@@ -49,7 +49,7 @@ study (the oregano-derived plasma-polymer coating wound-healing study).
 | `post-06-brief-accepted.png` | Research brief, after accepting one | A suggestion's row now reads "Already confirmed" instead of offering Accept. |
 | `post-07-decisions.png` | Review (`#/overview`) | Every open decision the planner can see, grouped by tier and linked back to the step that owns it. |
 | `post-08-chrome.png` | Measurement (`#/measurement`) | The app chrome: header, workflow compass, measurement switcher. |
-| `post-09-review-verdict.png` | Review, dark theme | The pass/fail verdict, the export menu, and the "Copy prompt for your own LLM" / "Print" buttons. |
+| `post-09-review-verdict.png` | Review | The pass/fail verdict, the export menu, and the "Copy prompt for your own LLM" / "Print" buttons. |
 | `post-10-review-diagram.png` | Review | The study as a generated diagram: question → measurements → readout → modality → design → controls → filenames. |
 
 ### The demo description
@@ -89,5 +89,5 @@ screen in the app) before photographing it.
 
 | File | Content |
 | --- | --- |
-| `post-11-benchcard.png` | The full bench card generated for the example study's first measurement (Bacterial viability). |
+| `post-11-benchcard.png` | The full bench card for the example study's Intracellular ROS measurement — chosen because it's the one of the four with every channel resolved (real Ex/Em on both DCF and DAPI) and the fullest control set (4). Its acquisition date is filled in with today's date before rendering (`tools/render_artifacts.mjs`) the same way an unanswered date input defaults in the app, so the filenames don't lead with the `1970-01-01` placeholder. |
 | `post-12-llm-prompt.png` | The prompt's instruction preamble in full, the first few lines of its JSON, then — skipping the rest of the JSON, noted as cut — the "Decisions this plan has not made yet" and "Questions to consider" sections, which is the part worth showing. |

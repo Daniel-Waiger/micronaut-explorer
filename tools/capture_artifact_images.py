@@ -66,12 +66,18 @@ def build_pages(artifacts_dir: Path, pages_dir: Path) -> None:
     pages_dir.mkdir(parents=True, exist_ok=True)
 
     bench_text = (artifacts_dir / "benchcard.md").read_text(encoding="utf-8")
+    # Read the assay label back out of the card's own header ("# Measurement
+    # bench card -- <label>") rather than hardcoding it a second time here --
+    # a hardcoded copy is exactly what went stale the last time
+    # render_artifacts.mjs's assay choice changed.
+    first_line = bench_text.split("\n", 1)[0]
+    bench_assay_label = first_line.split(" -- ", 1)[-1].strip() if " -- " in first_line else "the example study"
     (pages_dir / "benchcard.html").write_text(
         _page(
             "Bench card",
             "This is the <b>.md file</b> the “Download bench card” button saves — "
-            "not a screen inside the app. Generated for the example study's first measurement, "
-            "Bacterial viability, by the app's own render/benchcard.js.",
+            f"not a screen inside the app. Generated for the example study's {html.escape(bench_assay_label)} "
+            "measurement by the app's own render/benchcard.js.",
             bench_text,
         ),
         encoding="utf-8",
