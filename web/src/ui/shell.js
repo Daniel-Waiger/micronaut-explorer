@@ -161,7 +161,7 @@ export function renderShell(root, store, router, options = {}) {
   document.addEventListener('pointerdown', (event) => { if (!utilities.contains(event.target)) closeMenu(); });
 
   if (onReset) utilityMenu.appendChild(action('Reset to example study', () => {
-    if (window.confirm('Replace this study with the oregano example? Current work remains available in Restore.')) onReset();
+    if (window.confirm('Open the oregano example? Your current study will be preserved in Restore and demo activity cannot remove it.')) onReset();
   }));
   if (onExportProject) utilityMenu.appendChild(action('Export project backup', onExportProject));
   if (onImportProject) {

@@ -268,9 +268,26 @@ function init() {
   // copied, or disowned before the visitor may type in it. `origin: 'example'`
   // still exists in the schema so older autosaves keep loading unchanged.
   function openExampleStudy() {
+    // Preserve the exact current state synchronously, before replace() can
+    // expose example data to the autosave subscriber. This snapshot is
+    // protected from normal ring eviction: browsing or editing demo data can
+    // never delete user-entered work. If durable preservation is unavailable,
+    // do not switch workspaces at all.
+    const protectedId = saveExperiment(store.get(), {
+      onQuotaExceeded: reportStorageFailure,
+      protectFromAutomaticEviction: true,
+    });
+    if (!protectedId) {
+      reportPersistentLifecycleFailure(
+        'Could not preserve your current study, so the example was not opened. Download a project backup or free storage, then try again.'
+      );
+      return false;
+    }
     const example = createDefaultStudy();
     store.replace(withOrigin(example, 'template'));
-    showToast('Opened the example study. It is yours to edit; your previous versions remain in Restore.');
+    if (shell && typeof shell.setRecoveryEntries === 'function') shell.setRecoveryEntries(recoveryEntries());
+    showToast('Opened the example study. Your study was preserved in Restore and demo activity cannot remove it.');
+    return true;
   }
 
   function startBlankStudy() {
