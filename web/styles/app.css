@@ -511,7 +511,6 @@ button:focus-visible {
 .nav-utilities .nav-step[data-step-id="release-notes"],
 .nav-utilities .nav-step[data-step-id="release-notes"]:hover,
 .nav-utilities .nav-step[data-step-id="release-notes"].active { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
-.shell-utilities { display: none; }
 
 /* Scoped under .nav-utilities so these two beat `.nav-step { color:
    var(--muted) }`, which sits later in the file at equal specificity and was
@@ -4816,8 +4815,8 @@ td, th { border-color: var(--line); }
 
 @media (max-width: 430px) {
   /* New study and Walkthrough have moved into the nav rail's control panel,
-     so the save indicator (and the already-hidden Utilities toggle) are the
-     header's only remaining content. */
+     so the save indicator and Utilities toggle are the header's only
+     remaining content. */
   .header-actions {
     width: 100%;
   }
