@@ -17,6 +17,7 @@ export const STORAGE_PREFIX = `micronaut.v${STORAGE_SCHEMA_VERSION}.`;
 
 const RING_SIZE = 5;
 const RING_INDEX_KEY = STORAGE_PREFIX + 'ring';
+const PROTECTED_SLOTS_KEY = STORAGE_PREFIX + 'protectedSlots';
 const CHANGES_KEY = STORAGE_PREFIX + 'changesSinceExport';
 
 function slotKey(id) {
@@ -74,22 +75,41 @@ function removeKey(storage, key, onQuotaExceeded) {
  * RING_SIZE. Returns the new slot id, or null if the write itself failed
  * (e.g. quota exceeded -- onQuotaExceeded still fires in that case).
  */
-export function saveExperiment(experiment, { storage = defaultBackend(), onQuotaExceeded } = {}) {
+export function saveExperiment(experiment, {
+  storage = defaultBackend(),
+  onQuotaExceeded,
+  protectFromAutomaticEviction = false,
+} = {}) {
   const id = uuid();
   const ok = writeJSON(storage, slotKey(id), experiment, onQuotaExceeded);
   if (!ok) return null;
 
   const ids = readRing(storage);
   ids.push(id);
+  const protectedIds = new Set(readJSON(storage, PROTECTED_SLOTS_KEY, []));
+  if (protectFromAutomaticEviction) protectedIds.add(id);
   const evicted = [];
   while (ids.length > RING_SIZE) {
-    evicted.push(ids.shift());
+    const evictionIndex = ids.findIndex((candidate) => !protectedIds.has(candidate));
+    // Protected snapshots are deliberately allowed to extend the recovery
+    // list beyond the ordinary five-slot ring. Example activity must never
+    // age out the user's study that was open before the example.
+    if (evictionIndex < 0) break;
+    evicted.push(ids.splice(evictionIndex, 1)[0]);
   }
   if (!writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded)) {
     // A slot without a ring entry is unusable, so report this save as failed
     // rather than claiming recovery succeeded. Best-effort cleanup is itself
     // total and reports any storage failure through the same callback.
     removeKey(storage, slotKey(id), onQuotaExceeded);
+    return null;
+  }
+  if (protectFromAutomaticEviction && !writeJSON(storage, PROTECTED_SLOTS_KEY, [...protectedIds], onQuotaExceeded)) {
+    // Without the protection marker this save would make a promise it cannot
+    // keep. Remove it from both the slot store and ring and report failure so
+    // callers can leave the user's current workspace untouched.
+    removeKey(storage, slotKey(id), onQuotaExceeded);
+    writeJSON(storage, RING_INDEX_KEY, ids.filter((candidate) => candidate !== id), onQuotaExceeded);
     return null;
   }
   for (const oldId of evicted) removeKey(storage, slotKey(oldId), onQuotaExceeded);
@@ -171,6 +191,9 @@ export function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceed
   removeKey(storage, slotKey(id), onQuotaExceeded);
   const ids = readRing(storage).filter((existingId) => existingId !== id);
   writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded);
+  const protectedIds = readJSON(storage, PROTECTED_SLOTS_KEY, [])
+    .filter((existingId) => existingId !== id);
+  writeJSON(storage, PROTECTED_SLOTS_KEY, protectedIds, onQuotaExceeded);
 }
 
 /**

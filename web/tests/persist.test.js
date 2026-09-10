@@ -81,6 +81,33 @@ test('the ring buffer keeps exactly 5 entries and evicts oldest-first', () => {
   assert.notEqual(loadExperiment(ids[2], { storage }), null);
 });
 
+test('a user snapshot protected before opening demo data is never evicted by demo saves', () => {
+  const storage = makeFakeStorage();
+  const userStudy = emptyExperiment();
+  userStudy.meta.title = 'My irreplaceable study';
+  const userId = saveExperiment(userStudy, { storage, protectFromAutomaticEviction: true });
+
+  for (let i = 0; i < 20; i += 1) {
+    const demo = emptyExperiment();
+    demo.meta.title = `demo-edit-${i}`;
+    saveExperiment(demo, { storage });
+  }
+
+  assert.ok(listSaved({ storage }).includes(userId));
+  assert.equal(loadExperiment(userId, { storage }).meta.title, 'My irreplaceable study');
+  assert.equal(listSaved({ storage }).length, 5);
+});
+
+test('only an explicit delete removes a protected pre-demo snapshot', () => {
+  const storage = makeFakeStorage();
+  const id = saveExperiment(emptyExperiment(), { storage, protectFromAutomaticEviction: true });
+
+  deleteExperiment(id, { storage });
+
+  assert.equal(loadExperiment(id, { storage }), null);
+  assert.deepEqual(listSaved({ storage }), []);
+});
+
 test('a QuotaExceededError storage backend fires onQuotaExceeded and does not throw', () => {
   const storage = makeQuotaExceededStorage();
   let caught = null;

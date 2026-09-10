@@ -192,7 +192,7 @@ export const guideStep = {
       section(main, 'Getting started', (c) => {
         bullets(c, [
           'Choose “Plan my study” to start your own Study map, or “Explore a completed example” to inspect the oregano plan. The example is not your data.',
-          'Make a copy before treating an example as your own plan. You can return to the completed example without replacing your study.',
+          'Opening the example preserves your current study in Restore before anything changes on screen. Demo activity cannot age that protected copy out of Restore.',
           'You do not have to answer everything. Fields you skip are simply marked as not set; ' +
             'the app still produces whatever it can from what you have entered.',
         ]);
