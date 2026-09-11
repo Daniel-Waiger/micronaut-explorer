@@ -10,6 +10,7 @@
 //
 // All lifecycle writes remain callbacks owned by main.js.
 import { isExampleOrigin } from '../../core/appController.js';
+import { IS_SANDBOX } from '../../core/storageScope.js';
 import { openInNewTab, SANDBOX_URL } from '../newTab.js';
 import { createIcon } from '../icons.js';
 import { createStudyMap } from '../studyMap.js';
@@ -243,7 +244,10 @@ export const homeStep = {
     // appendGuidedEntry) so both stay simple "callback missing => render
     // nothing" functions, while every real render of this page still gets a
     // working opener with no wiring required from main.js.
-    const { router, onOpenExampleTab = openInNewTab } = options;
+    // isSandbox injected (defaulting to the real flag) the same way
+    // ui/shell.js takes it, so both branches stay drivable from the DOM
+    // stub without a real location.search to resolve against.
+    const { router, onOpenExampleTab = openInNewTab, isSandbox = IS_SANDBOX } = options;
     main.textContent = '';
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
@@ -266,7 +270,14 @@ export const homeStep = {
     // was. It sits directly under "Plan my study" so the two read as the pair
     // of choices they actually are: plan your own, or go look at a finished
     // one. Everything that follows the map stays after the map.
-    appendExampleLink(main, onOpenExampleTab);
+    // Hidden inside the practice tab itself, where it would invite you to
+    // open a practice tab while you are standing in one, looking at the very
+    // example it offers to show you. Same reasoning as the Utilities menu
+    // item ui/shell.js hides there; this card was missed when that one was
+    // gated, and regenerating the manual's screenshots is what surfaced it --
+    // the card sat in the middle of every practice-tab capture offering the
+    // reader the page they were already on.
+    if (!isSandbox) appendExampleLink(main, onOpenExampleTab);
 
     // This controller owns map input, persistence calls, and deterministic
     // next-decision routing. Home only chooses when the map is revealed.

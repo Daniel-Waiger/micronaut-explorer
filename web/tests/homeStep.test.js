@@ -11,7 +11,9 @@
 // (one-concern tests).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendGuidedEntry, appendExampleLink } from '../src/ui/steps/home.js';
+import { appendGuidedEntry, appendExampleLink, homeStep } from '../src/ui/steps/home.js';
+import { createStore } from '../src/core/store.js';
+import { emptyExperiment } from '../src/core/schema.js';
 import { createDomStub } from './domStub.js';
 
 function withHomeContainer(callback) {
@@ -234,6 +236,44 @@ test('the example card opens the practice tab rather than replacing the study', 
     // study open in this tab.
     assert.deepEqual(opened, ['?demo=1']);
   });
+});
+
+test('the example card is offered in your own tab and hidden inside the practice tab', () => {
+  // Driven through homeStep.render rather than appendExampleLink directly --
+  // unlike every other test in this file, which deliberately avoids render()
+  // because it also builds a real Study map. The gate under test lives in
+  // render() itself, so there is nowhere else to observe it, and the stub
+  // turns out to carry createStudyMap fine with an emptyExperiment() store.
+  //
+  // The bug: the practice tab kept offering "Explore a completed example",
+  // inviting the reader to open a practice tab while standing in one, looking
+  // at the very example it offered to show them. The Utilities menu item was
+  // gated for this; this card was missed.
+  const render = (isSandbox) => {
+    const { document: fakeDocument, install, restore } = createDomStub();
+    install();
+    try {
+      const main = fakeDocument.createElement('main');
+      homeStep.render(main, createStore(emptyExperiment()), {
+        router: { navigate: () => {}, current: () => 'home' },
+        onOpenExampleTab: () => {},
+        isSandbox,
+      });
+      return main.querySelectorAll('.home-card-title').map((el) => el.textContent);
+    } finally {
+      restore();
+    }
+  };
+
+  assert.ok(render(false).includes('Explore a completed example'), 'your own tab offers the example');
+  assert.equal(
+    render(true).includes('Explore a completed example'),
+    false,
+    'the practice tab must not offer to open the page you are already on'
+  );
+  // The walkthrough card survives in both -- this gate is about the example
+  // entry point only, not about emptying the page.
+  assert.ok(render(true).some((t) => /walkthrough/i.test(t)), 'the walkthrough card stays');
 });
 
 test('the example card is absent when no opener is supplied', () => {
