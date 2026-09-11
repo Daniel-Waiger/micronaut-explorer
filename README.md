@@ -236,7 +236,10 @@ CI runs the JS suite plus the Planner's own Python build-pipeline tests
   correction**. Corrections need a source we can check; "measured on our own instrument" is a
   valid one, as long as it says so.
 
-The forms live in [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/). Blank issues stay
+The issue forms live in [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/), and the Q&A
+discussion form in [.github/DISCUSSION_TEMPLATE/](.github/DISCUSSION_TEMPLATE/) — that one binds
+by filename to the discussion category's slug, so renaming the category means renaming the file.
+Blank issues stay
 enabled on purpose — the planner's own Feedback button opens a blank, pre-labelled issue, and
 turning blank issues off would break that link. See the comment in
 [config.yml](.github/ISSUE_TEMPLATE/config.yml).

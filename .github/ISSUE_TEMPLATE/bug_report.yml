@@ -9,7 +9,8 @@ body:
 
         **Please do not paste your study JSON into this issue.** The Feedback page's package
         ends with your whole study — the research question, markers, conditions, file names —
-        and an issue here is public. Paste only the short header lines (Generated / Step /
+        after a line reading `--- study JSON (lets us reproduce exactly what you saw) ---`, and
+        this repository is public. Paste only the short header lines above it (Generated / Step /
         Knowledge-pack issues / Browser), describe the record in words, or say so below and
         we will arrange somewhere private for the file.
 
@@ -62,9 +63,10 @@ body:
     attributes:
       label: The header lines from the Feedback page
       description: >
-        Feedback → Copy feedback package, then paste just the lines above "--- study JSON ---".
-        They carry the page you were on, your browser, and whether the knowledge pack loaded
-        cleanly, which answers most of our first round of questions.
+        Feedback → Copy feedback package, then paste just the lines above the one that reads
+        `--- study JSON (lets us reproduce exactly what you saw) ---`. They carry the page you
+        were on, your browser, and whether the knowledge pack loaded cleanly, which answers most
+        of our first round of questions. Everything below that line is your study; leave it out.
       placeholder: |
         Micronaut Planner -- feedback report
         Generated: 2026-09-11T08:14:22.031Z

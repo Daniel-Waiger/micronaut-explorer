@@ -16,6 +16,10 @@ body:
         our facility uses" is a perfectly good source — just say that, so the next reader knows
         what kind of claim it is.
 
+        This repository is public, so a correction is the one entry and the value — not the
+        panel it sits in, and not a pasted study JSON. If naming your own instrument or facility
+        as the source is more than you want on a public page, "measured in-house" is enough.
+
   - type: dropdown
     id: part
     attributes:

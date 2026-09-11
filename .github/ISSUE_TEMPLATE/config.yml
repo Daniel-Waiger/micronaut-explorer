@@ -1,3 +1,17 @@
+# LABELS THESE FORMS REFERENCE. A label a form asks for has to already exist in the repo, or
+# the issue is simply filed without it — no error, no warning, and the filterable group the
+# label was supposed to create never appears. Checked 2026-09-11:
+#
+#   bug              exists   (bug_report.yml)
+#   enhancement      exists   (feature_request.yml)
+#   question         exists   (../DISCUSSION_TEMPLATE/q-a.yml)
+#   knowledge-pack   MISSING  (knowledge_pack.yml)
+#   feedback         MISSING  (not a form at all — web/src/ui/feedbackHandoff.js puts it in the
+#                              in-app Feedback button's URL, so this one has been quietly
+#                              inert for as long as that button has existed)
+#
+# Create the missing two under Issues -> Labels. Add a line here when a new form wants a label.
+#
 # Blank issues stay switched on deliberately, and for a second reason here beyond the CRM's.
 #
 # First, the same one: someone with a half-formed thought should never hit a wall of required
