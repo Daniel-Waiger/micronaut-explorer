@@ -171,6 +171,32 @@ test('serializeExperiment/deserializeExperiment round-trip to a deeply-equal obj
   assert.deepEqual(roundTripped, experiment);
 });
 
+// Studies are gaining a real identity: schema.js's emptyExperiment() mints
+// meta.id/createdAt/updatedAt, and appController.js stamps meta.updatedAt
+// fresh on every SAVE (a write concern -- see appController.js's
+// withSaveStamp). This module's job in that split is the READ side, and it
+// must have no clock and no opinion about identity at all: serializing and
+// then reading a backup back through this file must never mint a new id or
+// claim a new save time. If it did, restoring an old backup would silently
+// rewrite its identity and pretend it was just saved -- exactly what a
+// project backup must never do to the file it is reading.
+test('meta.id/createdAt/updatedAt survive serialize -> deserialize -> parseAndMigrate unchanged', () => {
+  const experiment = emptyExperiment();
+  const { id, createdAt, updatedAt } = experiment.meta;
+
+  const text = serializeExperiment(experiment);
+
+  const roundTripped = deserializeExperiment(text);
+  assert.equal(roundTripped.meta.id, id);
+  assert.equal(roundTripped.meta.createdAt, createdAt);
+  assert.equal(roundTripped.meta.updatedAt, updatedAt);
+
+  const { experiment: migrated } = parseAndMigrateExperiment(text);
+  assert.equal(migrated.meta.id, id);
+  assert.equal(migrated.meta.createdAt, createdAt);
+  assert.equal(migrated.meta.updatedAt, updatedAt);
+});
+
 test('parseAndMigrateExperiment accepts current and older project backups without storage side effects', () => {
   const current = emptyExperiment();
   current.meta.title = 'Current backup';

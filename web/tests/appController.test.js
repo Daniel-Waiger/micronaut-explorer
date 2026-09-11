@@ -198,6 +198,158 @@ test('autosave debounce: five edits inside 500ms produce exactly one save, and n
   assert.equal(persist.calls.saveExperiment[0].meta.title, 'edit-4');
 });
 
+// --- meta.updatedAt stamping on every save path -------------------------
+// (the write-side half of studies gaining a real identity: schema.js mints
+// meta.id/createdAt/updatedAt on creation and backfills a missing id on
+// migration; this module's job is to keep updatedAt current on every write
+// and expose it to the Restore list.)
+
+test('performAutosave stamps meta.updatedAt from the injected clock', async () => {
+  const { controller, store, persist, timers } = makeController({ now: () => 'STAMP-AUTOSAVE' });
+  controller.startAutosave();
+
+  store.patch({ meta: { ...store.get().meta, title: 'edited' } });
+  await tick();
+  timers.advance(500);
+
+  assert.equal(persist.calls.saveExperiment.length, 1);
+  assert.equal(persist.calls.saveExperiment[0].meta.updatedAt, 'STAMP-AUTOSAVE');
+});
+
+test('startBlankStudy stamps meta.updatedAt on the protected snapshot it saves', () => {
+  const store = createStore(withTitle(emptyExperiment(), 'mine'));
+  const { controller, persist } = makeController({ store, now: () => 'STAMP-BLANK' });
+
+  assert.equal(controller.actions.onNewBlank(), true);
+
+  assert.ok(persist.calls.saveExperiment.length >= 1);
+  for (const saved of persist.calls.saveExperiment) {
+    assert.equal(saved.meta.updatedAt, 'STAMP-BLANK');
+  }
+});
+
+test('openExampleStudy stamps meta.updatedAt on the protected snapshot it saves', () => {
+  const store = createStore(withTitle(emptyExperiment(), 'practice work'));
+  const { controller, persist } = makeController({ store, isSandbox: true, now: () => 'STAMP-EXAMPLE' });
+
+  assert.equal(controller.actions.onOpenExample(), true);
+
+  assert.ok(persist.calls.saveExperiment.length >= 1);
+  for (const saved of persist.calls.saveExperiment) {
+    assert.equal(saved.meta.updatedAt, 'STAMP-EXAMPLE');
+  }
+});
+
+test('clearAllStoredData stamps meta.updatedAt on the re-save of the open study', () => {
+  const { controller, persist } = makeController({ now: () => 'STAMP-CLEAR' });
+
+  assert.equal(controller.actions.onClearAllStorage(), true);
+
+  assert.equal(persist.calls.saveExperiment.length, 1);
+  assert.equal(persist.calls.saveExperiment[0].meta.updatedAt, 'STAMP-CLEAR');
+});
+
+// --- The loop guard: stamping must never mutate the live study ----------
+
+test('a save never mutates the study sitting in the store (the loop guard withSaveStamp exists for)', async () => {
+  // If withSaveStamp ever wrote the timestamp back into the live study
+  // instead of a copy, that write would run through store.patch/replace's
+  // subscriber notification -- which is exactly what startAutosave listens
+  // on to schedule the NEXT debounced save. A mutating stamp would therefore
+  // make every save schedule another save, forever. This is the single most
+  // important assertion in this file for that reason.
+  const store = createStore(withTitle(emptyExperiment(), 'original'));
+  const before = store.get();
+  const beforeUpdatedAt = before.meta.updatedAt;
+  const { controller, persist, timers } = makeController({ store, now: () => 'STAMP-LOOP-GUARD' });
+  controller.startAutosave();
+
+  store.patch({ meta: { ...store.get().meta, title: 'edited' } });
+  await tick();
+  const editedState = store.get();
+  timers.advance(500);
+
+  assert.equal(persist.calls.saveExperiment.length, 1, 'sanity: exactly one autosave fired');
+  assert.equal(persist.calls.saveExperiment[0].meta.updatedAt, 'STAMP-LOOP-GUARD', 'the SAVED copy is stamped');
+
+  // The live store must be untouched by the save itself: still the same
+  // object reference the edit produced, and its own meta.updatedAt (whatever
+  // it was before this save -- store.patch's shallow merge left it alone)
+  // must not have picked up the stamp that only the copy handed to persist
+  // received.
+  assert.equal(store.get(), editedState, 'store.get() must still be the same reference the edit produced');
+  assert.equal(store.get().meta.updatedAt, beforeUpdatedAt, 'the live study must not have been stamped');
+
+  // And, the direct symptom a mutating stamp would cause: no runaway second
+  // autosave fires on its own after the one legitimate save above.
+  timers.advance(5000);
+  assert.equal(persist.calls.saveExperiment.length, 1, 'no self-triggered follow-up save');
+});
+
+// --- recoveryEntries: savedAt from the raw, un-migrated slot ------------
+
+test('an exported project backup is stamped like any other write', () => {
+  // An export IS a write of this document, so the file has to say when it was
+  // written. Without the stamp it carries whatever updatedAt the in-memory
+  // study holds -- for a study created and edited in this session and never
+  // reloaded, that is still emptyExperiment()'s creation time. Importing that
+  // file later would then present an hour-old document as untouched since
+  // creation, and any future list sorting by recency would file it wrongly.
+  const exported = [];
+  const store = createStore(withTitle(emptyExperiment(), 'my study'));
+  const before = store.get().meta.updatedAt;
+  const { controller } = makeController({
+    store,
+    persist: makeFakePersist({ exportToFile: (experiment, filename) => exported.push({ experiment, filename }) }),
+    now: () => 'EXPORT_TIMESTAMP',
+  });
+
+  controller.actions.onExportProject();
+
+  assert.equal(exported.length, 1);
+  assert.equal(exported[0].experiment.meta.updatedAt, 'EXPORT_TIMESTAMP');
+  // The identity travels with it unchanged -- an export must not re-mint,
+  // or the same document would come back as a different one.
+  assert.equal(exported[0].experiment.meta.id, store.get().meta.id);
+  assert.equal(exported[0].experiment.meta.title, 'my study');
+  // And the same loop guard as every other save path: the live study is not
+  // touched by having been exported.
+  assert.equal(store.get().meta.updatedAt, before, 'exporting must not mutate the open study');
+});
+
+test('recoveryEntries reports savedAt from the raw slot, and null for a legacy or corrupt updatedAt', () => {
+  const persist = makeFakePersist({
+    listSaved: () => ['slot-current', 'slot-legacy', 'slot-corrupt'],
+    loadExperiment: (id) => {
+      if (id === 'slot-current') {
+        return withTitle(emptyExperiment(), 'current'); // meta.updatedAt not set by this helper on purpose below
+      }
+      if (id === 'slot-legacy') {
+        // A slot saved before this change exists: meta has no updatedAt at
+        // all. This is what every existing user's stored data looks like on
+        // first load after upgrading -- not an edge case.
+        const exp = withTitle(emptyExperiment(), 'legacy');
+        delete exp.meta.updatedAt;
+        return exp;
+      }
+      // A hand-edited or otherwise corrupt slot: updatedAt present but not a
+      // string. Must degrade to null, never flow through as-is.
+      const exp = withTitle(emptyExperiment(), 'corrupt');
+      exp.meta.updatedAt = 1234567890;
+      return exp;
+    },
+  });
+  const { controller } = makeController({ persist });
+
+  const entries = controller.recoveryEntries();
+  const byId = Object.fromEntries(entries.map((e) => [e.id, e]));
+
+  assert.equal(typeof byId['slot-current'].savedAt, 'string', 'a real ISO updatedAt is passed through');
+  assert.equal(byId['slot-legacy'].savedAt, null, 'a legacy slot with no updatedAt reports null, not undefined');
+  assert.equal('savedAt' in byId['slot-legacy'], true, 'the key itself must still be present');
+  assert.equal(byId['slot-corrupt'].savedAt, null, 'a non-string updatedAt reports null rather than flowing through');
+});
+
 // --- Fix 1: startBlankStudy must not lose the just-typed edit ---------
 
 test('startBlankStudy flushes the pending autosave with the EDITED study before replace (fails pre-fix)', async () => {

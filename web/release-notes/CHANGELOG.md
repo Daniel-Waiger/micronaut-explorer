@@ -23,6 +23,22 @@ that existing history, not a scheme that was tracked from day one.
   handle back into the tab holding your real study. The practice tab keeps
   its own edits between visits, and carries a bar across the top with its own
   **Reset to the example** control for starting over from the shipped plan.
+- The Utilities menu's **Restore previous version** list now shows when each
+  saved version was written, not just its title — a second line under each
+  entry reading something like "5m ago" or "2h ago" for a recent save, and a
+  plain local date (e.g. "Sep 11, 2026") once a save is a day old or more,
+  via `ui/shell.js`'s new `restoreWhenLabel()`. This matters most exactly
+  where the list used to be least useful: several saves in a row of a study
+  that hasn't been retitled render as a stack of identical-looking "Untitled
+  study" (or identical-title) rows with nothing to tell them apart. Every
+  saved slot written before this change carries no save time at all, so that
+  case is load-bearing rather than a corner to round off:
+  `restoreWhenLabel()` returns an empty string for a missing, non-string, or
+  unparseable value, and the row it belongs to simply omits the second line
+  and looks exactly as it always has — never "Invalid Date". The added line
+  is hidden from the button's accessible name (which would otherwise run the
+  title and the time together with no separator between them); an explicit
+  `aria-label` restates both as one properly punctuated phrase instead.
 
 ### Changed
 - Opening the example study no longer has anything to protect: because it

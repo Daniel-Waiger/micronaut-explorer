@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { compassScopeLine, footerPositionLabel } from '../src/ui/shell.js';
+import { compassScopeLine, footerPositionLabel, restoreWhenLabel } from '../src/ui/shell.js';
 
 const css = readFileSync(new URL('../styles/app.css', import.meta.url), 'utf8');
 const shell = readFileSync(new URL('../src/ui/shell.js', import.meta.url), 'utf8');
@@ -79,4 +79,95 @@ test('compassScopeLine never renders a dangling "Now editing: " for an empty sco
     assert.notEqual(line.trim(), 'Now editing:');
     assert.ok(line.length > 'Now editing: '.length || !line.startsWith('Now editing: '));
   }
+});
+
+// restoreWhenLabel(iso): the Restore list's "when was this saved" line.
+// recoveryEntries() (appController.js, not this file's to touch) returns
+// savedAt: null for every slot saved before that field existed -- so the
+// invalid-input branches below are not edge cases, they are what every
+// upgrading user's oldest saved slots look like on first load, and this
+// function's contract is to degrade to '' for every one of them rather than
+// ever render "Invalid Date".
+test('restoreWhenLabel: recent saves read as relative time', () => {
+  // Frozen clock, not Date.now(). Asserting an exact string against the wall
+  // clock races the machine: these tests read the clock once to build the
+  // timestamp and the function reads it again, so a stall of one second
+  // between the two turns '45s ago' into '46s ago' and fails the suite for a
+  // reason unrelated to the code. Injecting the instant removes the race
+  // instead of hiding it behind a tolerance.
+  const NOW = Date.parse('2026-09-11T12:00:00.000Z');
+  const ago = (ms) => new Date(NOW - ms).toISOString();
+  const at = (ms) => restoreWhenLabel(ago(ms), { now: () => NOW });
+
+  assert.equal(at(3_000), 'just now');
+  assert.equal(at(45_000), '45s ago');
+  assert.equal(at(5 * 60_000), '5m ago');
+  assert.equal(at(59 * 60_000), '59m ago');
+  assert.equal(at(2 * 3_600_000), '2h ago');
+  assert.equal(at(23 * 3_600_000), '23h ago');
+  // The exact cutovers, which a tolerance-based test would paper over.
+  assert.equal(at(9_999), 'just now');
+  assert.equal(at(10_000), '10s ago');
+  assert.equal(at(24 * 3_600_000 - 1), '23h ago');
+  assert.doesNotMatch(at(24 * 3_600_000), /ago$/, 'a day old switches to an absolute date');
+});
+
+test('restoreWhenLabel: a save a day or more old reads as an absolute local date, not a climbing hour count', () => {
+  const NOW = Date.parse('2026-09-11T12:00:00.000Z');
+  const iso = new Date(NOW - 3 * 24 * 3_600_000).toISOString();
+  const expected = new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  const label = restoreWhenLabel(iso, { now: () => NOW });
+  assert.equal(label, expected);
+  assert.doesNotMatch(label, /ago$/);
+});
+
+test('restoreWhenLabel returns \'\' for null, undefined, a non-string, and an unparseable string -- never "Invalid Date"', () => {
+  for (const bad of [null, undefined, 1_700_000_000_000, {}, [], 'not-a-date', '']) {
+    const label = restoreWhenLabel(bad);
+    assert.equal(label, '');
+    assert.doesNotMatch(String(label), /Invalid Date/);
+  }
+});
+
+// renderRecoveryEntries (shell.js): action()'s shared textContent-setting
+// helper (used by four other menu items) must stay untouched, so the second
+// line is appended to the button it returns rather than folded into the
+// label action() itself builds.
+test('the restore row appends a second-line span for the save time instead of changing the shared action() helper', () => {
+  assert.match(shell, /function action\(label, callback, className = '', role = 'menuitem'\) \{\s*const button = document\.createElement\('button'\);\s*button\.type = 'button';\s*button\.className = `shell-utility-action \$\{className\}`\.trim\(\);\s*button\.setAttribute\('role', role\);\s*button\.textContent = label;/);
+  assert.match(shell, /const whenLabel = restoreWhenLabel\(entry\.savedAt\);/);
+  assert.match(shell, /when\.className = 'shell-restore-when';/);
+  assert.match(shell, /restore\.appendChild\(when\);/);
+});
+
+// Accessibility: with the second text node present, the button's default
+// accessible name (its concatenated text content) would run the title and
+// the time together with no separator. aria-hidden takes the visual-only
+// second line out of that computation; the explicit aria-label on the
+// button puts the same two facts back in as one properly punctuated phrase.
+test('the appended time span is hidden from the accessible name, which is instead set explicitly on the button', () => {
+  assert.match(shell, /when\.setAttribute\('aria-hidden', 'true'\)/);
+  assert.match(shell, /restore\.setAttribute\('aria-label', `\$\{titleLine\}, saved \$\{whenLabel\}`\)/);
+});
+
+// Everything renderRecoveryEntries already did must survive untouched: the
+// "Latest: " prefix on index 0, the delete button's stopPropagation and its
+// aria-label, and both window.confirm strings.
+test('the restore row keeps its existing Latest prefix, delete control, and confirm strings intact', () => {
+  assert.match(shell, /const titleLine = `\$\{index === 0 \? 'Latest: ' : ''\}\$\{entryTitle\}`;/);
+  assert.match(shell, /window\.confirm\('Restore this saved version\? Your current work remains available in Restore\.'\)/);
+  assert.match(shell, /remove\.setAttribute\('aria-label', `Permanently delete the saved version "\$\{entryTitle\}"`\)/);
+  assert.match(shell, /event\.stopPropagation\(\);/);
+  assert.match(shell, /window\.confirm\(`Permanently delete the saved version "\$\{entryTitle\}"\? This cannot be undone\.`\)/);
+});
+
+// CSS: the second line must actually stack under the title (display: block
+// -- a bare <span> is inline and would run on after the title text instead),
+// and must draw its colour from an existing custom property rather than a
+// hardcoded one, since app.css supports light, dark and two explicit
+// [data-theme] blocks from a single rule.
+test('app.css stacks .shell-restore-when on its own line using an existing muted-text token', () => {
+  assert.match(css, /\.shell-restore-when\s*\{[^}]*display:\s*block;[^}]*\}/);
+  assert.match(css, /\.shell-restore-when\s*\{[^}]*color:\s*var\(--muted\);[^}]*\}/);
+  assert.doesNotMatch(css.match(/\.shell-restore-when\s*\{[^}]*\}/)[0], /#[0-9a-fA-F]{3,8}\b/);
 });

@@ -2983,6 +2983,20 @@ td, th { border-color: var(--line); }
 .shell-restore-action { font-size: 12.5px; }
 .shell-restore-row { display: flex; align-items: center; gap: 2px; }
 .shell-restore-row .shell-restore-action { flex: 1; min-width: 0; }
+/* Second line inside the restore button (shell.js's renderRecoveryEntries),
+   holding restoreWhenLabel()'s output. `display: block` is what actually
+   stacks it under the title line -- a bare <span> is inline and would just
+   run on after the title text instead. .shell-utility-action's min-height is
+   a *minimum* (app.css:2880-2892), not a fixed height, and neither it nor
+   .shell-restore-action clamps overflow or forces nowrap, so the button
+   grows to fit this extra line with no other layout change needed. */
+.shell-restore-when {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 550;
+}
 .shell-restore-delete {
   font: inherit;
   font-size: 13px;

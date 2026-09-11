@@ -131,6 +131,37 @@ export function createAppController({
     shell = nextShell;
   }
 
+  /**
+   * Stamp `meta.updatedAt` (from the injected `now`, so this is exactly as
+   * fake-clock-testable as `saveState.savedAt` already is) on a COPY of
+   * `experiment`, for handing to persist.saveExperiment -- never on the
+   * object living in the store.
+   *
+   * Why here and not in persist.js: persist.js's saveExperiment docstring
+   * says plainly that module has no clock anywhere and is deliberately
+   * ignorant of document shape (slot ids are "not keyed by
+   * experiment.meta.id") -- it cannot stamp a field it never looks at.
+   * appController already owns `now`, so this is the one place both the
+   * save and the stamp happen together.
+   *
+   * CRITICAL, and the one thing that must never regress: this returns a
+   * NEW object rather than mutating `experiment` in place. Writing the
+   * timestamp back into the LIVE study (e.g. via store.patch/replace)
+   * would run it through the same notification path startAutosave's
+   * subscriber listens on to schedule the next debounced save -- so a
+   * mutating version of this helper would have every save notify
+   * subscribers, which schedules another autosave, which stamps and
+   * notifies again: an unbounded loop. Returning a copy means the
+   * timestamp only ever reaches persist (and, through it, the Restore
+   * list, which reads the persisted slot's raw meta.updatedAt directly);
+   * the in-memory study just picks up its own updatedAt the next time it
+   * is loaded fresh from storage, same as every other field persist.js
+   * round-trips.
+   */
+  function withSaveStamp(experiment) {
+    return { ...experiment, meta: { ...(experiment.meta || {}), updatedAt: now() } };
+  }
+
   function notifyToast(message) {
     if (shell && typeof shell.showToast === 'function') shell.showToast(message);
   }
@@ -175,12 +206,28 @@ export function createAppController({
       const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
         ? raw.meta.title.trim()
         : 'Untitled study';
-      return { id, title };
+      // Read raw, un-migrated meta.updatedAt directly (this function never
+      // calls migrate()) rather than fabricating one: every slot saved
+      // before this change genuinely has no updatedAt, and reporting `null`
+      // honestly for those is the point, not an edge case to paper over. A
+      // hand-edited or corrupt slot whose updatedAt survived as some other
+      // type (a number, an object) is normalized to `null` the same way,
+      // since it is not a value anything downstream should render as a date.
+      const savedAt = typeof raw?.meta?.updatedAt === 'string' ? raw.meta.updatedAt : null;
+      return { id, title, savedAt };
     });
   }
 
   function exportProjectBackup() {
-    persist.exportToFile(store.get(), projectFilename(store.get()));
+    // Stamped like any other write. Without this the downloaded file carries
+    // whatever updatedAt the in-memory study happens to hold -- which, for a
+    // study created and edited in this session and never reloaded, is still
+    // the creation time from emptyExperiment(). Someone importing that file
+    // an hour later would get a document claiming it had not been touched
+    // since it was made, and a workspace list sorting by recency would put it
+    // in the wrong place. The export IS the moment this copy was written, so
+    // that is what it should say.
+    persist.exportToFile(withSaveStamp(store.get()), projectFilename(store.get()));
     persist.markExported({ onQuotaExceeded: reportStorageFailure });
     notifyToast('Project backup downloaded.');
   }
@@ -266,7 +313,7 @@ export function createAppController({
       );
       return false;
     }
-    const savedId = persist.saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+    const savedId = persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure });
     notifyRecoveryEntries();
     if (!savedId) {
       reportPersistentLifecycleFailure(
@@ -326,7 +373,7 @@ export function createAppController({
     // browsing or editing the example still can never delete whatever
     // practice work came before it. If durable preservation is unavailable,
     // do not switch workspaces at all.
-    const protectedId = persist.saveExperiment(store.get(), {
+    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
       onQuotaExceeded: reportStorageFailure,
       protectFromAutomaticEviction: true,
     });
@@ -367,7 +414,7 @@ export function createAppController({
    */
   function startBlankStudy() {
     flushAutosave();
-    const protectedId = persist.saveExperiment(store.get(), {
+    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
       onQuotaExceeded: reportStorageFailure,
       protectFromAutomaticEviction: true,
     });
@@ -433,7 +480,7 @@ export function createAppController({
   let saveTimer = null;
 
   function performAutosave() {
-    const savedId = persist.saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+    const savedId = persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure });
     if (savedId) {
       setSaveState({ status: 'saved', savedAt: now(), error: null });
       notifyRecoveryEntries();

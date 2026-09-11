@@ -65,6 +65,50 @@ export function saveLabel(saveState) {
   return `Saved locally · ${Math.round(seconds / 60)}m ago`;
 }
 
+// The one absolute-time complement to saveLabel's relative-only vocabulary
+// above. saveLabel never needs an upper bound because it is read live off the
+// header's own indicator -- the save it describes just happened. A slot in
+// Restore is a different animal: it can be seconds old or weeks old, and
+// "meta.updatedAt" on a really old slot has no `savedAt` at all (any slot
+// written before that field existed) or is stringified nonsense (a corrupted
+// or hand-edited record), neither of which is this function's job to notice
+// -- it always renders *something* sane, even '' for "say nothing".
+// RESTORE_ABSOLUTE_AFTER_HOURS is the cutover from "relative to now" to "a
+// real calendar date": past a day, "19h ago" stops being easier to place than
+// the date itself, so this trades relative for absolute rather than letting
+// the relative count climb into "312h ago" territory.
+const RESTORE_ABSOLUTE_AFTER_HOURS = 24;
+
+// `now` is injectable for the same reason appController.js injects its own
+// clock: without it these labels can only be tested against the wall clock,
+// which means a test asserting an exact string ('45s ago') races the machine
+// -- if more than a second passes between the test building its timestamp and
+// this function reading Date.now(), the assertion flips to '46s ago' and the
+// suite fails for a reason that has nothing to do with the code. That is not
+// a hypothetical; it showed up once under parallel load while this was being
+// written. Production callers pass nothing and get the real clock.
+export function restoreWhenLabel(iso, { now = () => Date.now() } = {}) {
+  if (typeof iso !== 'string' || !iso) return '';
+  const date = new Date(iso);
+  // Number.isNaN, not the global isNaN: a genuinely invalid Date's getTime()
+  // is NaN, and Number.isNaN doesn't coerce first the way the global one
+  // does -- same guard saveLabel already relies on above.
+  if (Number.isNaN(date.getTime())) return '';
+  const seconds = Math.max(0, Math.floor((now() - date.getTime()) / 1000));
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < RESTORE_ABSOLUTE_AFTER_HOURS) return `${hours}h ago`;
+  // toLocaleDateString with no timezone option reads the runtime's own local
+  // clock (the same "local by definition" property the module doc for this
+  // file's date rules elsewhere in this codebase relies on) -- deliberately
+  // no time-of-day component, since once a saved version is a day old or
+  // more, which day it was matters far more than which second.
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
 // `steps` is router.steps (every route, including the utility/guide ones);
 // 'guide' is the one non-utility route excluded from the primary workflow
 // (see engine/workflowProgress.js's PRIMARY_WORKFLOW/OPTIONAL_WORKFLOW
@@ -329,12 +373,42 @@ export function renderShell(root, store, router, options = {}) {
       const entryTitle = entry.title || 'Untitled study';
       const row = document.createElement('div');
       row.className = 'shell-restore-row';
-      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entryTitle}`, () => {
+      const titleLine = `${index === 0 ? 'Latest: ' : ''}${entryTitle}`;
+      const restore = action(titleLine, () => {
         if (window.confirm('Restore this saved version? Your current work remains available in Restore.')) {
           onRestoreRecovery(entry.id);
         }
       }, 'shell-restore-action');
       restore.title = 'Restore this saved version';
+      // action() just set restore.textContent above, which (per its own doc
+      // comment) is a SINGLE text node -- action() is shared with four other
+      // menu items and isn't touched for this. appendChild here adds the
+      // timestamp as a SECOND node alongside it instead, which is exactly
+      // what lets app.css's .shell-restore-when put it on its own line below
+      // titleLine without any change to that shared helper.
+      // recoveryEntries() (appController.js) returns savedAt: null for any
+      // slot saved before that field existed, so '' here is not an edge case
+      // -- it is what every upgrading user's oldest slots look like on first
+      // load, and skipping the span entirely reproduces today's one-line row
+      // exactly for them.
+      const whenLabel = restoreWhenLabel(entry.savedAt);
+      if (whenLabel) {
+        const when = document.createElement('span');
+        when.className = 'shell-restore-when';
+        when.textContent = whenLabel;
+        // Screen readers compute a button's accessible name from its text
+        // content unless an aria-label overrides that -- and with two text
+        // nodes now inside `restore` (titleLine, then whenLabel with no
+        // separator between them), that computed name would run the two
+        // together verbatim, e.g. "Latest: Autophagy assay5m ago". aria-hidden
+        // here takes the second line out of that computation, and the
+        // explicit aria-label below puts the same two facts back in as one
+        // properly punctuated phrase instead -- so sighted and screen-reader
+        // users get the same information, just assembled differently.
+        when.setAttribute('aria-hidden', 'true');
+        restore.appendChild(when);
+        restore.setAttribute('aria-label', `${titleLine}, saved ${whenLabel}`);
+      }
       row.appendChild(restore);
       if (onDeleteRecovery) {
         const remove = document.createElement('button');
