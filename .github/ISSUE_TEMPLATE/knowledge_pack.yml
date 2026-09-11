@@ -1,0 +1,74 @@
+name: Knowledge pack correction
+description: A marker, spectrum, control, or suggestion the planner has wrong
+labels: ["knowledge-pack"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The planner's suggestions come from a shipped knowledge pack (`web/kb/`) — marker names
+        and their aliases, excitation and emission peaks, the controls a design implies, and the
+        question and readout vocabularies. No model is ever called, so anything it tells you is
+        either right in that pack or wrong in that pack, and this is how the second one gets
+        fixed.
+
+        A correction needs a source we can check: a manufacturer's spectra page, a datasheet, a
+        paper, or a measurement you made yourself and are willing to say so about. "This is what
+        our facility uses" is a perfectly good source — just say that, so the next reader knows
+        what kind of claim it is.
+
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part of the pack?
+      options:
+        - Not sure
+        - Marker name or alias (markers.json)
+        - Excitation or emission peak (spectra.json)
+        - Overlap or cross-talk verdict (spectra.json)
+        - Controls suggested for a design (controls.json)
+        - Question or readout vocabulary (questions.json, readouts.json)
+        - Advice or guidance text (advisor.json)
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: entry
+    attributes:
+      label: Which entry?
+      description: The marker, dye, fluorescent protein, control, or phrase involved.
+      placeholder: ALEXA488, or "no-stain control"
+    validations:
+      required: true
+
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What does the planner say, and what should it say?
+      description: Both halves, please. Knowing the wrong value is how we find where it came from.
+      placeholder: >
+        The picker lists the emission peak as 519 nm; the manufacturer's spectra viewer gives
+        520 nm for the same dye in PBS.
+    validations:
+      required: true
+
+  - type: textarea
+    id: source
+    attributes:
+      label: Where does the correct value come from?
+      description: A link, a citation, a datasheet name, or "measured on our own instrument".
+      placeholder: >
+        Thermo Fisher Alexa Fluor 488 product page, spectra viewer, read 2026-09-01. Or: measured
+        on our Zeiss LSM 900, 488 line, in PBS.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: conditions
+    attributes:
+      label: One thing that trips up spectral corrections
+      options:
+        - label: >
+            I have said which buffer, mounting medium, or conditions my value is for, or I know
+            it is a nominal catalogue figure rather than a measured one.
+          required: false

@@ -1,0 +1,73 @@
+name: Feature request
+description: Suggest something you would like the planner to do
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Thanks for taking the time. You do not need to fill in every box, and a rough idea is
+        genuinely welcome. If you would rather just think out loud, the
+        [Discussions](https://github.com/Daniel-Waiger/micronaut-explorer/discussions) board is
+        the easier place to start.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like to be able to plan?
+      description: Describe it the way you would say it out loud.
+      placeholder: >
+        I would like to record which objective and immersion medium a measurement assumes, so
+        the acquisition plan says it out loud instead of living in my head.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would that help you?
+      description: >
+        What are you trying to get done, or what do you do today instead? This matters more than
+        the feature itself, because it often points at a simpler answer.
+      placeholder: >
+        Two people run the same measurement on different scopes and get numbers we cannot
+        compare, and nothing in the plan records which one was intended.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: screen
+    attributes:
+      label: Which part of the planner?
+      description: A rough guess is fine, and "not sure" is a real answer.
+      options:
+        - Not sure
+        - Study map
+        - Research brief (and description review)
+        - Measurements registry
+        - Measurement — Samples & design
+        - Measurement — Acquisition
+        - Measurement — Data plan
+        - Review (and its exports)
+        - Colour and spectra (fluorophore picker, spectral view)
+        - Guide and walkthrough
+        - Backup, restore, settings
+        - Something new, not part of a page that exists
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Two things worth knowing before you write
+      description: >
+        Not a test, and neither one rules your idea out — they just shape the answer, so it
+        helps if we are working from the same picture.
+      options:
+        - label: >
+            I understand the planner runs entirely in my browser, with no server and no account,
+            so it cannot send, sync, or share anything by itself.
+          required: false
+        - label: >
+            I understand no model is ever called, so suggestions can only come from exact text
+            matches and the shipped knowledge pack, not from inference.
+          required: false

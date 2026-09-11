@@ -1,0 +1,55 @@
+# Discussion category forms bind by FILENAME to the category slug, so this file only does
+# anything while a category whose slug is `q-a` exists (that is GitHub's default "Q&A"
+# category, created when Discussions is first switched on). Rename the category and this
+# form silently stops applying — rename the file to match.
+title: "[Question] "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask away. Nothing here is formal, and "I am not sure this is even a planner question" is
+        a fine way to start.
+
+        One thing worth keeping in mind: this board is public. If your study is unpublished,
+        describe the shape of it — two groups, three timepoints, four markers — rather than
+        pasting the study JSON or the real marker panel.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to work out?
+      placeholder: >
+        I have two imaging sessions a week apart on the same animals. Is that one measurement
+        with a timepoint, or two measurements?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: What does your study look like so far?
+      description: Only as much as you are happy to say in public. Rough is fine.
+      placeholder: >
+        Mouse retina, wildtype against a knockout, four animals each, confocal, three markers
+        plus a nuclear stain.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the planner is this about?
+      options:
+        - Not sure, or none of them
+        - Study map
+        - Research brief
+        - Measurements registry
+        - Samples & design
+        - Acquisition
+        - Data plan
+        - Review and exports
+        - Colour and spectra
+        - Backup, restore, settings
+    validations:
+      required: false

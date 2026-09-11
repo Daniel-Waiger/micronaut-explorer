@@ -1,0 +1,103 @@
+name: Bug report
+description: The planner behaved differently than you expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sorry it broke. Two boxes below are required, the rest only if you know them.
+
+        **Please do not paste your study JSON into this issue.** The Feedback page's package
+        ends with your whole study — the research question, markers, conditions, file names —
+        and an issue here is public. Paste only the short header lines (Generated / Step /
+        Knowledge-pack issues / Browser), describe the record in words, or say so below and
+        we will arrange somewhere private for the file.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what did you expect instead?
+      placeholder: >
+        I set the experimental unit to the animal and expected the replicate count on Samples &
+        design to follow it, but it kept counting wells.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you click, in order?
+      description: Rough steps are fine. Even three lines helps a lot.
+      placeholder: |
+        1. Opened the example study from Home
+        2. Went to Measurements and opened the first measurement
+        3. Set the experimental unit on Study map, then came back to Samples & design
+    validations:
+      required: true
+
+  - type: dropdown
+    id: screen
+    attributes:
+      label: Which part of the planner?
+      description: A rough guess is fine, and "not sure" is a real answer.
+      options:
+        - Not sure
+        - Study map
+        - Research brief (and description review)
+        - Measurements registry
+        - Measurement — Samples & design
+        - Measurement — Acquisition
+        - Measurement — Data plan
+        - Review (and its exports)
+        - Colour and spectra (fluorophore picker, spectral view)
+        - Guide and walkthrough
+        - Backup, restore, settings
+        - Feedback page
+        - Something else
+    validations:
+      required: false
+
+  - type: textarea
+    id: report-header
+    attributes:
+      label: The header lines from the Feedback page
+      description: >
+        Feedback → Copy feedback package, then paste just the lines above "--- study JSON ---".
+        They carry the page you were on, your browser, and whether the knowledge pack loaded
+        cleanly, which answers most of our first round of questions.
+      placeholder: |
+        Micronaut Planner -- feedback report
+        Generated: 2026-09-11T08:14:22.031Z
+        Step: measurement
+        Knowledge-pack issues: 0
+        Browser: Mozilla/5.0 (Macintosh; …) Safari/605.1.15
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: opened-how
+    attributes:
+      label: How do you open the planner?
+      description: >
+        This one matters more than it looks. Opening the file directly stops some browsers from
+        saving your work between visits, which looks like lost data rather than a storage rule.
+      options:
+        - From the public web address
+        - By opening index.html from my own computer
+        - From a local server I started myself
+        - Installed to my home screen or desktop
+        - Not sure
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: tried
+    attributes:
+      label: Have you tried these?
+      description: Not required. It just saves us both a round of questions.
+      options:
+        - label: A hard refresh (Ctrl+Shift+R, or Cmd+Shift+R on a Mac), in case an old copy was cached
+          required: false
+        - label: I exported a project backup first, so my study is safe either way
+          required: false

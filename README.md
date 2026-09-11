@@ -223,6 +223,28 @@ CI runs the JS suite plus the Planner's own Python build-pipeline tests
 `tests/test_regex_conformance.py`) — see
 [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
+## Getting help, reporting a problem
+
+- **A question, or "is the planner meant to do X?"** →
+  [Discussions](https://github.com/Daniel-Waiger/micronaut-explorer/discussions). Nothing
+  formal needed; the Q&A category has a short form that asks for the shape of your study.
+- **Something behaves wrong** → open an issue and pick **Bug report**. The Feedback page
+  (in the planner, under Utilities) builds a package with the page you were on, your browser,
+  and the knowledge-pack health — paste the header lines from it into the form.
+- **An idea** → **Feature request**, or Discussions if it is still half-formed.
+- **A marker, spectrum, or suggested control the pack has wrong** → **Knowledge pack
+  correction**. Corrections need a source we can check; "measured on our own instrument" is a
+  valid one, as long as it says so.
+
+The forms live in [.github/ISSUE_TEMPLATE/](.github/ISSUE_TEMPLATE/). Blank issues stay
+enabled on purpose — the planner's own Feedback button opens a blank, pre-labelled issue, and
+turning blank issues off would break that link. See the comment in
+[config.yml](.github/ISSUE_TEMPLATE/config.yml).
+
+**One privacy note that applies to all of them:** this repository is public, and the Feedback
+package ends with your entire study as JSON — question, markers, conditions, file names. Paste
+the short header lines, not the study, unless you are happy for it to be public.
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0. See the
