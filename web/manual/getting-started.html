@@ -44,11 +44,12 @@
 
       <section>
         <h2 id="example-study">Opening the example study</h2>
-        <p>Study map carries a quiet link near the bottom: <strong>"Want to see a finished plan? Open the example study."</strong> Before the worked oregano-plasma-coating plan appears, Micronaut saves a protected copy of your current study in Restore. Demo activity cannot age that copy out of Restore. If the browser cannot preserve the copy, the example does not open and your study stays on screen.</p>
+        <p>Study map carries a card called <strong>"Explore a completed example"</strong>. Clicking it opens the worked oregano-plasma-coating plan in a new browser tab — a practice tab, running its own separate copy of the Planner. The tab you were already working in is never touched: nothing on screen there changes, and nothing you've typed is affected.</p>
         <ol class="steps">
-          <li>From Study map, click <strong>"Open the example study"</strong> under the map.</li>
-          <li>The same link is also offered from Settings, if you want it again later.</li>
+          <li>From Study map, click <strong>"Explore a completed example"</strong> — the card just above the map. A new tab opens with the example already loaded.</li>
+          <li>The same option is also offered from the header's Utilities menu, if you want it again later.</li>
           <li>Once it's open, the example is ordinary, editable work — nothing marks it read-only, and nothing stops you from typing into it.</li>
+          <li>When you're done looking around, just close that tab. Your own study, in the tab you started from, was never part of the exchange.</li>
         </ol>
         <figure class="shot">
           <img src="images/06-guide.png" alt="The Guide step: a searchable in-app reference with a search box and definition-style sections for every term and workspace." loading="lazy"
@@ -56,8 +57,8 @@
           <div class="ph">Snapshot pending — images/06-guide.png</div>
           <figcaption>The Guide step — a searchable in-app reference for every term and workspace, reachable any time from the step navigation.</figcaption>
         </figure>
-        <div class="callout warn"><p><strong>⚠️ Careful.</strong> Opening the example <em>replaces</em> whatever is currently in your workspace — it doesn't add alongside it. Nothing is destroyed forever: your previous work stays reachable from the header's <strong>Utilities → Restore previous version</strong> menu, but it does leave the screen the moment you click the link. If you're partway through a real plan, that's worth knowing before you click.</p></div>
-        <div class="callout try"><p><strong>🧪 Try it.</strong> Open the example study now, then open <strong>Measurements</strong> from the step navigation. You'll see four measurements already sitting in the registry, each with its own status badge. Nothing you do here can affect a study you start fresh later — Study map's "New study" action (in the header's Utilities menu, or the nav rail) gives you a blank workspace again whenever you want one, and your example edits stay recoverable in Restore.</p></div>
+        <div class="callout tip"><p><strong>💡 Tip.</strong> The practice tab remembers its own edits, the same way your own study is remembered in the tab you started from — so coming back to it later picks up where you left off, rather than resetting to the pristine example each time. Want the pristine version back? The practice tab carries a bar across the top with a <strong>"Reset to the example"</strong> button that starts it over from the shipped plan.</p></div>
+        <div class="callout try"><p><strong>🧪 Try it.</strong> Open the example study now, then open <strong>Measurements</strong> from the step navigation in the new tab that opens. You'll see four measurements already sitting in the registry, each with its own status badge. Switch back to your own tab afterwards and you'll find nothing there has changed — Study map's "New study" action still gives you a blank workspace whenever you want one, entirely independent of whatever you did in the practice tab.</p></div>
       </section>
 
       <section>
@@ -79,7 +80,7 @@
           <thead><tr><th>Name</th><th>What it shows</th><th>Where you start it</th></tr></thead>
           <tbody>
             <tr><td>Feature Walkthrough</td><td>A short, one-time spotlight tour of the app's own layout — where things are, not what your study says.</td><td>The <strong>Walkthrough</strong> button in the nav rail's control panel (see above).</td></tr>
-            <tr><td>Guided example walkthrough</td><td>A persistent side panel that steps through your actual study, one workspace at a time — Study map, Research brief, Measurements, Measurement, then Review — explaining what each one is for and letting you try it on the study currently open.</td><td>The card on Study map itself, offering <strong>Start example walkthrough</strong>, <strong>Continue walkthrough</strong>, <strong>Resume walkthrough</strong>, or <strong>Restart walkthrough</strong> depending on where you left off, plus a secondary <strong>Explain Study map</strong> link every time — the card falls back to <strong>Explain Study map</strong> as its own primary action only if it can't tell what state the walkthrough is actually in.</td></tr>
+            <tr><td>Guided example walkthrough</td><td>A persistent side panel that steps through the example study, one workspace at a time — Study map, Research brief, Measurements, Measurement, then Review — explaining what each one is for and letting you try it there. Because it's a tour of the example itself, it only ever runs in the practice tab the example opens in (see above) — never over your own study.</td><td>The card on Study map itself, offering <strong>Start example walkthrough</strong>, <strong>Continue walkthrough</strong>, <strong>Resume walkthrough</strong>, or <strong>Restart walkthrough</strong> depending on where you left off, plus a secondary <strong>Explain Study map</strong> link every time — the card falls back to <strong>Explain Study map</strong> as its own primary action only if it can't tell what state the walkthrough is actually in.</td></tr>
           </tbody>
         </table>
         </div>
@@ -108,7 +109,7 @@
       <section class="quiz">
         <h2 id="self-check">Check yourself</h2>
         <details class="quiz-q"><summary>You open Micronaut Planner for the very first time. What's on screen?</summary><p>A blank Study map — no seeded example, no welcome dialog to dismiss. The example study is one click away from a link on that same page, but you have to ask for it.</p></details>
-        <details class="quiz-q"><summary>You click "Open the example study" while you already have a real plan open. What happens to your real plan?</summary><p>Micronaut first saves it as a protected version under Utilities → Restore previous version. Demo saves cannot evict it. If that preservation fails, the example does not open.</p></details>
+        <details class="quiz-q"><summary>You click "Explore a completed example" while you already have a real plan open. What happens to your real plan?</summary><p>Nothing. The example opens in a new browser tab, running its own separate copy of the Planner — the tab you were already working in is never navigated away, so your real plan just sits there exactly as you left it.</p></details>
         <details class="quiz-q"><summary>You want a fast reminder of what "provenance" means without leaving the app. Do you open this manual or the in-app Guide?</summary><p>The in-app Guide — it's built for exactly that: a searchable, short definition, reachable without navigating away from your study. Come back to this manual when you want the longer explanation.</p></details>
       </section>
 

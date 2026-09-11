@@ -6,8 +6,13 @@
 // second registry here. Storage is a convenience and every read/write is
 // total so a blocked preference store cannot prevent the app from booting.
 
+import { nsKey } from './storageScope.js';
+
 export const GUIDED_PROGRESS_VERSION = 1;
-export const GUIDED_PROGRESS_KEY = `micronaut.guidedProgress.v${GUIDED_PROGRESS_VERSION}`;
+// Namespaced so the practice tab tracks its own walkthrough progress rather
+// than overwriting (or resuming) the real study's -- an example run through
+// the guide must not leave the user's own tab paused mid-step, or vice versa.
+export const GUIDED_PROGRESS_KEY = nsKey(`micronaut.guidedProgress.v${GUIDED_PROGRESS_VERSION}`);
 
 const STATUSES = new Set(['not-started', 'active', 'paused', 'completed']);
 const RECORD_KEYS = ['version', 'status', 'currentStepId', 'completedStepIds', 'completedAt'];

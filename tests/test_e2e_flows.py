@@ -1,6 +1,6 @@
 """Browser end-to-end suite against the BUILT single-file artifact (AUD-19).
 
-Exactly seven tests, deliberately kept to that count (see docs/cma-lessons.md
+Exactly eight tests, deliberately kept to that count (see docs/cma-lessons.md
 lesson 4: surface area predicts retries, and a sprawling e2e file is exactly
 the surface area a fast unit-test layer should be absorbing instead). Each
 test earns its place by covering something no lower layer can:
@@ -16,13 +16,14 @@ test earns its place by covering something no lower layer can:
      a real browser page whose global is poisoned before any app script
      executes can reach that seam -- hence Page.addScriptToEvaluateOnNewDocument
      rather than a monkeypatch in `node --test`.
-  3. open the example, then start the guided walkthrough -- AUD-13's fix.
+  3. open the practice tab, then start the guided walkthrough -- AUD-13's fix.
      web/tests/guideStep.test.js unit-tests guide.js's own render() in
      isolation with an injected origin string; it cannot prove the ACTUAL
-     runtime value main.js's openExampleStudy() writes (`'template'`) is the
-     same string guide.js's gate now accepts, end to end, through a real
-     click on the real Home page. That producer/consumer seam (cma-lessons.md
-     lesson 36) is exactly what a browser test closes.
+     runtime value the app writes (`'template'`) is the same string guide.js's
+     gate now accepts, end to end, through a real boot. That producer/consumer
+     seam (cma-lessons.md lesson 36) is exactly what a browser test closes --
+     and since the walkthrough is now practice-tab-only, this is also the
+     check that ?demo=1 really does seed the example rather than open blank.
   4. pause -> reload -> resume at the same cursor -- guidedProgress.js's
      persistence is unit-tested against a fake storage; this proves a REAL
      full-page reload (not a simulated one) restores the walkthrough at the
@@ -37,7 +38,16 @@ test earns its place by covering something no lower layer can:
      armed button and reads the real toast and the real post-clear Restore
      list, rather than asserting on the return value of a directly-called
      function.
-  7. the served artifact contains no static import/export statements --
+  7. the practice tab cannot touch the real tab's study -- the isolation
+     guarantee ?demo=1 is sold on. core/storageScope.js resolves its scope
+     from location.search at MODULE LOAD, and under `node --test` there is no
+     `location` at all, so the scoped branch is reachable only through a real
+     navigation to a real query string. It also needs ONE real shared
+     localStorage bucket to be meaningful: the isolation here is by key
+     prefix, not a separate store, so the things that can leak (persist.js's
+     five-slot ring eviction, clearAll()'s prefix sweep) are exactly the
+     things a fake storage object in a unit test cannot reproduce.
+  8. the served artifact contains no static import/export statements --
      per cma-lessons.md lesson 48, "verified live" against a dev server can
      lie; this fetches the actual bytes tools/serve_dir.py answers with for
      the BUILT artifact (never web/'s unbundled source), which is what
@@ -135,17 +145,24 @@ def test_app_boots_with_a_throwing_localStorage_getter(page, index_url):
 
 def test_open_example_then_start_guided_walkthrough(page, index_url):
     """AUD-13's fix: before it, ui/steps/guide.js:101 gated the walkthrough's
-    Start button on `origin === 'example'`, but main.js retags an opened
-    example `'template'` the moment it lands in the store and nothing in the
-    current app ever writes the literal `'example'` tag -- so this path was
+    Start button on `origin === 'example'`, but the opened example is retagged
+    `'template'` the moment it lands in the store and nothing in the current
+    app ever writes the literal `'example'` tag -- so this path was
     UNREACHABLE. This is the one seam a `node --test` unit test cannot prove
     end to end: it can inject any origin string it likes into guide.js's
-    render(), but it cannot prove that string is the one openExampleStudy()
-    actually produces at runtime (cma-lessons.md lesson 36, producer/consumer
-    across two files).
+    render(), but it cannot prove that string is the one the app actually
+    produces at runtime (cma-lessons.md lesson 36, producer/consumer across
+    two files).
+
+    Now entered by opening the practice tab directly rather than by clicking
+    Home's old link. That link no longer replaces the study in this tab -- it
+    opens ?demo=1 in a NEW browser tab, which this single-target CDP driver
+    cannot follow. Navigating straight to the same URL exercises the identical
+    producer: main.js's sandbox boot tags its seeded example `'template'` with
+    the very same withOrigin() call the old click path used, so the seam under
+    test is unchanged.
     """
-    page.goto(index_url)
-    assert page.click_text("button.home-skip-link", "Open the example study")
+    page.goto(index_url + "?demo=1")
     page.hash_nav("guide")
     # Before AUD-13 this button read "Explain the workflow" instead (the
     # not-'example'-origin fallback) -- asserting the exact label, not just
@@ -160,8 +177,7 @@ def test_open_example_then_start_guided_walkthrough(page, index_url):
 
 
 def test_pause_reload_resume_keeps_the_same_cursor(page, index_url):
-    page.goto(index_url)
-    assert page.click_text("button.home-skip-link", "Open the example study")
+    page.goto(index_url + "?demo=1")
     page.hash_nav("guide")
     assert page.click_text(".guide-tour-button", "Start example walkthrough")
     page.wait_for("document.querySelector('.guided-walkthrough-panel') !== null")
@@ -280,3 +296,153 @@ def test_served_artifact_has_no_static_import_or_export_statements(index_url):
     export_decl = re.compile(r"(?m)^\s*export\s+(default\b|const\b|let\b|var\b|function\b|class\b|\{)")
     assert not static_import.search(html), "a static import statement survived into the served artifact"
     assert not export_decl.search(html), "a top-level export statement survived into the served artifact"
+
+
+REAL_STUDY_SENTINEL = "REAL-STUDY-SENTINEL-the-practice-tab-must-never-touch-this"
+
+# The two storage scopes core/storageScope.js splits the app's localStorage
+# into. Written out here rather than imported because there is nothing to
+# import from -- this suite drives a BUILT artifact over CDP, and the whole
+# point of the test below is to check the real keys Chrome actually holds.
+REAL_SCOPE_PREFIX = "micronaut."
+DEMO_SCOPE_PREFIX = "micronaut.demo."
+
+
+def _scope_fingerprint(page) -> str:
+    """A stable, comparable dump of every localStorage entry belonging to the
+    REAL tab's scope: everything under `micronaut.` that is not under
+    `micronaut.demo.`, sorted by key so two dumps compare byte for byte.
+
+    `micronaut.theme` is excluded because it is shared across scopes on
+    purpose (see storageScope.js's SHARED_KEYS) -- including it would make
+    this assertion fail for a reason that is a deliberate feature.
+    """
+    script = """
+    (() => {
+      const out = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (!key.startsWith(%s)) continue;
+        if (key.startsWith(%s)) continue;
+        if (key === 'micronaut.theme') continue;
+        out.push([key, localStorage.getItem(key)]);
+      }
+      out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+      return JSON.stringify(out);
+    })()
+    """ % (json.dumps(REAL_SCOPE_PREFIX), json.dumps(DEMO_SCOPE_PREFIX))
+    return page.eval_js(script)
+
+
+def _type_project_description(page, value: str) -> None:
+    """Type into Research brief's narrative textarea -- the one always-present
+    store-mutating field that exists whether the study is blank (real tab) or
+    the seeded example (practice tab), so the same helper drives autosaves in
+    both scopes."""
+    script = """
+    (() => {
+      const el = document.getElementById('project-description');
+      if (!el) return false;
+      el.value = %s;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
+    })()
+    """ % json.dumps(value)
+    assert page.eval_js(script), "expected #project-description on the Research brief step"
+
+
+def _wait_for_saved(page) -> None:
+    page.wait_for(
+        "document.querySelector('.shell-save-indicator')"
+        " && document.querySelector('.shell-save-indicator').textContent.includes('Saved locally')",
+        timeout=10,
+    )
+
+
+def test_the_practice_tab_cannot_touch_the_real_tabs_study(page, index_url):
+    """The isolation guarantee the practice tab (?demo=1) is sold on.
+
+    No `node --test` suite can prove this. core/storageScope.js resolves its
+    scope from `location.search` at MODULE LOAD -- under node there is no
+    `location` at all, so the scoped branch is only ever reachable through a
+    real navigation to a real query string, in a real browser, against one
+    real shared localStorage bucket. That is the whole seam.
+
+    The failure this guards against is not hypothetical. localStorage is ONE
+    bucket per origin, so isolation here is by key prefix, not by a separate
+    store (unlike the Core Facility Tracker this pattern is ported from,
+    which could open a whole separate IndexedDB database). Two concrete ways
+    a prefix scheme can leak, both exercised below:
+
+      1. Ring eviction. persist.js keeps a FIVE-slot ring and deletes the
+         oldest slot beyond it. If the practice tab's saves landed in the
+         real ring, six practice edits would silently evict the user's study.
+      2. clearAll()'s prefix sweep. It deletes every key matching its own
+         STORAGE_PREFIX. If the two prefixes were prefixes of one another,
+         "Clear all stored data" in one tab would wipe the other.
+
+    So: fingerprint the real scope, let the practice tab do both of those
+    things, and require the fingerprint to be unchanged -- then reload the
+    real tab and require the study to still read back.
+    """
+    # --- the real tab, with something identifiable in it -------------------
+    page.goto(index_url)
+    page.hash_nav("describe")
+    _type_project_description(page, REAL_STUDY_SENTINEL)
+    _wait_for_saved(page)
+    assert _local_storage_contains(page, REAL_STUDY_SENTINEL)
+
+    before = _scope_fingerprint(page)
+    assert before != "[]", "the real scope must actually hold something to protect"
+
+    # --- the practice tab, doing its worst ---------------------------------
+    page.goto(index_url + "?demo=1")
+
+    # It rendered, and the real tab's study is untouched merely by opening it.
+    assert page.text("h1.step-heading") == "Study map"
+    assert _local_storage_contains(page, REAL_STUDY_SENTINEL)
+
+    # (1) Eight distinct autosave cycles: more than persist.js's RING_SIZE of
+    # five, so eviction genuinely runs. Each is waited out fully, or the
+    # 500ms debounce would collapse them into far fewer real writes and the
+    # eviction path would never be reached.
+    page.hash_nav("describe")
+    for i in range(8):
+        _type_project_description(page, f"practice edit {i} -- churn the ring")
+        _wait_for_saved(page)
+
+    # Those writes must have landed in the practice scope, not the real one.
+    # Without this the next assertion could pass vacuously -- an app that
+    # persisted nothing at all would also leave the real fingerprint intact.
+    assert page.eval_js(
+        "Object.keys(localStorage).some(k => k.startsWith(%s))" % json.dumps(DEMO_SCOPE_PREFIX)
+    ), "the practice tab's autosaves did not land under its own key prefix"
+
+    # (2) The prefix sweep, via the real two-click armed control.
+    page.hash_nav("settings")
+    assert page.click_text("button.settings-danger-button", "Clear all stored data")
+    assert page.click_text(
+        "button.settings-danger-button", "Click again to permanently clear all stored data"
+    )
+    page.wait_for(
+        "document.querySelector('.shell-status')"
+        " && document.querySelector('.shell-status').textContent.includes('Cleared all locally stored data')"
+    )
+
+    # Compared from INSIDE the practice tab on purpose: navigating back to the
+    # real tab first would boot the app again, and a boot can legitimately
+    # write. This way the bytes are read with nothing in between.
+    assert _scope_fingerprint(page) == before, (
+        "the practice tab changed the real tab's stored study"
+    )
+    assert _local_storage_contains(page, REAL_STUDY_SENTINEL)
+
+    # --- back to the real tab: it still reads back ------------------------
+    page.goto(index_url)
+    page.hash_nav("describe")
+    assert page.eval_js(
+        "(() => { const el = document.getElementById('project-description');"
+        " return el ? el.value : null; })()"
+    ) == REAL_STUDY_SENTINEL
+    assert page.console_errors() == []

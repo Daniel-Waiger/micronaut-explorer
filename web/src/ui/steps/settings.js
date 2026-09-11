@@ -11,13 +11,19 @@ function settingsButton(label, onClick, className = 'copy-button') { const node 
 
 /**
  * A two-click "are you sure" button, for an action too destructive for the
- * plain window.confirm() used elsewhere in this app (New study / Restore /
- * Reset to example all explicitly say "your current work remains available
- * in Restore" -- clearing storage is the one action that is NOT true for,
- * since it deletes the restore ring itself). There is no confirm-modal
- * framework in this codebase to reach for instead, and this needs no new
- * dependency: the button's own label and class carry the "armed" state, and
- * a timer disarms it if the second click never comes.
+ * plain window.confirm() used elsewhere in this app (New study / Restore
+ * both explicitly say "your current work remains available in Restore" --
+ * clearing storage is the one action that is NOT true for, since it deletes
+ * the restore ring itself). Reset to example used to belong in that same
+ * list -- back when opening the example replaced whatever study was on
+ * screen, its confirm dialog carried the identical promise. Now that opening
+ * the example opens the separate practice tab (?demo=1, core/storageScope.js)
+ * instead, it never touches the study open here at all, so there is nothing
+ * for it to promise about this tab's work and it no longer belongs in this
+ * comparison. There is no confirm-modal framework in this codebase to reach
+ * for instead, and this needs no new dependency: the button's own label and
+ * class carry the "armed" state, and a timer disarms it if the second click
+ * never comes.
  */
 function armedButton(label, armedLabel, onConfirm) {
   const node = document.createElement('button');

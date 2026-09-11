@@ -9,16 +9,21 @@
 // only because the example used to be seeded as the visitor's own workspace.
 //
 // All lifecycle writes remain callbacks owned by main.js.
+import { isExampleOrigin } from '../../core/appController.js';
+import { openInNewTab, SANDBOX_URL } from '../newTab.js';
 import { createIcon } from '../icons.js';
 import { createStudyMap } from '../studyMap.js';
 
 // One big clickable tile: a title, a short line of what it does, and the
 // step it navigates to. Its icon comes from the same thin-stroke SVG system
 // as the shell so the entry point describes the scientific workflow.
-function card(parent, { icon, title, body, onClick }) {
+// `featured` (app.css's .home-card-featured) is the one visual escape hatch
+// from "every tile looks the same" -- used ONLY for the example-study entry
+// below, which used to be a tiny text link a new visitor could miss entirely.
+function card(parent, { icon, title, body, onClick, featured = false }) {
   const button = document.createElement('button');
   button.type = 'button';
-  button.className = 'home-card';
+  button.className = featured ? 'home-card home-card-featured' : 'home-card';
   button.addEventListener('click', onClick);
 
   const iconSpan = document.createElement('span');
@@ -66,6 +71,27 @@ function homeGuidedStatus(guidedStatus, getGuidedStatus) {
 // must additionally be offered so it is never lost as a reachable action.
 function homeGuidedEntryForStatus(status, options) {
   if (status === 'not-started') {
+    // The walkthrough only ever runs on the example study (guide.js's own
+    // Start gate checks the same isExampleOrigin), and the example can now
+    // only be OPENED from the practice tab (?demo=1) -- openExampleStudy
+    // (core/appController.js) refuses to run outside it. So a study that did
+    // not itself arrive from the example can never reach 'active' from here:
+    // promising "Start example walkthrough" on it would be a dead button.
+    // `isExample` is threaded in as a plain option (computed once by the
+    // caller from store.get().meta?.origin) rather than this function
+    // reaching for the store or core/appController.js itself, so this stays
+    // the same pure, directly-testable function it always was.
+    if (!options.isExample) {
+      return {
+        title: 'Try the guided walkthrough',
+        body: 'The walkthrough only runs on the finished example study -- open it in a separate practice tab to try it risk-free.',
+        onClick: () => {
+          const open = typeof options.onOpenExampleTab === 'function' ? options.onOpenExampleTab : openInNewTab;
+          open(SANDBOX_URL);
+        },
+        secondaryExplain: true,
+      };
+    }
     return {
       title: 'Start example walkthrough',
       body: 'Launch the guided walkthrough of a finished example study.',
@@ -167,22 +193,48 @@ export function appendGuidedEntry(main, options) {
 }
 
 // Also exported for the same direct-test reason as appendGuidedEntry: the
-// "no dead button" contract (row absent without onOpenExample) is cheapest
-// to prove against this function alone.
-export function appendExampleLink(main, onOpenExample) {
-  if (typeof onOpenExample !== 'function') return null;
-  return appendLinkRow(
-    main,
-    'Want to see a finished plan? Open the example study.',
-    () => onOpenExample()
-  );
+// "no dead button" contract (row absent without a working opener) is
+// cheapest to prove against this function alone.
+//
+// This USED to be a plain text link (appendLinkRow) sitting quietly below
+// the walkthrough card -- new users found it, if at all, by accident. It is
+// now a featured card in the same .home-grid family as the walkthrough
+// entry, because the example is one of the two things a first-time visitor
+// on this page most needs to find.
+//
+// The click no longer calls back into main.js to swap the in-memory study:
+// opening the example now means opening ui/newTab.js's SANDBOX_URL
+// (?demo=1) in a SEPARATE TAB against its own storage (core/storageScope.js)
+// -- the real tab on screen is never navigated away, so there is nothing
+// here left to preserve/protect/confirm. `onOpenExampleTab` is accepted as a
+// plain callback (not an options object) for exactly the same reason
+// `onOpenExample` used to be: homeStep.render supplies the real opener with
+// its default already applied (openInNewTab), while a test can pass its own
+// spy here directly, following ui/feedbackHandoff.js:111's onOpen precedent.
+export function appendExampleLink(main, onOpenExampleTab) {
+  if (typeof onOpenExampleTab !== 'function') return null;
+  const grid = document.createElement('div');
+  grid.className = 'home-grid';
+  const button = card(grid, {
+    icon: 'template',
+    title: 'Explore a completed example',
+    body: 'Opens a finished oregano study in a separate practice tab, with its own storage. Nothing you do there can touch this study.',
+    onClick: () => onOpenExampleTab(SANDBOX_URL),
+    featured: true,
+  });
+  main.appendChild(grid);
+  return button;
 }
 
 export const homeStep = {
   id: 'home',
   title: 'Study map',
   render(main, store, options = {}) {
-    const { router, onOpenExample } = options;
+    // onOpenExampleTab defaults here (not inside appendExampleLink/
+    // appendGuidedEntry) so both stay simple "callback missing => render
+    // nothing" functions, while every real render of this page still gets a
+    // working opener with no wiring required from main.js.
+    const { router, onOpenExampleTab = openInNewTab } = options;
     main.textContent = '';
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
@@ -197,12 +249,29 @@ export const homeStep = {
       title: 'Plan my study',
       body: 'This is your workspace. Your map answers are saved here as you plan.',
     });
+    // ABOVE the study map, deliberately. This entry was a text link at the
+    // very bottom of this page and new visitors simply never found it; moving
+    // it into a card was only half the fix, because the map's own question
+    // card is tall enough to push anything below it off the first screen
+    // entirely -- a card nobody scrolls to is no more findable than the link
+    // was. It sits directly under "Plan my study" so the two read as the pair
+    // of choices they actually are: plan your own, or go look at a finished
+    // one. Everything that follows the map stays after the map.
+    appendExampleLink(main, onOpenExampleTab);
+
     // This controller owns map input, persistence calls, and deterministic
     // next-decision routing. Home only chooses when the map is revealed.
     main.appendChild(createStudyMap({ store, router }).element);
-    appendGuidedEntry(main, options);
+    // isExample is derived here, once, from the live store -- not inside
+    // homeGuidedEntryForStatus -- so that function stays a pure, directly
+    // testable mapping from (status, options) to an entry (see its own
+    // comment on the 'not-started' branch).
+    appendGuidedEntry(main, {
+      ...options,
+      onOpenExampleTab,
+      isExample: isExampleOrigin(store.get().meta?.origin),
+    });
 
-    appendExampleLink(main, onOpenExample);
     appendLinkRow(main, 'Looking for a specific term or step? See the Guide.', () => {
       if (router) router.navigate('guide');
     });

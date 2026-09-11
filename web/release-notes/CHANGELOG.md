@@ -9,7 +9,41 @@ that existing history, not a scheme that was tracked from day one.
 
 ## [Unreleased]
 
+### Added
+- Opening the shipped example study now opens it in a second browser tab —
+  a practice tab, at `index.html?demo=1` — running its own separate copy of
+  the app against its own saved work, rather than replacing whatever was open
+  in the tab you started from. `core/storageScope.js` resolves which set of
+  saved data a tab reads and writes (today, exactly two: your own, and the
+  practice tab's), and `ui/newTab.js` opens the practice tab by synthesising
+  a click on a real link rather than calling `window.open` directly, so that
+  a popup blocker sees an ordinary navigation and `rel="noopener"` can be set
+  — which matters here beyond the usual advice, since `?demo=1` is
+  same-origin and without it the practice tab would otherwise receive a live
+  handle back into the tab holding your real study. The practice tab keeps
+  its own edits between visits, and carries a bar across the top with its own
+  **Reset to the example** control for starting over from the shipped plan.
+
 ### Changed
+- Opening the example study no longer has anything to protect: because it
+  now runs in its own tab against its own saved work, your current study is
+  never replaced, so there is nothing left to preserve it against. The
+  copy that used to promise "your current study will be preserved in Restore
+  and demo activity cannot remove it" is gone along with the risk it was
+  written to cover; see the manual's Getting Started and Saving, Backups &
+  Privacy chapters for the corrected walkthrough. (One honest limit worth
+  restating here: the practice tab's isolation is by a distinct prefix
+  within the browser's one shared storage per site, a strong convention
+  rather than a separate vault — see `core/storageScope.js`'s header
+  comment.)
+- The guided example walkthrough — a tour of the example study specifically
+  — is now reachable only from the practice tab the example opens in, since
+  that is the only place the example itself is ever open.
+- `openExampleStudy` (`core/appController.js`) now refuses outright to run
+  outside the practice tab, logging an error rather than replacing the
+  current study, so the one truly destructive path in that module stays
+  unreachable no matter what ends up calling it — not only from today's
+  actual call sites.
 - **Measurement status is now three independently scoped axes** — definition,
   plan, and export conformance — replacing the single three-word vocabulary
   that quietly conflated them. Each axis has its own statuses (Draft /

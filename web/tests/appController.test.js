@@ -160,6 +160,11 @@ function makeController(overrides = {}) {
     createExampleStudy: overrides.createExampleStudy || (() => withTitle(emptyExperiment(), 'example')),
     createEmptyStudy: overrides.createEmptyStudy || emptyExperiment,
     isPersisted: overrides.isPersisted || false,
+    // Defaults to the REAL tab, matching createAppController's own default --
+    // the safe reading absent other information is "this is somebody's real
+    // study". A test that wants the practice tab has to say so, which is what
+    // makes the refusal below impossible to pass by accident.
+    isSandbox: overrides.isSandbox || false,
     timers,
     now: overrides.now || (() => 'FIXED_TIMESTAMP'),
     logger,
@@ -344,11 +349,15 @@ test('adoptExampleTemplate still refuses a store that never came from the exampl
 // --- openExampleStudy's protected snapshot ------------------------------
 
 test('openExampleStudy aborts and leaves store.get() unchanged when the protective save returns null', () => {
+  // isSandbox: true because this behaviour now only exists inside the practice
+  // tab -- in the real tab the refusal below fires first and the protective
+  // save is never even attempted. Without this the test would still pass for
+  // the WRONG reason (nothing replaced, because nothing ran).
   const original = withTitle(emptyExperiment(), 'my current work');
   const store = createStore(original);
   const persist = makeFakePersist({ saveExperiment: () => null });
   const shell = makeRecordingShell();
-  const { controller } = makeController({ store, persist });
+  const { controller } = makeController({ store, persist, isSandbox: true });
   controller.attachShell(shell);
 
   const result = controller.actions.onOpenExample();
@@ -356,6 +365,58 @@ test('openExampleStudy aborts and leaves store.get() unchanged when the protecti
   assert.equal(result, false);
   assert.equal(store.get(), original, 'the store must not have been replaced');
   assert.equal(controller.getSaveState().status, 'failed');
+});
+
+test('openExampleStudy refuses outside the practice tab, under either action name', () => {
+  // The guarantee the whole feature rests on: in a real tab there is no way
+  // to reach the study-replacing path at all. Asserting via the PUBLIC action
+  // names (not the internal function) is deliberate -- those are what a
+  // future button, a mis-merge, or a console call would reach for, and the
+  // guard exists precisely because a call-site check cannot cover them.
+  for (const actionName of ['onOpenExample', 'onReset']) {
+    const original = withTitle(emptyExperiment(), 'my real study');
+    const store = createStore(original);
+    const persist = makeFakePersist();
+    const { controller, logger } = makeController({ store, persist });
+
+    assert.equal(controller.actions[actionName](), false, `${actionName} must refuse`);
+    assert.equal(store.get(), original, `${actionName} must not replace the study`);
+    // Not even the protective snapshot runs: refusing early means the real
+    // tab's ring is not written to at all, so a stray call cannot churn it.
+    assert.equal(persist.calls.saveExperiment.length, 0, `${actionName} must not write`);
+    assert.equal(logger.errors.length, 1, `${actionName} must say why it refused`);
+  }
+});
+
+test('openExampleStudy flushes a pending autosave before replacing the study', async () => {
+  // The bug startBlankStudy documents at length, which openExampleStudy had
+  // too and nothing had yet triggered: a pending 500ms debounce holds a
+  // closure that fires AFTER store.replace(), reads store.get() fresh, and
+  // persists the EXAMPLE over the slot that should hold the practice edit
+  // made just before reset. Flushing first is what makes the saved snapshot
+  // the edit rather than the example.
+  const store = createStore(withTitle(emptyExperiment(), 'practice edit'));
+  const persist = makeFakePersist();
+  const timers = makeManualTimers();
+  const { controller } = makeController({ store, persist, timers, isSandbox: true });
+  controller.startAutosave();
+
+  store.patch({ researchQuestion: 'edited in the sandbox' });
+  await tick();
+  assert.equal(persist.calls.saveExperiment.length, 0, 'the debounce should still be holding the save');
+
+  controller.actions.onReset();
+
+  // The flushed save ran against the edit, not the example that replaced it.
+  assert.equal(persist.calls.saveExperiment[0].researchQuestion, 'edited in the sandbox');
+
+  // And the timer really was cancelled rather than left to fire late: advancing
+  // well past the debounce window must not produce another save of the example
+  // on top of it. (The protective snapshot is the only other save expected.)
+  const savesAfterReset = persist.calls.saveExperiment.length;
+  timers.advance(5000);
+  assert.equal(persist.calls.saveExperiment.length, savesAfterReset,
+    'a cancelled timer must not fire afterwards');
 });
 
 // --- Guided-progress storage failure announcement -----------------------

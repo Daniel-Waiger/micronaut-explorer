@@ -23,6 +23,7 @@
 
 import { selectAdvice, summarizeTrigger } from '../engine/advisor.js';
 import { describePredicate } from '../engine/predicate.js';
+import { nsKey } from '../core/storageScope.js';
 
 const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 
@@ -48,7 +49,13 @@ const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 // developer-facing text in front of a scientist for no benefit beyond what
 // the two tiers above already give; it stays reserved for whoever is
 // authoring or debugging a rule.
-const ADVISOR_DEBUG_KEY = 'micronaut.advisorDebug';
+//
+// Namespaced like every other key in this family: the debug flag is a
+// developer convenience toggled by hand in DevTools, and without scoping,
+// turning it on in the practice tab (or vice versa) would silently turn on
+// raw-predicate debug output in the OTHER tab too, since both would otherwise
+// read the exact same localStorage key.
+const ADVISOR_DEBUG_KEY = nsKey('micronaut.advisorDebug');
 
 function advisorDebugEnabled() {
   try {

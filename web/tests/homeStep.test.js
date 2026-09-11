@@ -46,7 +46,11 @@ function secondaryExplainLinks(main) {
 test('not-started offers Start example walkthrough and calls onStartGuided exactly once', () => {
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
-    appendGuidedEntry(main, { guidedStatus: { status: 'not-started' }, ...cb });
+    // isExample: true -- the walkthrough is a tour OF the example, and since
+    // the example now only ever opens in the practice tab, this is the only
+    // situation in which Start can actually fire. The opposite branch is the
+    // next test.
+    appendGuidedEntry(main, { guidedStatus: { status: 'not-started' }, isExample: true, ...cb });
 
     const card = primaryCard(main);
     assert.match(card.textContent, /Start example walkthrough/);
@@ -159,24 +163,52 @@ test('getGuidedStatus() takes precedence over a stale guidedStatus prop', () => 
   });
 });
 
-test('clicking "Open the example study" calls onOpenExample exactly once', () => {
+test('not-started on a study that did not come from the example offers the practice tab, not a Start that cannot fire', () => {
   withHomeContainer((main) => {
-    const calls = [];
-    appendExampleLink(main, () => calls.push(true));
+    const cb = guidedCallbacks();
+    const opened = [];
+    appendGuidedEntry(main, {
+      guidedStatus: { status: 'not-started' },
+      isExample: false,
+      onOpenExampleTab: (url) => opened.push(url),
+      ...cb,
+    });
 
-    const link = main.querySelectorAll('.home-skip-link').find((el) => /Open the example study/.test(el.textContent));
-    assert.ok(link, 'expected the example-study link row to render');
-    link.click();
-    assert.equal(calls.length, 1);
+    const card = primaryCard(main);
+    // The dead-button check. Before the practice tab existed this branch
+    // promised "Start example walkthrough" on every study; now that the
+    // example can only be opened in its own tab, guide.js's Start gate would
+    // never open for this study, so promising Start here would be a button
+    // that silently does nothing.
+    assert.doesNotMatch(card.textContent, /Start example walkthrough/);
+    assert.match(card.textContent, /practice tab/);
+
+    card.click();
+    assert.deepEqual(opened, ['?demo=1'], 'must open the practice tab');
+    assert.equal(cb.calls.start.length, 0, 'must not claim to have started a walkthrough');
   });
 });
 
-test('the example-study link row is absent when onOpenExample is not supplied', () => {
+test('the example card opens the practice tab rather than replacing the study', () => {
+  withHomeContainer((main) => {
+    const opened = [];
+    const card = appendExampleLink(main, (url) => opened.push(url));
+
+    assert.ok(card, 'expected the example card to render');
+    assert.match(card.className, /home-card-featured/, 'it is the one featured card on this page');
+    assert.match(card.textContent, /Explore a completed example/);
+
+    card.click();
+    // A URL, not a lifecycle callback: nothing about this click touches the
+    // study open in this tab.
+    assert.deepEqual(opened, ['?demo=1']);
+  });
+});
+
+test('the example card is absent when no opener is supplied', () => {
   withHomeContainer((main) => {
     const result = appendExampleLink(main, undefined);
     assert.equal(result, null);
-    const link = main.querySelectorAll('.home-skip-link').find((el) => /Open the example study/.test(el.textContent));
-    assert.equal(link, undefined);
-    assert.equal(main.children.length, 0);
+    assert.equal(main.children.length, 0, 'no dead button, and no empty grid left behind');
   });
 });

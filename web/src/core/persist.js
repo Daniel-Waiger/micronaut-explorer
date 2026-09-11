@@ -1,6 +1,7 @@
 import { uuid } from './ids.js';
 import { migrate } from './schema.js';
 import { validateImportedExperiment } from './importValidate.js';
+import { nsKey } from './storageScope.js';
 
 // localStorage is a CONVENIENCE, never the record of truth: two users on a
 // shared-scope PC share one storage bucket under file://, IT can clear
@@ -13,7 +14,21 @@ import { validateImportedExperiment } from './importValidate.js';
 // in-memory fake, and a fake that throws QuotaExceededError.
 
 export const STORAGE_SCHEMA_VERSION = 1;
-export const STORAGE_PREFIX = `micronaut.v${STORAGE_SCHEMA_VERSION}.`;
+// Namespaced through nsKey so the practice tab (?demo=1) reads and writes a
+// distinct ring, index and change counter from the user's own study --
+// without this, opening the example would autosave into (and evict slots
+// from) the same ring the real study relies on for recovery. RING_INDEX_KEY,
+// PROTECTED_SLOTS_KEY, CHANGES_KEY and slotKey() below all derive from this
+// constant, so they inherit the scoping for free.
+//
+// The non-collision property clearAll()'s prefix sweep depends on holds in
+// both directions: 'micronaut.demo.v1.ring'.startsWith('micronaut.v1.') is
+// false (the scoped key does not start with the unscoped prefix), and
+// 'micronaut.v1.ring'.startsWith('micronaut.demo.v1.') is false (the
+// unscoped key does not start with the scoped prefix either). So a clearAll()
+// run in one scope's STORAGE_PREFIX can never delete -- or leave behind --
+// the other scope's keys, in either direction.
+export const STORAGE_PREFIX = nsKey(`micronaut.v${STORAGE_SCHEMA_VERSION}.`);
 
 const RING_SIZE = 5;
 const RING_INDEX_KEY = STORAGE_PREFIX + 'ring';

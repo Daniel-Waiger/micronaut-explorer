@@ -8,6 +8,8 @@ import { buildFeedbackReport } from '../core/feedbackReport.js';
 import { handoffFeedback } from './feedbackHandoff.js';
 import { createIcon } from './icons.js';
 import { measurementStatus, measurementStatusLabel } from '../engine/measurementStatus.js';
+import { IS_SANDBOX, nsKey } from '../core/storageScope.js';
+import { openInNewTab, SANDBOX_URL } from './newTab.js';
 
 // Maps a measurement status record's `tone` onto the switcher pill's existing
 // badge classes (app.css:2947-2954), so the pill and the Measurements
@@ -20,8 +22,19 @@ const MEASUREMENT_TONE_CLASS = Object.freeze({
   neutral: 'is-not-started',
 });
 
+// UNSCOPED on purpose (core/storageScope.js's nsKey is deliberately NOT
+// applied here): the practice tab (?demo=1) should look like the user's own
+// app, and a remembered light/dark choice carries no study data, so there is
+// nothing about it worth isolating per tab. storageScope.js's own SHARED_KEYS
+// already treats this exact key as shared, so nsKey(THEME_KEY) would resolve
+// to the same unscoped key anyway -- left unscoped explicitly here so that
+// fact doesn't have to be re-derived by reading storageScope.js.
 const THEME_KEY = 'micronaut.theme';
-const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
+// SCOPED, unlike THEME_KEY above: nav-collapsed is ordinary per-tab layout
+// state, not a preference worth sharing on purpose, so it gets the default
+// treatment -- namespaced so collapsing the rail in one tab can never
+// silently flip it in the other.
+const NAV_COLLAPSED_KEY = nsKey('micronaut.navCollapsed');
 
 function readPreference(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -87,6 +100,10 @@ export function renderShell(root, store, router, options = {}) {
   const {
     onReset, onNewBlank, onAdoptExample, onExportProject, onImportProject,
     onRestoreRecovery, onDeleteRecovery, kbIssueCount,
+    // Injected (defaulting to the real IS_SANDBOX) so both the practice-tab
+    // and real-tab branches of the banner below are exercisable against the
+    // DOM stub without a real `location.search` to resolve against.
+    isSandbox = IS_SANDBOX,
   } = options;
   // Missing lifecycle state must degrade conservatively. Only main can know
   // that a recovery slot was actually loaded or a save completed.
@@ -96,6 +113,64 @@ export function renderShell(root, store, router, options = {}) {
   let themeNavButton = null;
   let featureWalkthroughHandler = null;
   root.textContent = '';
+
+  // Persistent, non-dismissable strip: the practice tab (?demo=1) must never
+  // be mistaken for the real one, so unlike every other notice in this file
+  // there is no close/dismiss control here at all. Built only when isSandbox
+  // is true, so the real tab's DOM carries no trace of it -- not just
+  // hidden, absent. Sits above the (sticky) header rather than joining its
+  // sticky stack: the ResizeObserver-published --shell-*-height custom
+  // properties a few hundred lines down assume exactly header + workflow
+  // strip + switcher, and this banner is practice-tab-only chrome that has
+  // no reason to earn a place in that shared calculation.
+  let sandboxBanner = null;
+  if (isSandbox) {
+    sandboxBanner = document.createElement('div');
+    sandboxBanner.className = 'sandbox-banner';
+    sandboxBanner.setAttribute('role', 'note');
+    const bannerText = document.createElement('span');
+    bannerText.className = 'sandbox-banner-text';
+    bannerText.textContent = 'Practice tab — example data in its own separate storage. Nothing here touches your real study.';
+    sandboxBanner.appendChild(bannerText);
+
+    const bannerActions = document.createElement('div');
+    bannerActions.className = 'sandbox-banner-actions';
+
+    const whyButton = document.createElement('button');
+    whyButton.type = 'button';
+    whyButton.className = 'sandbox-banner-action';
+    whyButton.textContent = 'Why a separate tab?';
+    whyButton.addEventListener('click', () => {
+      // The real explanation, not a euphemism: this app holds exactly one
+      // study at a time, and a browser tab can only hold one page's worth of
+      // that state too -- so a second tab against its own storage is the
+      // only way to let you take the example apart with no risk to the
+      // study open in the other tab. No custom modal system exists in this
+      // file (see feedbackHandoff.js for the one place that owns one, which
+      // this is not part of), so this reuses the same window.alert this
+      // codebase already relies on elsewhere (ui/steps/naming.js) for a
+      // single-acknowledgement message.
+      window.alert(
+        'Micronaut keeps one study open at a time, and a browser tab can only hold one study\'s worth of that on screen -- so the only way to let you take the example apart with no risk is to give it its own tab.\n\n' +
+        'Close this tab whenever you are done: your study in the other tab is still open exactly as you left it. Anything you change here, in this practice tab, is kept too, so you can come back to it.'
+      );
+    });
+    bannerActions.appendChild(whyButton);
+
+    if (onReset) {
+      const resetButton = document.createElement('button');
+      resetButton.type = 'button';
+      resetButton.className = 'sandbox-banner-action';
+      resetButton.textContent = 'Reset to the example';
+      resetButton.addEventListener('click', () => {
+        if (window.confirm('Reset this practice tab back to the shipped example? Your current practice activity will be preserved in Restore.')) {
+          onReset();
+        }
+      });
+      bannerActions.appendChild(resetButton);
+    }
+    sandboxBanner.appendChild(bannerActions);
+  }
 
   const header = document.createElement('header');
   header.className = 'shell-header';
@@ -203,9 +278,21 @@ export function renderShell(root, store, router, options = {}) {
   });
   document.addEventListener('pointerdown', (event) => { if (!utilities.contains(event.target)) closeMenu(); });
 
-  if (onReset) utilityMenu.appendChild(action('Reset to example study', () => {
-    if (window.confirm('Open the oregano example? Your current study will be preserved in Restore and demo activity cannot remove it.')) onReset();
-  }));
+  // This used to read "Reset to example study" and REPLACE the study on
+  // screen after a window.confirm -- onReset (core/appController.js's
+  // openExampleStudy) now refuses to run at all outside the practice tab, so
+  // that control would be a dead button here even with the confirm kept.
+  // Opening the practice tab (its own storage, ?demo=1) is the real
+  // replacement, and it displaces nothing on screen, so there is nothing
+  // left to confirm.
+  // Hidden inside the practice tab itself, where it would offer to open the
+  // tab you are already standing in. The banner's "Reset to the example"
+  // above is the equivalent control there.
+  if (!isSandbox) {
+    utilityMenu.appendChild(action('Open example in a practice tab', () => {
+      openInNewTab(SANDBOX_URL);
+    }));
+  }
   if (onExportProject) utilityMenu.appendChild(action('Export project backup', onExportProject));
   if (onImportProject) {
     const input = document.createElement('input');
@@ -609,7 +696,7 @@ export function renderShell(root, store, router, options = {}) {
   status.className = 'shell-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  root.append(header, workflowStrip, switcher, body, footer, status);
+  root.append(...(sandboxBanner ? [sandboxBanner] : []), header, workflowStrip, switcher, body, footer, status);
 
   // Publishes the footer's real, current height so .shell-status and
   // .shell-main (app.css) can clear it exactly instead of duplicating a

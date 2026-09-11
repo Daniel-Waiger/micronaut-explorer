@@ -33,8 +33,17 @@
 // completion-screen "Use as template" action already routes through
 // appController.js's isExampleOrigin-guarded adoptExampleTemplate, so it
 // needs no separate check of its own here.
+//
+// The example can now only be OPENED from the practice tab (?demo=1) --
+// openExampleStudy (core/appController.js) refuses to run outside it -- so a
+// study on THIS tab that is not already example-origin can never turn into
+// one by clicking Start here. The non-example fallback below therefore
+// carries a second action that opens the practice tab (ui/newTab.js), so the
+// walkthrough stays reachable from Guide instead of quietly becoming
+// unreachable the day the in-tab example was removed.
 
 import { isExampleOrigin } from '../../core/appController.js';
+import { openInNewTab, SANDBOX_URL } from '../newTab.js';
 
 /**
  * A titled, searchable section: an <h2> plus whatever nodes `build(container)`
@@ -102,6 +111,11 @@ export const guideStep = {
     onResumeGuided,
     onRestartGuided,
     onExplainGuided,
+    // Defaulted here, same pattern as ui/steps/home.js's render(): the real
+    // app always gets a working opener with no wiring required, while a test
+    // can inject its own spy in place of this default to assert the URL
+    // without a real browser (ui/feedbackHandoff.js:111's onOpen precedent).
+    onOpenExampleTab = openInNewTab,
   } = {}) {
     main.textContent = '';
 
@@ -139,6 +153,13 @@ export const guideStep = {
               label: 'Explain the workflow',
               callback: onExplainGuided,
               title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+              // Only this branch is reached because the walkthrough cannot
+              // start HERE for lack of an example study (paused/completed
+              // above are reachable regardless of origin, and the
+              // isExample-gated Start already took the not-started+example
+              // case) -- so only this branch needs the practice-tab escape
+              // hatch below.
+              offerPracticeTab: !isExample,
             };
     const guideButton = document.createElement('button');
     guideButton.type = 'button';
@@ -149,6 +170,26 @@ export const guideStep = {
       if (typeof guideAction.callback === 'function') guideAction.callback('guide');
     });
     main.appendChild(guideButton);
+
+    // The walkthrough is otherwise unreachable from this study: Explain
+    // talks about it, but nothing on this page can start it. Opening the
+    // practice tab (its own storage, ?demo=1) is the one thing that still
+    // can.
+    if (guideAction.offerPracticeTab) {
+      const practiceTabButton = document.createElement('button');
+      practiceTabButton.type = 'button';
+      // Deliberately NOT carrying .guide-tour-button: that selector names the
+    // ONE button whose label reports the walkthrough's state, and both the
+    // browser suite (tests/test_e2e_flows.py) and guideStep.test.js read it
+    // with a first-match query. A second element wearing it would make those
+    // reads depend on DOM order. Styling comes from app.css listing this
+    // class alongside .guide-tour-button instead.
+    practiceTabButton.className = 'copy-button guide-practice-tab-button';
+      practiceTabButton.textContent = 'Try it in a practice tab';
+      practiceTabButton.title = 'Open a finished example study in a separate practice tab, with its own storage, where the guided walkthrough can run.';
+      practiceTabButton.addEventListener('click', () => onOpenExampleTab(SANDBOX_URL));
+      main.appendChild(practiceTabButton);
+    }
 
     para(
       main,
