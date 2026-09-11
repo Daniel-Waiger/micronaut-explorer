@@ -91,6 +91,30 @@
   .task .ttl{flex:1 1 260px;}
   .task .by{font-size:12px;color:var(--muted);font-family:var(--mono);}
 
+  /* dependency graph -- columns come from the task graph's batch index when
+     the run supplied one, else a computed longest-path depth (see renderDag).
+     Node fill/stroke reuse the exact same status colours as the .pill rules
+     above; this is not a second palette. */
+  .dag{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .dag h2{margin:0 0 11px;font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);}
+  .dagHint{margin:0;font-size:13.5px;color:var(--muted);}
+  .dagScroll{overflow-x:auto;}
+  .dagnode rect{stroke-width:1.3;}
+  .dagnode.pending rect{fill:rgba(90,102,128,.18);stroke:var(--pend);}
+  .dagnode.idle rect{fill:rgba(90,102,128,.18);stroke:var(--pend);}
+  .dagnode.running rect{fill:rgba(255,176,32,.16);stroke:var(--run);}
+  .dagnode.paused rect{fill:rgba(255,176,32,.16);stroke:var(--run);}
+  .dagnode.verifying rect{fill:rgba(34,211,238,.16);stroke:var(--verifying);}
+  .dagnode.done rect{fill:rgba(53,208,127,.14);stroke:var(--done);}
+  .dagnode.resolved rect{fill:rgba(167,139,250,.16);stroke:var(--resolved);}
+  .dagnode.failed rect{fill:rgba(255,84,112,.16);stroke:var(--fail);}
+  .dagnode text{font-family:var(--sans);}
+  .dagnode .tid{font-family:var(--mono);font-weight:700;font-size:12px;fill:var(--accent);}
+  .dagnode .ttl{font-size:11px;fill:var(--ink);}
+  .dagnode .stlabel{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;fill:var(--muted);}
+  .dagedge{stroke:var(--muted);stroke-width:1.4;fill:none;opacity:.6;}
+  .dagarrow{fill:var(--muted);opacity:.75;}
+
   /* log */
   .log{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
   .log h2{margin:0 0 11px;font-size:11.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--muted);}
@@ -126,6 +150,14 @@
 
   <div class="board" id="board"></div>
 
+  <section class="dag" id="dagSection">
+    <h2>Dependency graph</h2>
+    <p class="dagHint" id="dagEmpty" hidden>No tasks recorded yet — this fills in once the board has tasks.</p>
+    <div class="dagScroll" id="dagScroll">
+      <svg id="dagSvg" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Task dependency graph"></svg>
+    </div>
+  </section>
+
   <section class="log">
     <h2>Run log</h2>
     <ul id="logBody"></ul>
@@ -144,30 +176,428 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "No active run",
-  "orchestrator": "none",
-  "active_model": "Idle",
+  "run": "audit-remediation",
+  "orchestrator": "Claude Opus 5",
+  "active_model": "Claude Opus 5",
   "active_status": "idle",
-  "phase": "Idle",
-  "state_note": "No CMA run is currently active. Latest repo activity: Classic-era scaffolding cleanup (skills dedup, dead scripts/docs removed, dashboard snapshot refreshed).",
+  "phase": "",
+  "state_note": "",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
-      "k": "Status",
-      "v": "Idle",
-      "tone": "sm"
+      "k": "JS tests",
+      "v": "839 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Python tests",
+      "v": "85 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Batch",
+      "v": "9 of 9"
+    },
+    {
+      "k": "Tasks",
+      "v": "22 of 22",
+      "tone": "ok"
+    },
+    {
+      "k": "E2E",
+      "v": "7 passed",
+      "tone": "ok"
     }
   ],
-  "defects": [],
-  "tasks": [],
+  "defects": [
+    {
+      "id": "D4",
+      "location": "web/src/core/persist.js:245",
+      "title": "clearAll returned ok:true over suppressed removeItem failures - could announce a clear that did not happen",
+      "body": "",
+      "repro": ""
+    }
+  ],
+  "tasks": [
+    {
+      "id": "AUD-01",
+      "phase": "Batch 1",
+      "title": "Guard persist.js storage access and make clearAll report truthfully",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [],
+      "batch": 1
+    },
+    {
+      "id": "AUD-02",
+      "phase": "Batch 1",
+      "title": "Separate physical samples from acquisition runs in the ICS schedule",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [],
+      "batch": 1
+    },
+    {
+      "id": "AUD-03",
+      "phase": "Batch 1",
+      "title": "Let an observational study complete the Measurements step",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [],
+      "batch": 1
+    },
+    {
+      "id": "AUD-04",
+      "phase": "Batch 1",
+      "title": "Consolidate the duplicated DOM stub into one shared test helper",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [],
+      "batch": 1
+    },
+    {
+      "id": "AUD-05",
+      "phase": "Batch 1",
+      "title": "Delete the stale readout comment in core/assay.js",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [],
+      "batch": 1
+    },
+    {
+      "id": "AUD-06",
+      "phase": "Batch 2",
+      "title": "Rewrite measurementStatus into three explicitly scoped axes",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [],
+      "batch": 2
+    },
+    {
+      "id": "AUD-07",
+      "phase": "Batch 3",
+      "title": "Compute each measurement's status inside deriveWorkflowProgress",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-03",
+        "AUD-06"
+      ],
+      "batch": 3
+    },
+    {
+      "id": "AUD-08",
+      "phase": "Batch 4",
+      "title": "Extract main.js's lifecycle into a testable appController",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-01"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "AUD-09",
+      "phase": "Batch 5",
+      "title": "Shell: one measurement vocabulary on the pill, honest footer and compass labels",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-07"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "AUD-10",
+      "phase": "Batch 5",
+      "title": "Measurements registry: scoped status badges without staleness",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-07",
+        "AUD-04",
+        "AUD-08"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "AUD-11",
+      "phase": "Batch 5",
+      "title": "Measurement header: three badges for three scopes",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-07",
+        "AUD-08"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "AUD-12",
+      "phase": "Batch 5",
+      "title": "Study Map: offer the walkthrough Start action that never existed",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-04",
+        "AUD-08"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "AUD-13",
+      "phase": "Batch 5",
+      "title": "Un-gate the walkthrough and correct the Guide's stale instructions",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-04",
+        "AUD-08"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "AUD-14",
+      "phase": "Batch 5",
+      "title": "Wire the two schedule counts through the Data plan step",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-02",
+        "AUD-04",
+        "AUD-08"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "AUD-15",
+      "phase": "Batch 5",
+      "title": "Review: honest provenance, honest export verdict, honest download labels",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-07",
+        "AUD-08"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "AUD-16",
+      "phase": "Batch 6",
+      "title": "Style the scoped status badges",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-09",
+        "AUD-10",
+        "AUD-11"
+      ],
+      "batch": 6
+    },
+    {
+      "id": "AUD-17",
+      "phase": "Batch 9",
+      "title": "Assert app copy and manual copy agree",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-15",
+        "AUD-20"
+      ],
+      "batch": 9
+    },
+    {
+      "id": "AUD-18",
+      "phase": "Batch 7",
+      "title": "Extract the stdlib Chrome DevTools driver into a reusable module",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [],
+      "batch": 7
+    },
+    {
+      "id": "AUD-19",
+      "phase": "Batch 8",
+      "title": "Browser end-to-end suite against the built artifact",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-18",
+        "AUD-13",
+        "AUD-08"
+      ],
+      "batch": 8
+    },
+    {
+      "id": "AUD-20",
+      "phase": "Batch 8",
+      "title": "Correct the manual's status, readiness and provenance chapters",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-15",
+        "AUD-12",
+        "AUD-13",
+        "AUD-06"
+      ],
+      "batch": 8
+    },
+    {
+      "id": "AUD-21",
+      "phase": "Batch 8",
+      "title": "Replace the step-count drift with a hierarchy, and record the status scopes",
+      "status": "done",
+      "by": "Sonnet",
+      "depends_on": [
+        "AUD-06",
+        "AUD-15"
+      ],
+      "batch": 8
+    },
+    {
+      "id": "AUD-22",
+      "phase": "Rename the comparison choice away from collapsed group/condition wording:UI consumers",
+      "title": "",
+      "status": "done",
+      "by": "Sonnet"
+    }
+  ],
   "log": [
     {
-      "time": "17:40:58",
-      "msg": "Dashboard snapshot reset to neutral state as part of Classic-era scaffolding cleanup."
+      "time": "22:14:40",
+      "msg": "AUD-18 pulled forward: no deps, file-disjoint from AUD-06 and the DAG work"
+    },
+    {
+      "time": "22:15:47",
+      "msg": "Batch 1 complete and verified on disk (5/5)"
+    },
+    {
+      "time": "22:15:47",
+      "msg": "DAG view live; board state re-asserted after re-seed"
+    },
+    {
+      "time": "22:16:26",
+      "msg": "AUD-06 done: 3 scoped axes, 784 JS passing"
+    },
+    {
+      "time": "22:16:26",
+      "msg": "D1 opened: consumers stale by design until batch 5"
+    },
+    {
+      "time": "22:22:40",
+      "msg": "AUD-07 done: per-assay status attached in engine; 788 JS passing"
+    },
+    {
+      "time": "22:26:47",
+      "msg": "AUD-18 done: stdlib CDP driver extracted; 26 new py tests, zero deps"
+    },
+    {
+      "time": "22:37:25",
+      "msg": "AUD-08 done: main.js 544->359 lines; 3 behaviour fixes landed"
+    },
+    {
+      "time": "22:37:25",
+      "msg": "AUD-22 added: comparison radio copy was missing from the graph"
+    },
+    {
+      "time": "22:39:33",
+      "msg": "Batch 5 dispatched: 8 file-disjoint Sonnet agents; AUD-10+AUD-11 clear defect D1"
+    },
+    {
+      "time": "22:41:27",
+      "msg": "AUD-11 done: three scoped badges on measurement header"
+    },
+    {
+      "time": "22:42:12",
+      "msg": "AUD-22 done: 'Compares groups or treatments'"
+    },
+    {
+      "time": "22:42:12",
+      "msg": "dist/ lock errors seen again during pytest - AUD-19's tmp_path fix is load-bearing"
+    },
+    {
+      "time": "22:42:58",
+      "msg": "AUD-15 done: provenance + export-checks verdict + download labels"
+    },
+    {
+      "time": "22:42:58",
+      "msg": "AUD-20 scope widened: glossary-faq.html also carries stale provenance copy"
+    },
+    {
+      "time": "22:44:52",
+      "msg": "AUD-12 done: Start action exists on Study Map for the first time"
+    },
+    {
+      "time": "22:47:36",
+      "msg": "AUD-14 done: mounting scales by samples, acquisition by runs (falsification-tested)"
+    },
+    {
+      "time": "22:47:36",
+      "msg": "D2 found by AUD-14, fixed warm-context in domStub.js and verified"
+    },
+    {
+      "time": "22:48:29",
+      "msg": "AUD-09 + AUD-13 done; nav stateLabel vocabulary preserved as required"
+    },
+    {
+      "time": "22:48:29",
+      "msg": "Removed guideStep's local append monkeypatch - redundant after the D2 domStub fix"
+    },
+    {
+      "time": "22:52:24",
+      "msg": "D1 CLEARED: built artifact boots in headless Chrome, zero console errors"
+    },
+    {
+      "time": "22:52:24",
+      "msg": "Verified live: 'Start example walkthrough' present; registry badges render"
+    },
+    {
+      "time": "22:58:35",
+      "msg": "AUD-21: README hierarchy + status-scopes.md + TASKS/ROADMAP refresh + CHANGELOG entry; 832 JS + 52 Py green"
+    },
+    {
+      "time": "23:00:45",
+      "msg": "AUD-20 done: manual reconciled across 6 pages incl. rewritten quizzes"
+    },
+    {
+      "time": "23:00:56",
+      "msg": "AUD-16 done: tone-based badges, WCAG-checked, pre-existing nowrap overflow fixed"
+    },
+    {
+      "time": "23:02:39",
+      "msg": "AUD-21: Opus verifier found status-scopes.md:71-75 misstated plan-axis mechanism (plan requires definition=defined per measurementStatus.js:135) + unearned web/manual/ claim at :3; both fixed and re-verified green (832 JS / 52 Py)"
+    },
+    {
+      "time": "23:03:19",
+      "msg": "AUD-21 done: hierarchy replaces step counts; status-scopes.md added"
+    },
+    {
+      "time": "23:03:19",
+      "msg": "D3 fixed: corrected serve_dir usage in 4 plan docs"
+    },
+    {
+      "time": "23:07:28",
+      "msg": "AUD-17 done: copy-consistency guard, all 5 assertions falsification-proven"
+    },
+    {
+      "time": "23:20:10",
+      "msg": "AUD-19 done: 7 e2e tests; git-worktree proof they fail against HEAD"
+    },
+    {
+      "time": "23:20:10",
+      "msg": "Opus gate: 837 JS + 85 py green; artifact boots clean; pill and registry now agree live"
+    },
+    {
+      "time": "23:23:54",
+      "msg": "Code review: 2 findings, both fixed and regression-tested"
+    },
+    {
+      "time": "23:23:54",
+      "msg": "RUN COMPLETE: 22/22 tasks, 839 JS + 85 py + 7 e2e green"
     }
   ],
-  "snapshot_at": "2026-09-04 17:40"
+  "snapshot_at": "2026-09-10 23:23"
 };
 /* CMA:EMBEDDED:END */
 
@@ -237,6 +667,123 @@ function render(d){
         '<li><span class="t">' + esc(l.time || "") + '</span>' + esc(l.msg) + '</li>'
       ).join("")
     : '<li><span class="t">—</span>Nothing logged yet.</li>';
+
+  renderDag(tasks);
+}
+
+const DAG_STATUSES = ["pending","running","verifying","done","resolved","failed","paused","idle"];
+const dagStatusClass = s => DAG_STATUSES.includes(s) ? s : "pending";
+
+// Column = the task graph's own batch index (1-based -> 0-based) when the
+// run supplied one, so the graph reads left-to-right along the same
+// batches the board's phase headers use. When no task carries a batch
+// (an older graph, or one seeded without --from-task-graph), fall back to
+// each task's longest-path depth over `depends_on`, memoized with a
+// visiting-guard so a bad/cyclic edge can't recurse forever.
+function dagColumns(tasks){
+  const byId = {};
+  tasks.forEach(t => { byId[t.id] = t; });
+  const hasBatch = tasks.some(t => Number.isFinite(t.batch));
+  const col = {};
+  if (hasBatch){
+    tasks.forEach(t => { col[t.id] = Number.isFinite(t.batch) ? Math.max(0, t.batch - 1) : 0; });
+    return col;
+  }
+  const visiting = new Set();
+  const depth = id => {
+    if (col[id] !== undefined) return col[id];
+    if (visiting.has(id)) return 0; // cycle guard: never trust a graph to be acyclic
+    visiting.add(id);
+    const t = byId[id];
+    const deps = (t && Array.isArray(t.depends_on)) ? t.depends_on : [];
+    let d = 0;
+    for (const dep of deps){ if (byId[dep]) d = Math.max(d, depth(dep) + 1); }
+    visiting.delete(id);
+    col[id] = d;
+    return d;
+  };
+  tasks.forEach(t => depth(t.id));
+  return col;
+}
+
+// Renders tasks as SVG nodes and `depends_on` as directed edges, inline --
+// no library, no CDN, no build step, so it keeps working over file://.
+// Called from render() on the same poll/embedded-snapshot path as the rest
+// of the page, so it updates live and degrades (no tasks / no edges / one
+// node) without throwing.
+function renderDag(tasks){
+  const svg = $("dagSvg");
+  if (!tasks.length){
+    svg.removeAttribute("viewBox");
+    svg.setAttribute("width", "0");
+    svg.setAttribute("height", "0");
+    svg.innerHTML = "";
+    $("dagEmpty").hidden = false;
+    return;
+  }
+  $("dagEmpty").hidden = true;
+
+  const col = dagColumns(tasks);
+  const byCol = {};
+  tasks.forEach(t => {
+    const c = col[t.id] || 0;
+    (byCol[c] || (byCol[c] = [])).push(t);
+  });
+  const cols = Object.keys(byCol).map(Number).sort((a, b) => a - b);
+
+  const NODE_W = 196, NODE_H = 58, COL_GAP = 56, ROW_GAP = 20, PAD = 18;
+  const maxRows = Math.max.apply(null, cols.map(c => byCol[c].length).concat(1));
+  const width = PAD * 2 + cols.length * NODE_W + Math.max(0, cols.length - 1) * COL_GAP;
+  const height = PAD * 2 + maxRows * NODE_H + Math.max(0, maxRows - 1) * ROW_GAP;
+
+  const pos = {};
+  cols.forEach((c, ci) => {
+    byCol[c].forEach((t, ri) => {
+      pos[t.id] = { x: PAD + ci * (NODE_W + COL_GAP), y: PAD + ri * (NODE_H + ROW_GAP) };
+    });
+  });
+
+  let defsSvg = '<marker id="dagArrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">' +
+    '<path class="dagarrow" d="M0 0 L8 4 L0 8 z"></path></marker>';
+  let edgesSvg = "";
+  tasks.forEach(t => {
+    const deps = Array.isArray(t.depends_on) ? t.depends_on : [];
+    const to = pos[t.id];
+    if (!to) return;
+    deps.forEach(depId => {
+      const from = pos[depId];
+      if (!from) return; // unknown/missing dependency id -- skip the edge, never crash
+      const x1 = from.x + NODE_W, y1 = from.y + NODE_H / 2;
+      const x2 = to.x, y2 = to.y + NODE_H / 2;
+      const mx = (x1 + x2) / 2;
+      edgesSvg += '<path class="dagedge" marker-end="url(#dagArrow)" d="M' + x1 + ' ' + y1 +
+        ' C ' + mx + ' ' + y1 + ', ' + mx + ' ' + y2 + ', ' + x2 + ' ' + y2 + '"></path>';
+    });
+  });
+
+  let clipsSvg = "", nodesSvg = "";
+  tasks.forEach((t, i) => {
+    const p = pos[t.id];
+    if (!p) return;
+    const clipId = "dagclip" + i;
+    clipsSvg += '<clipPath id="' + clipId + '"><rect width="' + (NODE_W - 4) + '" height="' + NODE_H + '"></rect></clipPath>';
+    const title = t.title || "";
+    const truncated = title.length > 30 ? title.slice(0, 29) + "…" : title;
+    const stCls = dagStatusClass(t.status);
+    nodesSvg += '<g class="dagnode ' + esc(stCls) + '" transform="translate(' + p.x + ',' + p.y + ')">' +
+      '<title>' + esc(t.id + (title ? ": " + title : "")) + '</title>' +
+      '<rect width="' + NODE_W + '" height="' + NODE_H + '" rx="8"></rect>' +
+      '<g clip-path="url(#' + clipId + ')">' +
+        '<text class="tid" x="10" y="18">' + esc(t.id) + '</text>' +
+        '<text class="ttl" x="10" y="34">' + esc(truncated) + '</text>' +
+        '<text class="stlabel" x="10" y="49">' + esc(stCls) + '</text>' +
+      '</g></g>';
+  });
+
+  svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+  svg.setAttribute("width", width);
+  svg.setAttribute("height", height);
+  svg.innerHTML = "<defs>" + defsSvg + clipsSvg + "</defs>" + edgesSvg + nodesSvg;
 }
 
 let lastRaw = "", lastChange = Date.now(), liveMode = false;

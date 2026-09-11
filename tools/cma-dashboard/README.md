@@ -73,6 +73,39 @@ python update.py --new-run "planner-web P1" --orch "Claude Opus" \
 `--new-run` resets *all* run state (tasks, defects, stats, log) so a new run
 never inherits the last one's board.
 
+`--from-task-graph` also carries two more fields onto each task, both purely
+additive to the existing `id`/`phase`/`title`/`status`/`by`:
+
+- `depends_on` — the task's `depends_on` array from the graph, filtered to
+  ids that actually exist elsewhere in the same graph. A task with no
+  `depends_on`, or one naming an id the graph doesn't have, just gets `[]`
+  for that entry — never a crash.
+- `batch` — the task's 1-based index into the graph's `batches` array (the
+  same data `phase`'s "Batch N" label is derived from), or `null` when the
+  graph has no `batches`. A batch entry may be a bare list of task ids or an
+  object carrying them under `tasks`; both shapes are read.
+
+Both are tolerant of graphs that don't carry them: a graph with no
+`depends_on` anywhere yields tasks with empty edge lists, and a graph with no
+`batches` yields `batch: null` for every task. Neither omission is an error.
+
+## Dependency graph view
+
+Below the task board, the page renders the same tasks as an inline-SVG DAG:
+nodes are tasks, directed edges are `depends_on` (arrow pointing at the
+dependent task), and nodes are laid out in columns so the graph reads
+left-to-right along the dependency flow. Columns come from each task's
+`batch` field when the run supplied one; if no task carries a `batch`, the
+page computes a longest-path depth from `depends_on` itself. Nodes are
+coloured by current status using the exact same colours as the task board's
+pills (not a second palette), and — since colour is never the only signal on
+this page — every node still carries its id, a truncated title, and its
+status as plain text, with the full title available on hover via an SVG
+`<title>`. No tasks, no edges, or a single-node graph all render without
+error. Like the rest of the page, it redraws on every `render()` call, so it
+updates live while a server is running and is baked into the offline
+snapshot the same way everything else is.
+
 ## Driving a run
 
 ```bash

@@ -1,0 +1,397 @@
+{
+  "objective": "Act on the architecture audit of the web Planner: one honestly-scoped status vocabulary, a reachable guided walkthrough, persistence that never reports a success it did not achieve, observational studies able to finish the workflow, harmonized AI-provenance language, and a zero-install test suite that can reach the lifecycle and UI code where all of those defects live.",
+  "plan_doc": "C:/Users/dwaig/.claude/plans/overall-assessment-micronaut-noble-muffin.md",
+  "invariants": [
+    "ZERO-INSTALL: no npm, no node_modules, no new dependency, ever. web/package.json stays {\"type\":\"module\",\"private\":true}.",
+    "Baseline to beat: 761 JS tests (node --test web/tests/*.test.js) and 52 Python tests, all green. Run BOTH suites: a duplicate top-level symbol breaks only the Python build test.",
+    "The single-file build rejects duplicate top-level symbols across modules (tests/test_single_file_build.py:83-109). Every new top-level name must be module-prefixed.",
+    "No top-level await anywhere in web/src -- the single-file inliner forbids it.",
+    "Executors never run git commit, git push, or open a PR.",
+    "Read docs/cma-lessons.md before starting and apply it unprompted."
+  ],
+  "batches": [
+    [
+      "AUD-01",
+      "AUD-02",
+      "AUD-03",
+      "AUD-04",
+      "AUD-05"
+    ],
+    [
+      "AUD-06"
+    ],
+    [
+      "AUD-07"
+    ],
+    [
+      "AUD-08"
+    ],
+    [
+      "AUD-09",
+      "AUD-10",
+      "AUD-11",
+      "AUD-12",
+      "AUD-13",
+      "AUD-14",
+      "AUD-15",
+      "AUD-22"
+    ],
+    [
+      "AUD-16"
+    ],
+    [
+      "AUD-18"
+    ],
+    [
+      "AUD-19",
+      "AUD-20",
+      "AUD-21"
+    ],
+    [
+      "AUD-17"
+    ]
+  ],
+  "tasks": [
+    {
+      "id": "AUD-01",
+      "phase": "Foundations",
+      "title": "Guard persist.js storage access and make clearAll report truthfully",
+      "scope": "Wrap defaultBackend() in try/catch (copy the pattern from core/guidedProgress.js:28-34) so a throwing globalThis.localStorage cannot escape -- it is a DEFAULT PARAMETER of all ten exported functions, so it currently throws before any internal guard runs. Guard clearAll()'s storage.length / storage.key(i) enumeration and change its return from undefined to an explicit result object. Do NOT convert deleteExperiment/markChanged/markExported.",
+      "verification": "Add a hostile-storage fake whose getItem, length getter and key() all throw, plus a fake whose localStorage property access itself throws. Prove every exported function degrades to its documented fallback without throwing, clearAll reports failure, and clearAll still removes only STORAGE_PREFIX keys while leaving a foreign key intact.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/persist.js",
+        "web/tests/persist.test.js"
+      ]
+    },
+    {
+      "id": "AUD-02",
+      "phase": "Foundations",
+      "title": "Separate physical samples from acquisition runs in the ICS schedule",
+      "scope": "Export physicalSampleCount(design) from engine/conditions.js (give the unexported plannedRowCount at :83-91 an includeTechnicalReplicates option; physical = groups x factors x biological replicates). Give buildIcsSchedule an acquisitionRunCount option defaulting to sampleCount so existing cases are unchanged: mounting multiplies by sampleCount, acquisition by acquisitionRunCount. Fix the 'N sample(s)' summary/description strings at ics.js:112-123 for the acquisition row.",
+      "verification": "With technicalReplicates=3, prove mounting minutes are NOT tripled while acquisition minutes are, and that omitting acquisitionRunCount reproduces today's output exactly. Prove physicalSampleCount ignores the technical axis and stays total on malformed design input.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/conditions.js",
+        "web/src/engine/render/ics.js",
+        "web/tests/conditions.test.js",
+        "web/tests/ics.test.js"
+      ]
+    },
+    {
+      "id": "AUD-03",
+      "phase": "Foundations",
+      "title": "Let an observational study complete the Measurements step",
+      "scope": "In engine/workflowProgress.js studyProgress (:117-132), gate the anyAssayHasGroups requirement on experiment.studyContext.comparisonMode !== 'observational' -- NOT === 'groups', so the 'not-decided' default behaves exactly as today. studyProgress already receives experiment. Mirror the precedent at engine/experimentMap.js:306-309. Touch nothing else in this file.",
+      "verification": "Prove the existing assertion at web/tests/workflowProgress.test.js:119 (research question alone -> in-progress) still passes unchanged, that an explicit observational study with assay content reaches 'complete' on the study step and 5/5 on summary, and that a 'groups' study with no group levels is still not complete. Add the missing 'study' assertion to the existing observational test at :101-114.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/workflowProgress.js",
+        "web/tests/workflowProgress.test.js"
+      ]
+    },
+    {
+      "id": "AUD-04",
+      "phase": "Foundations",
+      "title": "Consolidate the duplicated DOM stub into one shared test helper",
+      "scope": "web/tests/spectralViewUi.test.js:5-163 and web/tests/fluorophorePicker.test.js:5-120 carry near-duplicate hand-rolled DOM stubs. Promote one shared web/tests/domStub.js (NOT *.test.js -- the CI glob must ignore it, same convention as web/tests/fixtures.js) exporting createDomStub() -> { document, window, install, restore }. Migrate both existing callers. Add only what step renderers actually need: dataset, createTextNode, documentElement, getElementById, remove, insertBefore, focus/activeElement, click, '#id' and 'tag.class' selectors, value/checked/files/type/open/disabled/title, and window shims for confirm, alert, manual setTimeout/clearTimeout, matchMedia, requestAnimationFrame, navigator.clipboard. No layout, no event bubbling, no canvas, no getComputedStyle.",
+      "verification": "Both migrated test files pass unchanged in assertion count and intent, total line count across the three files goes DOWN, and `node --test web/tests/*.test.js` does not pick up domStub.js as a test file.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/tests/domStub.js",
+        "web/tests/spectralViewUi.test.js",
+        "web/tests/fluorophorePicker.test.js"
+      ]
+    },
+    {
+      "id": "AUD-05",
+      "phase": "Foundations",
+      "title": "Delete the stale readout comment in core/assay.js",
+      "scope": "core/assay.js:70-75 claims readout/readoutText are 'deliberately NOT wired in' and 'not yet consumed anywhere'. The same file contradicts it at :181-184 and engine/experimentMap.js:266 reads both. Delete the false half; keep any statement that is still a current invariant. Comments state current invariants, not commit sequence.",
+      "verification": "Grep proves no surviving comment claims the fields are unconsumed, and web/tests/assay.test.js still passes.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/assay.js"
+      ]
+    },
+    {
+      "id": "AUD-06",
+      "phase": "Status engine",
+      "title": "Rewrite measurementStatus into three explicitly scoped axes",
+      "scope": "Replace the single three-word vocabulary with a frozen record { definition, plan, conformance, headline: {scope, status}, tone }. definition <- map.measurements[i].state (missing/provisional/answered -> draft/provisional/defined). plan <- triage items with source==='map', tier in {measurement-design, before-acquisition}, measurementId===id; 'later' still ignored; plan is 'open' until definition is 'defined'. conformance <- conformance.assays[i].readiness VERBATIM (blocked/needs-review/ready -> blocked/needs-review/passes; 'not-checked' with no report). headline = first scope not at its top status, in order definition->plan->conformance. 'Ready to acquire' becomes the label of plan:ready and of NOTHING else; the lightweight state becomes 'Defined'. Delete the dead state==='needs-attention' branch (experimentMap.measurementState never emits it) and BLOCKING_ISSUE_SEVERITIES (now unused). Export MEASUREMENT_STATUS_SCOPES, per-scope status lists, labels, tones, and MEASUREMENT_STATUS_FILTERS for the registry select. Keep the signature measurementStatus(measurement, { decisions, conformance } = {}) and total-on-malformed behavior. Rewrite the module header comment. LOAD-BEARING: the plan axis must filter source==='map'; conformanceItems in engine/decisionTriage.js emits assayId and NO measurementId, so matching both keys would re-import conformance issues into the plan scope and rebuild the double-reporting this split exists to end.",
+      "verification": "Prove headline ordering (definition gap beats plan gap beats conformance gap; all satisfied -> conformance:passes); that a triage item carrying assayId and no measurementId does NOT touch the plan axis; that the three axes are independent (a blocked conformance still reports definition:defined, plan:ready); that 'Ready to acquire' labels plan:ready and nothing else; and that malformed input yields the all-lowest record without throwing. Update the assertions at web/tests/measurementStatus.test.js:7-13, :15-20 (drop the needs-attention line -- it asserts a dead branch), :22-31, :42-50 (now readiness-based, not severity-based), :52-60.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "files": [
+        "web/src/engine/measurementStatus.js",
+        "web/tests/measurementStatus.test.js"
+      ]
+    },
+    {
+      "id": "AUD-07",
+      "phase": "Status engine",
+      "title": "Compute each measurement's status inside deriveWorkflowProgress",
+      "scope": "engine/workflowProgress.js already receives conformance and already builds buildExperimentMap(exp, { conformance }) at :179. Add decisionTriage(map, conformance) there and attach a `status` field to each per-assay entry (:196-202) via measurementStatus. Consumers then read workflowProgress.assays[i].status, which main.js already passes to every step. Do NOT touch PRIMARY_WORKFLOW, aggregate, the existing per-assay `state`, or `summary` -- shell.js's nav badges still reason about those. Extend the docstring.",
+      "verification": "Prove assays[i].status equals measurementStatus recomputed in the test from decisionTriage(result.map, conformance) -- assert the wiring, not a reimplementation. Prove an assay whose id has no map entry still gets the total fallback record, that deriveWorkflowProgress({}, {readiness:'ready',assays:[]}) does not throw, and REGRESSION-PIN that assays[i].state and summary are byte-identical to before this change.",
+      "depends_on": [
+        "AUD-03",
+        "AUD-06"
+      ],
+      "parallel_safe": false,
+      "files": [
+        "web/src/engine/workflowProgress.js",
+        "web/tests/workflowProgress.test.js"
+      ]
+    },
+    {
+      "id": "AUD-08",
+      "phase": "Lifecycle",
+      "title": "Extract main.js's lifecycle into a testable appController",
+      "scope": "Create web/src/core/appController.js. The seam is main.js:354: everything above it inside init() that touches store+persist moves out (loadInitialExperiment, withOrigin, projectFilename, recoveryEntries, setSaveState, reportStorageFailure, reportPersistentLifecycleFailure, exportProjectBackup, importProjectBackup, restoreRecoverySlot, deleteRecoverySlot, clearAllStoredData, openExampleStudy, startBlankStudy, adoptExampleTemplate, the guided-progress transition helpers, and the debounced autosave subscriber). Shell rendering, walkthrough controllers, explainGuided and renderActiveStep STAY. Inject store, persist, guided, timers, now, logger, autosaveDebounceMs -- injected timers are what make the 500ms debounce deterministically testable. Preserve the existing two-phase `let shell = null` pattern as an explicit attachShell(shell): showToast is destructured AFTER the callbacks are passed to renderShell, so do not restructure that ordering. Export withOrigin, projectFilename and resolveInitialExperiment as pure module-level functions. THREE BEHAVIOUR FIXES land here: (1) add flushAutosave() and call it before store.replace() in startBlankStudy, plus the protected snapshot pattern already proven in openExampleStudy, aborting via reportPersistentLifecycleFailure if it fails -- this closes the 500ms window in which the pending timer persists the new blank study instead of the edit the user just made, while ui/steps/settings.js:59 promises the work stays in Restore; (2) clearAllStoredData consumes clearAll's new result and shows the success toast ONLY when the clear and the follow-up saveExperiment both succeeded, otherwise reports the failure instead of erasing it; (3) add a shared example-origin predicate accepting BOTH 'example' and 'template' (nothing in the current app writes 'example' any more -- main.js:287 retags the example as 'template', which is why the guided walkthrough, adoptExampleTemplate and the walkthrough's 'Use as template' are all dead) and use it in adoptExampleTemplate. Also add getWorkflowProgress: () => currentWorkflowProgress() to the step options at :449-471. main.js keeps its module-scope init() call and no top-level await.",
+      "verification": "New web/tests/appController.test.js with injected fakes. Prove: one save for five edits inside 500ms and nothing at 499ms; edit -> advance 200ms -> startBlankStudy passes the EDITED study to saveExperiment BEFORE replace (this currently fails); clearAll returning failure produces a failure toast and not the success one (currently fails); a storage whose length getter throws does not escape; openExampleStudy's protective save returning null leaves store.get() unchanged and returns false; a guided storage failure before attachShell neither throws nor toasts, and after attachShell toasts exactly once. Then prove the live app still boots and every moved callback still reaches its button.",
+      "depends_on": [
+        "AUD-01"
+      ],
+      "parallel_safe": false,
+      "files": [
+        "web/src/core/appController.js",
+        "web/src/main.js",
+        "web/tests/appController.test.js"
+      ]
+    },
+    {
+      "id": "AUD-09",
+      "phase": "UI consumers",
+      "title": "Shell: one measurement vocabulary on the pill, honest footer and compass labels",
+      "scope": "THREE fixes in ui/shell.js. (1) The switcher pill (:449-451) stops calling assayState/stateLabel and renders the measurement's headline label + tone from workflowProgress.assays[i].status, falling back to measurementStatus(null) because the options default at :52 carries no statuses. Map tone onto the EXISTING class names (ok->is-complete, attention->is-needs-attention, progress->is-in-progress, neutral->is-not-started) so app.css:2947-2954 needs no edit. Remove the now-dead assayState. DO NOT TOUCH stateLabel() (:22-29) or the nav step badges (:641, :657) -- after this change the nav badge is stateLabel's only consumer and its subject is a ROUTE, not a measurement; a different subject legitimately keeps a different vocabulary, and changing it would silently relabel all five nav steps and their aria-labels. (2) The footer position label (:720) currently reads 'Guide (optional)' for ANY route absent from primarySteps(), so Settings and Feedback (both utility:true) claim to be the Guide -- use the active step's own title from router.steps. (3) The compass scope (:345-353, :374) uses a two-route allow-list, so Review says 'Now editing: Whole study' for a read-only page and Research brief says 'Measurement: X' for a study-wide narrative; give describe a 'suggestions target' phrasing and Review a non-editing phrasing. Export footerPositionLabel(steps, activeId) and the compass scope-line helper as pure functions (about 6 lines) rather than making tests stub 786 lines of shell.",
+      "verification": "Extend web/tests/shell-utilities.test.js: a primary route yields 'Step N of 5'; settings, feedback and guide each name THEMSELVES rather than all three saying 'Guide (optional)'; an empty scope yields no dangling 'Now editing: '. Prove stateLabel and the nav badge output are unchanged.",
+      "depends_on": [
+        "AUD-07"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/shell.js",
+        "web/tests/shell-utilities.test.js"
+      ]
+    },
+    {
+      "id": "AUD-10",
+      "phase": "UI consumers",
+      "title": "Measurements registry: scoped status badges without staleness",
+      "scope": "ui/steps/study.js currently discards the workflowProgress it is passed (:106) and rebuilds its own conformance-free map at :311. Consume progress.map.measurements and progress.assays[i].status instead; drop the buildExperimentMap import. Render the headline badge plus the two other axes as muted chips IN THE SAME status cell -- no new grid column, so app.css:4996's 7-column template is untouched. Feed the status filter select from MEASUREMENT_STATUS_FILTERS and match on scope:status. Rewrite the :97-101 comment block, which asserts one badge / one vocabulary. LOAD-BEARING TRAP: renderAssayList() is a closure re-run on search keystrokes, filter changes AND after the copy-groups mutation at :185. Copy-groups uses store.setPath, which mutates `assays` IN PLACE, so main.js:497-501's `assays !== lastAssays` re-render does NOT fire. Use the render-time snapshot for pure view changes but call options.getWorkflowProgress() on the copy-groups path, with a comment citing main.js:497-501. Getting this wrong looks correct in every test and is visible only by clicking 'Copy groups to measurements that have none' and watching badges fail to move.",
+      "verification": "New web/tests/studyStep.test.js against the shared DOM stub. Prove each row's badge textContent and its data attribute BOTH derive from the same status record so they cannot disagree; that the filter hides non-matching rows; that empty groups/replicates/modality render an em dash rather than 'undefined'; that adding a measurement patches a NEW assays array reference; and that the filter select's options are exactly MEASUREMENT_STATUS_FILTERS with no second hand-authored list. Then prove the copy-groups path re-reads progress -- assert badges change after a copy-groups mutation that does not replace the assays array.",
+      "depends_on": [
+        "AUD-07",
+        "AUD-04",
+        "AUD-08"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/study.js",
+        "web/tests/studyStep.test.js"
+      ]
+    },
+    {
+      "id": "AUD-11",
+      "phase": "UI consumers",
+      "title": "Measurement header: three badges for three scopes",
+      "scope": "ui/steps/measurement.js rebuilds its own conformance-free map at :112. Read options.workflowProgress.assays.find(...).status instead and drop the buildExperimentMap import. Make appendStatusBadge (:41-50) scope-aware and render all three axes inside one wrapper element at :115, so the header's three sections (Samples & design, Acquisition, Data plan) line up with the three axes. Fall back to measurementStatus(null) when no status is present. Note in the header comment that the header is a render-time snapshot while the embedded sub-steps re-render themselves (pre-existing behavior, not introduced here).",
+      "verification": "Prove all three badges render with their scope's label, that a measurement with a blocked conformance still shows definition 'Defined' rather than collapsing to one pessimistic word, and that a missing status record degrades to the all-lowest record without throwing.",
+      "depends_on": [
+        "AUD-07",
+        "AUD-08"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/measurement.js"
+      ]
+    },
+    {
+      "id": "AUD-12",
+      "phase": "UI consumers",
+      "title": "Study Map: offer the walkthrough Start action that never existed",
+      "scope": "ui/steps/home.js appendGuidedEntry (:76-93) has branches for paused and completed and falls through to 'Explain Study map' for everything else -- so 'not-started' has no Start action and onStartGuided (already passed to every step at main.js:461-466) has NO caller on this page. Add: not-started -> 'Start example walkthrough' -> onStartGuided; active -> 'Continue walkthrough' reopening the panel. Keep 'Explain Study map' reachable as a secondary action in every state -- it is the only non-progress-mutating entry. An active walkthrough already auto-resumes on load at main.js:541, so confirm which controller method reopens a panel the user closed rather than assuming resume() handles a non-paused state.",
+      "verification": "New web/tests/homeStep.test.js against the shared DOM stub: one case per guided status including the new Start branch; malformed status degrades to the explain action; getGuidedStatus() takes precedence over a stale guidedStatus prop; clicking 'Open the example study' calls onOpenExample exactly once; the link row is absent when onOpenExample is not supplied (no dead button).",
+      "depends_on": [
+        "AUD-04",
+        "AUD-08"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/home.js",
+        "web/tests/homeStep.test.js"
+      ]
+    },
+    {
+      "id": "AUD-13",
+      "phase": "UI consumers",
+      "title": "Un-gate the walkthrough and correct the Guide's stale instructions",
+      "scope": "ui/steps/guide.js:101 gates the walkthrough on meta.origin === 'example', but main.js:287 retags the opened example as 'template' and NOTHING in the current app ever writes 'example' into the live store -- so 'Start example walkthrough' is unreachable and Resume/Restart with it. Use the shared example-origin predicate from AUD-08 (accepts example OR template). Also pass onRestartGuided into this step (:87-93 does not receive it) so a completed walkthrough is restartable here too. Apply the same predicate at ui/walkthrough.js:241 ('Use as template'), dead for the identical reason. SEPARATELY, fix two stale claims: :284-290 says the GitHub action 'opens a prefilled issue with the same report already in the body', but ui/feedbackHandoff.js:22-24 prefills only labels=feedback and its own modal at :57-62 correctly says the link contains no feedback, browser details or study data -- the modal is right, the Guide is wrong. And :270 points at Review for a restorable copy; the importable backup is on Settings, while Review's downloads are derived reports.",
+      "verification": "New web/tests/guideStep.test.js: origin 'example' + not-started -> Start; origin 'template' + not-started -> Start TOO (this is the fix; assert it explicitly, since the pre-fix behavior was 'Explain the workflow'); paused -> Resume; completed -> Restart; the title attribute matches the branch. Grep proves no surviving text claims the GitHub link carries the report body.",
+      "depends_on": [
+        "AUD-04",
+        "AUD-08"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/guide.js",
+        "web/src/ui/walkthrough.js",
+        "web/tests/guideStep.test.js"
+      ]
+    },
+    {
+      "id": "AUD-14",
+      "phase": "UI consumers",
+      "title": "Wire the two schedule counts through the Data plan step",
+      "scope": "ui/steps/naming.js:296 names planFilenames(view, NAMING_CONFIG).length 'sampleCount' -- that is the planned FILE count, technical replicates included. Pass physicalSampleCount(view.design) as sampleCount and the planFilenames length as acquisitionRunCount, using the AUD-02 exports.",
+      "verification": "New web/tests/namingStep.test.js against the shared DOM stub, using a fixture with at least 6 planned rows AND a technical-replicate axis so a hardcoded literal or an off-by-one fails: prove the two counts differ and are passed to the right parameters. Prove zero planned filenames takes the no-events branch without downloading.",
+      "depends_on": [
+        "AUD-02",
+        "AUD-04",
+        "AUD-08"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/naming.js",
+        "web/tests/namingStep.test.js"
+      ]
+    },
+    {
+      "id": "AUD-15",
+      "phase": "UI consumers",
+      "title": "Review: honest provenance, honest export verdict, honest download labels",
+      "scope": "THREE fixes. (1) ui/steps/overview.js:537-538 claims the review is 'built entirely from what you've entered ... nothing here is LLM-generated', but Review also renders advisor.json and spectra.json content, both Claude-drafted. Adopt the already-correct wording from engine/studydoc.js:267 ('parameters you entered or authored knowledge-pack content'). (2) The conformance verdict (:695-705) calls an artifact-conformance pass 'All planner checks complete'. checkConformance only covers design conditions, naming patterns, placeholder detection, path validity, spectral proximity and cross-assay collisions -- it never checks research question, system, comparison mode or experimental unit, which are experimentMap decisions. Retitle the heading to 'Export checks' and the ready verdict to 'All export checks pass', append the open-decision count when triage.counts.total > 0 (triage is ALREADY computed on the same render at :541-544 -- add no plumbing), and extend the disclaimer at :709, which currently lists only external concerns and never says it does not check the Study map. (3) 'Study data (.json)' at :623-626 is a rendered report and is NOT importable, while Settings' 'Download project backup' is -- relabel both per the approved copy, and fix the misdirecting fallback toast at :648.",
+      "verification": "Grep proves no surviving 'built entirely from what you've entered' or 'All planner checks complete' string in web/src. Prove the verdict names open decisions when triage has any and omits the clause when it has none. Prove both download labels distinguish importable from report-only.",
+      "depends_on": [
+        "AUD-07",
+        "AUD-08"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/overview.js",
+        "web/src/ui/steps/settings.js"
+      ]
+    },
+    {
+      "id": "AUD-16",
+      "phase": "Presentation",
+      "title": "Style the scoped status badges",
+      "scope": "Sole CSS owner, landing after the markup settles. Move the status badge rules to tone attributes (attention / ok / progress / neutral), add the badge-group wrapper (flex, wrap, small gap), and keep the existing 'state is carried by the text' comment -- state must never be colour-only. Do NOT change app.css:4996's registry grid template or :2947-2954's pill tones.",
+      "verification": "Inspect the built artifact served over HTTP at 1200px, 760px and 375px in BOTH themes: three badges wrap without horizontal overflow, the registry status cell does not widen the grid, and every state remains legible from text alone with colour ignored.",
+      "depends_on": [
+        "AUD-09",
+        "AUD-10",
+        "AUD-11"
+      ],
+      "parallel_safe": false,
+      "files": [
+        "web/styles/app.css"
+      ]
+    },
+    {
+      "id": "AUD-17",
+      "phase": "Test harness",
+      "title": "Assert app copy and manual copy agree",
+      "scope": "New copy-consistency test in the style of the existing web/tests/manual.test.js (plain text/regex inspection of files on disk, no DOM, no dependency). Every copy defect in this run shipped because nothing asserted the strings agree. Assert: the labels exported by engine/measurementStatus.js are the labels documented in web/manual/measurements.html; the provenance sentence in ui/steps/overview.js matches the one quoted in web/manual/review-exports.html (the same sentence today -- they drifted into being wrong TOGETHER); and no manual page claims the knowledge pack is 'human-authored' while engine/spectra.js:83 defaults reviewStatus to 'claude-drafted'.",
+      "verification": "Prove each assertion FAILS against the pre-fix strings (paste them in temporarily to confirm the test has teeth, then revert) and passes after this run's copy changes.",
+      "depends_on": [
+        "AUD-15",
+        "AUD-20"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/tests/copyConsistency.test.js"
+      ]
+    },
+    {
+      "id": "AUD-18",
+      "phase": "Test harness",
+      "title": "Extract the stdlib Chrome DevTools driver into a reusable module",
+      "scope": "tools/capture_screenshots.py already drives real Chrome over the DevTools Protocol using ONLY the standard library. Move WebSocketClient, CDPSession, wait_for_http, wait_for_cdp, new_page_target and the free-port helper into a new tools/browser_cdp.py and import them back, leaving capture_screenshots.py BEHAVIOURALLY IDENTICAL (its SCREENS table, scroll/theme logic and main() stay put, and its stdlib-only header comment stays true). Add a Page wrapper (goto, hash_nav, reload, eval_js, click, click_text, text, exists, wait_for, local-storage get/set/clear, close) and console_errors(), built on the events CDPSession already stashes -- enable Runtime and Log and collect consoleAPICalled type=error, exceptionThrown, and entryAdded level=error. Split resolve_chrome_binary() into a cross-platform find_chrome() returning None when nothing is executable (CHROME_BIN, then PATH names, then per-platform install paths, then the existing fallback), keeping resolve_chrome_binary()'s current SystemExit behavior for the screenshot tool.",
+      "verification": "New tests/test_browser_cdp.py, no browser required: cover find_chrome()'s candidate ordering and its None result, plus the WebSocket frame encoder/decoder round-trip. Then prove capture_screenshots.py still runs and produces an identical screenshot set.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "tools/browser_cdp.py",
+        "tools/capture_screenshots.py",
+        "tests/test_browser_cdp.py"
+      ]
+    },
+    {
+      "id": "AUD-19",
+      "phase": "Test harness",
+      "title": "Browser end-to-end suite against the built artifact",
+      "scope": "New tests/conftest.py (none exists today) with session fixtures that build the single-file artifact into pytest's tmp_path -- NEVER the shared dist/ -- serve it with tools/serve_dir.py on a free port, and launch headless Chrome, SKIPPING rather than failing when find_chrome() returns None (ubuntu-latest ships Chrome; Windows dev boxes may not). New tests/test_e2e_flows.py, SEVEN tests and defend that size: blank first visit renders with zero console errors; the app still boots with localStorage redefined as a throwing getter (inject before navigation -- this is the white-screen regression guard and it cannot be written at any other layer); open the example then start the walkthrough; pause, reload, resume at the same cursor; edit then Start a blank study and prove the work is in Restore; clear-all reports truthfully; and the served artifact contains no static import/export statements. ALSO fix the shared-dist race: tests/test_single_file_build.py:347 and :456 build into ROOT/'dist' and assert on it while every other test in that file already uses tmp_path -- make those two match. Finally add a third 'e2e' job to .github/workflows/ci.yml (checkout, setup-python, pip install pytest, report which Chrome was found, run the suite) and add tests/test_browser_cdp.py to the existing test job's explicit file list. Leave the web-test job's glob alone -- it already picks up new *.test.js and correctly skips non-test helpers. Do NOT add a Chrome dependency to deploy.yml.",
+      "verification": "Run the suite locally against a real build and prove all seven pass; prove the walkthrough test would have FAILED before AUD-13; prove the throwing-localStorage test would have failed before AUD-01; and prove the suite skips cleanly with CHROME_BIN pointed at a nonexistent path.",
+      "depends_on": [
+        "AUD-18",
+        "AUD-13",
+        "AUD-08"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "tests/conftest.py",
+        "tests/test_e2e_flows.py",
+        "tests/test_single_file_build.py",
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "id": "AUD-20",
+      "phase": "Docs",
+      "title": "Correct the manual's status, readiness and provenance chapters",
+      "scope": "web/manual/measurements.html: the filter list (:75) and status table (:102, :109-110) describe the old three-word vocabulary; :110's definition ('Every check the planner itself owns is satisfied') was FALSE because the checks were never passed in, and is now true only of the plan axis; the :114 scoped-honestly callout now belongs to plan:ready; and :138 is a quiz answer that explicitly declares the switcher/registry disagreement 'not a bug' -- that premise is GONE, so rewrite the answer rather than rewording it. web/manual/study-map.html:85 claims measurements use 'the same three-word vocabulary under slightly different labels', which stops being true. web/manual/big-ideas.html:63-64 claims all guidance comes from a 'human-authored' rule set and lookup tables -- contradicted by both spectra.json and advisor.json, and advisor.json is the exact source of the 'modality-specific tip on Acquisition' the sentence cites; keep the accurate runtime half ('never calls a language model') and adopt the canonical provenance sentence from the plan. web/manual/review-exports.html:40 quotes overview.js's old provenance string verbatim and must change in lockstep. web/manual/getting-started.html:75 documents Start/Resume/Restart, which is finally true after AUD-12/AUD-13. If any page's cache-busting ?v= is bumped, ALL pages must be bumped together (web/tests/manual.test.js:131-142).",
+      "verification": "web/tests/manual.test.js stays green (dead links, missing screenshots, theme guard, ?v= consistency). Grep proves no page still describes a three-word measurement vocabulary, calls the disagreement expected, or calls the knowledge pack human-authored.",
+      "depends_on": [
+        "AUD-15",
+        "AUD-12",
+        "AUD-13",
+        "AUD-06"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/manual/measurements.html",
+        "web/manual/study-map.html",
+        "web/manual/big-ideas.html",
+        "web/manual/review-exports.html",
+        "web/manual/getting-started.html"
+      ]
+    },
+    {
+      "id": "AUD-21",
+      "phase": "Docs",
+      "title": "Replace the step-count drift with a hierarchy, and record the status scopes",
+      "scope": "README.md:26-27 says 'three workspaces plus a review' while its own list runs to six top-level bullets, and the docs variously claim three, five and seven steps. Replace the count with the hierarchy diagram from the plan, which counts nothing, and tidy README.md:97-116 where the deterministic exact-text scan is filed under 'things that use a model's help'. Refresh the status-vocabulary lines and 'Last updated' dates in TASKS.md (:76) and ROADMAP.md (:98), and note in ROADMAP.md the deliberately deferred idea of modelling observational / group-comparison / factorial / mixed as first-class study shapes (a schema change with migration consequences, explicitly NOT in this pass). Add a new docs/plans/status-scopes.md carrying the hierarchy plus the three-scoped-status table as the reference the manual and README both point at. Add a new entry to web/release-notes/CHANGELOG.md covering this run -- and note the visible behaviour change: plumbing real triage means a measurement that showed 'Ready to acquire' yesterday may now show 'Needs a decision'. Do NOT rewrite the historical entry at web/release-notes/CHANGELOG.md:195.",
+      "verification": "Grep proves no surviving 'three workspaces' claim or contradictory step count across README.md, TASKS.md, ROADMAP.md and web/manual/. Confirm the historical changelog entry is untouched and the new entry names the behaviour change.",
+      "depends_on": [
+        "AUD-06",
+        "AUD-15"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "README.md",
+        "TASKS.md",
+        "ROADMAP.md",
+        "docs/plans/status-scopes.md",
+        "web/release-notes/CHANGELOG.md"
+      ]
+    },
+    {
+      "id": "AUD-22",
+      "phase": "UI consumers",
+      "title": "Rename the comparison choice away from the collapsed group/condition wording",
+      "scope": "ui/studyMap.js:196-198 offers ['groups','Compare groups or conditions'] / ['observational','Observational study']. 'or conditions' collapses three distinct engine concepts: a GROUP is one mutually exclusive axis, FACTORS cross it, and a CONDITION is the derived group x factor x replicate row (documented at engine/conditions.js:4). A condition is computed, never something you choose to compare. Approved replacement: 'Compares groups or treatments'. Change the label text only -- the stored value 'groups' and the schema are untouched.",
+      "verification": "Grep proves no surviving 'Compare groups or conditions'. The stored comparisonMode values are unchanged, so web/tests/experimentMap.test.js and workflowProgress.test.js stay green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/studyMap.js"
+      ]
+    }
+  ]
+}
