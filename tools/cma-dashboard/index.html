@@ -176,428 +176,183 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "audit-remediation",
-  "orchestrator": "Claude Opus 5",
-  "active_model": "Claude Opus 5",
-  "active_status": "idle",
-  "phase": "",
+  "run": "app-review 2026-09-11",
+  "orchestrator": "Claude Fable 5.1",
+  "active_model": "Claude Opus",
+  "active_status": "running",
+  "phase": "Batch 1 of 3 — reviews",
   "state_note": "",
-  "current_task": null,
+  "current_task": {
+    "id": "R1-R6",
+    "title": "Batch 1 reviews dispatched"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "839 passed",
+      "v": "879 passed",
       "tone": "ok"
     },
     {
       "k": "Python tests",
-      "v": "85 passed",
-      "tone": "ok"
-    },
-    {
-      "k": "Batch",
-      "v": "9 of 9"
-    },
-    {
-      "k": "Tasks",
-      "v": "22 of 22",
-      "tone": "ok"
-    },
-    {
-      "k": "E2E",
-      "v": "7 passed",
+      "v": "88 passed",
       "tone": "ok"
     }
   ],
-  "defects": [
-    {
-      "id": "D4",
-      "location": "web/src/core/persist.js:245",
-      "title": "clearAll returned ok:true over suppressed removeItem failures - could announce a clear that did not happen",
-      "body": "",
-      "repro": ""
-    }
-  ],
+  "defects": [],
   "tasks": [
     {
-      "id": "AUD-01",
+      "id": "R1",
       "phase": "Batch 1",
-      "title": "Guard persist.js storage access and make clearAll report truthfully",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "Docs claims vs reality",
+      "status": "running",
+      "by": "Opus",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "AUD-02",
+      "id": "R2",
       "phase": "Batch 1",
-      "title": "Separate physical samples from acquisition runs in the ICS schedule",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "In-app copy, manual and privacy claims vs behaviour",
+      "status": "running",
+      "by": "Opus",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "AUD-03",
+      "id": "R3",
       "phase": "Batch 1",
-      "title": "Let an observational study complete the Measurements step",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "Scientific-data claims: spectra, references, advisor",
+      "status": "running",
+      "by": "Opus",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "AUD-04",
+      "id": "R4",
       "phase": "Batch 1",
-      "title": "Consolidate the duplicated DOM stub into one shared test helper",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "Live UX/UI: primary workflow in the built app",
+      "status": "running",
+      "by": "Opus",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "AUD-05",
+      "id": "R5",
       "phase": "Batch 1",
-      "title": "Delete the stale readout comment in core/assay.js",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "Live UX/UI: utilities, edges and secondary pages",
+      "status": "running",
+      "by": "Opus",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "AUD-06",
+      "id": "R6",
+      "phase": "Batch 1",
+      "title": "Adversarial code read of untested UI wiring",
+      "status": "running",
+      "by": "Opus",
+      "depends_on": [],
+      "batch": 1
+    },
+    {
+      "id": "V1",
       "phase": "Batch 2",
-      "title": "Rewrite measurementStatus into three explicitly scoped axes",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [],
+      "title": "Adversarial verification of R1",
+      "status": "pending",
+      "by": "queued",
+      "depends_on": [
+        "R1"
+      ],
       "batch": 2
     },
     {
-      "id": "AUD-07",
-      "phase": "Batch 3",
-      "title": "Compute each measurement's status inside deriveWorkflowProgress",
-      "status": "done",
-      "by": "Sonnet",
+      "id": "V2",
+      "phase": "Batch 2",
+      "title": "Adversarial verification of R2",
+      "status": "pending",
+      "by": "queued",
       "depends_on": [
-        "AUD-03",
-        "AUD-06"
+        "R2"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "V3",
+      "phase": "Batch 2",
+      "title": "Adversarial verification of R3",
+      "status": "pending",
+      "by": "queued",
+      "depends_on": [
+        "R3"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "V4",
+      "phase": "Batch 2",
+      "title": "Adversarial verification of R4",
+      "status": "pending",
+      "by": "queued",
+      "depends_on": [
+        "R4"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "V5",
+      "phase": "Batch 2",
+      "title": "Adversarial verification of R5",
+      "status": "pending",
+      "by": "queued",
+      "depends_on": [
+        "R5"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "V6",
+      "phase": "Batch 2",
+      "title": "Adversarial verification of R6",
+      "status": "pending",
+      "by": "queued",
+      "depends_on": [
+        "R6"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "S1",
+      "phase": "Batch 3",
+      "title": "Merge, re-scan, report, remediation graph, lessons, dashboard",
+      "status": "pending",
+      "by": "queued",
+      "depends_on": [
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6"
       ],
       "batch": 3
-    },
-    {
-      "id": "AUD-08",
-      "phase": "Batch 4",
-      "title": "Extract main.js's lifecycle into a testable appController",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-01"
-      ],
-      "batch": 4
-    },
-    {
-      "id": "AUD-09",
-      "phase": "Batch 5",
-      "title": "Shell: one measurement vocabulary on the pill, honest footer and compass labels",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-07"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-10",
-      "phase": "Batch 5",
-      "title": "Measurements registry: scoped status badges without staleness",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-07",
-        "AUD-04",
-        "AUD-08"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-11",
-      "phase": "Batch 5",
-      "title": "Measurement header: three badges for three scopes",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-07",
-        "AUD-08"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-12",
-      "phase": "Batch 5",
-      "title": "Study Map: offer the walkthrough Start action that never existed",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-04",
-        "AUD-08"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-13",
-      "phase": "Batch 5",
-      "title": "Un-gate the walkthrough and correct the Guide's stale instructions",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-04",
-        "AUD-08"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-14",
-      "phase": "Batch 5",
-      "title": "Wire the two schedule counts through the Data plan step",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-02",
-        "AUD-04",
-        "AUD-08"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-15",
-      "phase": "Batch 5",
-      "title": "Review: honest provenance, honest export verdict, honest download labels",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-07",
-        "AUD-08"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-16",
-      "phase": "Batch 6",
-      "title": "Style the scoped status badges",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-09",
-        "AUD-10",
-        "AUD-11"
-      ],
-      "batch": 6
-    },
-    {
-      "id": "AUD-17",
-      "phase": "Batch 9",
-      "title": "Assert app copy and manual copy agree",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-15",
-        "AUD-20"
-      ],
-      "batch": 9
-    },
-    {
-      "id": "AUD-18",
-      "phase": "Batch 7",
-      "title": "Extract the stdlib Chrome DevTools driver into a reusable module",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [],
-      "batch": 7
-    },
-    {
-      "id": "AUD-19",
-      "phase": "Batch 8",
-      "title": "Browser end-to-end suite against the built artifact",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-18",
-        "AUD-13",
-        "AUD-08"
-      ],
-      "batch": 8
-    },
-    {
-      "id": "AUD-20",
-      "phase": "Batch 8",
-      "title": "Correct the manual's status, readiness and provenance chapters",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-15",
-        "AUD-12",
-        "AUD-13",
-        "AUD-06"
-      ],
-      "batch": 8
-    },
-    {
-      "id": "AUD-21",
-      "phase": "Batch 8",
-      "title": "Replace the step-count drift with a hierarchy, and record the status scopes",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-06",
-        "AUD-15"
-      ],
-      "batch": 8
-    },
-    {
-      "id": "AUD-22",
-      "phase": "Rename the comparison choice away from collapsed group/condition wording:UI consumers",
-      "title": "",
-      "status": "done",
-      "by": "Sonnet"
     }
   ],
   "log": [
     {
-      "time": "22:14:40",
-      "msg": "AUD-18 pulled forward: no deps, file-disjoint from AUD-06 and the DAG work"
+      "time": "20:46:04",
+      "msg": "Run seeded from task graph; building dist + baseline suites"
     },
     {
-      "time": "22:15:47",
-      "msg": "Batch 1 complete and verified on disk (5/5)"
+      "time": "20:46:53",
+      "msg": "dist built (1070286 B); JS 879/879; batch 1 dispatched to 6 Opus reviewers"
     },
     {
-      "time": "22:15:47",
-      "msg": "DAG view live; board state re-asserted after re-seed"
-    },
-    {
-      "time": "22:16:26",
-      "msg": "AUD-06 done: 3 scoped axes, 784 JS passing"
-    },
-    {
-      "time": "22:16:26",
-      "msg": "D1 opened: consumers stale by design until batch 5"
-    },
-    {
-      "time": "22:22:40",
-      "msg": "AUD-07 done: per-assay status attached in engine; 788 JS passing"
-    },
-    {
-      "time": "22:26:47",
-      "msg": "AUD-18 done: stdlib CDP driver extracted; 26 new py tests, zero deps"
-    },
-    {
-      "time": "22:37:25",
-      "msg": "AUD-08 done: main.js 544->359 lines; 3 behaviour fixes landed"
-    },
-    {
-      "time": "22:37:25",
-      "msg": "AUD-22 added: comparison radio copy was missing from the graph"
-    },
-    {
-      "time": "22:39:33",
-      "msg": "Batch 5 dispatched: 8 file-disjoint Sonnet agents; AUD-10+AUD-11 clear defect D1"
-    },
-    {
-      "time": "22:41:27",
-      "msg": "AUD-11 done: three scoped badges on measurement header"
-    },
-    {
-      "time": "22:42:12",
-      "msg": "AUD-22 done: 'Compares groups or treatments'"
-    },
-    {
-      "time": "22:42:12",
-      "msg": "dist/ lock errors seen again during pytest - AUD-19's tmp_path fix is load-bearing"
-    },
-    {
-      "time": "22:42:58",
-      "msg": "AUD-15 done: provenance + export-checks verdict + download labels"
-    },
-    {
-      "time": "22:42:58",
-      "msg": "AUD-20 scope widened: glossary-faq.html also carries stale provenance copy"
-    },
-    {
-      "time": "22:44:52",
-      "msg": "AUD-12 done: Start action exists on Study Map for the first time"
-    },
-    {
-      "time": "22:47:36",
-      "msg": "AUD-14 done: mounting scales by samples, acquisition by runs (falsification-tested)"
-    },
-    {
-      "time": "22:47:36",
-      "msg": "D2 found by AUD-14, fixed warm-context in domStub.js and verified"
-    },
-    {
-      "time": "22:48:29",
-      "msg": "AUD-09 + AUD-13 done; nav stateLabel vocabulary preserved as required"
-    },
-    {
-      "time": "22:48:29",
-      "msg": "Removed guideStep's local append monkeypatch - redundant after the D2 domStub fix"
-    },
-    {
-      "time": "22:52:24",
-      "msg": "D1 CLEARED: built artifact boots in headless Chrome, zero console errors"
-    },
-    {
-      "time": "22:52:24",
-      "msg": "Verified live: 'Start example walkthrough' present; registry badges render"
-    },
-    {
-      "time": "22:58:35",
-      "msg": "AUD-21: README hierarchy + status-scopes.md + TASKS/ROADMAP refresh + CHANGELOG entry; 832 JS + 52 Py green"
-    },
-    {
-      "time": "23:00:45",
-      "msg": "AUD-20 done: manual reconciled across 6 pages incl. rewritten quizzes"
-    },
-    {
-      "time": "23:00:56",
-      "msg": "AUD-16 done: tone-based badges, WCAG-checked, pre-existing nowrap overflow fixed"
-    },
-    {
-      "time": "23:02:39",
-      "msg": "AUD-21: Opus verifier found status-scopes.md:71-75 misstated plan-axis mechanism (plan requires definition=defined per measurementStatus.js:135) + unearned web/manual/ claim at :3; both fixed and re-verified green (832 JS / 52 Py)"
-    },
-    {
-      "time": "23:03:19",
-      "msg": "AUD-21 done: hierarchy replaces step counts; status-scopes.md added"
-    },
-    {
-      "time": "23:03:19",
-      "msg": "D3 fixed: corrected serve_dir usage in 4 plan docs"
-    },
-    {
-      "time": "23:07:28",
-      "msg": "AUD-17 done: copy-consistency guard, all 5 assertions falsification-proven"
-    },
-    {
-      "time": "23:20:10",
-      "msg": "AUD-19 done: 7 e2e tests; git-worktree proof they fail against HEAD"
-    },
-    {
-      "time": "23:20:10",
-      "msg": "Opus gate: 837 JS + 85 py green; artifact boots clean; pill and registry now agree live"
-    },
-    {
-      "time": "23:23:54",
-      "msg": "Code review: 2 findings, both fixed and regression-tested"
-    },
-    {
-      "time": "23:23:54",
-      "msg": "RUN COMPLETE: 22/22 tasks, 839 JS + 85 py + 7 e2e green"
+      "time": "20:47:32",
+      "msg": "pytest installed; Python 88/88 baseline"
     }
   ],
-  "snapshot_at": "2026-09-10 23:23"
+  "snapshot_at": "2026-09-11 20:47"
 };
 /* CMA:EMBEDDED:END */
 
