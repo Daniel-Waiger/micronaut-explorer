@@ -27,15 +27,12 @@
 export const ASSAY_SCOPED_ROOTS = new Set(['specimen', 'design', 'panel', 'acquisition', 'controls', 'timing']);
 
 // Scalar fields that live DIRECTLY on the assay object rather than inside one
-// of the container roots above -- 'label' (commit 2's rename), 'readout'/
-// 'readoutText' (reserved on emptyAssay below for commit 3, not yet wired
-// into assayView). Without this set, scopeWrite('label', assayId) falls
-// through isAssayScopedPath as study-level and writes into a PHANTOM
-// experiment.label at the study root -- setPath auto-vivifies a missing root
-// on write with no error, exactly the hazard this module's header warns
-// about, just for a path shape commit 1 never had to write to. Solved for all
-// three scalar fields now so commit 3 does not have to revisit this
-// predicate a second time.
+// of the container roots above: 'label', 'readout', 'readoutText'. Without
+// this set, scopeWrite('label', assayId) falls through isAssayScopedPath as
+// study-level and writes into a PHANTOM experiment.label at the study root --
+// setPath auto-vivifies a missing root on write with no error, exactly the
+// hazard this module's header warns about. All three scalar fields are
+// covered here so scopeWrite never has to revisit this predicate.
 export const ASSAY_SCALAR_FIELDS = new Set(['label', 'readout', 'readoutText']);
 
 // Matches the bare container ('naming.fields' itself, e.g. a future bulk
@@ -67,10 +64,9 @@ export function emptyAssay(id) {
   return {
     id,
     label: '',
-    // readout/readoutText and the controls tier that reads them are
-    // deliberately NOT wired into assayView below -- commit 1 (this module)
-    // ships before web/kb/readouts.json exists. The fields are real schema,
-    // just not yet consumed anywhere.
+    // readout/readoutText: real schema fields, wired into assayView below
+    // and consumed by engine/experimentMap.js and the controls tier
+    // (web/kb/readouts.json) that reads them.
     readout: '',
     readoutText: '',
     specimen: { organism: '', sampleType: '', preparation: '', notes: '' },
@@ -178,9 +174,7 @@ function projectProvenance(provenance, assayId) {
  * emptyExperiment() without a matching line here is a visible gap in this
  * function, not a silent leak through a spread.
  *
- * `readout`/`readoutText` are wired in as of commit 3 (web/kb/readouts.json,
- * engine/controls.js) -- commit 1's header comment said these were
- * deliberately NOT included yet; they are now, verbatim from the assay, no
+ * `readout`/`readoutText` are passed through verbatim from the assay, no
  * KB logic here (this module stays a leaf; canonicalization happens in
  * ui/steps/describe.js at answer time, where the readouts KB is available).
  *
