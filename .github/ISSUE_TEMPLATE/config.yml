@@ -1,0 +1,36 @@
+# LABELS THESE FORMS REFERENCE. A label a form asks for has to already exist in the repo, or
+# the issue is simply filed without it — no error, no warning, and the filterable group the
+# label was supposed to create never appears. Checked 2026-09-11:
+#
+#   bug              exists   (bug_report.yml)
+#   enhancement      exists   (feature_request.yml)
+#   question         exists   (../DISCUSSION_TEMPLATE/q-a.yml)
+#   knowledge-pack   MISSING  (knowledge_pack.yml)
+#   feedback         MISSING  (not a form at all — web/src/ui/feedbackHandoff.js puts it in the
+#                              in-app Feedback button's URL, so this one has been quietly
+#                              inert for as long as that button has existed)
+#
+# Create the missing two under Issues -> Labels. Add a line here when a new form wants a label.
+#
+# Blank issues stay switched on deliberately, and for a second reason here beyond the CRM's.
+#
+# First, the same one: someone with a half-formed thought should never hit a wall of required
+# fields.
+#
+# Second, and easy to break by accident: the planner's own Feedback page opens
+# `/issues/new?labels=feedback` directly (see web/src/ui/feedbackHandoff.js). That URL lands on
+# the blank form only while blank issues are enabled — set this to false and GitHub redirects it
+# to `/issues/new/choose`, which drops the `feedback` label and puts a template chooser in front
+# of a tester who has a filled clipboard and no interest in choosing. If you ever do turn blank
+# issues off, point that constant at a real template path instead (`?template=bug_report.yml`).
+blank_issues_enabled: true
+contact_links:
+  - name: Ideas, questions, and "is the planner meant to do X?"
+    url: https://github.com/Daniel-Waiger/micronaut-explorer/discussions
+    about: Nothing formal needed. Say what you are trying to plan and we will work it out together.
+  - name: User manual
+    url: https://daniel-waiger.github.io/micronaut-planner/manual/
+    about: What each page is for, in plain language. Worth a look before filing, it may already be there.
+  - name: Release notes
+    url: https://daniel-waiger.github.io/micronaut-planner/release-notes/
+    about: What changed in each version, newest first.
