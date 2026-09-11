@@ -7,6 +7,18 @@ import { MAX_STUDY_ROWS } from '../engine/plan.js';
 import { buildFeedbackReport } from '../core/feedbackReport.js';
 import { handoffFeedback } from './feedbackHandoff.js';
 import { createIcon } from './icons.js';
+import { measurementStatus, measurementStatusLabel } from '../engine/measurementStatus.js';
+
+// Maps a measurement status record's `tone` onto the switcher pill's existing
+// badge classes (app.css:2947-2954), so the pill and the Measurements
+// registry -- both readers of workflowProgress.assays[i].status -- share one
+// vocabulary instead of the pill speaking the retired route-state words.
+const MEASUREMENT_TONE_CLASS = Object.freeze({
+  ok: 'is-complete',
+  attention: 'is-needs-attention',
+  progress: 'is-in-progress',
+  neutral: 'is-not-started',
+});
 
 const THEME_KEY = 'micronaut.theme';
 const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
@@ -38,6 +50,37 @@ export function saveLabel(saveState) {
   if (seconds < 10) return 'Saved locally · just now';
   if (seconds < 60) return `Saved locally · ${seconds}s ago`;
   return `Saved locally · ${Math.round(seconds / 60)}m ago`;
+}
+
+// `steps` is router.steps (every route, including the utility/guide ones);
+// 'guide' is the one non-utility route excluded from the primary workflow
+// (see engine/workflowProgress.js's PRIMARY_WORKFLOW/OPTIONAL_WORKFLOW
+// split). A route inside that primary set gets its ordinal position; any
+// other route (Settings, Feedback, Guide) names itself via its own `title`
+// instead of every one of them claiming to be "Guide (optional)".
+export function footerPositionLabel(steps, activeId) {
+  const safeSteps = Array.isArray(steps) ? steps : [];
+  const primary = safeSteps.filter((step) => step && step.id !== 'guide' && !step.utility);
+  const index = primary.findIndex((step) => step.id === activeId);
+  if (index !== -1) return `Step ${index + 1} of ${primary.length}`;
+  const active = safeSteps.find((step) => step && step.id === activeId);
+  return (active && typeof active.title === 'string' && active.title) || 'Guide (optional)';
+}
+
+// Research brief (`describe`) writes a study-wide narrative whose
+// suggestions merely TARGET the active measurement, so it earns its own
+// non-editing-of-that-measurement phrasing; Review (`overview`) is read-only
+// and must never claim to be "editing" anything. Every other route
+// (including `measurement`, which really is being edited) keeps the original
+// "Now editing" phrasing. Always resolves to a complete phrase -- never a
+// bare "Now editing: " -- because both branches that need a measurement name
+// fall back to a literal default instead of an empty label.
+export function compassScopeLine(routeId, measurementLabel) {
+  const label = typeof measurementLabel === 'string' && measurementLabel.trim() ? measurementLabel.trim() : 'Not selected';
+  if (routeId === 'describe') return `Suggestions target: ${label}`;
+  if (routeId === 'measurement') return `Now editing: Measurement: ${label}`;
+  if (routeId === 'overview') return 'Reviewing: Whole study';
+  return 'Now editing: Whole study';
 }
 
 export function renderShell(root, store, router, options = {}) {
@@ -324,8 +367,15 @@ export function renderShell(root, store, router, options = {}) {
   function workflowStep(routeId) {
     return primarySteps().find((step) => step.id === workflowForRoute(routeId));
   }
-  function assayState(id) {
-    return workflowProgress.assays?.find((assay) => assay?.id === id)?.state || 'not-started';
+  // workflowProgress's default at options.workflowProgress (:52) carries no
+  // assays/statuses at all, so a lookup miss falls back to
+  // measurementStatus(null)'s all-lowest record rather than leaving the pill
+  // undefined on first paint.
+  function measurementStatusFor(id) {
+    const entry = Array.isArray(workflowProgress.assays)
+      ? workflowProgress.assays.find((assay) => assay?.id === id)
+      : null;
+    return entry?.status || measurementStatus(null);
   }
   function compassText(value, fallback) {
     return typeof value === 'string' && value.trim() ? value.trim() : fallback;
@@ -342,14 +392,15 @@ export function renderShell(root, store, router, options = {}) {
     if (comparison.mode === 'groups' && groups.length > 0) return groups.join(' vs ');
     return '';
   }
-  function measurementScope(experiment, map, routeId) {
-    // Research brief accepts measurement-scoped details, and the measurement
-    // page is entirely one measurement. Everything else is whole-study. The
-    // shell only names the scope; each step still owns its data binding.
-    if (!['describe', 'measurement'].includes(routeId)) return 'Whole study';
+  // Research brief accepts measurement-scoped SUGGESTIONS while writing a
+  // study-wide narrative, and the measurement page is entirely one
+  // measurement; everything else (including the read-only Review) has no
+  // single measurement in scope. Only those two routes need the active
+  // measurement's own label.
+  function compassMeasurementLabel(experiment, map) {
     const measurements = Array.isArray(map?.measurements) ? map.measurements : [];
     const active = measurements.find((measurement) => measurement?.id === experiment.activeAssayId);
-    return `Measurement: ${compassText(active?.label, 'Not selected')}`;
+    return compassText(active?.label, 'Not selected');
   }
   function nextDecisionDestination(nextDecision, experiment) {
     if (!nextDecision || typeof nextDecision !== 'object' || typeof nextDecision.routeId !== 'string') return null;
@@ -366,12 +417,11 @@ export function renderShell(root, store, router, options = {}) {
     const titleText = compassText(experiment.meta?.title, compassText(map.question?.value, 'Untitled study'));
     const questionText = compassText(map.question?.value, '');
     const systemText = compassText(map.system?.value, '');
-    const scopeText = measurementScope(experiment, map, activeId);
+    const scopeLine = compassScopeLine(activeId, compassMeasurementLabel(experiment, map));
 
     workflowSummary.textContent = compassDisplayText(titleText);
     workflowSummary.title = titleText;
     workflowSummary.setAttribute('aria-label', titleText);
-    const scopeLine = `Now editing: ${scopeText}`;
     compassScope.textContent = compassDisplayText(scopeLine);
     compassScope.title = scopeLine;
     compassScope.setAttribute('aria-label', scopeLine);
@@ -447,8 +497,10 @@ export function renderShell(root, store, router, options = {}) {
       select.textContent = assay.label || `Measurement ${index + 1}`;
       select.addEventListener('click', () => { if (assay.id !== store.get().activeAssayId) store.patch({ activeAssayId: assay.id }); });
       const badge = document.createElement('span');
-      badge.className = `assay-progress-badge is-${assayState(assay.id)}`;
-      badge.textContent = stateLabel(assayState(assay.id));
+      const status = measurementStatusFor(assay.id);
+      const toneClass = MEASUREMENT_TONE_CLASS[status.tone] || MEASUREMENT_TONE_CLASS.neutral;
+      badge.className = `assay-progress-badge ${toneClass}`;
+      badge.textContent = measurementStatusLabel(status.headline.scope, status.headline.status);
       pill.append(select, badge);
       if (assays.length > 1) {
         const remove = document.createElement('button');
@@ -717,7 +769,7 @@ export function renderShell(root, store, router, options = {}) {
       destination.routeId === activeId &&
       (!destination.measurementId || destination.measurementId === experiment.activeAssayId);
     const continueDestination = isCurrentDestination(mapDestination, currentExperiment) ? null : mapDestination;
-    position.textContent = index === -1 ? 'Guide (optional)' : `Step ${index + 1} of ${steps.length}`;
+    position.textContent = footerPositionLabel(router.steps, activeId);
     back.disabled = index <= 0;
     next.disabled = continueDestination === null && (index === -1 || index >= steps.length - 1);
     next.textContent = continueDestination ? 'Continue to next decision' : 'Continue';

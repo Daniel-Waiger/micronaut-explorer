@@ -70,26 +70,27 @@
 
       <section>
         <h2 id="workflow-badges">Workflow badges</h2>
-        <p>Every step button in the nav rail, and every measurement pill in the switcher bar above the workspace, carries a small colored badge naming its current state:</p>
+        <p>Every step button in the nav rail carries a small colored badge naming that step's own current state:</p>
         <div class="table-wrap">
         <table>
           <thead><tr><th>Badge</th><th>Meaning</th></tr></thead>
           <tbody>
-            <tr><td>Not started</td><td>Nothing has been entered for this step or measurement yet.</td></tr>
+            <tr><td>Not started</td><td>Nothing has been entered for this step yet.</td></tr>
             <tr><td>In progress</td><td>Some fields are filled in, but the step isn't finished.</td></tr>
             <tr><td>Decision needed</td><td>Something here is open, or a planner check is unhappy — this is exactly the kind of thing "Next decision" and Continue surface for you.</td></tr>
-            <tr><td>Ready for now</td><td>Every check this step or measurement owns is currently satisfied.</td></tr>
+            <tr><td>Ready for now</td><td>Every check this step owns is currently satisfied.</td></tr>
           </tbody>
         </table>
         </div>
-        <div class="callout warn"><p><strong>⚠️ Careful.</strong> "Ready for now" describes the plan's completeness against the app's own checks — it is never a claim that the experiment is scientifically correct, adequately powered, or approved by anyone. Measurements use the same three-word vocabulary under slightly different labels — <strong>Draft</strong>, <strong>Needs a decision</strong>, <strong>Ready to acquire</strong> — for exactly this reason: see <a href="measurements.html">Measurements Registry</a>.</p></div>
+        <p>Every measurement pill in the switcher bar above the workspace also carries a badge, but a different vocabulary — it's the exact same <strong>headline status badge</strong> the Measurements registry shows for that measurement, read from the identical status record: one of <strong>Draft</strong> / <strong>Provisionally defined</strong> / <strong>Defined</strong> (has the measurement itself been filled in), <strong>Plan open</strong> / <strong>Needs a decision</strong> / <strong>Ready to acquire</strong> (does its plan still have an open decision), or <strong>Not checked</strong> / <strong>Blocked</strong> / <strong>Needs review</strong> / <strong>Checks pass</strong> (do its export checks pass). Because the pill and the registry row read the same record, they can never disagree — see <a href="measurements.html#statuses">Measurements Registry</a> for the full three-axis breakdown.</p>
+        <div class="callout warn"><p><strong>⚠️ Careful.</strong> None of these badges — on a step or on a measurement pill — is ever a claim that the experiment is scientifically correct, adequately powered, or approved by anyone. Every one of them describes the plan's completeness against the app's own checks, nothing more.</p></div>
       </section>
 
       <section class="quiz">
         <h2 id="self-check">Check yourself</h2>
         <details class="quiz-q"><summary>You want to name your comparison groups — "irrigated" and "dry," say. Do you type them on Study map?</summary><p>No. Study map only shows a read-only summary of whichever group names your measurements already use. Groups are typed once, per measurement, on that measurement's own Samples &amp; design section.</p></details>
         <details class="quiz-q"><summary>You're on the Measurement page and click "Continue to next decision." Where does it take you?</summary><p>Wherever the study's single highest-priority open decision actually is — a different workspace, and a different measurement if that's what the decision names, switching the active measurement for you automatically.</p></details>
-        <details class="quiz-q"><summary>A measurement's pill shows "Ready for now." Does that mean the experiment is scientifically sound?</summary><p>No — it only means the planner's own checks for that measurement are currently satisfied. It's a statement about the plan's completeness, not a validation of the science.</p></details>
+        <details class="quiz-q"><summary>A measurement's switcher pill shows "Checks pass." Does that mean the experiment is scientifically sound?</summary><p>No — the pill only ever shows the headline of the same three-axis status the Measurements registry shows (see <a href="measurements.html#statuses">Measurements Registry</a>), and even "Checks pass" is a statement about the plan's completeness and its export checks, not a validation of the science.</p></details>
       </section>
 
       <nav class="pager" id="pager"></nav>

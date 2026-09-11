@@ -24,6 +24,17 @@
 // Deliberately describes the workflow and concepts, not a numbered tutorial:
 // the app is usable outside-in. The optional guided example is a separate
 // seven-step aid; Guide remains reference material, not an eighth step.
+//
+// The walkthrough-start gate below shares core/appController.js's
+// isExampleOrigin(origin) rather than re-deriving the example/template
+// equivalence here (see that module's own comment): an opened example is
+// retagged 'template' the moment it lands in the store, so a literal
+// `origin === 'example'` check can never open. ui/walkthrough.js's
+// completion-screen "Use as template" action already routes through
+// appController.js's isExampleOrigin-guarded adoptExampleTemplate, so it
+// needs no separate check of its own here.
+
+import { isExampleOrigin } from '../../core/appController.js';
 
 /**
  * A titled, searchable section: an <h2> plus whatever nodes `build(container)`
@@ -89,6 +100,7 @@ export const guideStep = {
     getGuidedStatus,
     onStartGuided,
     onResumeGuided,
+    onRestartGuided,
     onExplainGuided,
   } = {}) {
     main.textContent = '';
@@ -98,20 +110,41 @@ export const guideStep = {
     heading.textContent = 'Guide';
     main.appendChild(heading);
 
-    const isExample = store.get().meta?.origin === 'example';
+    // isExampleOrigin (core/appController.js) accepts BOTH 'example' and
+    // 'template': openExampleStudy retags the opened example 'template' the
+    // moment it lands in the store, and nothing in the current app ever
+    // writes the older 'example' tag into a live store, so checking for
+    // 'example' alone would make Start permanently unreachable.
+    const isExample = isExampleOrigin(store.get().meta?.origin);
     const guideStatus = guideGuidedStatus(guidedStatus, getGuidedStatus);
-    const guideAction = isExample && guideStatus === 'paused'
-      ? { label: 'Resume example walkthrough', callback: onResumeGuided }
-      : isExample && guideStatus === 'not-started'
-        ? { label: 'Start example walkthrough', callback: onStartGuided }
-        : { label: 'Explain the workflow', callback: onExplainGuided };
+    const guideAction = guideStatus === 'paused'
+      ? {
+          label: 'Resume example walkthrough',
+          callback: onResumeGuided,
+          title: 'Resume the optional seven-step example walkthrough without changing this study.',
+        }
+      : guideStatus === 'completed'
+        ? {
+            label: 'Restart example walkthrough',
+            callback: onRestartGuided,
+            title: 'Restart the optional seven-step example walkthrough from its first step.',
+          }
+        : isExample && guideStatus === 'not-started'
+          ? {
+              label: 'Start example walkthrough',
+              callback: onStartGuided,
+              title: 'Open the optional seven-step example walkthrough without changing this study.',
+            }
+          : {
+              label: 'Explain the workflow',
+              callback: onExplainGuided,
+              title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+            };
     const guideButton = document.createElement('button');
     guideButton.type = 'button';
     guideButton.className = 'copy-button guide-tour-button';
     guideButton.textContent = guideAction.label;
-    guideButton.title = isExample
-      ? 'Open the optional seven-step example walkthrough without changing this study.'
-      : 'Open a contextual explanation without changing your study or walkthrough progress.';
+    guideButton.title = guideAction.title;
     guideButton.addEventListener('click', () => {
       if (typeof guideAction.callback === 'function') guideAction.callback('guide');
     });
@@ -266,8 +299,9 @@ export const guideStep = {
           c,
           'Your work is autosaved in this browser, so a refresh restores it. Local storage is a ' +
             'convenience, not a safe record — it can be cleared by the browser, is not shared ' +
-            'between machines, and is lost in private/incognito windows. To keep a copy, use the ' +
-            'Download buttons on the Review step.'
+            'between machines, and is lost in private/incognito windows. To keep a restorable ' +
+            'copy, use “Project backup (.micronaut.json, importable)” on the Settings step — ' +
+            'Review’s downloads are reports for reading, not files you can import back in.'
         );
       })
     );
@@ -285,8 +319,10 @@ export const guideStep = {
           c,
           'Found something wrong, or missing? Use “Copy feedback report” in the header — it copies ' +
             'the current step, your browser, and your full study as text, ready to paste into an ' +
-            'email or a GitHub issue. “GitHub issue” next to it opens a prefilled issue with the ' +
-            'same report already in the body. Neither ever sends anything on its own.'
+            'email or a GitHub issue. “Open GitHub issue” next to it copies that same report, then ' +
+            'opens GitHub’s new-issue page labeled feedback — the link itself carries no feedback, ' +
+            'browser details, or study data, so paste the copied report into the issue yourself. ' +
+            'Neither ever sends anything on its own.'
         );
       })
     );

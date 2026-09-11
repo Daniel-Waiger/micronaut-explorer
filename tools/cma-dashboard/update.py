@@ -104,42 +104,65 @@ def _sync_html(state: dict) -> bool:
     return True
 
 
-def _phase_map_from_batches(graph: dict) -> dict[str, str]:
-    """Map task id -> "Batch N" from a task graph's `batches` array, when it
-    has one. Falls back to each task's own `phase` field otherwise."""
-    mapping: dict[str, str] = {}
+def _batch_maps_from_graph(graph: dict) -> tuple[dict[str, str], dict[str, int]]:
+    """Map task id -> "Batch N" (for `phase`) and task id -> N (1-based,
+    for layout) from a task graph's `batches` array, when it has one. Both
+    maps are empty for a graph with no `batches`, which callers must treat
+    as "no batch info" rather than an error."""
+    phase_map: dict[str, str] = {}
+    batch_map: dict[str, int] = {}
     for index, batch in enumerate(graph.get("batches") or [], start=1):
-        for task_id in batch:
-            mapping[task_id] = f"Batch {index}"
-    return mapping
+        # A batch entry is either a bare list of task ids or an object that
+        # carries them under `tasks` -- both shapes occur in real task graphs,
+        # and guessing wrong must not invent phantom ids or raise.
+        ids = batch.get("tasks") if isinstance(batch, dict) else batch
+        if not isinstance(ids, list):
+            continue
+        for task_id in ids:
+            if not isinstance(task_id, str):
+                continue
+            phase_map[task_id] = f"Batch {index}"
+            batch_map[task_id] = index
+    return phase_map, batch_map
 
 
 def _tasks_from_graph(path: Path) -> list[dict]:
     """Import tasks from a plan task-graph JSON.
 
     Reads only the fields every task graph in this scheme carries (id, title,
-    and either a `batches` array or a per-task `phase`), so it works across
-    differently-shaped graphs without per-run adaptation -- which is the
-    entire reason this flag exists.
+    and either a `batches` array or a per-task `phase`), plus -- when
+    present -- each task's `depends_on` edges and its batch index, so it
+    works across differently-shaped graphs without per-run adaptation --
+    which is the entire reason this flag exists. A graph with no
+    `depends_on`, no `batches`, or a `depends_on` entry naming an id this
+    graph doesn't have is tolerated: those just yield no edges / no batch,
+    never a crash.
     """
     graph = json.loads(path.read_text(encoding="utf-8"))
     raw_tasks = graph.get("tasks")
     if not isinstance(raw_tasks, list) or not raw_tasks:
         raise SystemExit(f"{path}: no 'tasks' array found")
 
-    batch_of = _phase_map_from_batches(graph)
+    phase_of, batch_of = _batch_maps_from_graph(graph)
+    known_ids = {entry.get("id") for entry in raw_tasks if entry.get("id")}
     tasks = []
     for entry in raw_tasks:
         task_id = entry.get("id")
         if not task_id:
             continue
+        depends_on = entry.get("depends_on")
+        if not isinstance(depends_on, list):
+            depends_on = []
+        edges = [d for d in depends_on if isinstance(d, str) and d in known_ids]
         tasks.append(
             {
                 "id": task_id,
-                "phase": batch_of.get(task_id) or entry.get("phase") or "Tasks",
+                "phase": phase_of.get(task_id) or entry.get("phase") or "Tasks",
                 "title": entry.get("title", ""),
                 "status": "pending",
                 "by": "queued",
+                "depends_on": edges,
+                "batch": batch_of.get(task_id),
             }
         )
     if not tasks:

@@ -179,7 +179,7 @@ acceptance, run:
 node --test web/tests/*.test.js
 python -m pytest -q tests/test_single_file_build.py tests/test_kb_json_valid.py tests/test_regex_conformance.py
 python tools/build_single_file.py --web-dir web --out dist
-python tools/serve_dir.py --dir dist --port 8124
+PORT=8124 python tools/serve_dir.py dist
 ```
 
 Use the built artifact served over HTTP for the live traces. Do not trust a

@@ -23,8 +23,25 @@ identically from `file://`, a local server, or GitHub Pages.
 
 ## What it does today
 
-The planner has three workspaces plus a review. They are things a study *has*,
-not steps to march through — jump to any of them in any order:
+The planner is organized as a hierarchy, not a step count — these are things a
+study *has*, not steps to march through, so jump to any of them in any order:
+
+```text
+Study
+├── Study Map: question, system, comparison, experimental unit
+├── Research Brief: study-wide narrative
+├── Measurements registry
+│   └── Measurement
+│       ├── Samples & design
+│       ├── Acquisition
+│       └── Data plan
+└── Review: whole-study synthesis and exports
+
+Utilities
+├── Guide / walkthrough
+├── Backup, restore, and settings
+└── Feedback
+```
 
 - **Study map** — the shape of the study: the research question, the system or
   material, whether you're comparing groups or observing, and what counts as one
@@ -37,30 +54,31 @@ not steps to march through — jump to any of them in any order:
   marker aliases from the dictionary, biological-replicate counts, magnification,
   and unambiguous ISO dates. Everything else remains saved narrative unless the
   researcher explicitly reviews and accepts a suggestion.
-- **Measurements** — a registry of the observations or analyses used to answer the
-  study question: search it, filter by status or modality, and open one to plan it.
-  A measurement is one observation or analysis; some disciplines call it an assay.
-  Each row carries one status — **Draft**, **Needs a decision**, or **Ready to
-  acquire**. "Ready" means the planner's own checks are satisfied; it never claims
-  the experiment is correct, powered, or approved.
-- **A measurement's own page** — opening a row gives you that measurement's whole
-  plan on one scroll, because these three decide each other:
+- **Measurements registry** — a registry of the observations or analyses used to
+  answer the study question: search it, filter by status or modality, and open one
+  to plan it. A measurement is one observation or analysis; some disciplines call
+  it an assay. Each row shows a single headline badge drawn from three
+  independently scoped statuses — definition, plan, and export conformance — never
+  one collapsed word; see [docs/plans/status-scopes.md](docs/plans/status-scopes.md)
+  for the full model.
+- **Measurement** — opening a row gives you that measurement's whole plan on one
+  scroll, because these three decide each other:
   - *Samples & design* — groups, replication, and the conditions they generate.
   - *Acquisition* — modality, panel, and readouts/controls, with modality-specific
     advice (STED / confocal / widefield / light-sheet / SEM-TEM / Raman) from a
-    rules knowledge base (`web/kb/advisor.json`).
+    rules knowledge base (`web/kb/advisor.json`), plus the **Color panel**: a
+    qualitative spectral-spillover advisor over the measurement's fluorophores
+    (excitation/emission peak-proximity flags, not a spectral-overlap integral;
+    content is Claude-drafted and flagged unreviewed in `web/kb/spectra.json`). An
+    optional structured panel editor lets you name each channel's target and
+    conjugation mode (direct antibody / indirect / genetically encoded / a
+    direct-binding probe / self-labeling tag) — the fact-precise alternative to the
+    free-text markers field, and what lets the controls engine tell whether an
+    antibody is actually involved.
   - *Data plan* — the filename convention built from the finished design, reusing
     Classic's naming/validation logic ported to JS, plus a one-click **Download
     schedule (.ics)** export of the measurement's timing (built from the same
     timing interview) that imports into any calendar app.
-- **Color panel** — a qualitative spectral-spillover advisor over the active measurement's
-  fluorophores: excitation/emission peak-proximity flags, not a spectral-overlap
-  integral. Content is Claude-drafted and flagged unreviewed (`web/kb/spectra.json`).
-  An optional structured panel editor below it lets you name each channel's target
-  and conjugation mode (direct antibody / indirect / genetically encoded / a
-  direct-binding probe / self-labeling tag) — the fact-precise alternative to the
-  free-text markers field, and what lets the controls engine tell whether an
-  antibody is actually involved.
 - **Review** — a shareable study diagram, a conformance check (one pass/fail
   verdict composed from every validator the app already runs), a deterministic
   walkthrough, a staged progression ladder (idea → advanced modality), and
@@ -68,15 +86,20 @@ not steps to march through — jump to any of them in any order:
   dump, a per-measurement print-oriented bench card, and a separate **Copy prompt for
   your own LLM** action (+ the study as JSON) for discussing the finished plan
   in whatever LLM you already use.
-- **Guide** — an in-app user guide, always in the step nav.
 
-A **Feedback** page collects what you were doing, the current page, browser
-details, and your full study into one package you can copy, download, or take
-to a GitHub issue. The GitHub issue path pre-applies the `feedback` label
-(GitHub's new-issue form reads it from the link's own query string), so
-feedback opened from the app is one filterable group inside the repo — no
-server or credential involved. Nothing is sent anywhere unless you choose one
-of those actions.
+### Utilities
+
+- **Guide / walkthrough** — an in-app user guide, plus a deterministic guided
+  walkthrough over the shipped example study; always in the step nav.
+- **Backup, restore, and settings** — export or import a project backup, and clear
+  locally stored data.
+- **Feedback** — a page that collects what you were doing, the current page,
+  browser details, and your full study into one package you can copy, download, or
+  take to a GitHub issue. The GitHub issue path pre-applies the `feedback` label
+  (GitHub's new-issue form reads it from the link's own query string), so feedback
+  opened from the app is one filterable group inside the repo — no server or
+  credential involved. Nothing is sent anywhere unless you choose one of those
+  actions.
 
 ## Screenshots
 
@@ -100,20 +123,22 @@ Regenerate them with `python3 tools/capture_screenshots.py`.
 nothing a model produces is read back into your study. There is no API key, no
 endpoint to configure, and no network request.
 
-Two things use a model's help, both one-way:
+Only one thing in the app touches a language model at all, and it is one-way
+and entirely external to the app:
 
-- **Research brief review** is a deterministic exact-text scan of your saved
-  description. It recognises marker aliases from the dictionary, biological
-  replicate counts, magnification, and unambiguous ISO dates — and nothing else.
-  Each suggestion quotes the exact text it matched, and no field is written until
-  you choose **Accept suggestion** or **Replace current value**. Everything the
-  scan did not match stays narrative; the app never claims to have understood
-  your whole description.
 - **Review → Copy prompt for your own LLM** hands you a block to paste into
   whatever model you already use: ground rules that keep it from inventing a
   marker or a setting, your study as JSON, the decisions Micronaut can tell you
   have not been made yet, and questions worth asking. You read the reply and act
-  on it yourself.
+  on it yourself — nothing it produces is parsed back into the study.
+
+Everything else is deterministic, including **Research brief review**, which is
+a plain exact-text scan of your saved description. It recognises marker aliases
+from the dictionary, biological-replicate counts, magnification, and unambiguous
+ISO dates — and nothing else. Each suggestion quotes the exact text it matched,
+and no field is written until you choose **Accept suggestion** or **Replace
+current value**. Everything the scan did not match stays narrative; the app
+never claims to have understood your whole description.
 
 Earlier versions could call a local Ollama endpoint and parse a pasted model
 reply back into study fields. That path is gone. It only worked for people who

@@ -33,7 +33,17 @@ function readRing(storage) {
 }
 
 function defaultBackend() {
-  return typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined;
+  // Privacy-mode browsers can make globalThis.localStorage THROW on access
+  // (not merely return undefined), and this is a default parameter of every
+  // exported function below -- it runs before any internal try/catch, so an
+  // unguarded read here would escape past all of them and white-screen the
+  // app at startup. Pattern mirrors core/guidedProgress.js's
+  // guidedProgressBackend().
+  try {
+    return typeof globalThis !== 'undefined' ? globalThis.localStorage : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function readJSON(storage, key, fallback) {
@@ -60,12 +70,20 @@ function writeJSON(storage, key, value, onQuotaExceeded) {
   }
 }
 
+// Returns whether the key is actually gone. Callers that report success to a
+// user (clearAll -> main's "Cleared all locally stored data" toast) cannot
+// tell a real deletion from a suppressed failure otherwise -- removeItem can
+// throw on a backend this module does not control, and a silently swallowed
+// throw is how "all your data is cleared" gets said over data that is still
+// there.
 function removeKey(storage, key, onQuotaExceeded) {
-  if (!storage) return;
+  if (!storage) return false;
   try {
     storage.removeItem(key);
+    return true;
   } catch (err) {
     if (onQuotaExceeded) onQuotaExceeded(err);
+    return false;
   }
 }
 
@@ -205,21 +223,52 @@ export function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceed
  * an index-driven sweep and then be picked up by the next listSaved() -- a
  * "start over" that silently restores the old experiment is worse than none.
  * Foreign keys sharing the same storage are left untouched.
+ *
+ * Returns an explicit result -- { ok, removed, error } -- instead of
+ * undefined: storage.length/storage.key(i) below are unguarded reads into a
+ * backend this module does not control (a privacy-mode browser, a hostile or
+ * incomplete Storage shim), and a caller that cannot tell "actually cleared"
+ * from "silently did nothing" has no honest way to report success to the
+ * user. `removed` lists the STORAGE_PREFIX keys this call attempted to
+ * delete (empty on failure); `error` is the caught exception on failure,
+ * otherwise null.
  */
 export function clearAll({ storage = defaultBackend(), onQuotaExceeded } = {}) {
-  if (!storage) return;
+  if (!storage) {
+    return { ok: false, removed: [], error: new Error('No storage backend is available.') };
+  }
   const doomed = [];
-  for (let i = 0; i < storage.length; i += 1) {
-    const key = storage.key(i);
-    if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX)) {
-      doomed.push(key);
+  try {
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i);
+      if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX)) {
+        doomed.push(key);
+      }
     }
+  } catch (err) {
+    return { ok: false, removed: [], error: err };
   }
   // Collect first, delete second: removing while iterating by index reindexes
   // the remaining keys and silently skips every other one.
+  //
+  // Keep going after a failed delete rather than bailing on the first one: a
+  // partial clear is still worth completing, and `removed` then reports what
+  // genuinely went. `ok` is false if ANY key survived, so a caller can never
+  // announce a clear that did not happen.
+  const removed = [];
+  const failed = [];
   for (const key of doomed) {
-    removeKey(storage, key, onQuotaExceeded);
+    if (removeKey(storage, key, onQuotaExceeded)) removed.push(key);
+    else failed.push(key);
   }
+  if (failed.length > 0) {
+    return {
+      ok: false,
+      removed,
+      error: new Error(`Could not remove ${failed.length} stored key(s): ${failed.join(', ')}`),
+    };
+  }
+  return { ok: true, removed, error: null };
 }
 
 export function markChanged({ storage = defaultBackend(), onQuotaExceeded } = {}) {

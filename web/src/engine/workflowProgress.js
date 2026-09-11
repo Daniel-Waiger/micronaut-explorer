@@ -6,8 +6,10 @@
 
 import { assayView } from '../core/assay.js';
 import { conditionIssues } from './conditions.js';
+import { decisionTriage } from './decisionTriage.js';
 import { buildExperimentMap } from './experimentMap.js';
 import { phaseQuestions } from './interview.js';
+import { measurementStatus } from './measurementStatus.js';
 
 // Nouns, not steps. The nav used to list seven workspaces in a fixed order,
 // which read as a seven-part exam a researcher could be failing at any moment.
@@ -117,6 +119,13 @@ function anyAssayHasGroups(assays) {
 function studyProgress(experiment, conformance, assays) {
   const hasResearchQuestion = hasValue(experiment && experiment.researchQuestion);
   const hasGroups = anyAssayHasGroups(assays);
+  // An explicit observational choice makes an empty group axis intentional
+  // (see core/schema.js's STUDY_COMPARISON_MODES comment), so only require
+  // group levels when the study has NOT explicitly opted out of them. The
+  // 'not-decided' default is deliberately left requiring groups, exactly as
+  // before this gate existed.
+  const comparisonMode = experiment && experiment.studyContext && experiment.studyContext.comparisonMode;
+  const groupsSatisfied = comparisonMode === 'observational' ? true : hasGroups;
   const allAssaysHaveContent = assays.length > 0 && assays.every(hasAssayContent);
   const crossAssayIssues = Array.isArray(conformance && conformance.crossAssayIssues)
     ? conformance.crossAssayIssues
@@ -126,7 +135,7 @@ function studyProgress(experiment, conformance, assays) {
   // so consume its existing output rather than rerunning studyNameIssues or
   // trying to reinterpret severities here.
   if (crossAssayIssues.length > 0) return 'needs-attention';
-  if (hasResearchQuestion && hasGroups && allAssaysHaveContent) return 'complete';
+  if (hasResearchQuestion && groupsSatisfied && allAssaysHaveContent) return 'complete';
   if (hasResearchQuestion || hasGroups || assays.some(hasAssayContent)) return 'in-progress';
   return 'not-started';
 }
@@ -173,10 +182,22 @@ function reportForAssay(conformance, assayId) {
  * contribute to the summary. Per-assay `overview` consumes conformance's
  * `readiness` verbatim, and the study Overview mirrors the whole-study
  * readiness verbatim.
+ *
+ * This is also the one place each measurement's scoped status record is
+ * computed: `decisionTriage(map, conformance)` runs exactly once here, and
+ * each per-assay entry's `status` field is `measurementStatus(...)` for that
+ * assay's `map.measurements` entry, given that shared triage and the same
+ * conformance report. Consumers (the switcher pill, the Measurements
+ * registry, the Measurement header) must read `assays[i].status` rather than
+ * re-running `checkConformance` or `decisionTriage` per render.
  */
 export function deriveWorkflowProgress(experiment, conformance, questions = []) {
   const exp = experiment && typeof experiment === 'object' ? experiment : {};
   const map = buildExperimentMap(exp, { conformance });
+  const triage = decisionTriage(map, conformance);
+  const measurementsById = new Map(
+    (Array.isArray(map.measurements) ? map.measurements : []).map((measurement) => [measurement.id, measurement])
+  );
   const assays = Array.isArray(exp.assays) ? exp.assays : [];
   const perAssay = assays.map((assay, index) => {
     const view = assayView(exp, assay && assay.id);
@@ -193,12 +214,19 @@ export function deriveWorkflowProgress(experiment, conformance, questions = []) 
     // guided walkthrough and the per-assay tree still speak about them by name.
     const measurement = { state: aggregate([design.state, microscopy.state, naming.state]) };
 
+    // `status` is the scoped { definition, plan, conformance } record for
+    // this assay's own map measurement. An assay id absent from the map (it
+    // should always be present, but this module is total) still gets
+    // measurementStatus's all-lowest fallback record rather than throwing.
+    const status = measurementStatus(measurementsById.get(assay && assay.id), { decisions: triage, conformance });
+
     return {
       id: assay && assay.id,
       label: (assay && assay.label) || `Assay ${index + 1}`,
       readiness: report && report.readiness,
       steps: { project, design, microscopy, naming, measurement, overview },
       state: aggregate([project.state, design.state, microscopy.state, naming.state, overview.state]),
+      status,
     };
   });
 

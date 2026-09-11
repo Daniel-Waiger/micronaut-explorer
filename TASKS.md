@@ -1,6 +1,6 @@
 # Open tasks — Micronaut Planner
 
-Last updated: 2026-09-03
+Last updated: 2026-09-10
 
 > Near-term worklist. `ROADMAP.md` holds the long-range "why"; authoritative
 > scope for any listed item lives in its plan doc under `docs/plans/`.
@@ -72,8 +72,13 @@ already know are open, so a model reviews the real gaps.
 Ten routes became five plus three utilities. Samples & design, Acquisition and
 Data plan are sections of one measurement page — composed from the existing step
 objects, not rewritten. Measurements became a searchable registry. The research
-question has one owner again (the Study map). One status vocabulary reaches the
-user: **Draft · Needs a decision · Ready to acquire**.
+question has one owner again (the Study map). Measurement status is no longer
+one overloaded three-word vocabulary — it's three independently scoped axes
+(definition, plan, export conformance), each with its own statuses; a
+headline badge shows whichever axis isn't yet at its top status, and **Ready
+to acquire** now names only the plan axis's top status. See
+[docs/plans/status-scopes.md](docs/plans/status-scopes.md) for the full
+model.
 
 Old `#/design`, `#/panel`, `#/naming` links still resolve.
 

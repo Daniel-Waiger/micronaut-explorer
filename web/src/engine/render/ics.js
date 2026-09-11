@@ -79,27 +79,42 @@ function icsEvent(event, now) {
  * time" are different facts and must not collapse into the same output.
  *
  * Mounting and acquisition are PER-SAMPLE ETAs (the question bank's own
- * wording): each is multiplied by `sampleCount` into one combined block --
- * a calendar app gains nothing from 40 separate 10-minute mounting events
- * where "about 6.5 hours of mounting" says the same thing more usefully.
- * `sampleCount` is clamped to at least 1 so a design with zero planned
- * conditions (an unanswered/broken design, per engine/plan.js) still
- * produces one worked block instead of a schedule that silently vanishes.
+ * wording), but they do NOT scale by the same count. Mounting is a physical-
+ * slide operation: it happens once per physical SAMPLE, so it is multiplied
+ * by `sampleCount`. Acquisition is a repeat MEASUREMENT of that same mounted
+ * sample -- a technical replicate, by definition, re-acquires without
+ * re-mounting (web/kb/questions.json's technicalReplicates question) -- so it
+ * is multiplied by `acquisitionRunCount`, which defaults to `sampleCount` when
+ * the caller doesn't distinguish the two (every existing caller/test). Each
+ * total becomes one combined block -- a calendar app gains nothing from 40
+ * separate 10-minute mounting events where "about 6.5 hours of mounting" says
+ * the same thing more usefully. Both counts are independently clamped to at
+ * least 1 so a design with zero planned conditions (an unanswered/broken
+ * design, per engine/plan.js) still produces one worked block instead of a
+ * schedule that silently vanishes.
  *
  * Pure, deterministic: returns `{uid, summary, description, start, minutes}`
  * objects, not iCalendar text -- renderIcs (below) is the one place that
  * text format is produced, so a future second consumer (the deferred Google
  * Calendar sync) can build its own events from the exact same list.
  */
-export function buildIcsSchedule({ assayLabel, timing, sampleCount, startDate }) {
+export function buildIcsSchedule({
+  assayLabel,
+  timing,
+  sampleCount,
+  acquisitionRunCount = sampleCount,
+  startDate,
+}) {
   const t = timing && typeof timing === 'object' ? timing : {};
-  const count = Number.isFinite(sampleCount) && sampleCount > 0 ? Math.floor(sampleCount) : 1;
+  const clampCount = (value) => (Number.isFinite(value) && value > 0 ? Math.floor(value) : 1);
+  const count = clampCount(sampleCount);
+  const runCount = clampCount(acquisitionRunCount);
   const label = typeof assayLabel === 'string' && assayLabel.trim() ? assayLabel.trim() : 'This assay';
   const start = startDate instanceof Date && !Number.isNaN(startDate.getTime()) ? startDate : new Date();
 
-  const perSample = (minutesPerSample) =>
-    typeof minutesPerSample === 'number' && Number.isFinite(minutesPerSample) && minutesPerSample > 0
-      ? minutesPerSample * count
+  const scaledMinutes = (minutesPerUnit, units) =>
+    typeof minutesPerUnit === 'number' && Number.isFinite(minutesPerUnit) && minutesPerUnit > 0
+      ? minutesPerUnit * units
       : null;
 
   const stagesInOrder = [
@@ -111,15 +126,15 @@ export function buildIcsSchedule({ assayLabel, timing, sampleCount, startDate })
     },
     {
       key: 'mounting',
-      minutes: perSample(t.etaMountingMinutes),
+      minutes: scaledMinutes(t.etaMountingMinutes, count),
       summary: `${label}: Mounting (${count} sample${count === 1 ? '' : 's'})`,
       description: `Mounting, ${t.etaMountingMinutes} min/sample × ${count} sample(s).`,
     },
     {
       key: 'acquisition',
-      minutes: perSample(t.etaAcquisitionMinutes),
-      summary: `${label}: Microscope acquisition (${count} sample${count === 1 ? '' : 's'})`,
-      description: `Acquisition, ${t.etaAcquisitionMinutes} min/sample × ${count} sample(s).`,
+      minutes: scaledMinutes(t.etaAcquisitionMinutes, runCount),
+      summary: `${label}: Microscope acquisition (${runCount} run${runCount === 1 ? '' : 's'})`,
+      description: `Acquisition, ${t.etaAcquisitionMinutes} min/run × ${runCount} run(s).`,
     },
     {
       key: 'analysis',

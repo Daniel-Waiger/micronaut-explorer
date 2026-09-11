@@ -1,94 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fluorophorePickerCreate } from '../src/ui/fluorophorePicker.js';
-
-class FluorophorePickerFakeClassList {
-  constructor(element) {
-    this.element = element;
-  }
-
-  contains(name) {
-    return (this.element.className || '').split(/\s+/).filter(Boolean).includes(name);
-  }
-}
-
-class FluorophorePickerFakeElement {
-  constructor(name, ownerDocument) {
-    this.localName = name;
-    this.ownerDocument = ownerDocument;
-    this.children = [];
-    this.attributes = new Map();
-    this.listeners = new Map();
-    this.className = '';
-    this.classList = new FluorophorePickerFakeClassList(this);
-    this.hidden = false;
-    this.value = '';
-    this._text = '';
-  }
-
-  set textContent(value) {
-    this._text = String(value ?? '');
-    this.children = [];
-  }
-
-  get textContent() {
-    return this._text + this.children.map((child) => child.textContent).join('');
-  }
-
-  appendChild(child) {
-    this.children.push(child);
-    return child;
-  }
-
-  setAttribute(name, value) {
-    this.attributes.set(name, String(value));
-  }
-
-  getAttribute(name) {
-    return this.attributes.has(name) ? this.attributes.get(name) : null;
-  }
-
-  addEventListener(type, handler) {
-    const handlers = this.listeners.get(type) || [];
-    handlers.push(handler);
-    this.listeners.set(type, handlers);
-  }
-
-  dispatch(type) {
-    for (const handler of this.listeners.get(type) || []) handler({ type });
-  }
-
-  focus() {
-    this.ownerDocument.activeElement = this;
-  }
-
-  querySelector(selector) {
-    return this.querySelectorAll(selector)[0] || null;
-  }
-
-  querySelectorAll(selector) {
-    const results = [];
-    const className = selector.startsWith('.') ? selector.slice(1) : null;
-    const visit = (element) => {
-      for (const child of element.children) {
-        if (className ? child.classList.contains(className) : child.localName === selector) results.push(child);
-        visit(child);
-      }
-    };
-    visit(this);
-    return results;
-  }
-}
-
-class FluorophorePickerFakeDocument {
-  constructor() {
-    this.activeElement = null;
-  }
-
-  createElement(name) {
-    return new FluorophorePickerFakeElement(name, this);
-  }
-}
+import { createDomStub } from './domStub.js';
 
 const fluorophorePickerOptions = [
   { value: 'ALEXA488', label: 'ALEXA488 — Ex 495 / Em 519 nm' },
@@ -96,13 +9,12 @@ const fluorophorePickerOptions = [
 ];
 
 function withFluorophorePickerDocument(callback) {
-  const originalDocument = globalThis.document;
-  const fakeDocument = new FluorophorePickerFakeDocument();
-  globalThis.document = fakeDocument;
+  const { document: fakeDocument, install, restore } = createDomStub();
+  install();
   try {
     callback(fakeDocument);
   } finally {
-    globalThis.document = originalDocument;
+    restore();
   }
 }
 

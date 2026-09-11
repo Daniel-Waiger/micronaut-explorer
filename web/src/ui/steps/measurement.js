@@ -16,11 +16,21 @@
 //
 // The steps stay independently renderable, which is what keeps this a
 // composition: any of them can still be mounted alone.
+//
+// The header (including its status badges) is a render-time snapshot: it is
+// built once from `options.workflowProgress` when this page renders and does
+// not update itself afterward. The embedded sub-steps below it re-render
+// themselves on their own store subscriptions, so the header can go stale
+// relative to them -- pre-existing behaviour, not introduced by this module.
 
 import { designStep } from './design.js';
 import { assayView } from '../../core/assay.js';
-import { buildExperimentMap } from '../../engine/experimentMap.js';
-import { measurementStatus, measurementStatusLabel } from '../../engine/measurementStatus.js';
+import {
+  measurementStatus,
+  measurementStatusLabel,
+  MEASUREMENT_STATUS_SCOPES,
+  MEASUREMENT_STATUS_TONES,
+} from '../../engine/measurementStatus.js';
 
 const MEASUREMENT_SECTIONS = Object.freeze([
   Object.freeze({ id: 'measurement-section-design', label: 'Samples & design' }),
@@ -38,13 +48,15 @@ function activeMeasurement(experiment) {
   };
 }
 
-function appendStatusBadge(parent, status) {
+function appendStatusBadge(parent, scope, status) {
   const badge = document.createElement('span');
   // State is carried by the text itself, not only by the colour the dataset
   // attribute selects -- the same rule the rest of the app follows.
   badge.className = 'measurement-status-badge';
+  badge.dataset.scope = scope;
   badge.dataset.status = status;
-  badge.textContent = measurementStatusLabel(status);
+  badge.dataset.tone = (MEASUREMENT_STATUS_TONES[scope] && MEASUREMENT_STATUS_TONES[scope][status]) || 'neutral';
+  badge.textContent = measurementStatusLabel(scope, status);
   parent.appendChild(badge);
   return badge;
 }
@@ -109,10 +121,17 @@ export function createMeasurementStep({ panelStep, namingStep }) {
         return;
       }
 
-      const map = buildExperimentMap(experiment);
-      const mapped = (Array.isArray(map.measurements) ? map.measurements : [])
-        .find((measurement) => measurement && measurement.id === assay.id);
-      appendStatusBadge(header, measurementStatus(mapped));
+      const progressAssays = Array.isArray(options.workflowProgress?.assays)
+        ? options.workflowProgress.assays
+        : [];
+      const status = progressAssays.find((entry) => entry && entry.id === assay.id)?.status
+        || measurementStatus(null);
+      const statusGroup = document.createElement('div');
+      statusGroup.className = 'measurement-status-group';
+      for (const scope of MEASUREMENT_STATUS_SCOPES) {
+        appendStatusBadge(statusGroup, scope, status[scope]);
+      }
+      header.appendChild(statusGroup);
 
       const view = assayView(experiment, assay.id);
       const readout = typeof view.readoutText === 'string' && view.readoutText.trim()

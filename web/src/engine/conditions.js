@@ -79,8 +79,17 @@ function effectiveReplicateCount(raw) {
   return 1; // an explicit-but-invalid value still expands (as 1 row); flagged separately
 }
 
-/** Total row count a design would expand to, without building any rows. */
-function plannedRowCount(design) {
+/**
+ * Total row count a design would expand to, without building any rows.
+ *
+ * `{ includeTechnicalReplicates }` (default true) controls whether the
+ * technical-replicate axis is folded into the total. A technical replicate is
+ * a repeat MEASUREMENT of the same physical sample (web/kb/questions.json's
+ * timing/technicalReplicates question), not a second physical specimen -- so
+ * counting it multiplies FILES/acquisition runs, not physical samples. See
+ * physicalSampleCount below for the samples-only total.
+ */
+function plannedRowCount(design, { includeTechnicalReplicates = true } = {}) {
   const factors = factorsOf(design);
   const groupLevels = groupLevelsOf(design);
   let total = Math.max(groupLevels.length, 1); // 0 group levels -> a design with no groups defined yet
@@ -88,8 +97,27 @@ function plannedRowCount(design) {
     total *= levelsOf(factor).length;
   }
   total *= effectiveReplicateCount(design && design.biologicalReplicates) ?? 1;
-  total *= effectiveReplicateCount(design && design.technicalReplicates) ?? 1;
+  if (includeTechnicalReplicates) {
+    total *= effectiveReplicateCount(design && design.technicalReplicates) ?? 1;
+  }
   return total;
+}
+
+/**
+ * Total PHYSICAL SAMPLE count a design implies: groups x factors x
+ * biological replicates, deliberately EXCLUDING the technical-replicate axis.
+ * A technical replicate is a repeat measurement of the same physical sample,
+ * not a second one -- so this is the count a bench operation that touches
+ * the physical specimen (e.g. mounting a slide) should scale by, as opposed
+ * to `planFilenames(...).length` / plannedRowCount's full row count, which
+ * also counts repeat acquisitions of that same sample.
+ *
+ * Total on malformed/absent design input, like its sibling plannedRowCount:
+ * never throws, degrades via the same factorsOf/groupLevelsOf/
+ * effectiveReplicateCount guards.
+ */
+export function physicalSampleCount(design) {
+  return plannedRowCount(design, { includeTechnicalReplicates: false });
 }
 
 /** Extract the `{token}` names referenced by a template string, in order. */

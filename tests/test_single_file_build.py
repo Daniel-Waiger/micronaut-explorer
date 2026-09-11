@@ -343,10 +343,10 @@ def test_real_web_index_html_has_all_three_marker_pairs() -> None:
         assert f"<!-- /BUILD:{marker} -->" in real_index
 
 
-def test_real_web_build_succeeds() -> None:
-    output = build(ROOT / "web", ROOT / "dist")
+def test_real_web_build_succeeds(tmp_path: Path) -> None:
+    output = build(ROOT / "web", tmp_path / "dist")
     assert len(output) > 0
-    assert (ROOT / "dist" / "index.html").exists()
+    assert (tmp_path / "dist" / "index.html").exists()
 
 
 def test_script_imports_only_stdlib() -> None:
@@ -450,10 +450,10 @@ def test_network_words_in_comments_do_not_false_positive(tmp_path: Path) -> None
     assert "const FOO = 1;" in output
 
 
-def test_real_web_source_has_no_network_primitives() -> None:
+def test_real_web_source_has_no_network_primitives(tmp_path: Path) -> None:
     """The actual app must currently pass the new gate (not just the
     synthetic fixtures above)."""
-    output = build(ROOT / "web", ROOT / "dist")
+    output = build(ROOT / "web", tmp_path / "dist")
     assert len(output) > 0
 
 
@@ -488,11 +488,11 @@ def test_missing_release_notes_folder_does_not_fail_the_build(tmp_path: Path) ->
     assert not (out_dir / "release-notes").exists()
 
 
-def test_real_web_release_notes_folder_is_copied_into_dist() -> None:
+def test_real_web_release_notes_folder_is_copied_into_dist(tmp_path: Path) -> None:
     """The actual app's dist/ output must carry the real release-notes/
     folder, not just a synthetic one."""
-    build(ROOT / "web", ROOT / "dist")
-    assert (ROOT / "dist" / "release-notes" / "index.html").exists()
+    build(ROOT / "web", tmp_path / "dist")
+    assert (tmp_path / "dist" / "release-notes" / "index.html").exists()
 
 
 def _write_release_notes_fixture(
@@ -597,12 +597,12 @@ def test_missing_manual_folder_does_not_fail_the_build(tmp_path: Path) -> None:
     assert not (out_dir / "manual").exists()
 
 
-def test_real_web_manual_folder_is_copied_into_dist() -> None:
+def test_real_web_manual_folder_is_copied_into_dist(tmp_path: Path) -> None:
     """The actual app's dist/ output must carry the real manual/ folder,
     including its manual.js, not just a synthetic one."""
-    build(ROOT / "web", ROOT / "dist")
-    assert (ROOT / "dist" / "manual" / "index.html").exists()
-    assert (ROOT / "dist" / "manual" / "manual.js").exists()
+    build(ROOT / "web", tmp_path / "dist")
+    assert (tmp_path / "dist" / "manual" / "index.html").exists()
+    assert (tmp_path / "dist" / "manual" / "manual.js").exists()
 
 
 def _write_manual_fixture(

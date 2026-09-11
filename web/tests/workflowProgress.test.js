@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { emptyExperiment } from '../src/core/schema.js';
 import { createDefaultStudy } from '../src/core/defaultStudy.js';
 import { checkConformance } from '../src/engine/conformance.js';
+import { decisionTriage } from '../src/engine/decisionTriage.js';
 import { buildExperimentMap } from '../src/engine/experimentMap.js';
+import { measurementStatus } from '../src/engine/measurementStatus.js';
 import { deriveWorkflowProgress, OPTIONAL_WORKFLOW, PRIMARY_WORKFLOW } from '../src/engine/workflowProgress.js';
 import { BASE_TEMPLATE, NAMING_CONFIG, realKb } from './fixtures.js';
 
@@ -110,7 +112,27 @@ test('Study-map progress follows orientation transitions, including observationa
   assert.equal(completed.map.comparison.mode, 'observational');
   assert.equal(completed.map.comparison.state, 'answered');
   assert.equal(primaryStep(completed, 'home').state, 'complete');
+  // An explicit observational study never has group levels by design, so the
+  // Measurements step must not be capped at in-progress waiting for an axis
+  // this study deliberately does not have.
+  assert.equal(primaryStep(completed, 'study').state, 'complete');
   assert.deepEqual(completed, progress(observational), 'Study-map progress must remain deterministic for the same completed data');
+});
+
+test('an observational study with no assay content is still in-progress, and a groups study with no levels never completes', () => {
+  const bareObservational = orient(emptyExperiment(), 'observational');
+  bareObservational.assays[0].label = '';
+  bareObservational.assays[0].readout = '';
+  bareObservational.assays[0].readoutText = '';
+  assert.equal(primaryStep(progress(bareObservational), 'study').state, 'in-progress');
+
+  const groupsNoLevels = orient(emptyExperiment(), 'groups');
+  groupsNoLevels.assays[0].design.groups.levels = [];
+  assert.notEqual(primaryStep(progress(groupsNoLevels), 'study').state, 'complete');
+
+  const notDecidedNoLevels = orient(emptyExperiment(), 'not-decided');
+  notDecidedNoLevels.assays[0].design.groups.levels = [];
+  assert.notEqual(primaryStep(progress(notDecidedNoLevels), 'study').state, 'complete');
 });
 
 test('Measurements progress keeps its existing study-wide content and cross-assay conformance behavior', () => {
@@ -198,10 +220,98 @@ test('a fully oriented, conformance-ready study reports both Study-map and Revie
   assert.equal(primaryStep(result, 'overview').readiness, 'ready');
 });
 
+test('a fully oriented, conformance-ready OBSERVATIONAL study reaches 5/5, with no group levels anywhere', () => {
+  const study = readyDefaultStudy();
+  study.studyContext = { ...study.studyContext, comparisonMode: 'observational' };
+  for (const assay of study.assays) {
+    // An observational study never has group levels; assays whose only
+    // design content was the seeded group axis need a different design fact
+    // (here biological replicates) so this test isolates the comparisonMode
+    // gate rather than accidentally re-requiring groups through design.
+    assay.design.groups.levels = [];
+    if (!Array.isArray(assay.design.factors) || assay.design.factors.length === 0) {
+      assay.design.biologicalReplicates = 3;
+    }
+    // readoutText and naming.fields.sample are seeded 'kb-default' (a weak
+    // tag), which phaseProgress does not count as confirmed; tag them 'user'
+    // so this fixture can reach every step, the same way the single-assay
+    // 'confirmed phase fields' test above does.
+    study.provenance.slots[`assay:${assay.id}.readoutText`] = { tag: 'user', detail: null };
+    study.provenance.slots[`assay:${assay.id}.naming.fields.sample`] = { tag: 'user', detail: null };
+  }
+
+  const result = progress(study);
+  assert.equal(result.map.comparison.mode, 'observational');
+  assert.equal(primaryStep(result, 'study').state, 'complete');
+  assert.equal(primaryStep(result, 'overview').state, 'complete');
+  assert.equal(result.summary.complete, 5);
+  assert.equal(result.summary.state, 'complete');
+});
+
 test('workflow progress is deterministic and total for malformed input', () => {
   assert.doesNotThrow(() => deriveWorkflowProgress(null, null, null));
   assert.deepEqual(
     deriveWorkflowProgress(null, null, null),
     deriveWorkflowProgress(null, null, null)
   );
+});
+
+test('deriveWorkflowProgress({}, { readiness: "ready", assays: [] }) does not throw', () => {
+  assert.doesNotThrow(() => deriveWorkflowProgress({}, { readiness: 'ready', assays: [] }));
+});
+
+// AUD-07: each per-assay `status` is wired straight from a single
+// decisionTriage(map, conformance) pass plus this assay's own
+// map.measurements entry -- these tests assert that WIRING, not a
+// reimplementation of measurementStatus's own rules (AUD-06 owns those).
+test("assays[i].status equals measurementStatus recomputed from decisionTriage(result.map, conformance) and this assay's own map measurement", () => {
+  const study = createDefaultStudy();
+  study.assays[0].design.groups.levels = ['CTL', 'OPP'];
+  const conformance = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const result = deriveWorkflowProgress(study, conformance, QUESTIONS);
+
+  assert.ok(result.assays.length > 0, 'sanity: fixture has assays to check');
+  const triage = decisionTriage(result.map, conformance);
+  const measurementsById = new Map(result.map.measurements.map((measurement) => [measurement.id, measurement]));
+  for (const assay of result.assays) {
+    const expected = measurementStatus(measurementsById.get(assay.id), { decisions: triage, conformance });
+    assert.deepEqual(assay.status, expected);
+  }
+});
+
+test('an assay whose id has no entry in map.measurements still gets measurementStatus\'s total fallback record', () => {
+  const study = createDefaultStudy();
+  // A blank id is exactly the case experimentMap.js's validAssays (:57-66)
+  // filters out of map.measurements entirely, while workflowProgress's own
+  // `assays` array (built straight from exp.assays) still carries it -- the
+  // real-world way an assay id can be absent from the map.
+  study.assays[0].id = '';
+  const conformance = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const result = deriveWorkflowProgress(study, conformance, QUESTIONS);
+
+  assert.equal(
+    result.map.measurements.some((measurement) => measurement.id === ''),
+    false,
+    'sanity: the map really has no entry for the blank id'
+  );
+  const triage = decisionTriage(result.map, conformance);
+  assert.deepEqual(result.assays[0].status, measurementStatus(undefined, { decisions: triage, conformance }));
+});
+
+test('regression-pin: adding assays[i].status leaves assays[i].state and summary unchanged', () => {
+  const study = createDefaultStudy();
+  const [valid, invalid] = study.assays;
+  valid.design.groups.levels = ['CTL', 'OPP'];
+  invalid.design.groups.levels = ['CTL', 'CTL'];
+
+  const result = progress(study);
+  assert.deepEqual(
+    result.assays.map((assay) => assay.state),
+    ['needs-attention', 'needs-attention', 'needs-attention', 'needs-attention']
+  );
+  assert.deepEqual(result.summary, { complete: 2, total: 5, state: 'needs-attention' });
+  for (const assay of result.assays) {
+    assert.equal(typeof assay.state, 'string', 'state stays the pre-existing string vocabulary');
+    assert.equal(typeof assay.status, 'object', 'status is the new, additive record');
+  }
 });
