@@ -3013,6 +3013,11 @@ td, th { border-color: var(--line); }
 .home-study-ownership-title { margin: 0; color: var(--ink); font-size: 16px; font-weight: 760; }
 .home-study-ownership-body { margin: 6px 0 0; color: var(--muted); }
 .home-study-ownership-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+/* .copy-button carries `margin-left: auto` for the toolbar rows it was built
+   for (a copy action pinned to the right of a header). Inside this panel the
+   button is the row's only, leading content, so that auto margin would park
+   it against the far edge away from the sentence it belongs to. */
+.home-study-ownership-actions .copy-button { margin-left: 0; }
 
 .field-confirmation-state {
   display: inline-flex;

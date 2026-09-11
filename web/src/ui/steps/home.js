@@ -9,6 +9,7 @@
 // only because the example used to be seeded as the visitor's own workspace.
 //
 // All lifecycle writes remain callbacks owned by main.js.
+import { buildExperimentMap } from '../../engine/experimentMap.js';
 import { createIcon } from '../icons.js';
 import { createStudyMap } from '../studyMap.js';
 
@@ -166,16 +167,69 @@ export function appendGuidedEntry(main, options) {
   }
 }
 
+// One label for the action itself, whichever of the two entry points below
+// renders it: the e2e suite and tools/capture_screenshots.py both find this
+// button by its `data-action="open-example"` marker, so the two variants stay
+// interchangeable to everything outside this file.
+const OPEN_EXAMPLE_LABEL = 'Open the example study';
+const EXAMPLE_PITCH = 'Want to see a finished plan?';
+
+function markExampleAction(control) {
+  control.dataset.action = 'open-example';
+  return control;
+}
+
 // Also exported for the same direct-test reason as appendGuidedEntry: the
 // "no dead button" contract (row absent without onOpenExample) is cheapest
 // to prove against this function alone.
 export function appendExampleLink(main, onOpenExample) {
   if (typeof onOpenExample !== 'function') return null;
-  return appendLinkRow(
-    main,
-    'Want to see a finished plan? Open the example study.',
-    () => onOpenExample()
+  return markExampleAction(
+    appendLinkRow(main, `${EXAMPLE_PITCH} ${OPEN_EXAMPLE_LABEL}.`, () => onOpenExample())
   );
+}
+
+// The same offer, as its own panel above the map rather than a 12.5px link
+// below it. Rendered ONLY for a visitor who has answered nothing yet (see
+// shouldPromoteExample): measured on a first run, the quiet link sits ~350px
+// below the fold at 1366x768, under two other links of identical weight,
+// while the one prominent card on the page launches the WALKTHROUGH rather
+// than the example -- so the person with the least context had the least
+// visible route to the thing that supplies it.
+export function appendExampleCallout(main, onOpenExample) {
+  if (typeof onOpenExample !== 'function') return null;
+  const section = appendOwnership(main, {
+    title: EXAMPLE_PITCH,
+    body:
+      'A complete worked plan -- the oregano-coating wound-healing study -- that opens as '
+      + 'ordinary editable work. Your current study is saved to Restore first.',
+  });
+  section.classList.add('home-example-ownership');
+  const actions = document.createElement('div');
+  actions.className = 'home-study-ownership-actions';
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'copy-button';
+  button.textContent = OPEN_EXAMPLE_LABEL;
+  button.addEventListener('click', () => onOpenExample());
+  markExampleAction(button);
+  actions.appendChild(button);
+  section.appendChild(actions);
+  return button;
+}
+
+// Which of the two entry points above this render gets. `answered === 0` is
+// the whole test: the study map counts five orientation decisions, and a
+// visitor who has answered none of them either just arrived or just started
+// a blank study -- exactly the two moments a worked example helps. Once even
+// one decision is answered the visitor has their own work on screen, and the
+// offer drops back to the quiet link; pitching the demo on every later visit
+// would be nagging. A missing or malformed projection returns false, so the
+// degraded case is today's behaviour (quiet link) rather than a promotion
+// this function cannot actually justify.
+export function shouldPromoteExample(map) {
+  const answered = map && map.orientation ? map.orientation.answered : null;
+  return answered === 0;
 }
 
 export const homeStep = {
@@ -197,12 +251,22 @@ export const homeStep = {
       title: 'Plan my study',
       body: 'This is your workspace. Your map answers are saved here as you plan.',
     });
+    // Read the projection here rather than threading another option through
+    // main.js: it is the same pure buildExperimentMap() the Study map below
+    // builds for itself, and this step already owns the decision of what to
+    // reveal around that map.
+    const promoteExample = shouldPromoteExample(buildExperimentMap(store.get()));
+    if (promoteExample) appendExampleCallout(main, onOpenExample);
     // This controller owns map input, persistence calls, and deterministic
     // next-decision routing. Home only chooses when the map is revealed.
     main.appendChild(createStudyMap({ store, router }).element);
     appendGuidedEntry(main, options);
 
-    appendExampleLink(main, onOpenExample);
+    // Exactly one example entry point per render -- the callout above has
+    // already made the offer when it is showing, and two identical actions on
+    // one page is the kind of duplication that made this page hard to read in
+    // the first place.
+    if (!promoteExample) appendExampleLink(main, onOpenExample);
     appendLinkRow(main, 'Looking for a specific term or step? See the Guide.', () => {
       if (router) router.navigate('guide');
     });

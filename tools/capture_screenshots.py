@@ -284,10 +284,13 @@ SCREENS = [
     ),
 ]
 
+# Study map renders the example offer as EITHER a prominent panel (a visitor
+# with nothing answered yet -- which is exactly the state a capture run starts
+# in) or the quiet link below the map (a study already in progress). Both
+# carry data-action="open-example", so this finds whichever one is on screen.
 OPEN_EXAMPLE_JS = """
 (() => {
-  const btn = Array.from(document.querySelectorAll('button.home-skip-link'))
-    .find((b) => b.textContent.includes('Open the example study'));
+  const btn = document.querySelector('button[data-action="open-example"]');
   if (btn) btn.click();
   return Boolean(btn);
 })()
@@ -392,7 +395,7 @@ def main() -> int:
             time.sleep(wait_ms / 1000)
 
         # Initial load: land on Study map, then explicitly ask for the
-        # shipped example study via its own "Open the example study" link
+        # shipped example study via its own "Open the example study" action
         # (ui/steps/home.js) rather than hand-rolling a localStorage payload
         # -- this exercises the app's real load path and guarantees the
         # content is the app's own example data, not fabricated captions.

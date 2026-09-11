@@ -2,7 +2,7 @@
 
 Reference screenshots of Micronaut Planner, captured against the shipped
 example study (the oregano-plasma-coating wound-healing study, opened via
-Study map's own "Open the example study" link -- see
+Study map's own "Open the example study" action -- see
 `web/src/core/defaultStudy.js`). All images are 1440px wide, light theme
 except the last.
 
@@ -34,8 +34,9 @@ python3 tools/capture_screenshots.py
 ## How the study is seeded
 
 The capture script loads the app fresh, clicks Study map's real "Open the
-example study" link (the same one a visitor would click), and waits for its
-confirmation toast to clear. This is the app's own shipped example data
+example study" button (the same one a visitor would click -- it finds
+whichever of that action's two variants is on screen by its `data-action`
+marker), and waits for its confirmation toast to clear. This is the app's own shipped example data
 (`web/src/core/defaultStudy.js`), not a fabricated or hand-edited payload --
 re-running the script reproduces the exact same study deterministically.
 

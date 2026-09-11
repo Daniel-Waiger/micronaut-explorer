@@ -11,7 +11,15 @@
 // (one-concern tests).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendGuidedEntry, appendExampleLink } from '../src/ui/steps/home.js';
+import {
+  appendGuidedEntry,
+  appendExampleLink,
+  appendExampleCallout,
+  shouldPromoteExample,
+} from '../src/ui/steps/home.js';
+import { buildExperimentMap } from '../src/engine/experimentMap.js';
+import { createDefaultStudy } from '../src/core/defaultStudy.js';
+import { emptyExperiment } from '../src/core/schema.js';
 import { createDomStub } from './domStub.js';
 
 function withHomeContainer(callback) {
@@ -179,4 +187,64 @@ test('the example-study link row is absent when onOpenExample is not supplied', 
     assert.equal(link, undefined);
     assert.equal(main.children.length, 0);
   });
+});
+
+// --- the promoted (above-the-map) variant of the same offer -----------------
+//
+// A first-run visitor could reach the example only through a 12.5px link
+// rendered last on the page, ~350px below the fold at 1366x768 and flanked by
+// two links of identical weight. These cover the promoted panel that replaces
+// it for that visitor, and the rule that decides between the two.
+
+test('the promoted example callout renders a real action and calls onOpenExample exactly once', () => {
+  withHomeContainer((main) => {
+    const calls = [];
+    const button = appendExampleCallout(main, () => calls.push(true));
+
+    assert.ok(button, 'expected the callout to render its open action');
+    // The action must be a proper button, not another muted skip link --
+    // being visually secondary to everything else on the page is the whole
+    // defect this variant exists to fix.
+    assert.equal(button.className.includes('home-skip-link'), false);
+    assert.equal(button.dataset.action, 'open-example');
+    assert.match(main.textContent, /Want to see a finished plan\?/);
+    assert.match(button.textContent, /Open the example study/);
+    button.click();
+    assert.equal(calls.length, 1);
+  });
+});
+
+test('the promoted example callout is absent when onOpenExample is not supplied', () => {
+  withHomeContainer((main) => {
+    assert.equal(appendExampleCallout(main, undefined), null);
+    assert.equal(main.children.length, 0);
+  });
+});
+
+test('both example entry points carry the same data-action marker', () => {
+  withHomeContainer((main) => {
+    // tests/test_e2e_flows.py and tools/capture_screenshots.py find whichever
+    // variant is on screen by this marker alone; if the two ever disagree,
+    // those callers silently stop exercising one of them.
+    const quiet = appendExampleLink(main, () => {});
+    const promoted = appendExampleCallout(main, () => {});
+    assert.equal(quiet.dataset.action, 'open-example');
+    assert.equal(promoted.dataset.action, 'open-example');
+  });
+});
+
+test('a study with nothing answered promotes the example; the shipped example study does not', () => {
+  // Real projections of the two real studies, not hand-shaped map literals:
+  // the promotion rule is only worth anything if it holds for what the app
+  // actually puts in the store on a first run and after opening the example.
+  assert.equal(shouldPromoteExample(buildExperimentMap(emptyExperiment())), true);
+  assert.equal(shouldPromoteExample(buildExperimentMap(createDefaultStudy())), false);
+});
+
+test('a missing or malformed map degrades to the quiet link rather than promoting', () => {
+  assert.equal(shouldPromoteExample(null), false);
+  assert.equal(shouldPromoteExample({}), false);
+  assert.equal(shouldPromoteExample({ orientation: {} }), false);
+  assert.equal(shouldPromoteExample({ orientation: { answered: '0' } }), false);
+  assert.equal(shouldPromoteExample({ orientation: { answered: 2 } }), false);
 });

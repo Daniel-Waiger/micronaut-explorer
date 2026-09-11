@@ -58,6 +58,13 @@ import urllib.request
 
 PRIMARY_WORKFLOW_LENGTH = 5  # engine/workflowProgress.js's PRIMARY_WORKFLOW: home/describe/study/measurement/overview
 
+# Study map offers the example either as a prominent panel above the map (a
+# visitor with nothing answered yet -- the state every test here starts in) or
+# as the quiet link below it (a study already in progress). ui/steps/home.js
+# marks BOTH with data-action="open-example" precisely so callers like this one
+# do not have to know which variant is on screen.
+OPEN_EXAMPLE_SELECTOR = 'button[data-action="open-example"]'
+
 THROWING_LOCAL_STORAGE_JS = """
 Object.defineProperty(window, 'localStorage', {
   configurable: true,
@@ -145,7 +152,7 @@ def test_open_example_then_start_guided_walkthrough(page, index_url):
     across two files).
     """
     page.goto(index_url)
-    assert page.click_text("button.home-skip-link", "Open the example study")
+    assert page.click_text(OPEN_EXAMPLE_SELECTOR, "Open the example study")
     page.hash_nav("guide")
     # Before AUD-13 this button read "Explain the workflow" instead (the
     # not-'example'-origin fallback) -- asserting the exact label, not just
@@ -161,7 +168,7 @@ def test_open_example_then_start_guided_walkthrough(page, index_url):
 
 def test_pause_reload_resume_keeps_the_same_cursor(page, index_url):
     page.goto(index_url)
-    assert page.click_text("button.home-skip-link", "Open the example study")
+    assert page.click_text(OPEN_EXAMPLE_SELECTOR, "Open the example study")
     page.hash_nav("guide")
     assert page.click_text(".guide-tour-button", "Start example walkthrough")
     page.wait_for("document.querySelector('.guided-walkthrough-panel') !== null")
