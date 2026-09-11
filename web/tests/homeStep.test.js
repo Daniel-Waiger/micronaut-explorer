@@ -72,7 +72,7 @@ test('not-started offers Start example walkthrough and calls onStartGuided exact
 test('active offers Continue walkthrough, reopening the panel via onResumeGuided', () => {
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
-    appendGuidedEntry(main, { guidedStatus: { status: 'active' }, ...cb });
+    appendGuidedEntry(main, { guidedStatus: { status: 'active' }, isExample: true, ...cb });
 
     const card = primaryCard(main);
     assert.match(card.textContent, /Continue walkthrough/);
@@ -91,7 +91,7 @@ test('active offers Continue walkthrough, reopening the panel via onResumeGuided
 test('paused still offers Resume walkthrough via onResumeGuided (unchanged)', () => {
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
-    appendGuidedEntry(main, { guidedStatus: { status: 'paused' }, ...cb });
+    appendGuidedEntry(main, { guidedStatus: { status: 'paused' }, isExample: true, ...cb });
 
     const card = primaryCard(main);
     assert.match(card.textContent, /Resume walkthrough/);
@@ -104,7 +104,7 @@ test('paused still offers Resume walkthrough via onResumeGuided (unchanged)', ()
 test('completed still offers Restart walkthrough via onRestartGuided (unchanged)', () => {
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
-    appendGuidedEntry(main, { guidedStatus: { status: 'completed' }, ...cb });
+    appendGuidedEntry(main, { guidedStatus: { status: 'completed' }, isExample: true, ...cb });
 
     const card = primaryCard(main);
     assert.match(card.textContent, /Restart walkthrough/);
@@ -118,7 +118,7 @@ test('a malformed guided status degrades to the explain action instead of throwi
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
     assert.doesNotThrow(() => {
-      appendGuidedEntry(main, { getGuidedStatus: () => ({ status: 42 }), ...cb });
+      appendGuidedEntry(main, { getGuidedStatus: () => ({ status: 42 }), isExample: true, ...cb });
     });
 
     const card = primaryCard(main);
@@ -139,7 +139,7 @@ test('a missing guided status (no guidedStatus, no getGuidedStatus) also degrade
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
     assert.doesNotThrow(() => {
-      appendGuidedEntry(main, { ...cb });
+      appendGuidedEntry(main, { isExample: true, ...cb });
     });
     assert.match(primaryCard(main).textContent, /Explain Study map/);
   });
@@ -151,6 +151,7 @@ test('getGuidedStatus() takes precedence over a stale guidedStatus prop', () => 
     appendGuidedEntry(main, {
       guidedStatus: { status: 'completed' },
       getGuidedStatus: () => ({ status: 'active' }),
+      isExample: true,
       ...cb,
     });
 
@@ -187,6 +188,36 @@ test('not-started on a study that did not come from the example offers the pract
     assert.deepEqual(opened, ['?demo=1'], 'must open the practice tab');
     assert.equal(cb.calls.start.length, 0, 'must not claim to have started a walkthrough');
   });
+});
+
+test('no status offers the walkthrough on a study that did not come from the example', () => {
+  // The hole an earlier shape of this change left open. Gating only
+  // 'not-started' meant a non-example study still got Continue / Resume /
+  // Restart -- a tour OF THE EXAMPLE, reopened over the user's own work, in
+  // the one tab this change exists to keep the example out of. Upgrading
+  // users really can land here: the real tab's progress record is stored
+  // under the same unprefixed key it always was, so a walkthrough left paused
+  // before this change survives into a tab the example is no longer in.
+  for (const status of ['not-started', 'active', 'paused', 'completed']) {
+    withHomeContainer((main) => {
+      const cb = guidedCallbacks();
+      const opened = [];
+      appendGuidedEntry(main, {
+        guidedStatus: { status },
+        isExample: false,
+        onOpenExampleTab: (url) => opened.push(url),
+        ...cb,
+      });
+
+      const card = primaryCard(main);
+      assert.match(card.textContent, /practice tab/, `${status} should offer the practice tab`);
+      card.click();
+      assert.deepEqual(opened, ['?demo=1'], `${status} should open the practice tab`);
+      assert.equal(cb.calls.start.length, 0, `${status} must not start a walkthrough here`);
+      assert.equal(cb.calls.resume.length, 0, `${status} must not resume a walkthrough here`);
+      assert.equal(cb.calls.restart.length, 0, `${status} must not restart a walkthrough here`);
+    });
+  }
 });
 
 test('the example card opens the practice tab rather than replacing the study', () => {

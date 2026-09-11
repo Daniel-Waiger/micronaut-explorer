@@ -130,7 +130,7 @@ export function renderShell(root, store, router, options = {}) {
     sandboxBanner.setAttribute('role', 'note');
     const bannerText = document.createElement('span');
     bannerText.className = 'sandbox-banner-text';
-    bannerText.textContent = 'Practice tab — example data in its own separate storage. Nothing here touches your real study.';
+    bannerText.textContent = 'Practice tab — example data, saved separately from your own study. Nothing you do here changes your work.';
     sandboxBanner.appendChild(bannerText);
 
     const bannerActions = document.createElement('div');

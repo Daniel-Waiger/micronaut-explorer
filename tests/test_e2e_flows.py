@@ -1,6 +1,6 @@
 """Browser end-to-end suite against the BUILT single-file artifact (AUD-19).
 
-Exactly eight tests, deliberately kept to that count (see docs/cma-lessons.md
+Exactly nine tests, deliberately kept to that count (see docs/cma-lessons.md
 lesson 4: surface area predicts retries, and a sprawling e2e file is exactly
 the surface area a fast unit-test layer should be absorbing instead). Each
 test earns its place by covering something no lower layer can:
@@ -47,7 +47,13 @@ test earns its place by covering something no lower layer can:
      prefix, not a separate store, so the things that can leak (persist.js's
      five-slot ring eviction, clearAll()'s prefix sweep) are exactly the
      things a fake storage object in a unit test cannot reproduce.
-  8. the served artifact contains no static import/export statements --
+  8. a walkthrough left running before the practice tab existed does not
+     reopen over a real study -- the upgrade path. main.js calls init() at
+     module scope so its boot-time auto-resume is unreachable from
+     `node --test`, and the legacy progress record has to be in real
+     localStorage before the first script runs, which only a real navigation
+     can arrange.
+  9. the served artifact contains no static import/export statements --
      per cma-lessons.md lesson 48, "verified live" against a dev server can
      lie; this fetches the actual bytes tools/serve_dir.py answers with for
      the BUILT artifact (never web/'s unbundled source), which is what
@@ -445,4 +451,52 @@ def test_the_practice_tab_cannot_touch_the_real_tabs_study(page, index_url):
         "(() => { const el = document.getElementById('project-description');"
         " return el ? el.value : null; })()"
     ) == REAL_STUDY_SENTINEL
+    assert page.console_errors() == []
+
+
+def test_a_walkthrough_left_running_before_the_practice_tab_does_not_reopen_over_a_real_study(page, index_url):
+    """The upgrade path. Before the practice tab existed, an `active` guided
+    record implied the example WAS loaded in that tab -- opening it in place
+    was the only way to start a walkthrough. Now the example never lives in
+    the real tab, but the real scope's progress key is the same unprefixed
+    `micronaut.guidedProgress.v1` it always was, so a record written by an
+    older build survives into a tab the example is no longer in. `main.js`
+    auto-resumes an active record at boot; ungated, that pops the walkthrough
+    panel open over the user's own study and narrates steps about a study that
+    is not on screen.
+
+    Only a real boot can prove the gate: `main.js` calls init() at module
+    scope, so nothing inside it is importable by `node --test` (that is the
+    documented reason core/appController.js exists at all). The record also
+    has to be sitting in real localStorage BEFORE the app's first script runs.
+    """
+    record = json.dumps({
+        "version": 1,
+        "status": "active",
+        "currentStepId": "describe",
+        "completedStepIds": ["home"],
+        "completedAt": None,
+    })
+
+    # --- the real tab: a legacy record must NOT reopen the walkthrough ------
+    page.goto(index_url)
+    page.set_local_storage("micronaut.guidedProgress.v1", record)
+    page.reload()
+    assert page.text("h1.step-heading") == "Study map"
+    assert not page.exists(".guided-walkthrough-panel"), (
+        "a walkthrough left running before this change reopened over a real study"
+    )
+    # Guide must redirect rather than silently swallow it: the tour is still
+    # reachable, just not here.
+    page.hash_nav("guide")
+    assert page.text(".guide-tour-button") == "Explain the workflow"
+    assert page.exists(".guide-practice-tab-button")
+
+    # --- the practice tab: the same record SHOULD still resume -------------
+    # Without this half the test would pass just as well against an app that
+    # had broken auto-resume outright.
+    page.goto(index_url + "?demo=1")
+    page.set_local_storage("micronaut.demo.guidedProgress.v1", record)
+    page.reload()
+    page.wait_for("document.querySelector('.guided-walkthrough-panel') !== null")
     assert page.console_errors() == []

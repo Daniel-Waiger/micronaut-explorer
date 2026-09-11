@@ -43,7 +43,7 @@ import { createMeasurementStep } from './ui/steps/measurement.js';
 import { feedbackStep } from './ui/steps/feedback.js';
 import { settingsStep } from './ui/steps/settings.js';
 import { loadOnboarding } from './core/onboarding.js';
-import { createAppController, resolveInitialExperiment, withOrigin } from './core/appController.js';
+import { createAppController, isExampleOrigin, resolveInitialExperiment, withOrigin } from './core/appController.js';
 
 /**
  * Read the knowledge pack from the ONE place its global is read, then hand
@@ -373,7 +373,22 @@ function init() {
 
   // The one thing allowed to open itself on load, and only because the user
   // explicitly left a walkthrough paused mid-way on a previous visit.
-  if (appController.getGuidedState().status === 'active') guidedController.resume();
+  //
+  // Gated on the study actually being the example, not just on there being an
+  // active record. The walkthrough is a tour OF the example, and the example
+  // now only ever lives in the practice tab -- but a progress record written
+  // before that change survives in the real tab under the same unprefixed key
+  // it has always used. Without this check, upgrading a user who left a
+  // walkthrough running would pop the panel open over their own study on the
+  // next load, narrating steps about a study that is not on screen. Same
+  // predicate ui/steps/guide.js and ui/steps/home.js gate their walkthrough
+  // actions on, so all three agree on when the walkthrough may appear.
+  if (
+    isExampleOrigin(store.get().meta?.origin)
+    && appController.getGuidedState().status === 'active'
+  ) {
+    guidedController.resume();
+  }
 }
 
 init();

@@ -70,28 +70,37 @@ function homeGuidedStatus(guidedStatus, getGuidedStatus) {
 // on load. secondaryExplain marks every branch where "Explain Study map"
 // must additionally be offered so it is never lost as a reachable action.
 function homeGuidedEntryForStatus(status, options) {
+  // Checked BEFORE the status ladder, deliberately.
+  //
+  // The walkthrough only ever runs on the example study (ui/steps/guide.js's
+  // Start gate checks the same isExampleOrigin), and the example can now only
+  // be opened in the practice tab (?demo=1) -- openExampleStudy
+  // (core/appController.js) refuses to run outside it.
+  //
+  // An earlier shape of this change gated only 'not-started', which left the
+  // other statuses still offering Continue/Resume/Restart on a study that
+  // never came from the example: a tour OF THE EXAMPLE, reopened over
+  // somebody's own work. Upgrading users really can be in that state, because
+  // the real scope's progress key is the unprefixed one it has always been, so
+  // a walkthrough they left paused before this change survives into a tab the
+  // example is no longer in. One check here covers every status at once.
+  //
+  // `isExample` is threaded in as a plain option (computed once by the caller
+  // from store.get().meta?.origin) rather than this function reaching for the
+  // store or core/appController.js itself, so it stays the pure, directly
+  // testable mapping it has always been.
+  if (!options.isExample) {
+    return {
+      title: 'Try the guided walkthrough',
+      body: 'The walkthrough only runs on the finished example study -- open it in a separate practice tab to try it risk-free.',
+      onClick: () => {
+        const open = typeof options.onOpenExampleTab === 'function' ? options.onOpenExampleTab : openInNewTab;
+        open(SANDBOX_URL);
+      },
+      secondaryExplain: true,
+    };
+  }
   if (status === 'not-started') {
-    // The walkthrough only ever runs on the example study (guide.js's own
-    // Start gate checks the same isExampleOrigin), and the example can now
-    // only be OPENED from the practice tab (?demo=1) -- openExampleStudy
-    // (core/appController.js) refuses to run outside it. So a study that did
-    // not itself arrive from the example can never reach 'active' from here:
-    // promising "Start example walkthrough" on it would be a dead button.
-    // `isExample` is threaded in as a plain option (computed once by the
-    // caller from store.get().meta?.origin) rather than this function
-    // reaching for the store or core/appController.js itself, so this stays
-    // the same pure, directly-testable function it always was.
-    if (!options.isExample) {
-      return {
-        title: 'Try the guided walkthrough',
-        body: 'The walkthrough only runs on the finished example study -- open it in a separate practice tab to try it risk-free.',
-        onClick: () => {
-          const open = typeof options.onOpenExampleTab === 'function' ? options.onOpenExampleTab : openInNewTab;
-          open(SANDBOX_URL);
-        },
-        secondaryExplain: true,
-      };
-    }
     return {
       title: 'Start example walkthrough',
       body: 'Launch the guided walkthrough of a finished example study.',
@@ -218,7 +227,7 @@ export function appendExampleLink(main, onOpenExampleTab) {
   const button = card(grid, {
     icon: 'template',
     title: 'Explore a completed example',
-    body: 'Opens a finished oregano study in a separate practice tab, with its own storage. Nothing you do there can touch this study.',
+    body: 'Opens a finished oregano study in a separate practice tab, saved separately from your work. Nothing you do there changes this study.',
     onClick: () => onOpenExampleTab(SANDBOX_URL),
     featured: true,
   });

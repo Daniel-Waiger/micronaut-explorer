@@ -38,16 +38,21 @@ function fakeStore(origin) {
 
 function renderGuide(document, store, overrides = {}) {
   const calls = { start: 0, resume: 0, restart: 0, explain: 0 };
+  // Captures the injected opener rather than letting it fall through to the
+  // real openInNewTab, which would try to touch document.body in a stub.
+  const opened = [];
   const main = document.createElement('div');
   guideStep.render(main, store, {
     onStartGuided: () => calls.start++,
     onResumeGuided: () => calls.resume++,
     onRestartGuided: () => calls.restart++,
     onExplainGuided: () => calls.explain++,
+    onOpenExampleTab: (url) => opened.push(url),
     ...overrides,
   });
   const button = main.querySelector('.guide-tour-button');
-  return { main, button, calls };
+  const practiceTabButton = main.querySelector('.guide-practice-tab-button');
+  return { main, button, practiceTabButton, opened, calls };
 }
 
 test('guide step: walkthrough Start/Resume/Restart/Explain gating', () => {
@@ -81,7 +86,10 @@ test('guide step: walkthrough Start/Resume/Restart/Explain gating', () => {
       assert.equal(calls.explain, 0, 'pre-fix behavior (wrongly falling to Explain) must not recur');
     }
 
-    // paused -> Resume, regardless of origin (mirrors home.js's precedent).
+    // paused -> Resume, on an EXAMPLE study. The origin matters now: the
+    // non-example case is covered by its own test below, because offering
+    // Resume there would reopen a tour of the example over the user's own
+    // study.
     {
       const { button, calls } = renderGuide(document, fakeStore('template'), {
         guidedStatus: { status: 'paused' },
@@ -93,9 +101,12 @@ test('guide step: walkthrough Start/Resume/Restart/Explain gating', () => {
       assert.equal(calls.restart, 0);
     }
 
-    // completed -> Restart, regardless of origin.
+    // completed -> Restart, again on an example study. This block used to
+    // pass fakeStore('imported') and assert Restart "regardless of origin" --
+    // that was the bug: an imported study would be offered a restart of a
+    // walkthrough written for the example.
     {
-      const { button, calls } = renderGuide(document, fakeStore('imported'), {
+      const { button, calls } = renderGuide(document, fakeStore('example'), {
         guidedStatus: { status: 'completed' },
       });
       assert.equal(button.textContent, 'Restart example walkthrough');
@@ -133,6 +144,53 @@ test('guide step: walkthrough Start/Resume/Restart/Explain gating', () => {
     {
       const { button } = renderGuide(document, fakeStore('example'), { guidedStatus: null });
       assert.equal(button.textContent, 'Start example walkthrough');
+    }
+  });
+});
+
+test('guide step: no status offers the walkthrough on a non-example study, and the practice tab is offered instead', () => {
+  withGuidePage((document) => {
+    // The gate used to apply only to 'not-started', so a non-example study
+    // with a surviving progress record still got Resume/Restart -- a tour OF
+    // THE EXAMPLE, reopened over the user's own work. Upgrading users can be
+    // in exactly that state: the real tab's progress is stored under the same
+    // unprefixed key it always was, so a walkthrough paused before the
+    // practice tab existed survives into a tab the example is no longer in.
+    for (const origin of ['blank', 'imported', 'user', 'draft']) {
+      for (const status of ['not-started', 'paused', 'completed', 'active']) {
+        const { button, practiceTabButton, opened, calls } = renderGuide(
+          document,
+          fakeStore(origin),
+          { guidedStatus: { status } }
+        );
+        const where = `${origin}/${status}`;
+        assert.equal(button.textContent, 'Explain the workflow', `${where} must not offer the walkthrough`);
+        assert.equal(calls.start + calls.resume + calls.restart, 0, `${where} must not run a walkthrough`);
+
+        // The escape hatch: without it the walkthrough would simply become
+        // unreachable from Guide rather than redirected. Copilot flagged that
+        // this button had no assertion anywhere -- the browser tests all
+        // start from ?demo=1, so they never reach this branch.
+        assert.ok(practiceTabButton, `${where} should offer the practice tab`);
+        assert.equal(practiceTabButton.textContent, 'Try it in a practice tab');
+        practiceTabButton.click();
+        assert.deepEqual(opened, ['?demo=1'], `${where} should open the practice tab`);
+      }
+    }
+  });
+});
+
+test('guide step: an example study is NOT offered the practice-tab escape hatch', () => {
+  // The counterpart to the test above: on the example itself the walkthrough
+  // runs here, so a second button pointing at another practice tab would be
+  // noise. This is what keeps the gate from being trivially satisfied by
+  // always rendering the hatch.
+  withGuidePage((document) => {
+    for (const status of ['not-started', 'paused', 'completed']) {
+      const { practiceTabButton } = renderGuide(document, fakeStore('template'), {
+        guidedStatus: { status },
+      });
+      assert.equal(practiceTabButton, null, `${status} on the example needs no practice-tab button`);
     }
   });
 });

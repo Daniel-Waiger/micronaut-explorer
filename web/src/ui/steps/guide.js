@@ -131,36 +131,53 @@ export const guideStep = {
     // 'example' alone would make Start permanently unreachable.
     const isExample = isExampleOrigin(store.get().meta?.origin);
     const guideStatus = guideGuidedStatus(guidedStatus, getGuidedStatus);
-    const guideAction = guideStatus === 'paused'
+    // isExample gates the WHOLE walkthrough action set, not just Start.
+    //
+    // Gating only Start (the first shape of this change) left a real hole:
+    // `paused` and `completed` were tested FIRST, so a non-example study still
+    // offered "Resume example walkthrough" / "Restart example walkthrough" --
+    // buttons that would run a tour OF THE EXAMPLE over somebody's own work,
+    // in the very tab this change exists to keep the example out of.
+    //
+    // That is not a pre-existing wart, it is new: before the practice tab, an
+    // `active`/`paused` record implied the example WAS loaded in this tab,
+    // because opening it in place was the only way to start a walkthrough at
+    // all. Now the example is never here, so any progress record surviving in
+    // this tab -- and upgrading users keep theirs, since the real scope's key
+    // is the unprefixed one it always was -- is guaranteed to describe a study
+    // the walkthrough was not written for. One check at the top is what makes
+    // "the walkthrough only runs on the example" true for every status rather
+    // than for one of them.
+    const guideAction = !isExample
       ? {
-          label: 'Resume example walkthrough',
-          callback: onResumeGuided,
-          title: 'Resume the optional seven-step example walkthrough without changing this study.',
+          label: 'Explain the workflow',
+          callback: onExplainGuided,
+          title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+          offerPracticeTab: true,
         }
-      : guideStatus === 'completed'
+      : guideStatus === 'paused'
         ? {
-            label: 'Restart example walkthrough',
-            callback: onRestartGuided,
-            title: 'Restart the optional seven-step example walkthrough from its first step.',
+            label: 'Resume example walkthrough',
+            callback: onResumeGuided,
+            title: 'Resume the optional seven-step example walkthrough without changing this study.',
           }
-        : isExample && guideStatus === 'not-started'
+        : guideStatus === 'completed'
           ? {
-              label: 'Start example walkthrough',
-              callback: onStartGuided,
-              title: 'Open the optional seven-step example walkthrough without changing this study.',
+              label: 'Restart example walkthrough',
+              callback: onRestartGuided,
+              title: 'Restart the optional seven-step example walkthrough from its first step.',
             }
-          : {
-              label: 'Explain the workflow',
-              callback: onExplainGuided,
-              title: 'Open a contextual explanation without changing your study or walkthrough progress.',
-              // Only this branch is reached because the walkthrough cannot
-              // start HERE for lack of an example study (paused/completed
-              // above are reachable regardless of origin, and the
-              // isExample-gated Start already took the not-started+example
-              // case) -- so only this branch needs the practice-tab escape
-              // hatch below.
-              offerPracticeTab: !isExample,
-            };
+          : guideStatus === 'not-started'
+            ? {
+                label: 'Start example walkthrough',
+                callback: onStartGuided,
+                title: 'Open the optional seven-step example walkthrough without changing this study.',
+              }
+            : {
+                label: 'Explain the workflow',
+                callback: onExplainGuided,
+                title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+              };
     const guideButton = document.createElement('button');
     guideButton.type = 'button';
     guideButton.className = 'copy-button guide-tour-button';
@@ -186,7 +203,7 @@ export const guideStep = {
     // class alongside .guide-tour-button instead.
     practiceTabButton.className = 'copy-button guide-practice-tab-button';
       practiceTabButton.textContent = 'Try it in a practice tab';
-      practiceTabButton.title = 'Open a finished example study in a separate practice tab, with its own storage, where the guided walkthrough can run.';
+      practiceTabButton.title = 'Open a finished example study in a separate practice tab, saved separately from your own study, where the guided walkthrough can run.';
       practiceTabButton.addEventListener('click', () => onOpenExampleTab(SANDBOX_URL));
       main.appendChild(practiceTabButton);
     }
@@ -266,7 +283,7 @@ export const guideStep = {
       section(main, 'Getting started', (c) => {
         bullets(c, [
           'Choose “Plan my study” to start your own Study map, or “Explore a completed example” to inspect the oregano plan. The example is not your data.',
-          'Opening the example preserves your current study in Restore before anything changes on screen. Demo activity cannot age that protected copy out of Restore.',
+          'The example opens in a separate practice tab of its own, so the study you are working on is not replaced, moved, or closed -- it stays open in the tab you came from. Close the practice tab when you are done with it.',
           'You do not have to answer everything. Fields you skip are simply marked as not set; ' +
             'the app still produces whatever it can from what you have entered.',
         ]);

@@ -44,6 +44,14 @@ that existing history, not a scheme that was tracked from day one.
   current study, so the one truly destructive path in that module stays
   unreachable no matter what ends up calling it — not only from today's
   actual call sites.
+- **"Clear all stored data" is now scoped to the tab it's run from.**
+  `persist.js`'s `clearAll()` sweeps by the same prefix `core/storageScope.js`
+  now namespaces every key under, so running it from the practice tab clears
+  only that tab's saved versions and running it from your own tab clears only
+  yours — neither tab can reach across and wipe the other's history. Settings
+  and the manual's Saving, Backups & Privacy chapter have been reworded to
+  say so plainly, rather than the older "removes every locally saved version"
+  phrasing that read as global.
 - **Measurement status is now three independently scoped axes** — definition,
   plan, and export conformance — replacing the single three-word vocabulary
   that quietly conflated them. Each axis has its own statuses (Draft /
