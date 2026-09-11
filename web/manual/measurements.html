@@ -72,7 +72,7 @@
       <p>Above the list itself sit three controls, all of which act on the list live as you use them:</p>
       <ul>
         <li><strong>Search</strong> — matches against a measurement's name, readout, modality, specimen summary, and group names, all at once. It is a plain substring match, not fuzzy: a near-miss spelling will not surface a row, by design.</li>
-        <li><strong>Status</strong> — filters to one registry status: <em>All statuses</em>, <em>Draft</em>, <em>Needs a decision</em>, or <em>Ready to acquire</em> (see <a href="#statuses">below</a>).</li>
+        <li><strong>Status</strong> — filters to one specific status on any one of the three status axes described below: <em>All statuses</em>, or one <em>Definition</em> status (Draft / Provisionally defined / Defined), one <em>Plan</em> status (Plan open / Needs a decision / Ready to acquire), or one <em>Conformance</em> status (Not checked / Blocked / Needs review / Checks pass) (see <a href="#statuses">below</a>).</li>
         <li><strong>Modality</strong> — filters to one modality actually in use in this study (STED, confocal, widefield, light-sheet, SEM/TEM, Raman, or whatever else you've entered on Acquisition). The list of choices rebuilds itself from what your measurements actually contain, so it never offers a modality nothing uses.</li>
       </ul>
       <figure class="shot">
@@ -89,7 +89,7 @@
       <p>Each row in the registry carries, left to right:</p>
       <ul>
         <li><strong>Name</strong>, as a clickable button — the whole name opens that measurement's page. Under it, a short line showing the readout you've described (or a placeholder if you haven't yet).</li>
-        <li><strong>Status</strong> — the three-word registry badge described below.</li>
+        <li><strong>Status</strong> — a headline badge plus two smaller supporting chips, described below.</li>
         <li><strong>Modality</strong> — whatever this measurement's Acquisition section has recorded, or an em dash if it's still blank.</li>
         <li><strong>Groups</strong> — this measurement's own comparison groups, joined as "A vs B", or an em dash if none are set yet.</li>
         <li><strong>Replicates</strong> — biological and/or technical replicate counts, whichever ones you've entered.</li>
@@ -100,18 +100,19 @@
 
     <section>
       <h2 id="statuses">Measurement statuses</h2>
-      <p>Every row, and the header of the measurement's own page, carries exactly one status badge, in the register of a project tracker rather than a grading scheme:</p>
+      <p>A measurement's status isn't one word — it's three separate, honestly scoped questions, each answered on its own axis, in the register of a project tracker rather than a grading scheme. Every row, and the header of the measurement's own page, carries all three:</p>
       <div class="table-wrap">
       <table>
-        <thead><tr><th>Badge</th><th>Meaning</th></tr></thead>
+        <thead><tr><th>Axis</th><th>Question it answers</th><th>Statuses, worst to best</th></tr></thead>
         <tbody>
-          <tr><td><strong>Draft</strong></td><td>Nothing consequential has been decided yet.</td></tr>
-          <tr><td><strong>Needs a decision</strong></td><td>Something is open — an unanswered decision the app can see, or a validator that isn't happy with what's entered so far.</td></tr>
-          <tr><td><strong>Ready to acquire</strong></td><td>Every check the planner itself owns is satisfied.</td></tr>
+          <tr><td><strong>Definition</strong></td><td>Has the measurement itself actually been filled in?</td><td>Draft → Provisionally defined → <strong>Defined</strong></td></tr>
+          <tr><td><strong>Plan</strong></td><td>Does this measurement still own an open decision?</td><td>Plan open → Needs a decision → <strong>Ready to acquire</strong></td></tr>
+          <tr><td><strong>Conformance</strong></td><td>Do this measurement's export checks pass?</td><td>Not checked → Blocked → Needs review → <strong>Checks pass</strong></td></tr>
         </tbody>
       </table>
       </div>
-      <div class="callout warn"><p><strong>⚠️ Careful.</strong> "Ready to acquire" is scoped honestly: it means the planner's own known requirements are met, never that the experiment is correct, well-powered, or approved by anyone. It describes the <em>plan's completeness</em>, not the science — always confirm real acquisition settings at the microscope.</p></div>
+      <p>A row shows one <strong>headline badge</strong> — the first of the three axes, always checked in that order (Definition, then Plan, then Conformance), that isn't already at its own best status — plus the other two axes as smaller, muted chips beside it. The measurement's own page header shows the same three, unabbreviated. Splitting the old single word into three keeps each axis honest about what it actually checks, instead of one badge quietly speaking for all three at once.</p>
+      <div class="callout warn"><p><strong>⚠️ Careful.</strong> <strong>Ready to acquire</strong> — the <em>plan</em> axis's own best status — is scoped honestly: it means every open decision this measurement's own plan currently owns has been resolved, never that the experiment is correct, well-powered, or approved by anyone. It describes the <em>plan's completeness</em>, not the science, and it is a different claim from the conformance axis's <strong>Checks pass</strong> — always confirm real acquisition settings at the microscope.</p></div>
     </section>
 
     <section>
@@ -121,7 +122,7 @@
         <li><strong>From the registry</strong> — click a measurement's name to open it, which also makes it the active one.</li>
         <li><strong>From the switcher bar</strong> — a row of pills near the top of every screen, one per measurement, always visible regardless of which step you're on. Click a pill to make that measurement active without leaving the page you're on.</li>
       </ul>
-      <p>Each pill in the switcher bar carries its own small badge, separate from the registry's status column: <strong>Not started</strong>, <strong>In progress</strong>, <strong>Decision needed</strong>, or <strong>Ready for now</strong>. This is a genuinely different reading of the same measurement — it comes from the app's whole-study workflow tracker, not from the three-word registry status — so don't be surprised if the two disagree slightly at first glance; they're answering related but distinct questions ("where does this measurement sit in the app's guided workflow" versus "does the plan itself pass its own checks").</p>
+      <p>Each pill in the switcher bar carries its own small badge — and it shows the exact same <strong>headline badge</strong> the registry shows for that measurement (see <a href="#statuses">above</a>), read from the identical status record. The pill only has room for the headline, not the two supporting chips, but it can never disagree with the registry row: they're two renderings of one shared status, not two separate opinions.</p>
       <div class="callout tip"><p><strong>💡 Tip.</strong> The step nav's own "Measurement" entry always names whichever measurement is currently active, rather than a generic label — so you can tell which one you're editing without opening the page.</p></div>
     </section>
 
@@ -135,7 +136,7 @@
     <section class="quiz">
       <h2 id="self-check">Check yourself</h2>
       <details class="quiz-q"><summary>You create a second measurement on a study that already has one with groups "Control" and "Treatment." Do the new measurement's groups come along automatically?</summary><p>Yes — a brand-new measurement seeds its groups from an existing measurement that already has some (the active one first), so you don't retype them. It's a starting point, not a lock: editing the new measurement's own groups on its Samples &amp; design page overrides the seed just like typing from scratch.</p></details>
-      <details class="quiz-q"><summary>A measurement's switcher-bar pill says "Decision needed" but its registry row says "Ready to acquire." Is that a bug?</summary><p>No. The switcher's badge and the registry's status are two separate readings — one from the app's whole-study workflow tracker, one from the planner's own per-measurement checks — and they are allowed to disagree slightly, since they answer different questions.</p></details>
+      <details class="quiz-q"><summary>A measurement's switcher-bar pill shows "Needs a decision." Could its registry row show "Checks pass" for that same measurement at that same moment?</summary><p>No. The pill's badge and the registry row's headline badge are read from the exact same status record — whichever of the three axes (definition, plan, conformance) is first not at its own best status is what both display, in the same fixed order. They can never disagree. To see the other two axes too, look at the registry row's chips or the measurement page's own header, which show all three at once.</p></details>
       <details class="quiz-q"><summary>You filter the registry to Status = "Draft" and see no rows, even though your study clearly has measurements. What does the empty-state message tell you?</summary><p>It distinguishes "no measurements yet" from "no measurement matches these filters" — since you have measurements, you'll see the second message, telling you to loosen or clear a filter rather than to go add a first measurement.</p></details>
     </section>
 

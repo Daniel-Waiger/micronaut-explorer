@@ -28,7 +28,7 @@
         <h2 id="what-youll-learn">What you'll be able to do</h2>
         <ul>
           <li>Read the study map, decisions list, and diagram on the Review step</li>
-          <li>Understand the "Planner checks" readiness verdict and what it does (and doesn't) validate</li>
+          <li>Understand the "Export checks" readiness verdict and what it does (and doesn't) validate</li>
           <li>Download each export Micronaut offers, and know which format fits which purpose</li>
           <li>Understand what happens when you try to export a study that still needs review</li>
           <li>Copy a ready-made prompt for pasting into your own LLM, and know exactly what it does and doesn't do</li>
@@ -37,7 +37,7 @@
 
       <section>
         <h2 id="what-review-is">What Review is</h2>
-        <p>Review is the last step in the nav, and deliberately a read-only one: it enters nothing new into your study. Everything on the page is assembled live from whatever you've already answered on Study map, Research brief, and each measurement's Samples &amp; design, Acquisition, and Data plan. Its own explainer puts it plainly: "a deterministic review of this study, built entirely from what you've entered on the other steps — nothing here is LLM-generated."</p>
+        <p>Review is the last step in the nav, and deliberately a read-only one: it enters nothing new into your study. Everything on the page is assembled live from whatever you've already answered on Study map, Research brief, and each measurement's Samples &amp; design, Acquisition, and Data plan. Its own explainer puts it plainly: "A deterministic review of this study -- every fact below comes from parameters you entered or from authored knowledge-pack content -- nothing here is LLM-generated."</p>
 
         <figure class="shot">
           <img src="images/05-overview-review.png" alt="Review screen showing the whole study's readiness, its diagram, and its exports in one screen." loading="lazy"
@@ -59,14 +59,14 @@
       </section>
 
       <section>
-        <h2 id="planner-checks">Planner checks: the readiness verdict</h2>
-        <p>The <strong>Planner checks</strong> section gives one verdict for the whole study, composed from every validator the app already runs elsewhere (naming format checks, design/condition issues, spectral-overlap flags, path-length warnings, and unanswered required fields):</p>
+        <h2 id="planner-checks">Export checks: the readiness verdict</h2>
+        <p>The <strong>Export checks</strong> section gives one verdict for the whole study, composed from every validator the app already runs elsewhere (naming format checks, design/condition issues, spectral-overlap flags, path-length warnings, and unanswered required fields):</p>
         <ul>
-          <li><strong>All planner checks complete</strong> — nothing outstanding.</li>
+          <li><strong>All export checks pass</strong> — nothing blocking. If any open decisions remain (see Decisions above), the verdict names how many, even though none of them are blocking an export.</li>
           <li><strong>Needs review: N incomplete or provisional item(s) remain</strong> — nothing blocking, but some fields are still placeholders or warnings worth a look.</li>
           <li><strong>Blocked: N issue(s) need correction before final export</strong> — at least one real error (an invalid naming value, for instance) exists somewhere in the study.</li>
         </ul>
-        <p>Directly under the verdict, a standing disclaimer keeps the scope honest: <em>"Planner checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability."</em> A clean verdict means Micronaut's own checks passed — nothing more.</p>
+        <p>Directly under the verdict, a standing disclaimer keeps the scope honest: <em>"Export checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability, and they do not check your Study map decisions (research question, system, comparison mode, or experimental unit) -- see Decisions above for those."</em> A clean verdict means Micronaut's own checks passed — nothing more.</p>
         <div class="callout why"><p><strong>🔍 Why it works this way.</strong> This is the same conformance engine that flags naming errors on <a href="validation-naming.html">Data plan</a> and design issues on <a href="conditions-controls.html">Samples &amp; design</a> — Review doesn't run a second, separate opinion, it just collects the one verdict in one place.</p></div>
       </section>
 
@@ -86,7 +86,7 @@
               <tr><td><strong>Markdown (.md)</strong></td><td>The full study write-up as plain-text Markdown — readout, design, controls, filenames, and the ladder, for every measurement.</td></tr>
               <tr><td><strong>Study map (.svg)</strong></td><td>The study diagram above, saved as a standalone, openable SVG image.</td></tr>
               <tr><td><strong>File manifest (.csv)</strong></td><td>One row per planned filename, with its group, factors, and replicate numbers — the spreadsheet-ready version of the planned-name lists.</td></tr>
-              <tr><td><strong>Study data (.json)</strong></td><td>A full raw-data dump of the study document used to build everything else on this page.</td></tr>
+              <tr><td><strong>Study report data (.json, not importable)</strong></td><td>A full raw-data dump of the study document used to build everything else on this page. Despite the extension, this is a report, not a save file — it can't be brought back in with Import project backup; use Settings' <strong>Project backup (.micronaut.json, importable)</strong> for that (see <a href="saving-privacy.html#backups">Project backups</a>).</td></tr>
             </tbody>
           </table>
         </div>
@@ -114,7 +114,7 @@
       <section class="quiz">
         <h2 id="self-check">Check yourself</h2>
         <details class="quiz-q"><summary>A measurement's readiness shows "Needs review." Can you still export a Markdown file?</summary><p>Yes — a confirmation dialog lists example issues and lets you export anyway. Only "Blocked" (a real error, not just an incomplete field) refuses the export outright.</p></details>
-        <details class="quiz-q"><summary>Does a clean "All planner checks complete" verdict mean your experiment design is scientifically sound?</summary><p>No. Review's own disclaimer says planner checks don't validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability — only that Micronaut's own naming/design/panel checks came back clean.</p></details>
+        <details class="quiz-q"><summary>Does a clean "All export checks pass" verdict mean your experiment design is scientifically sound?</summary><p>No. Review's own disclaimer says export checks don't validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability (and don't check your Study map decisions either) — only that Micronaut's own naming/design/panel checks came back clean.</p></details>
         <details class="quiz-q"><summary>You paste the "Copy prompt for your own LLM" text into a chatbot and it answers. Does that answer get written into your study automatically?</summary><p>No. It's a one-way handoff — you read the model's reply and decide yourself whether and how to act on it; nothing it says is read back into Micronaut.</p></details>
       </section>
 

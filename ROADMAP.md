@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-09-03
+Last updated: 2026-09-10
 
 Near-term worklist: [TASKS.md](TASKS.md). This file is the high-level direction.
 
@@ -95,8 +95,23 @@ messages.
   Research brief, Measurements (a searchable registry), the measurement you opened,
   and Review. Samples & design, Acquisition and Data plan are sections of one
   measurement page, composed from the existing step objects rather than rewritten.
-- **One status vocabulary** reaches the user — Draft · Needs a decision · Ready to
-  acquire — while `conformance` remains the sole export gate.
+- **Status is three independently scoped axes, not one collapsed vocabulary** —
+  definition, plan, and export conformance — each with its own statuses. The
+  headline badge shows whichever axis isn't yet at its top status, and
+  **Ready to acquire** now names only the plan axis's top status rather than a
+  single word standing in for all three. `conformance` remains the sole export
+  gate. See [docs/plans/status-scopes.md](docs/plans/status-scopes.md).
+
+### Deliberately deferred: first-class study shapes
+**Not in this pass.** `comparisonMode` is currently a flag (`groups` /
+`observational`) rather than a first-class notion of study shape. The idea
+worth doing eventually is to model `observational | group-comparison |
+factorial | mixed` explicitly, so the workflow, the Study map's questions, and
+the conditions engine can each reason about the actual design shape instead
+of inferring it from one flag plus whatever factors happen to be present.
+That is a schema change with migration consequences for every persisted study
+and every plan doc that currently reasons about `comparisonMode`, so it is
+explicitly parked rather than folded into this pass.
 
 ### The LLM seam: closed, not deferred
 **The in-app model path has been removed rather than finished.** Micronaut never calls

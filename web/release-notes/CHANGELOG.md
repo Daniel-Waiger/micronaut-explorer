@@ -9,6 +9,41 @@ that existing history, not a scheme that was tracked from day one.
 
 ## [Unreleased]
 
+### Changed
+- **Measurement status is now three independently scoped axes** — definition,
+  plan, and export conformance — replacing the single three-word vocabulary
+  that quietly conflated them. Each axis has its own statuses (Draft /
+  Provisionally defined / Defined; Plan open / Needs a decision / Ready to
+  acquire; Not checked / Blocked / Needs review / Checks pass), and the
+  registry and the measurement switcher now read the same record instead of
+  being able to disagree. See
+  [docs/plans/status-scopes.md](../../docs/plans/status-scopes.md).
+  **Visible behaviour change:** because real decision triage is now plumbed
+  into the plan axis, a measurement that showed "Ready to acquire" yesterday
+  may now show "Needs a decision" today. That is the intended correction —
+  the plan axis was not actually checking for open decisions before — not a
+  regression.
+- Review's export verdict now reads "Export checks" / "All export checks
+  pass" (plus an open-decision count when any remain), replacing the
+  overstated "All planner checks complete"; its provenance sentence now
+  credits authored knowledge-pack content instead of claiming everything on
+  the page came only from what you typed.
+- Observational studies can now complete the Measurements step of the
+  workflow, which previously hard-required group levels only a
+  groups-comparison study has.
+- The guided example walkthrough is reachable again from the Study map's
+  Start action, and the Guide's gate now accepts the `template` origin the
+  app actually writes (it previously accepted only `example`, which nothing
+  in the app wrote any more).
+- The `.ics` schedule export now separates physical samples (mounting) from
+  acquisition runs (acquisition) instead of reporting one count for both.
+
+### Fixed
+- `localStorage` access throughout persistence is now guarded against a
+  throwing storage backend, `clearAll` reports a real result instead of
+  `undefined`, and starting a blank study no longer loses just-typed work to
+  the 500ms autosave window.
+
 ## [0.20.0] - 2026-09-07
 
 ### Added
