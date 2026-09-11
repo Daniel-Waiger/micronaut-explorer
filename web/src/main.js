@@ -42,8 +42,7 @@ import { createMeasurementStep } from './ui/steps/measurement.js';
 import { feedbackStep } from './ui/steps/feedback.js';
 import { settingsStep } from './ui/steps/settings.js';
 import { loadOnboarding } from './core/onboarding.js';
-
-const AUTOSAVE_DEBOUNCE_MS = 500;
+import { createAppController, resolveInitialExperiment } from './core/appController.js';
 
 /**
  * Read the knowledge pack from the ONE place its global is read, then hand
@@ -62,71 +61,70 @@ function loadAppKb() {
   return shapeAppKb(rawKb);
 }
 
-/**
- * The thin wrapper around core/persist.js's loadMostRecentRecoverable that
- * supplies main.js's own console.error logging and the empty-study fallback --
- * persist.js deliberately doesn't know what a fresh study looks like, so
- * `experiment: null` means "start fresh" here. Only fires when NO usable
- * autosave exists at all (true first run, or every ring slot was corrupted) --
- * an existing in-progress study is never touched.
- *
- * A first run starts BLANK, not on the shipped oregano example. Seeding the
- * example made a visitor's first workspace someone else's four-measurement
- * study, and an entire ownership subsystem (banners, read-only exploration,
- * "make a copy") existed only to walk that back. The example is still one
- * click away -- see openExampleStudy() and Home's "Open the example study" --
- * but it is now something the visitor asks for rather than something they
- * have to disown.
- */
-function loadInitialExperiment() {
-  const { experiment, skippedCount, totalSaved } = loadMostRecentRecoverable({
-    onUnreadable: (id, err) =>
-      console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
-  });
-  return {
-    experiment: experiment || emptyExperiment(),
-    skippedCount,
-    totalSaved,
-    // `totalSaved` can be non-zero when every slot was unreadable. Only an
-    // experiment actually recovered from the ring justifies a saved claim.
-    isPersisted: Boolean(experiment),
-  };
-}
-
-// A study's origin describes how it entered the workspace; it is not
-// provenance. Keep this immutable so imports/restores replace the entire
-// snapshot rather than leaking metadata from the study that was open before.
-function withOrigin(experiment, origin) {
-  return { ...experiment, meta: { ...(experiment.meta || {}), origin } };
-}
-
-function projectFilename(experiment) {
-  const title = String(experiment?.meta?.title || 'micronaut-study')
-    .trim()
-    .replace(/[^A-Za-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return `${title || 'micronaut-study'}.micronaut.json`;
-}
-
-function recoveryEntries() {
-  // The shell receives display-only data, never a persistence backend. It
-  // therefore cannot accidentally load, mutate, or clear localStorage on its
-  // own; selected restores always come back through main's callback below.
-  return listSaved().map((id) => {
-    const raw = loadExperiment(id);
-    const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
-      ? raw.meta.title.trim()
-      : 'Untitled study';
-    return { id, title };
-  });
-}
+// A first run starts BLANK, not on the shipped oregano example. Seeding the
+// example made a visitor's first workspace someone else's four-measurement
+// study, and an entire ownership subsystem (banners, read-only exploration,
+// "make a copy") existed only to walk that back. The example is still one
+// click away -- see openExampleStudy() (core/appController.js) and Home's
+// "Open the example study" -- but it is now something the visitor asks for
+// rather than something they have to disown.
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
 // top-level await since the released artifact is one classic (non-module,
 // non-async) IIFE.
 function init() {
-  const { experiment: initialExperiment, skippedCount, totalSaved, isPersisted } = loadInitialExperiment();
+  // The persist.js bundle handed to appController -- explicit rather than
+  // importing core/persist.js directly inside appController.js, so a test
+  // can supply an in-memory fake for every one of these without touching
+  // localStorage.
+  const persistBundle = {
+    clearAll,
+    deleteExperiment,
+    exportToFile,
+    importFromFile,
+    listSaved,
+    loadExperiment,
+    loadMostRecentRecoverable,
+    loadRecoverableSlot,
+    markChanged,
+    markExported,
+    saveExperiment,
+  };
+
+  const { experiment: initialExperiment, skippedCount, totalSaved, isPersisted } = resolveInitialExperiment(
+    persistBundle,
+    emptyExperiment,
+    {
+      onUnreadable: (id, err) =>
+        console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
+    }
+  );
   const store = createStore(initialExperiment);
+
+  // The guidedProgress.js bundle handed to appController, same reasoning as
+  // persistBundle above.
+  const guidedBundle = {
+    load: loadGuidedProgress,
+    start: startGuidedProgress,
+    resume: resumeGuidedProgress,
+    pause: pauseGuidedProgress,
+    advance: advanceGuidedProgress,
+    restart: restartGuidedProgress,
+  };
+
+  // The lifecycle coordinator: every closure that touches store+persist
+  // (recovery ring, project import/export, guided-progress transitions, the
+  // debounced autosave subscriber) lives in core/appController.js now, not
+  // here -- see that module's header comment for why.
+  const appController = createAppController({
+    store,
+    persist: persistBundle,
+    guided: guidedBundle,
+    primaryWorkflow: PRIMARY_WORKFLOW,
+    createExampleStudy: createDefaultStudy,
+    createEmptyStudy: emptyExperiment,
+    isPersisted,
+  });
 
   const kb = loadAppKb();
   const describeStep = createDescribeStep(kb);
@@ -156,150 +154,7 @@ function init() {
   const router = createRouter(steps);
 
   const root = document.getElementById('app');
-  let saveState = { status: isPersisted ? 'saved' : 'unsaved', savedAt: null, error: null };
   let shell = null;
-  function setSaveState(next) {
-    saveState = { ...saveState, ...next };
-    // UX-08 supplies this narrow view updater. The optional call keeps this
-    // coordinator compatible with the pre-refactor shell while ensuring a
-    // save result can persist visibly without rebuilding the whole shell.
-    if (shell && typeof shell.setSaveState === 'function') shell.setSaveState(saveState);
-  }
-
-  function reportStorageFailure() {
-    setSaveState({
-      status: 'failed',
-      error: 'Storage is full or unavailable. Export a project backup, then free space from Settings → Clear all stored data (or delete an old saved version from Restore).',
-    });
-  }
-
-  function reportPersistentLifecycleFailure(message) {
-    // The shell's save indicator is the one persistent lifecycle-status
-    // surface. A toast alone vanishes after three seconds, leaving an import
-    // or recovery failure indistinguishable from a successful no-op.
-    setSaveState({ status: 'failed', error: message });
-    showToast(message);
-  }
-
-  function exportProjectBackup() {
-    exportToFile(store.get(), projectFilename(store.get()));
-    markExported({ onQuotaExceeded: reportStorageFailure });
-    showToast('Project backup downloaded.');
-  }
-
-  async function importProjectBackup(file) {
-    if (!file) return;
-    try {
-      const { experiment: imported, issues } = await importFromFile(file);
-      store.replace(withOrigin(imported, 'imported'));
-      // replace() schedules the ordinary autosave subscriber. Clear any
-      // earlier lifecycle failure immediately; that subscriber will keep the
-      // status at saving, then replace it with saved or a storage failure.
-      setSaveState({ status: 'saving', error: null });
-      // core/importValidate.js sanitizes rather than rejects most shape
-      // problems (a malformed provenance slot, an assay reset to defaults)
-      // so the rest of a real backup is never thrown away over one bad
-      // corner -- but a sanitized field is exactly the kind of change a
-      // project owner needs to notice, not one that should vanish into the
-      // console alone.
-      if (Array.isArray(issues) && issues.length > 0) {
-        issues.forEach((issue) => console.warn('Project import:', issue.message));
-        showToast(
-          `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details.`
-        );
-      } else {
-        showToast('Project imported. It is now the study being autosaved.');
-      }
-    } catch (err) {
-      reportPersistentLifecycleFailure(
-        `Could not import that project: ${err && err.message ? err.message : 'invalid file'}`
-      );
-    }
-  }
-
-  function restoreRecoverySlot(id) {
-    const { experiment, error } = loadRecoverableSlot(id, {
-      onUnreadable: (slotId, err) => console.error(`Could not restore autosave ${slotId}:`, err),
-    });
-    if (!experiment) {
-      reportPersistentLifecycleFailure(
-        `Could not restore that version: ${error ? error.message : 'it is unavailable'}`
-      );
-      return false;
-    }
-    store.replace(experiment);
-    setSaveState({ status: 'saving', error: null });
-    showToast('Restored the selected previous version.');
-    return true;
-  }
-
-  // Storage is a CONVENIENCE, never the record of truth (see persist.js's
-  // header), but until now the only in-app escape from a full or corrupt
-  // ring was closing the tab and clearing browsing data by hand -- these two
-  // give quota-exhausted or otherwise stuck users a real exit that never
-  // requires leaving the app. Neither touches the study currently open in
-  // memory: deleting a saved slot only removes ONE ring entry (the other
-  // four, and the live study, are untouched); clearing storage wipes every
-  // ring slot and the change counter, but the live in-memory study survives
-  // and the very next autosave attempt (forced immediately below, so the
-  // save indicator does not keep reporting the just-cleared failure) writes
-  // it into the now-empty ring.
-  function deleteRecoverySlot(id) {
-    deleteExperiment(id, { onQuotaExceeded: reportStorageFailure });
-    if (shell && typeof shell.setRecoveryEntries === 'function') shell.setRecoveryEntries(recoveryEntries());
-    showToast('Deleted that saved version.');
-  }
-
-  function clearAllStoredData() {
-    clearAll({ onQuotaExceeded: reportStorageFailure });
-    const savedId = saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
-    setSaveState(
-      savedId
-        ? { status: 'saved', savedAt: new Date().toISOString(), error: null }
-        : { status: 'unsaved', savedAt: null, error: null }
-    );
-    if (shell && typeof shell.setRecoveryEntries === 'function') shell.setRecoveryEntries(recoveryEntries());
-    showToast('Cleared all locally stored data. Your open study is unaffected, and saving has resumed.');
-  }
-
-  // Opening the example is now an explicit request, so it arrives as ordinary
-  // editable work tagged `template` ("started from the example") rather than
-  // `example` ("the shipped seed, not yours"). Nothing has to be adopted,
-  // copied, or disowned before the visitor may type in it. `origin: 'example'`
-  // still exists in the schema so older autosaves keep loading unchanged.
-  function openExampleStudy() {
-    // Preserve the exact current state synchronously, before replace() can
-    // expose example data to the autosave subscriber. This snapshot is
-    // protected from normal ring eviction: browsing or editing demo data can
-    // never delete user-entered work. If durable preservation is unavailable,
-    // do not switch workspaces at all.
-    const protectedId = saveExperiment(store.get(), {
-      onQuotaExceeded: reportStorageFailure,
-      protectFromAutomaticEviction: true,
-    });
-    if (!protectedId) {
-      reportPersistentLifecycleFailure(
-        'Could not preserve your current study, so the example was not opened. Download a project backup or free storage, then try again.'
-      );
-      return false;
-    }
-    const example = createDefaultStudy();
-    store.replace(withOrigin(example, 'template'));
-    if (shell && typeof shell.setRecoveryEntries === 'function') shell.setRecoveryEntries(recoveryEntries());
-    showToast('Opened the example study. Your study was preserved in Restore and demo activity cannot remove it.');
-    return true;
-  }
-
-  function startBlankStudy() {
-    store.replace(emptyExperiment());
-    showToast('Started a blank study. Your previous versions remain available in Restore.');
-  }
-
-  function adoptExampleTemplate() {
-    if (store.get().meta?.origin !== 'example') return false;
-    store.patch((state) => ({ meta: { ...state.meta, origin: 'template' } }));
-    return true;
-  }
 
   // One exact producer chain for the shell: use the same shaped KB and
   // naming constants as Overview, derive conformance once, then hand that
@@ -322,52 +177,27 @@ function init() {
     return routeId;
   }
 
-  let guidedStorageFailureAnnounced = false;
-  function reportGuidedStorageFailure(error) {
-    console.error('Could not persist guided walkthrough progress:', error);
-    // Guarded rather than calling showToast directly: this can fire before
-    // `shell` exists (the initial loadGuidedProgress call below runs ahead of
-    // renderShell), and repeatedly on every step transition once storage is
-    // broken -- announce the failure once, the first time a toast surface is
-    // actually available.
-    if (guidedStorageFailureAnnounced || !shell || typeof shell.showToast !== 'function') return;
-    guidedStorageFailureAnnounced = true;
-    shell.showToast('Walkthrough progress could not be saved — it will restart if you reload.');
-  }
-
-  let guidedProgressState = loadGuidedProgress(PRIMARY_WORKFLOW, {
-    onError: reportGuidedStorageFailure,
-  });
-
-  function applyGuidedTransition(transition, options = {}) {
-    guidedProgressState = transition(PRIMARY_WORKFLOW, {
-      ...options,
-      state: guidedProgressState,
-      onError: reportGuidedStorageFailure,
-    });
-    return guidedProgressState;
-  }
-
   let guidedController = null;
   let featureWalkthroughController = null;
 
   shell = renderShell(root, store, router, {
     kbIssueCount: kb.issues.length,
-    saveState,
-    recoveryEntries: recoveryEntries(),
+    saveState: appController.getSaveState(),
+    recoveryEntries: appController.recoveryEntries(),
     workflowProgress: currentWorkflowProgress(),
-    // These lifecycle actions replace the in-memory root and deliberately
-    // leave the five prior recovery slots intact. That makes a mistaken reset
-    // recoverable instead of making a "start over" action a data-loss trap.
-    onReset: openExampleStudy,
-    onNewBlank: startBlankStudy,
-    onAdoptExample: adoptExampleTemplate,
-    onOpenExample: openExampleStudy,
-    onExportProject: exportProjectBackup,
-    onImportProject: importProjectBackup,
-    onRestoreRecovery: restoreRecoverySlot,
-    onDeleteRecovery: deleteRecoverySlot,
+    // appController.actions carries every lifecycle callback the shell's
+    // buttons need (onReset/onNewBlank/onAdoptExample/onOpenExample/
+    // onExportProject/onImportProject/onRestoreRecovery/onDeleteRecovery/
+    // onClearAllStorage) -- the same object is spread into renderActiveStep's
+    // step options below, so both consumers share one set of callbacks.
+    ...appController.actions,
   });
+  // Explicit second phase, same two-phase pattern the pre-extraction code
+  // used (showToast was destructured from shell only after the callbacks
+  // above were already handed to renderShell): appController's callbacks are
+  // built and handed to renderShell before the shell they call back into
+  // exists at all.
+  appController.attachShell(shell);
   const { main, showToast } = shell;
 
   // Main is the sole lifecycle coordinator: the shell supplies one stable
@@ -384,21 +214,15 @@ function init() {
       namingConfig: NAMING_CONFIG,
       baseTemplate: BASE_TEMPLATE,
     }),
-    getProgress: () => guidedProgressState,
-    transitions: {
-      start: () => applyGuidedTransition(startGuidedProgress),
-      resume: () => applyGuidedTransition(resumeGuidedProgress),
-      pause: () => applyGuidedTransition(pauseGuidedProgress),
-      advance: (stepId) => applyGuidedTransition(advanceGuidedProgress, { fromStepId: stepId }),
-      restart: () => applyGuidedTransition(restartGuidedProgress),
-    },
+    getProgress: () => appController.getGuidedState(),
+    transitions: appController.guidedTransitions,
     routeForStep: guidedRouteIdForStep,
     stepForRoute: guidedStepIdForRoute,
     subscribe: (listener) => store.subscribe(listener),
-    onAdoptExample: adoptExampleTemplate,
-    onNewBlank: startBlankStudy,
+    onAdoptExample: appController.actions.onAdoptExample,
+    onNewBlank: appController.actions.onNewBlank,
     onKeepExploringExample: () => {},
-    onExportProject: exportProjectBackup,
+    onExportProject: appController.actions.onExportProject,
     onVisibilityChange: shell.setGuidedAsideVisible,
   });
   shell.setExplainStepHandler((stepId) => guidedController.explain(stepId));
@@ -454,20 +278,20 @@ function init() {
       // fresh projection as the shell. Passing it here keeps them from
       // rebuilding workflow or next-decision state locally.
       workflowProgress: currentWorkflowProgress(),
+      // AUD-10's copy-groups path mutates `assays` in place via
+      // store.setPath, so the assay-change re-render subscriber below never
+      // fires for it and a workflowProgress snapshot taken once up front
+      // would go stale; steps needing a post-mutation read call this instead.
+      getWorkflowProgress: () => currentWorkflowProgress(),
       experience: loadOnboarding().experience,
-      onNewBlank: startBlankStudy,
-      onAdoptExample: adoptExampleTemplate,
-      onOpenExample: openExampleStudy,
-      guidedStatus: guidedProgressState,
-      getGuidedStatus: () => guidedProgressState,
+      ...appController.actions,
+      guidedStatus: appController.getGuidedState(),
+      getGuidedStatus: () => appController.getGuidedState(),
       onStartGuided: () => guidedController.start(),
       onResumeGuided: () => guidedController.resume(),
       onRestartGuided: () => guidedController.restart(),
       onExplainGuided: explainGuided,
       kbIssueCount: kb.issues.length,
-      onExportProject: exportProjectBackup,
-      onImportProject: importProjectBackup,
-      onClearAllStorage: clearAllStoredData,
     });
   }
 
@@ -509,36 +333,27 @@ function init() {
     }
   });
 
-  // Debounced: saving on every keystroke would fill the 5-slot ring buffer
-  // with near-duplicate snapshots of the last few characters typed, rather
-  // than the last 5 genuinely distinct states the ring buffer exists to
-  // preserve as history.
-  let saveTimer = null;
+  // Split out of the debounced autosave subscriber that moved into
+  // core/appController.js's startAutosave(): this push has no persistence
+  // side effect at all, it is a pure view refresh, and it depends on
+  // kb/conformance state (currentWorkflowProgress) that stays here rather
+  // than being injected into appController.
   store.subscribe(() => {
     if (shell && typeof shell.setWorkflowProgress === 'function') {
       shell.setWorkflowProgress(currentWorkflowProgress());
     }
-    setSaveState({ status: 'saving', error: null });
-    // Run after the state transition: if this bookkeeping write fails, its
-    // visible failed state must not be overwritten immediately by "saving".
-    markChanged({ onQuotaExceeded: reportStorageFailure });
-    if (saveTimer) window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(() => {
-      const savedId = saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
-      if (savedId) {
-        setSaveState({ status: 'saved', savedAt: new Date().toISOString(), error: null });
-        if (shell && typeof shell.setRecoveryEntries === 'function') {
-          shell.setRecoveryEntries(recoveryEntries());
-        }
-      } else {
-        reportStorageFailure();
-      }
-    }, AUTOSAVE_DEBOUNCE_MS);
   });
+
+  // Debounced: saving on every keystroke would fill the 5-slot ring buffer
+  // with near-duplicate snapshots of the last few characters typed, rather
+  // than the last 5 genuinely distinct states the ring buffer exists to
+  // preserve as history. See core/appController.js's startAutosave/
+  // flushAutosave for the mechanics.
+  appController.startAutosave();
 
   // The one thing allowed to open itself on load, and only because the user
   // explicitly left a walkthrough paused mid-way on a previous visit.
-  if (guidedProgressState.status === 'active') guidedController.resume();
+  if (appController.getGuidedState().status === 'active') guidedController.resume();
 }
 
 init();
