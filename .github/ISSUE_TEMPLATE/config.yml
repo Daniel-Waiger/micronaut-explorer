@@ -5,12 +5,14 @@
 #   bug              exists   (bug_report.yml)
 #   enhancement      exists   (feature_request.yml)
 #   question         exists   (../DISCUSSION_TEMPLATE/q-a.yml)
-#   knowledge-pack   MISSING  (knowledge_pack.yml)
-#   feedback         MISSING  (not a form at all — web/src/ui/feedbackHandoff.js puts it in the
-#                              in-app Feedback button's URL, so this one has been quietly
-#                              inert for as long as that button has existed)
+#   knowledge-pack   exists   (knowledge_pack.yml)
+#   feedback         exists   (not a form at all — web/src/ui/feedbackHandoff.js puts it in the
+#                              in-app Feedback button's URL. It was created on the date above,
+#                              having been silently inert for as long as that button had
+#                              existed, so anything filed through the app before then carries
+#                              no label)
 #
-# Create the missing two under Issues -> Labels. Add a line here when a new form wants a label.
+# Add a line here, and create the label, when a new form wants one.
 #
 # Blank issues stay switched on deliberately, and for a second reason here beyond the CRM's.
 #
