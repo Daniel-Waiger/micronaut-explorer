@@ -20,6 +20,7 @@ import {
   conditionIssues,
   expandConditions,
   formatReplicateToken,
+  physicalSampleCount,
 } from '../src/engine/conditions.js';
 import { sanitizeToken } from '../src/engine/naming.js';
 
@@ -464,4 +465,47 @@ test('buildGroupSegments omits a factor the row carries no level for', () => {
 test('buildGroupSegments on a design with no groups and no factors yields an empty array', () => {
   const rows = expandConditions({ groups: { levels: [] }, factors: [] });
   assert.deepEqual(buildGroupSegments(rows[0], { groups: { levels: [] }, factors: [] }), []);
+});
+
+// --- physicalSampleCount: samples, not files (technical axis excluded) ----
+// A technical replicate is a repeat MEASUREMENT of the same physical sample
+// (web/kb/questions.json), so unlike the full row count, physicalSampleCount
+// must ignore that axis entirely -- groups x factors x biological replicates
+// only.
+
+test('physicalSampleCount ignores the technical-replicate axis entirely', () => {
+  const design = {
+    groups: { levels: ['CT', 'NAM50MM'] },
+    factors: [{ name: 'genotype', levels: ['WT', 'KO'] }],
+    biologicalReplicates: 2,
+    technicalReplicates: 3,
+  };
+  // 2 groups x 2 genotypes x 2 bio reps = 8 physical samples, regardless of
+  // the 3 technical replicates (which would make plannedRowCount 24).
+  assert.equal(physicalSampleCount(design), 8);
+  assert.equal(expandConditions(design).length, 24);
+});
+
+test('physicalSampleCount matches the full row count when there is no technical-replicate axis', () => {
+  const design = {
+    groups: { levels: ['CT', 'drug'] },
+    factors: [{ name: 'genotype', levels: ['WT', 'KO'] }],
+    biologicalReplicates: 3,
+    technicalReplicates: null,
+  };
+  assert.equal(physicalSampleCount(design), expandConditions(design).length);
+  assert.equal(physicalSampleCount(design), 12);
+});
+
+test('physicalSampleCount is total on malformed/absent design input, never throws', () => {
+  assert.equal(physicalSampleCount(undefined), 1);
+  assert.equal(physicalSampleCount(null), 1);
+  assert.equal(physicalSampleCount({}), 1);
+  assert.equal(physicalSampleCount({ factors: 'not-an-array', groups: 42 }), 1);
+  // An explicit-but-invalid technical replicate count must not affect
+  // physicalSampleCount at all -- the axis is excluded outright.
+  assert.equal(
+    physicalSampleCount({ factors: [], groups: { levels: [] }, technicalReplicates: 'bogus' }),
+    1
+  );
 });

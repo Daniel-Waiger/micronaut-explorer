@@ -117,3 +117,61 @@ test('renderIcs uses CRLF line endings (RFC 5545)', () => {
   assert.ok(ics.includes('\r\n'));
   assert.ok(!ics.replace(/\r\n/g, '').includes('\n'));
 });
+
+// --- acquisitionRunCount: mounting scales with physical samples, --------
+// acquisition scales with acquisition runs (which include technical
+// replicates) -- these must NOT be the same number once the two diverge.
+
+test('acquisitionRunCount scales acquisition but NOT mounting -- the technical-replicate asymmetry', () => {
+  // sampleCount is the physical-sample count (e.g. physicalSampleCount(design)
+  // for 4 samples); acquisitionRunCount folds in 3 technical replicates per
+  // sample, so it is 3x sampleCount, exactly as planFilenames(...).length
+  // would be for this design.
+  const events = buildIcsSchedule({
+    assayLabel: 'Bacterial viability',
+    timing: { etaFixationMinutes: null, etaMountingMinutes: 10, etaAcquisitionMinutes: 15, etaAnalysisMinutes: null },
+    sampleCount: 4,
+    acquisitionRunCount: 12, // 4 samples x 3 technical replicates
+    startDate: START,
+  });
+  assert.equal(events.length, 2);
+  const mounting = events.find((e) => e.summary.includes('Mounting'));
+  const acquisition = events.find((e) => e.summary.includes('acquisition'));
+  // Mounting is NOT tripled: it is still 10 min/sample x 4 physical samples.
+  assert.equal(mounting.minutes, 40);
+  // Acquisition IS tripled: 15 min/run x 12 acquisition runs.
+  assert.equal(acquisition.minutes, 180);
+  assert.match(mounting.summary, /4 samples/);
+  assert.match(acquisition.summary, /12 runs/);
+});
+
+test('omitting acquisitionRunCount reproduces the pre-AUD-02 output exactly (protects every existing caller)', () => {
+  const withoutRunCount = buildIcsSchedule({
+    assayLabel: 'Bacterial viability',
+    timing: { etaFixationMinutes: 30, etaMountingMinutes: 10, etaAcquisitionMinutes: 15, etaAnalysisMinutes: 60 },
+    sampleCount: 4,
+    startDate: START,
+  });
+  const withExplicitEqualRunCount = buildIcsSchedule({
+    assayLabel: 'Bacterial viability',
+    timing: { etaFixationMinutes: 30, etaMountingMinutes: 10, etaAcquisitionMinutes: 15, etaAnalysisMinutes: 60 },
+    sampleCount: 4,
+    acquisitionRunCount: 4,
+    startDate: START,
+  });
+  assert.deepEqual(withoutRunCount, withExplicitEqualRunCount);
+
+  const acquisition = withoutRunCount.find((e) => e.summary.includes('acquisition'));
+  assert.equal(acquisition.minutes, 60); // 15 * 4, unchanged from before this task
+});
+
+test('acquisitionRunCount is clamped to at least 1, same as sampleCount', () => {
+  const events = buildIcsSchedule({
+    assayLabel: 'X',
+    timing: { etaFixationMinutes: null, etaMountingMinutes: null, etaAcquisitionMinutes: 15, etaAnalysisMinutes: null },
+    sampleCount: 4,
+    acquisitionRunCount: 0,
+    startDate: START,
+  });
+  assert.equal(events[0].minutes, 15); // 15 * 1, not 15 * 4 and not NaN/0
+});
