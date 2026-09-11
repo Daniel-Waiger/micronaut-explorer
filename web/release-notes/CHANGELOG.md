@@ -9,7 +9,65 @@ that existing history, not a scheme that was tracked from day one.
 
 ## [Unreleased]
 
+### Added
+- Opening the shipped example study now opens it in a second browser tab —
+  a practice tab, at `index.html?demo=1` — running its own separate copy of
+  the app against its own saved work, rather than replacing whatever was open
+  in the tab you started from. `core/storageScope.js` resolves which set of
+  saved data a tab reads and writes (today, exactly two: your own, and the
+  practice tab's), and `ui/newTab.js` opens the practice tab by synthesising
+  a click on a real link rather than calling `window.open` directly, so that
+  a popup blocker sees an ordinary navigation and `rel="noopener"` can be set
+  — which matters here beyond the usual advice, since `?demo=1` is
+  same-origin and without it the practice tab would otherwise receive a live
+  handle back into the tab holding your real study. The practice tab keeps
+  its own edits between visits, and carries a bar across the top with its own
+  **Reset to the example** control for starting over from the shipped plan.
+- The Utilities menu's **Restore previous version** list now shows when each
+  saved version was written, not just its title — a second line under each
+  entry reading something like "5m ago" or "2h ago" for a recent save, and a
+  plain local date (e.g. "Sep 11, 2026") once a save is a day old or more,
+  via `ui/shell.js`'s new `restoreWhenLabel()`. This matters most exactly
+  where the list used to be least useful: several saves in a row of a study
+  that hasn't been retitled render as a stack of identical-looking "Untitled
+  study" (or identical-title) rows with nothing to tell them apart. Every
+  saved slot written before this change carries no save time at all, so that
+  case is load-bearing rather than a corner to round off:
+  `restoreWhenLabel()` returns an empty string for a missing, non-string, or
+  unparseable value, and the row it belongs to simply omits the second line
+  and looks exactly as it always has — never "Invalid Date". The added line
+  is hidden from the button's accessible name (which would otherwise run the
+  title and the time together with no separator between them); an explicit
+  `aria-label` restates both as one properly punctuated phrase instead.
+
 ### Changed
+- Opening the example study no longer has anything to protect: because it
+  now runs in its own tab against its own saved work, your current study is
+  never replaced, so there is nothing left to preserve it against. The
+  copy that used to promise "your current study will be preserved in Restore
+  and demo activity cannot remove it" is gone along with the risk it was
+  written to cover; see the manual's Getting Started and Saving, Backups &
+  Privacy chapters for the corrected walkthrough. (One honest limit worth
+  restating here: the practice tab's isolation is by a distinct prefix
+  within the browser's one shared storage per site, a strong convention
+  rather than a separate vault — see `core/storageScope.js`'s header
+  comment.)
+- The guided example walkthrough — a tour of the example study specifically
+  — is now reachable only from the practice tab the example opens in, since
+  that is the only place the example itself is ever open.
+- `openExampleStudy` (`core/appController.js`) now refuses outright to run
+  outside the practice tab, logging an error rather than replacing the
+  current study, so the one truly destructive path in that module stays
+  unreachable no matter what ends up calling it — not only from today's
+  actual call sites.
+- **"Clear all stored data" is now scoped to the tab it's run from.**
+  `persist.js`'s `clearAll()` sweeps by the same prefix `core/storageScope.js`
+  now namespaces every key under, so running it from the practice tab clears
+  only that tab's saved versions and running it from your own tab clears only
+  yours — neither tab can reach across and wipe the other's history. Settings
+  and the manual's Saving, Backups & Privacy chapter have been reworded to
+  say so plainly, rather than the older "removes every locally saved version"
+  phrasing that read as global.
 - **Measurement status is now three independently scoped axes** — definition,
   plan, and export conformance — replacing the single three-word vocabulary
   that quietly conflated them. Each axis has its own statuses (Draft /

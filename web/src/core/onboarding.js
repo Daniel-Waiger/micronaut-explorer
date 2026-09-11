@@ -11,9 +11,15 @@
 //
 // Core module: pure logic only, no DOM, no engine/ui imports, no network.
 
-const STAGE_KEY = 'micronaut.onboarding.stage';
-const EXPERIENCE_KEY = 'micronaut.onboarding.experience';
-const COMPLETED_KEY = 'micronaut.onboarding.completed';
+import { nsKey } from './storageScope.js';
+
+// Namespaced so the practice tab's walkthrough answers (stage/experience) and
+// its completed-gate flag never leak into the user's own tab: without this, a
+// visitor poking at the example would either permanently dismiss their own
+// onboarding gate or overwrite their real stage/experience choices.
+const STAGE_KEY = nsKey('micronaut.onboarding.stage');
+const EXPERIENCE_KEY = nsKey('micronaut.onboarding.experience');
+const COMPLETED_KEY = nsKey('micronaut.onboarding.completed');
 
 export const ONBOARDING_STAGES = ['idea', 'designing', 'acquiring'];
 export const ONBOARDING_LEVELS = ['novice', 'occasional', 'frequent'];

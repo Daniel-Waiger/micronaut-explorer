@@ -139,6 +139,64 @@ body {
   min-height: 100vh;
 }
 
+/* Practice-tab banner (shell.js's isSandbox branch, ?demo=1 only): a
+   persistent, non-dismissable strip so this tab is never mistaken for the
+   user's real one -- there is deliberately no dismiss control. Sits above
+   the header in normal flow rather than joining its sticky stack: it scrolls
+   away with the page instead of staying pinned, which is a deliberate
+   simplification that keeps it out of the ResizeObserver-published
+   --shell-*-height sizing math a few hundred lines down (see shell.js's own
+   comment on that calculation). Reuses the same solid accent-background /
+   accent-ink-text pill already used elsewhere in this file for "this one is
+   active/special" (the release-notes nav item, workflow-strip's Continue
+   action) rather than inventing a new color language for one more notice. */
+.sandbox-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px clamp(18px, 2.4vw, 28px);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-ink) 25%, transparent);
+  color: var(--accent-ink);
+  background: var(--accent);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.sandbox-banner-text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.sandbox-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sandbox-banner-action {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--accent-ink) 45%, transparent);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--accent-ink);
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sandbox-banner-action:hover {
+  background: color-mix(in srgb, var(--accent-ink) 15%, transparent);
+}
+
+.sandbox-banner-action:focus-visible {
+  outline: 2px solid var(--accent-ink);
+  outline-offset: 2px;
+}
+
 .shell-header {
   display: flex;
   align-items: center;
@@ -1186,6 +1244,21 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+/* The example-study entry (ui/steps/home.js's appendExampleLink) is the one
+   card on this page that earns a featured treatment: it used to be a tiny
+   text link a new visitor could miss entirely. This base-layer rule is
+   restated near the redesigned .home-card block below (~2607), which is the
+   one that actually wins the cascade for border-color/background -- see
+   that block's own comment. */
+.home-card-featured {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.home-card-featured:hover {
+  border-color: var(--accent);
+}
+
 .home-card-icon {
   font-size: 34px;
   line-height: 1;
@@ -1635,7 +1708,8 @@ button:focus-visible {
 }
 
 /* The Guide step (ui/steps/guide.js): a readable, max-width prose column. */
-.guide-tour-button {
+.guide-tour-button,
+.guide-practice-tab-button {
   margin-bottom: 16px;
 }
 
@@ -2633,6 +2707,30 @@ textarea:focus-visible {
 .home-card-title { color: var(--ink); font-size: 17px; font-weight: 720; }
 .home-card-body, .guide-para { color: var(--muted); }
 
+/* This block (from ~2600) is the later layer that actually wins .home-card's
+   own border-color/background over the plainer declarations near :1163 --
+   equal specificity, later in source, so it is what a browser really paints.
+   The featured card's accent treatment has to be restated here too, or it
+   would be silently overridden back to an ordinary card the moment this
+   block loads. */
+.home-card-featured {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+}
+
+.home-card-featured:hover {
+  border-color: var(--accent);
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.home-card-featured .home-card-icon {
+  background: var(--accent);
+}
+
+.home-card-featured .home-card-glyph {
+  color: var(--accent-ink);
+}
+
 .planned-box,
 .advice-section,
 .spectral-view,
@@ -2885,6 +2983,20 @@ td, th { border-color: var(--line); }
 .shell-restore-action { font-size: 12.5px; }
 .shell-restore-row { display: flex; align-items: center; gap: 2px; }
 .shell-restore-row .shell-restore-action { flex: 1; min-width: 0; }
+/* Second line inside the restore button (shell.js's renderRecoveryEntries),
+   holding restoreWhenLabel()'s output. `display: block` is what actually
+   stacks it under the title line -- a bare <span> is inline and would just
+   run on after the title text instead. .shell-utility-action's min-height is
+   a *minimum* (app.css:2880-2892), not a fixed height, and neither it nor
+   .shell-restore-action clamps overflow or forces nowrap, so the button
+   grows to fit this extra line with no other layout change needed. */
+.shell-restore-when {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 550;
+}
 .shell-restore-delete {
   font: inherit;
   font-size: 13px;

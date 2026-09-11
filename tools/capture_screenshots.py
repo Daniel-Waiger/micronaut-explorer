@@ -284,15 +284,6 @@ SCREENS = [
     ),
 ]
 
-OPEN_EXAMPLE_JS = """
-(() => {
-  const btn = Array.from(document.querySelectorAll('button.home-skip-link'))
-    .find((b) => b.textContent.includes('Open the example study'));
-  if (btn) btn.click();
-  return Boolean(btn);
-})()
-"""
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(
@@ -373,7 +364,17 @@ def main() -> int:
         session.call("DOM.enable")
 
         def goto(hash_: str, wait_ms: int = 600):
-            session.call("Page.navigate", {"url": f"{base_url}/index.html#/{hash_}"})
+            # `?demo=1` is the practice tab (core/storageScope.js): a second,
+            # namespaced set of localStorage keys that the app seeds with the
+            # shipped example study at boot, with no click required. Landing
+            # here instead of the bare app root means every shot in this file
+            # is captured against that seeded example rather than the user's
+            # own (empty, from this script's fresh profile) study. Appending
+            # the flag before the `#` is deliberate: resolveStorageScope reads
+            # it from location.search, and a hash change later (hash_nav,
+            # below) never touches the query string, so the scope sticks for
+            # every route this session navigates to.
+            session.call("Page.navigate", {"url": f"{base_url}/index.html?demo=1#/{hash_}"})
             # Poll for the app root to have rendered something rather than a
             # fixed sleep alone -- first paint after a full navigation can be
             # slower than an in-page hash change.
@@ -391,19 +392,14 @@ def main() -> int:
             session.evaluate(f"location.hash = '#/{hash_}'")
             time.sleep(wait_ms / 1000)
 
-        # Initial load: land on Study map, then explicitly ask for the
-        # shipped example study via its own "Open the example study" link
-        # (ui/steps/home.js) rather than hand-rolling a localStorage payload
-        # -- this exercises the app's real load path and guarantees the
-        # content is the app's own example data, not fabricated captions.
+        # Initial load: land on Study map in the practice tab. There is no
+        # button to click any more -- storageScope.js's makeNsKey resolves a
+        # 'demo' scope from the ?demo=1 flag on this URL, and the app seeds
+        # the shipped example study into that scope's (empty, on this
+        # script's fresh profile) storage at boot. That's still the app's
+        # real load path, not a hand-rolled localStorage payload, so the
+        # content captured below is genuinely the app's own example data.
         goto("home", wait_ms=800)
-        opened = session.evaluate(OPEN_EXAMPLE_JS)
-        if not opened:
-            raise RuntimeError("Could not find the 'Open the example study' button on Study map.")
-        # Let the confirmation toast ("Opened the example study...") finish
-        # its own ~3s auto-dismiss before any screenshot, rather than
-        # capturing it mid-fade over real content.
-        time.sleep(3.5)
 
         current_theme = "light"
 

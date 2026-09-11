@@ -8,6 +8,8 @@ import { buildFeedbackReport } from '../core/feedbackReport.js';
 import { handoffFeedback } from './feedbackHandoff.js';
 import { createIcon } from './icons.js';
 import { measurementStatus, measurementStatusLabel } from '../engine/measurementStatus.js';
+import { IS_SANDBOX, nsKey } from '../core/storageScope.js';
+import { openInNewTab, SANDBOX_URL } from './newTab.js';
 
 // Maps a measurement status record's `tone` onto the switcher pill's existing
 // badge classes (app.css:2947-2954), so the pill and the Measurements
@@ -20,8 +22,19 @@ const MEASUREMENT_TONE_CLASS = Object.freeze({
   neutral: 'is-not-started',
 });
 
+// UNSCOPED on purpose (core/storageScope.js's nsKey is deliberately NOT
+// applied here): the practice tab (?demo=1) should look like the user's own
+// app, and a remembered light/dark choice carries no study data, so there is
+// nothing about it worth isolating per tab. storageScope.js's own SHARED_KEYS
+// already treats this exact key as shared, so nsKey(THEME_KEY) would resolve
+// to the same unscoped key anyway -- left unscoped explicitly here so that
+// fact doesn't have to be re-derived by reading storageScope.js.
 const THEME_KEY = 'micronaut.theme';
-const NAV_COLLAPSED_KEY = 'micronaut.navCollapsed';
+// SCOPED, unlike THEME_KEY above: nav-collapsed is ordinary per-tab layout
+// state, not a preference worth sharing on purpose, so it gets the default
+// treatment -- namespaced so collapsing the rail in one tab can never
+// silently flip it in the other.
+const NAV_COLLAPSED_KEY = nsKey('micronaut.navCollapsed');
 
 function readPreference(key) {
   try { return localStorage.getItem(key); } catch { return null; }
@@ -50,6 +63,50 @@ export function saveLabel(saveState) {
   if (seconds < 10) return 'Saved locally · just now';
   if (seconds < 60) return `Saved locally · ${seconds}s ago`;
   return `Saved locally · ${Math.round(seconds / 60)}m ago`;
+}
+
+// The one absolute-time complement to saveLabel's relative-only vocabulary
+// above. saveLabel never needs an upper bound because it is read live off the
+// header's own indicator -- the save it describes just happened. A slot in
+// Restore is a different animal: it can be seconds old or weeks old, and
+// "meta.updatedAt" on a really old slot has no `savedAt` at all (any slot
+// written before that field existed) or is stringified nonsense (a corrupted
+// or hand-edited record), neither of which is this function's job to notice
+// -- it always renders *something* sane, even '' for "say nothing".
+// RESTORE_ABSOLUTE_AFTER_HOURS is the cutover from "relative to now" to "a
+// real calendar date": past a day, "19h ago" stops being easier to place than
+// the date itself, so this trades relative for absolute rather than letting
+// the relative count climb into "312h ago" territory.
+const RESTORE_ABSOLUTE_AFTER_HOURS = 24;
+
+// `now` is injectable for the same reason appController.js injects its own
+// clock: without it these labels can only be tested against the wall clock,
+// which means a test asserting an exact string ('45s ago') races the machine
+// -- if more than a second passes between the test building its timestamp and
+// this function reading Date.now(), the assertion flips to '46s ago' and the
+// suite fails for a reason that has nothing to do with the code. That is not
+// a hypothetical; it showed up once under parallel load while this was being
+// written. Production callers pass nothing and get the real clock.
+export function restoreWhenLabel(iso, { now = () => Date.now() } = {}) {
+  if (typeof iso !== 'string' || !iso) return '';
+  const date = new Date(iso);
+  // Number.isNaN, not the global isNaN: a genuinely invalid Date's getTime()
+  // is NaN, and Number.isNaN doesn't coerce first the way the global one
+  // does -- same guard saveLabel already relies on above.
+  if (Number.isNaN(date.getTime())) return '';
+  const seconds = Math.max(0, Math.floor((now() - date.getTime()) / 1000));
+  if (seconds < 10) return 'just now';
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < RESTORE_ABSOLUTE_AFTER_HOURS) return `${hours}h ago`;
+  // toLocaleDateString with no timezone option reads the runtime's own local
+  // clock (the same "local by definition" property the module doc for this
+  // file's date rules elsewhere in this codebase relies on) -- deliberately
+  // no time-of-day component, since once a saved version is a day old or
+  // more, which day it was matters far more than which second.
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 // `steps` is router.steps (every route, including the utility/guide ones);
@@ -87,6 +144,10 @@ export function renderShell(root, store, router, options = {}) {
   const {
     onReset, onNewBlank, onAdoptExample, onExportProject, onImportProject,
     onRestoreRecovery, onDeleteRecovery, kbIssueCount,
+    // Injected (defaulting to the real IS_SANDBOX) so both the practice-tab
+    // and real-tab branches of the banner below are exercisable against the
+    // DOM stub without a real `location.search` to resolve against.
+    isSandbox = IS_SANDBOX,
   } = options;
   // Missing lifecycle state must degrade conservatively. Only main can know
   // that a recovery slot was actually loaded or a save completed.
@@ -96,6 +157,64 @@ export function renderShell(root, store, router, options = {}) {
   let themeNavButton = null;
   let featureWalkthroughHandler = null;
   root.textContent = '';
+
+  // Persistent, non-dismissable strip: the practice tab (?demo=1) must never
+  // be mistaken for the real one, so unlike every other notice in this file
+  // there is no close/dismiss control here at all. Built only when isSandbox
+  // is true, so the real tab's DOM carries no trace of it -- not just
+  // hidden, absent. Sits above the (sticky) header rather than joining its
+  // sticky stack: the ResizeObserver-published --shell-*-height custom
+  // properties a few hundred lines down assume exactly header + workflow
+  // strip + switcher, and this banner is practice-tab-only chrome that has
+  // no reason to earn a place in that shared calculation.
+  let sandboxBanner = null;
+  if (isSandbox) {
+    sandboxBanner = document.createElement('div');
+    sandboxBanner.className = 'sandbox-banner';
+    sandboxBanner.setAttribute('role', 'note');
+    const bannerText = document.createElement('span');
+    bannerText.className = 'sandbox-banner-text';
+    bannerText.textContent = 'Practice tab — example data, saved separately from your own study. Nothing you do here changes your work.';
+    sandboxBanner.appendChild(bannerText);
+
+    const bannerActions = document.createElement('div');
+    bannerActions.className = 'sandbox-banner-actions';
+
+    const whyButton = document.createElement('button');
+    whyButton.type = 'button';
+    whyButton.className = 'sandbox-banner-action';
+    whyButton.textContent = 'Why a separate tab?';
+    whyButton.addEventListener('click', () => {
+      // The real explanation, not a euphemism: this app holds exactly one
+      // study at a time, and a browser tab can only hold one page's worth of
+      // that state too -- so a second tab against its own storage is the
+      // only way to let you take the example apart with no risk to the
+      // study open in the other tab. No custom modal system exists in this
+      // file (see feedbackHandoff.js for the one place that owns one, which
+      // this is not part of), so this reuses the same window.alert this
+      // codebase already relies on elsewhere (ui/steps/naming.js) for a
+      // single-acknowledgement message.
+      window.alert(
+        'Micronaut keeps one study open at a time, and a browser tab can only hold one study\'s worth of that on screen -- so the only way to let you take the example apart with no risk is to give it its own tab.\n\n' +
+        'Close this tab whenever you are done: your study in the other tab is still open exactly as you left it. Anything you change here, in this practice tab, is kept too, so you can come back to it.'
+      );
+    });
+    bannerActions.appendChild(whyButton);
+
+    if (onReset) {
+      const resetButton = document.createElement('button');
+      resetButton.type = 'button';
+      resetButton.className = 'sandbox-banner-action';
+      resetButton.textContent = 'Reset to the example';
+      resetButton.addEventListener('click', () => {
+        if (window.confirm('Reset this practice tab back to the shipped example? Your current practice activity will be preserved in Restore.')) {
+          onReset();
+        }
+      });
+      bannerActions.appendChild(resetButton);
+    }
+    sandboxBanner.appendChild(bannerActions);
+  }
 
   const header = document.createElement('header');
   header.className = 'shell-header';
@@ -203,9 +322,21 @@ export function renderShell(root, store, router, options = {}) {
   });
   document.addEventListener('pointerdown', (event) => { if (!utilities.contains(event.target)) closeMenu(); });
 
-  if (onReset) utilityMenu.appendChild(action('Reset to example study', () => {
-    if (window.confirm('Open the oregano example? Your current study will be preserved in Restore and demo activity cannot remove it.')) onReset();
-  }));
+  // This used to read "Reset to example study" and REPLACE the study on
+  // screen after a window.confirm -- onReset (core/appController.js's
+  // openExampleStudy) now refuses to run at all outside the practice tab, so
+  // that control would be a dead button here even with the confirm kept.
+  // Opening the practice tab (its own storage, ?demo=1) is the real
+  // replacement, and it displaces nothing on screen, so there is nothing
+  // left to confirm.
+  // Hidden inside the practice tab itself, where it would offer to open the
+  // tab you are already standing in. The banner's "Reset to the example"
+  // above is the equivalent control there.
+  if (!isSandbox) {
+    utilityMenu.appendChild(action('Open example in a practice tab', () => {
+      openInNewTab(SANDBOX_URL);
+    }));
+  }
   if (onExportProject) utilityMenu.appendChild(action('Export project backup', onExportProject));
   if (onImportProject) {
     const input = document.createElement('input');
@@ -242,12 +373,42 @@ export function renderShell(root, store, router, options = {}) {
       const entryTitle = entry.title || 'Untitled study';
       const row = document.createElement('div');
       row.className = 'shell-restore-row';
-      const restore = action(`${index === 0 ? 'Latest: ' : ''}${entryTitle}`, () => {
+      const titleLine = `${index === 0 ? 'Latest: ' : ''}${entryTitle}`;
+      const restore = action(titleLine, () => {
         if (window.confirm('Restore this saved version? Your current work remains available in Restore.')) {
           onRestoreRecovery(entry.id);
         }
       }, 'shell-restore-action');
       restore.title = 'Restore this saved version';
+      // action() just set restore.textContent above, which (per its own doc
+      // comment) is a SINGLE text node -- action() is shared with four other
+      // menu items and isn't touched for this. appendChild here adds the
+      // timestamp as a SECOND node alongside it instead, which is exactly
+      // what lets app.css's .shell-restore-when put it on its own line below
+      // titleLine without any change to that shared helper.
+      // recoveryEntries() (appController.js) returns savedAt: null for any
+      // slot saved before that field existed, so '' here is not an edge case
+      // -- it is what every upgrading user's oldest slots look like on first
+      // load, and skipping the span entirely reproduces today's one-line row
+      // exactly for them.
+      const whenLabel = restoreWhenLabel(entry.savedAt);
+      if (whenLabel) {
+        const when = document.createElement('span');
+        when.className = 'shell-restore-when';
+        when.textContent = whenLabel;
+        // Screen readers compute a button's accessible name from its text
+        // content unless an aria-label overrides that -- and with two text
+        // nodes now inside `restore` (titleLine, then whenLabel with no
+        // separator between them), that computed name would run the two
+        // together verbatim, e.g. "Latest: Autophagy assay5m ago". aria-hidden
+        // here takes the second line out of that computation, and the
+        // explicit aria-label below puts the same two facts back in as one
+        // properly punctuated phrase instead -- so sighted and screen-reader
+        // users get the same information, just assembled differently.
+        when.setAttribute('aria-hidden', 'true');
+        restore.appendChild(when);
+        restore.setAttribute('aria-label', `${titleLine}, saved ${whenLabel}`);
+      }
       row.appendChild(restore);
       if (onDeleteRecovery) {
         const remove = document.createElement('button');
@@ -609,7 +770,7 @@ export function renderShell(root, store, router, options = {}) {
   status.className = 'shell-status';
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
-  root.append(header, workflowStrip, switcher, body, footer, status);
+  root.append(...(sandboxBanner ? [sandboxBanner] : []), header, workflowStrip, switcher, body, footer, status);
 
   // Publishes the footer's real, current height so .shell-status and
   // .shell-main (app.css) can clear it exactly instead of duplicating a

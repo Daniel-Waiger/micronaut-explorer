@@ -1,10 +1,18 @@
 # Screenshots
 
 Reference screenshots of Micronaut Planner, captured against the shipped
-example study (the oregano-plasma-coating wound-healing study, opened via
-Study map's own "Open the example study" link -- see
-`web/src/core/defaultStudy.js`). All images are 1440px wide, light theme
-except the last.
+example study (the oregano-plasma-coating wound-healing study -- see
+`web/src/core/defaultStudy.js`).
+
+Captured in the PRACTICE TAB (`index.html?demo=1`), which is where the
+example lives now: the app seeds it there at boot against its own set of
+saved work, so there is no link to click and no risk of a capture run
+touching a real study. That is why every image carries the practice-tab
+banner across the top -- it is not an artefact of the tooling, it is what a
+reader following the manual actually sees, since the example only ever opens
+in that tab. See `web/src/core/storageScope.js`.
+
+All images are 1440px wide, light theme except the last.
 
 Regenerate all of them with:
 

@@ -117,6 +117,52 @@ test('emptyExperiment calls mint DIFFERENT assay ids', () => {
   assert.notEqual(a.activeAssayId, b.activeAssayId);
 });
 
+test('emptyExperiment mints a non-empty string meta.id and ISO-string createdAt/updatedAt', () => {
+  const exp = emptyExperiment();
+  assert.equal(typeof exp.meta.id, 'string');
+  assert.ok(exp.meta.id.length > 0);
+  assert.equal(typeof exp.meta.createdAt, 'string');
+  assert.equal(typeof exp.meta.updatedAt, 'string');
+  assert.ok(!Number.isNaN(new Date(exp.meta.createdAt).getTime()), 'createdAt must parse to a valid Date');
+  assert.ok(!Number.isNaN(new Date(exp.meta.updatedAt).getTime()), 'updatedAt must parse to a valid Date');
+});
+
+test('emptyExperiment calls mint DIFFERENT meta.ids', () => {
+  const a = emptyExperiment();
+  const b = emptyExperiment();
+  assert.notEqual(a.meta.id, b.meta.id);
+});
+
+test('migrate backfills a missing meta.id on a legacy document, returning a NEW root, and leaves createdAt null', () => {
+  // A null id is exactly the legacy-save shape (see the v1/v2 fixtures
+  // below, and emptyExperiment() before this change) -- migrate() must
+  // mint a real one, but must NOT invent a creation date it cannot justify.
+  const legacy = emptyExperiment();
+  legacy.meta.id = null;
+  legacy.meta.createdAt = null;
+
+  const migrated = migrate(legacy);
+  assert.notEqual(migrated, legacy);
+  assert.equal(typeof migrated.meta.id, 'string');
+  assert.ok(migrated.meta.id.length > 0);
+  assert.equal(migrated.meta.createdAt, null);
+  assert.equal(legacy.meta.id, null, 'migration must not mutate the saved object');
+});
+
+test('migrate backfills meta.id idempotently: a second pass is a true no-op, same reference and same id', () => {
+  // The important case: a re-minting backfill would hand the same document
+  // a DIFFERENT id every time it happens to be loaded, which defeats the
+  // entire purpose of an id meant to key a workspace index or survive an
+  // export/import round trip. Once backfilled, the id must be stable.
+  const legacy = emptyExperiment();
+  legacy.meta.id = null;
+
+  const onceBackfilled = migrate(legacy);
+  const twiceBackfilled = migrate(onceBackfilled);
+  assert.equal(twiceBackfilled, onceBackfilled);
+  assert.equal(twiceBackfilled.meta.id, onceBackfilled.meta.id);
+});
+
 test('migrate no-ops at the current schema version', () => {
   const exp = emptyExperiment();
   const migrated = migrate(exp);

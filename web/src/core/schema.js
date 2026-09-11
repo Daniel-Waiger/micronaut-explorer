@@ -18,7 +18,7 @@
 // stay written against the flat v2 shape forever.
 
 import { emptyAssay, isAssayScopedPath } from './assay.js';
-import { shortId } from './ids.js';
+import { shortId, uuid } from './ids.js';
 import { canOverwrite } from './provenance.js';
 
 export const SCHEMA_VERSION = 6;
@@ -75,12 +75,27 @@ const DEFAULT_NAMING_TEMPLATE =
 
 export function emptyExperiment() {
   const firstId = shortId();
+  // meta.id uses uuid(), NOT shortId(): shortId's collision space is "large
+  // but non-zero" (see importValidate.js's sanitizeAssay docstring, which
+  // already refuses to invent a fallback id for exactly that reason), and
+  // this id is a document identity that must survive an export/import round
+  // trip and later key a workspace index -- a collision here silently
+  // merges two unrelated studies' history, not just two assays in one
+  // in-memory session. uuid() falls back to a Math.random()-seeded v4 shape
+  // under file:// (see ids.js), which is still fine for this purpose.
+  const now = new Date().toISOString();
   return {
     schemaVersion: SCHEMA_VERSION,
     meta: {
-      id: null,
-      createdAt: null,
-      updatedAt: null,
+      id: uuid(),
+      // ISO 8601 strings, never Date objects: persist.js round-trips the
+      // whole document through JSON.stringify/parse and tests assert a
+      // strict deepEqual across that round trip, which compares
+      // prototypes -- a Date survives the stringify but comes back as a
+      // string, so storing a Date here would make a freshly created study
+      // fail that comparison the very first time it was saved and reloaded.
+      createdAt: now,
+      updatedAt: now,
       title: '',
       origin: 'blank',
     },
@@ -378,6 +393,44 @@ function normalizeStudyContext(current) {
   return isValid ? current : { ...current, studyContext: normalized };
 }
 
+// Saved studies from before meta.id existed carry `id: null` (or never had
+// the key at all -- emptyExperiment() from before this change always wrote
+// `null` explicitly, but a hand-edited or hostile file need not have). Mint
+// one at the load boundary rather than in a migration step so that MOVING
+// through schema versions and MERELY RE-LOADING an already-current save are
+// treated the same way: both are "this document reached the app without a
+// real id" and both get exactly one, ever -- and, critically, exactly once:
+// re-running migrate() on the already-backfilled result must find a real
+// string id already there and stop, or a document's identity would change
+// on every load, which defeats the entire point of an id that is supposed
+// to key a workspace index or survive an export/import round trip.
+//
+// This normalizer only ever touches meta.id -- createdAt is deliberately
+// left alone. An id is an arbitrary label with no truth value: minting one
+// the first time a legacy document is opened costs nothing and is
+// indistinguishable from having minted it at creation, because nothing
+// about the document's history depended on what the label says. A creation
+// date is not a label, it is a CLAIM about the past: stamping "now" onto a
+// study a user actually wrote months ago would assert something false about
+// it, in the same register importValidate.js already refuses to invent an
+// assay id it cannot justify (see sanitizeAssay's docstring) -- some fields
+// degrade to a reasonable default and some fields must stay honestly
+// unknown. updatedAt likewise needs no backfill here: every save now stamps
+// it (see appController.js's withSaveStamp -- persist.js has no clock and
+// deliberately knows nothing about document shape), so a document reaching
+// this boundary without one is
+// either brand new (already stamped by emptyExperiment()) or about to be
+// stamped by the very save that reads it back in.
+//
+// Follows the same idiom as normalizeStudyContext: preserve the original
+// reference when the field is already valid, so an already-current,
+// already-identified save keeps the no-op identity contract intact.
+function normalizeStudyIdentity(current) {
+  const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
+  if (typeof meta.id === 'string' && meta.id) return current;
+  return { ...current, meta: { ...meta, id: uuid() } };
+}
+
 export function migrate(obj) {
   let current = obj;
   let version = obj && typeof obj.schemaVersion === 'number' ? obj.schemaVersion : 0;
@@ -407,7 +460,15 @@ export function migrate(obj) {
   // them. Do it at the boundary every persisted experiment crosses instead.
   // Each normalizer preserves the original object when its own data is valid,
   // retaining the no-op identity contract for already-valid current saves.
+  //
+  // normalizeStudyIdentity runs BEFORE the meta.origin block below: that
+  // block early-returns as soon as origin is already one of STUDY_ORIGINS,
+  // and a legacy save with a valid origin but no id is exactly the common
+  // case (every pre-this-change emptyExperiment() wrote `origin: 'blank'`
+  // immediately). Running identity normalization after that return would
+  // silently skip the backfill for precisely the documents that need it.
   current = normalizeStudyContext(current);
+  current = normalizeStudyIdentity(current);
   const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
   if (STUDY_ORIGINS.has(meta.origin)) return current;
   return { ...current, meta: { ...meta, origin: 'user' } };

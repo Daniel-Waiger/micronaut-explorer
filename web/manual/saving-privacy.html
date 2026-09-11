@@ -61,7 +61,7 @@
 
       <section>
         <h2 id="restore">Restore: previous saved versions</h2>
-        <p>Micronaut keeps your last five distinct autosaved versions in a rotating history, oldest dropped automatically as new ones are saved. Open the <strong>Utilities</strong> menu (near the top of the app) to see <strong>Restore previous version</strong>, listing each saved version by the study's own title, newest first (labelled "Latest:").</p>
+        <p>Micronaut keeps your last five distinct autosaved versions in a rotating history, oldest dropped automatically as new ones are saved. Open the <strong>Utilities</strong> menu (near the top of the app) to see <strong>Restore previous version</strong>, listing each saved version by the study's own title and when it was saved, newest first (labelled "Latest:").</p>
         <ol class="steps">
           <li>Open <strong>Utilities</strong> and find a version under "Restore previous version."</li>
           <li>Click it, then confirm — restoring replaces your current in-memory study with that saved version. (Your current work is itself autosaved before you'd lose access to it, since restoring is just another change.)</li>
@@ -72,7 +72,7 @@
 
       <section>
         <figure class="shot">
-          <img src="images/10-settings-storage.png" alt="The Settings screen, showing Download project backup, Import project backup, Start a blank study and Clear all stored data buttons, with a note explaining what clearing removes." loading="lazy"
+          <img src="images/10-settings-storage.png" alt="The Settings screen, showing Project backup, Import project backup, Start a blank study and Clear all stored data buttons, with a note explaining what clearing removes and that it applies to the tab you run it from." loading="lazy"
                onerror="this.closest('.shot').classList.add('pending')">
           <div class="ph">Snapshot pending — the Settings screen's backup and storage controls.</div>
           <figcaption><strong>Settings</strong> gathers every storage action in one row: the two backup actions, a blank start, and the one destructive control, each with its consequences written next to it.</figcaption>
@@ -98,15 +98,15 @@
       </section>
 
       <section>
-        <h2 id="new-blank-and-reset">Starting over: New study and Reset to example</h2>
-        <p><strong>New study</strong> (in the nav rail) clears the workspace to a blank study after you confirm. <strong>Reset to example study</strong> first writes the exact current study to a protected Restore slot, then opens the shipped example. Demo saves never evict that protected user snapshot; if it cannot be preserved, the example is not opened.</p>
+        <h2 id="new-blank-and-reset">Starting over: New study, and the practice tab's Reset to example</h2>
+        <p><strong>New study</strong> (in the nav rail) clears the workspace to a blank study after you confirm — your previous versions stay reachable in Restore, exactly as with any other change. The example study works differently, and separately: opening it (from Study map's "Explore a completed example" card, or the header's Utilities menu) opens a new browser tab running its own copy of the Planner, so it never touches the study open in the tab you're already using. Edits you make in that practice tab are kept from one visit to the next, so you can leave and come back to them. When you'd rather start the example fresh, the bar across the top of the practice tab offers <strong>Reset to the example</strong>, which discards only that tab's practice edits and reopens the shipped plan. Closing the practice tab is simply how you leave it — your own study, in the tab you came from, is never part of the exchange.</p>
       </section>
 
       <section>
         <h2 id="clear-all">Clear all stored data</h2>
         <p>Settings also has <strong>Clear all stored data</strong> — the one destructive action in the app, and the only one guarded by a two-click "arm" instead of a single confirmation dialog: the first click changes the button's own label to "Click again to permanently clear all stored data" and arms it for a few seconds; a second click within that window actually clears everything, while letting the arming time out on its own disarms it again with no effect.</p>
         <ul>
-          <li>It removes every locally saved version (the entire Restore history) — freeing up storage space if it's full or corrupted.</li>
+          <li>In the tab you run it from, it removes every locally saved version (the entire Restore history) — freeing up storage space if it's full or corrupted. Run it from the practice tab and only the practice tab's saved versions are cleared; your own study's history, in your own tab, is untouched.</li>
           <li>It does <strong>not</strong> touch the study currently open in your browser tab. Your open work is safe, and Micronaut immediately writes it into the now-empty history as a fresh save, so autosaving resumes right away.</li>
         </ul>
         <div class="callout tip"><p><strong>💡 Tip.</strong> If you want to keep anything from your Restore history, download a project backup of it first — clearing removes that history for good, with no undo.</p></div>

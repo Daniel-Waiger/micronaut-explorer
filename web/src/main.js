@@ -1,5 +1,6 @@
 import { createDefaultStudy } from './core/defaultStudy.js';
 import { emptyExperiment } from './core/schema.js';
+import { IS_SANDBOX } from './core/storageScope.js';
 import { createStore } from './core/store.js';
 import { createRouter } from './core/router.js';
 import { renderShell } from './ui/shell.js';
@@ -42,7 +43,7 @@ import { createMeasurementStep } from './ui/steps/measurement.js';
 import { feedbackStep } from './ui/steps/feedback.js';
 import { settingsStep } from './ui/steps/settings.js';
 import { loadOnboarding } from './core/onboarding.js';
-import { createAppController, resolveInitialExperiment } from './core/appController.js';
+import { createAppController, isExampleOrigin, resolveInitialExperiment, withOrigin } from './core/appController.js';
 
 /**
  * Read the knowledge pack from the ONE place its global is read, then hand
@@ -65,9 +66,12 @@ function loadAppKb() {
 // example made a visitor's first workspace someone else's four-measurement
 // study, and an entire ownership subsystem (banners, read-only exploration,
 // "make a copy") existed only to walk that back. The example is still one
-// click away -- see openExampleStudy() (core/appController.js) and Home's
-// "Open the example study" -- but it is now something the visitor asks for
-// rather than something they have to disown.
+// click away -- Home's "Explore a completed example" card -- but it is now
+// something the visitor asks for rather than something they have to disown.
+// That click no longer lands here at all, though: it opens the example in its
+// own PRACTICE TAB (?demo=1, see core/storageScope.js) against a separate set
+// of saved work, so this tab's study is not replaced, and openExampleStudy()
+// (core/appController.js) refuses to run anywhere but that tab.
 
 // Bootstrap, not top-level await -- the single-file inliner forbids
 // top-level await since the released artifact is one classic (non-module,
@@ -91,14 +95,29 @@ function init() {
     saveExperiment,
   };
 
+  // A practice tab (?demo=1) resolves against its OWN key set
+  // (core/storageScope.js's nsKey namespaces every key persist.js touches),
+  // so on a first visit that ring is genuinely empty -- there is no autosave
+  // to recover, by construction, not by bug. resolveInitialExperiment's
+  // fallback factory is normally emptyExperiment (a true first run should
+  // start blank), but that would leave the practice tab open on a blank
+  // study with nothing to practise on. Swap in a factory that returns the
+  // shipped example instead, tagged 'template' -- see isExampleOrigin's
+  // long comment (core/appController.js) for why 'template' and not the
+  // older 'example': ui/steps/guide.js's Start button gates on that
+  // predicate, so tagging this wrong would make the walkthrough
+  // unreachable in the very tab that exists to run it.
+  const sandboxFallback = () => withOrigin(createDefaultStudy(), 'template');
+
   const { experiment: initialExperiment, skippedCount, totalSaved, isPersisted } = resolveInitialExperiment(
     persistBundle,
-    emptyExperiment,
+    IS_SANDBOX ? sandboxFallback : emptyExperiment,
     {
       onUnreadable: (id, err) =>
         console.error(`Discarding an unreadable autosave (slot ${id}), trying the next one:`, err),
     }
   );
+
   const store = createStore(initialExperiment);
 
   // The guidedProgress.js bundle handed to appController, same reasoning as
@@ -124,6 +143,7 @@ function init() {
     createExampleStudy: createDefaultStudy,
     createEmptyStudy: emptyExperiment,
     isPersisted,
+    isSandbox: IS_SANDBOX,
   });
 
   const kb = loadAppKb();
@@ -353,7 +373,22 @@ function init() {
 
   // The one thing allowed to open itself on load, and only because the user
   // explicitly left a walkthrough paused mid-way on a previous visit.
-  if (appController.getGuidedState().status === 'active') guidedController.resume();
+  //
+  // Gated on the study actually being the example, not just on there being an
+  // active record. The walkthrough is a tour OF the example, and the example
+  // now only ever lives in the practice tab -- but a progress record written
+  // before that change survives in the real tab under the same unprefixed key
+  // it has always used. Without this check, upgrading a user who left a
+  // walkthrough running would pop the panel open over their own study on the
+  // next load, narrating steps about a study that is not on screen. Same
+  // predicate ui/steps/guide.js and ui/steps/home.js gate their walkthrough
+  // actions on, so all three agree on when the walkthrough may appear.
+  if (
+    isExampleOrigin(store.get().meta?.origin)
+    && appController.getGuidedState().status === 'active'
+  ) {
+    guidedController.resume();
+  }
 }
 
 init();

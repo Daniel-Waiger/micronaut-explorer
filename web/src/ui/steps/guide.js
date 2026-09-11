@@ -33,8 +33,17 @@
 // completion-screen "Use as template" action already routes through
 // appController.js's isExampleOrigin-guarded adoptExampleTemplate, so it
 // needs no separate check of its own here.
+//
+// The example can now only be OPENED from the practice tab (?demo=1) --
+// openExampleStudy (core/appController.js) refuses to run outside it -- so a
+// study on THIS tab that is not already example-origin can never turn into
+// one by clicking Start here. The non-example fallback below therefore
+// carries a second action that opens the practice tab (ui/newTab.js), so the
+// walkthrough stays reachable from Guide instead of quietly becoming
+// unreachable the day the in-tab example was removed.
 
 import { isExampleOrigin } from '../../core/appController.js';
+import { openInNewTab, SANDBOX_URL } from '../newTab.js';
 
 /**
  * A titled, searchable section: an <h2> plus whatever nodes `build(container)`
@@ -102,6 +111,11 @@ export const guideStep = {
     onResumeGuided,
     onRestartGuided,
     onExplainGuided,
+    // Defaulted here, same pattern as ui/steps/home.js's render(): the real
+    // app always gets a working opener with no wiring required, while a test
+    // can inject its own spy in place of this default to assert the URL
+    // without a real browser (ui/feedbackHandoff.js:111's onOpen precedent).
+    onOpenExampleTab = openInNewTab,
   } = {}) {
     main.textContent = '';
 
@@ -117,29 +131,53 @@ export const guideStep = {
     // 'example' alone would make Start permanently unreachable.
     const isExample = isExampleOrigin(store.get().meta?.origin);
     const guideStatus = guideGuidedStatus(guidedStatus, getGuidedStatus);
-    const guideAction = guideStatus === 'paused'
+    // isExample gates the WHOLE walkthrough action set, not just Start.
+    //
+    // Gating only Start (the first shape of this change) left a real hole:
+    // `paused` and `completed` were tested FIRST, so a non-example study still
+    // offered "Resume example walkthrough" / "Restart example walkthrough" --
+    // buttons that would run a tour OF THE EXAMPLE over somebody's own work,
+    // in the very tab this change exists to keep the example out of.
+    //
+    // That is not a pre-existing wart, it is new: before the practice tab, an
+    // `active`/`paused` record implied the example WAS loaded in this tab,
+    // because opening it in place was the only way to start a walkthrough at
+    // all. Now the example is never here, so any progress record surviving in
+    // this tab -- and upgrading users keep theirs, since the real scope's key
+    // is the unprefixed one it always was -- is guaranteed to describe a study
+    // the walkthrough was not written for. One check at the top is what makes
+    // "the walkthrough only runs on the example" true for every status rather
+    // than for one of them.
+    const guideAction = !isExample
       ? {
-          label: 'Resume example walkthrough',
-          callback: onResumeGuided,
-          title: 'Resume the optional seven-step example walkthrough without changing this study.',
+          label: 'Explain the workflow',
+          callback: onExplainGuided,
+          title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+          offerPracticeTab: true,
         }
-      : guideStatus === 'completed'
+      : guideStatus === 'paused'
         ? {
-            label: 'Restart example walkthrough',
-            callback: onRestartGuided,
-            title: 'Restart the optional seven-step example walkthrough from its first step.',
+            label: 'Resume example walkthrough',
+            callback: onResumeGuided,
+            title: 'Resume the optional seven-step example walkthrough without changing this study.',
           }
-        : isExample && guideStatus === 'not-started'
+        : guideStatus === 'completed'
           ? {
-              label: 'Start example walkthrough',
-              callback: onStartGuided,
-              title: 'Open the optional seven-step example walkthrough without changing this study.',
+              label: 'Restart example walkthrough',
+              callback: onRestartGuided,
+              title: 'Restart the optional seven-step example walkthrough from its first step.',
             }
-          : {
-              label: 'Explain the workflow',
-              callback: onExplainGuided,
-              title: 'Open a contextual explanation without changing your study or walkthrough progress.',
-            };
+          : guideStatus === 'not-started'
+            ? {
+                label: 'Start example walkthrough',
+                callback: onStartGuided,
+                title: 'Open the optional seven-step example walkthrough without changing this study.',
+              }
+            : {
+                label: 'Explain the workflow',
+                callback: onExplainGuided,
+                title: 'Open a contextual explanation without changing your study or walkthrough progress.',
+              };
     const guideButton = document.createElement('button');
     guideButton.type = 'button';
     guideButton.className = 'copy-button guide-tour-button';
@@ -149,6 +187,26 @@ export const guideStep = {
       if (typeof guideAction.callback === 'function') guideAction.callback('guide');
     });
     main.appendChild(guideButton);
+
+    // The walkthrough is otherwise unreachable from this study: Explain
+    // talks about it, but nothing on this page can start it. Opening the
+    // practice tab (its own storage, ?demo=1) is the one thing that still
+    // can.
+    if (guideAction.offerPracticeTab) {
+      const practiceTabButton = document.createElement('button');
+      practiceTabButton.type = 'button';
+      // Deliberately NOT carrying .guide-tour-button: that selector names the
+    // ONE button whose label reports the walkthrough's state, and both the
+    // browser suite (tests/test_e2e_flows.py) and guideStep.test.js read it
+    // with a first-match query. A second element wearing it would make those
+    // reads depend on DOM order. Styling comes from app.css listing this
+    // class alongside .guide-tour-button instead.
+    practiceTabButton.className = 'copy-button guide-practice-tab-button';
+      practiceTabButton.textContent = 'Try it in a practice tab';
+      practiceTabButton.title = 'Open a finished example study in a separate practice tab, saved separately from your own study, where the guided walkthrough can run.';
+      practiceTabButton.addEventListener('click', () => onOpenExampleTab(SANDBOX_URL));
+      main.appendChild(practiceTabButton);
+    }
 
     para(
       main,
@@ -225,7 +283,7 @@ export const guideStep = {
       section(main, 'Getting started', (c) => {
         bullets(c, [
           'Choose “Plan my study” to start your own Study map, or “Explore a completed example” to inspect the oregano plan. The example is not your data.',
-          'Opening the example preserves your current study in Restore before anything changes on screen. Demo activity cannot age that protected copy out of Restore.',
+          'The example opens in a separate practice tab of its own, so the study you are working on is not replaced, moved, or closed -- it stays open in the tab you came from. Close the practice tab when you are done with it.',
           'You do not have to answer everything. Fields you skip are simply marked as not set; ' +
             'the app still produces whatever it can from what you have entered.',
         ]);

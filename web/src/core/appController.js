@@ -90,6 +90,13 @@ export function resolveInitialExperiment(persist, createEmptyStudy, { onUnreadab
  * @param {() => object} deps.createEmptyStudy - core/schema.js's emptyExperiment.
  * @param {boolean} [deps.isPersisted] - from resolveInitialExperiment's result;
  *   seeds the initial save-state status.
+ * @param {boolean} [deps.isSandbox=false] - core/storageScope.js's IS_SANDBOX,
+ *   true only in the `?demo=1` practice tab. Injected rather than imported
+ *   (like every other collaborator here -- see the header comment) so a test
+ *   can construct a controller in either mode without a real `location`.
+ *   Defaults to false -- the safe reading when nobody says otherwise is "this
+ *   is somebody's real study" -- and main.js is the one caller that passes the
+ *   real value. openExampleStudy's guard (below) is gated on this.
  * @param {{ setTimeout: Function, clearTimeout: Function }} [deps.timers]
  * @param {() => string} [deps.now] - returns the ISO timestamp used for `savedAt`.
  * @param {{ error: Function, warn: Function }} [deps.logger]
@@ -103,6 +110,7 @@ export function createAppController({
   createExampleStudy,
   createEmptyStudy,
   isPersisted = false,
+  isSandbox = false,
   timers = {
     setTimeout: (...args) => window.setTimeout(...args),
     clearTimeout: (...args) => window.clearTimeout(...args),
@@ -121,6 +129,37 @@ export function createAppController({
 
   function attachShell(nextShell) {
     shell = nextShell;
+  }
+
+  /**
+   * Stamp `meta.updatedAt` (from the injected `now`, so this is exactly as
+   * fake-clock-testable as `saveState.savedAt` already is) on a COPY of
+   * `experiment`, for handing to persist.saveExperiment -- never on the
+   * object living in the store.
+   *
+   * Why here and not in persist.js: persist.js's saveExperiment docstring
+   * says plainly that module has no clock anywhere and is deliberately
+   * ignorant of document shape (slot ids are "not keyed by
+   * experiment.meta.id") -- it cannot stamp a field it never looks at.
+   * appController already owns `now`, so this is the one place both the
+   * save and the stamp happen together.
+   *
+   * CRITICAL, and the one thing that must never regress: this returns a
+   * NEW object rather than mutating `experiment` in place. Writing the
+   * timestamp back into the LIVE study (e.g. via store.patch/replace)
+   * would run it through the same notification path startAutosave's
+   * subscriber listens on to schedule the next debounced save -- so a
+   * mutating version of this helper would have every save notify
+   * subscribers, which schedules another autosave, which stamps and
+   * notifies again: an unbounded loop. Returning a copy means the
+   * timestamp only ever reaches persist (and, through it, the Restore
+   * list, which reads the persisted slot's raw meta.updatedAt directly);
+   * the in-memory study just picks up its own updatedAt the next time it
+   * is loaded fresh from storage, same as every other field persist.js
+   * round-trips.
+   */
+  function withSaveStamp(experiment) {
+    return { ...experiment, meta: { ...(experiment.meta || {}), updatedAt: now() } };
   }
 
   function notifyToast(message) {
@@ -167,12 +206,28 @@ export function createAppController({
       const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
         ? raw.meta.title.trim()
         : 'Untitled study';
-      return { id, title };
+      // Read raw, un-migrated meta.updatedAt directly (this function never
+      // calls migrate()) rather than fabricating one: every slot saved
+      // before this change genuinely has no updatedAt, and reporting `null`
+      // honestly for those is the point, not an edge case to paper over. A
+      // hand-edited or corrupt slot whose updatedAt survived as some other
+      // type (a number, an object) is normalized to `null` the same way,
+      // since it is not a value anything downstream should render as a date.
+      const savedAt = typeof raw?.meta?.updatedAt === 'string' ? raw.meta.updatedAt : null;
+      return { id, title, savedAt };
     });
   }
 
   function exportProjectBackup() {
-    persist.exportToFile(store.get(), projectFilename(store.get()));
+    // Stamped like any other write. Without this the downloaded file carries
+    // whatever updatedAt the in-memory study happens to hold -- which, for a
+    // study created and edited in this session and never reloaded, is still
+    // the creation time from emptyExperiment(). Someone importing that file
+    // an hour later would get a document claiming it had not been touched
+    // since it was made, and a workspace list sorting by recency would put it
+    // in the wrong place. The export IS the moment this copy was written, so
+    // that is what it should say.
+    persist.exportToFile(withSaveStamp(store.get()), projectFilename(store.get()));
     persist.markExported({ onQuotaExceeded: reportStorageFailure });
     notifyToast('Project backup downloaded.');
   }
@@ -258,7 +313,7 @@ export function createAppController({
       );
       return false;
     }
-    const savedId = persist.saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+    const savedId = persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure });
     notifyRecoveryEntries();
     if (!savedId) {
       reportPersistentLifecycleFailure(
@@ -277,25 +332,67 @@ export function createAppController({
   // copied, or disowned before the visitor may type in it. `origin: 'example'`
   // still exists in the schema so older autosaves keep loading unchanged.
   function openExampleStudy() {
+    // HARD REFUSAL, first statement, unconditional. This function replaces
+    // the entire in-memory study -- the one truly destructive operation in
+    // this whole module -- so the guard belongs INSIDE it, not at its call
+    // sites. A call-site check only makes TODAY's callers safe (main.js no
+    // longer wires a real-tab control to this); it says nothing about a
+    // future button, a mis-merge that re-points a real-tab entry point back
+    // at openExampleStudy, or someone invoking
+    // controller.actions.onOpenExample()/onReset() from the console. Putting
+    // the check here instead makes the study-replacing path itself
+    // unreachable outside the practice tab, no matter how it gets invoked --
+    // the only thing a call-site check can never guarantee.
+    if (!isSandbox) {
+      logger.error(
+        'openExampleStudy: refused outside the practice tab (?demo=1). This call would replace the real study in place; it is a no-op here on purpose.'
+      );
+      return false;
+    }
+
+    // A pending debounced autosave timer holds a closure over store.get()
+    // that fires 500ms after the *last* edit, whenever that lands relative to
+    // this call. Without flushing it first, store.replace() below runs while
+    // that timer is still pending, and it then fires AFTER the replace, reads
+    // store.get() fresh (now the example), and persists the example over the
+    // ring slot that should hold the practice edit the user made just before
+    // clicking reset -- the exact bug documented on startBlankStudy above,
+    // reproduced here because this function has the identical shape
+    // (read-then-replace across a debounce window). startBlankStudy already
+    // calls flushAutosave() for this reason; this was the same latent bug,
+    // just not yet triggered because nothing had exercised this path with a
+    // pending timer.
+    flushAutosave();
+
     // Preserve the exact current state synchronously, before replace() can
     // expose example data to the autosave subscriber. This snapshot is
-    // protected from normal ring eviction: browsing or editing demo data can
-    // never delete user-entered work. If durable preservation is unavailable,
+    // protected from normal ring eviction: since this function is now only
+    // reachable from the sandbox tab, "the current state" here is always the
+    // sandbox's own prior practice activity, never the user's real study --
+    // but the protection is the same one openExampleStudy always used, so
+    // browsing or editing the example still can never delete whatever
+    // practice work came before it. If durable preservation is unavailable,
     // do not switch workspaces at all.
-    const protectedId = persist.saveExperiment(store.get(), {
+    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
       onQuotaExceeded: reportStorageFailure,
       protectFromAutomaticEviction: true,
     });
     if (!protectedId) {
       reportPersistentLifecycleFailure(
-        'Could not preserve your current study, so the example was not opened. Download a project backup or free storage, then try again.'
+        'Could not preserve your current practice state, so the example was not reopened. Download a project backup or free storage, then try again.'
       );
       return false;
     }
     const example = createExampleStudy();
     store.replace(withOrigin(example, 'template'));
     notifyRecoveryEntries();
-    notifyToast('Opened the example study. Your study was preserved in Restore and demo activity cannot remove it.');
+    // Pre-sandbox this toast said "Your study was preserved in Restore" --
+    // accurate when this function could be called from the real tab and
+    // really did displace someone's own study. Now that the guard above makes
+    // that unreachable, the only thing this ever does is reset the PRACTICE
+    // tab back to the shipped example, so the copy has to talk about practice
+    // activity, not "your study" (there is no other study here to preserve).
+    notifyToast('Reset to the example study. Your previous practice activity was preserved in Restore.');
     return true;
   }
 
@@ -317,7 +414,7 @@ export function createAppController({
    */
   function startBlankStudy() {
     flushAutosave();
-    const protectedId = persist.saveExperiment(store.get(), {
+    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
       onQuotaExceeded: reportStorageFailure,
       protectFromAutomaticEviction: true,
     });
@@ -383,7 +480,7 @@ export function createAppController({
   let saveTimer = null;
 
   function performAutosave() {
-    const savedId = persist.saveExperiment(store.get(), { onQuotaExceeded: reportStorageFailure });
+    const savedId = persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure });
     if (savedId) {
       setSaveState({ status: 'saved', savedAt: now(), error: null });
       notifyRecoveryEntries();
@@ -425,6 +522,14 @@ export function createAppController({
   // recoverable instead of making a "start over" action a data-loss trap.
   // Spread this same object into both renderShell's options and every
   // step's render() options (main.js) -- shared names, single source.
+  //
+  // onReset and onOpenExample are still both aliases of the same
+  // openExampleStudy, kept as two names because existing callers use both --
+  // but in the real tab they are now unreachable-by-design rather than merely
+  // unused: the UI no longer wires either to a real-tab control, and even if
+  // it did (or a console call invoked one directly), openExampleStudy's own
+  // isSandbox guard refuses outside the practice tab regardless of which
+  // name was used to reach it.
   const actions = {
     onReset: openExampleStudy,
     onNewBlank: startBlankStudy,

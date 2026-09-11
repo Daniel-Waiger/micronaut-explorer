@@ -11,7 +11,9 @@
 // (one-concern tests).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { appendGuidedEntry, appendExampleLink } from '../src/ui/steps/home.js';
+import { appendGuidedEntry, appendExampleLink, homeStep } from '../src/ui/steps/home.js';
+import { createStore } from '../src/core/store.js';
+import { emptyExperiment } from '../src/core/schema.js';
 import { createDomStub } from './domStub.js';
 
 function withHomeContainer(callback) {
@@ -46,7 +48,11 @@ function secondaryExplainLinks(main) {
 test('not-started offers Start example walkthrough and calls onStartGuided exactly once', () => {
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
-    appendGuidedEntry(main, { guidedStatus: { status: 'not-started' }, ...cb });
+    // isExample: true -- the walkthrough is a tour OF the example, and since
+    // the example now only ever opens in the practice tab, this is the only
+    // situation in which Start can actually fire. The opposite branch is the
+    // next test.
+    appendGuidedEntry(main, { guidedStatus: { status: 'not-started' }, isExample: true, ...cb });
 
     const card = primaryCard(main);
     assert.match(card.textContent, /Start example walkthrough/);
@@ -68,7 +74,7 @@ test('not-started offers Start example walkthrough and calls onStartGuided exact
 test('active offers Continue walkthrough, reopening the panel via onResumeGuided', () => {
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
-    appendGuidedEntry(main, { guidedStatus: { status: 'active' }, ...cb });
+    appendGuidedEntry(main, { guidedStatus: { status: 'active' }, isExample: true, ...cb });
 
     const card = primaryCard(main);
     assert.match(card.textContent, /Continue walkthrough/);
@@ -87,7 +93,7 @@ test('active offers Continue walkthrough, reopening the panel via onResumeGuided
 test('paused still offers Resume walkthrough via onResumeGuided (unchanged)', () => {
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
-    appendGuidedEntry(main, { guidedStatus: { status: 'paused' }, ...cb });
+    appendGuidedEntry(main, { guidedStatus: { status: 'paused' }, isExample: true, ...cb });
 
     const card = primaryCard(main);
     assert.match(card.textContent, /Resume walkthrough/);
@@ -100,7 +106,7 @@ test('paused still offers Resume walkthrough via onResumeGuided (unchanged)', ()
 test('completed still offers Restart walkthrough via onRestartGuided (unchanged)', () => {
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
-    appendGuidedEntry(main, { guidedStatus: { status: 'completed' }, ...cb });
+    appendGuidedEntry(main, { guidedStatus: { status: 'completed' }, isExample: true, ...cb });
 
     const card = primaryCard(main);
     assert.match(card.textContent, /Restart walkthrough/);
@@ -114,7 +120,7 @@ test('a malformed guided status degrades to the explain action instead of throwi
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
     assert.doesNotThrow(() => {
-      appendGuidedEntry(main, { getGuidedStatus: () => ({ status: 42 }), ...cb });
+      appendGuidedEntry(main, { getGuidedStatus: () => ({ status: 42 }), isExample: true, ...cb });
     });
 
     const card = primaryCard(main);
@@ -135,7 +141,7 @@ test('a missing guided status (no guidedStatus, no getGuidedStatus) also degrade
   withHomeContainer((main) => {
     const cb = guidedCallbacks();
     assert.doesNotThrow(() => {
-      appendGuidedEntry(main, { ...cb });
+      appendGuidedEntry(main, { isExample: true, ...cb });
     });
     assert.match(primaryCard(main).textContent, /Explain Study map/);
   });
@@ -147,6 +153,7 @@ test('getGuidedStatus() takes precedence over a stale guidedStatus prop', () => 
     appendGuidedEntry(main, {
       guidedStatus: { status: 'completed' },
       getGuidedStatus: () => ({ status: 'active' }),
+      isExample: true,
       ...cb,
     });
 
@@ -159,24 +166,120 @@ test('getGuidedStatus() takes precedence over a stale guidedStatus prop', () => 
   });
 });
 
-test('clicking "Open the example study" calls onOpenExample exactly once', () => {
+test('not-started on a study that did not come from the example offers the practice tab, not a Start that cannot fire', () => {
   withHomeContainer((main) => {
-    const calls = [];
-    appendExampleLink(main, () => calls.push(true));
+    const cb = guidedCallbacks();
+    const opened = [];
+    appendGuidedEntry(main, {
+      guidedStatus: { status: 'not-started' },
+      isExample: false,
+      onOpenExampleTab: (url) => opened.push(url),
+      ...cb,
+    });
 
-    const link = main.querySelectorAll('.home-skip-link').find((el) => /Open the example study/.test(el.textContent));
-    assert.ok(link, 'expected the example-study link row to render');
-    link.click();
-    assert.equal(calls.length, 1);
+    const card = primaryCard(main);
+    // The dead-button check. Before the practice tab existed this branch
+    // promised "Start example walkthrough" on every study; now that the
+    // example can only be opened in its own tab, guide.js's Start gate would
+    // never open for this study, so promising Start here would be a button
+    // that silently does nothing.
+    assert.doesNotMatch(card.textContent, /Start example walkthrough/);
+    assert.match(card.textContent, /practice tab/);
+
+    card.click();
+    assert.deepEqual(opened, ['?demo=1'], 'must open the practice tab');
+    assert.equal(cb.calls.start.length, 0, 'must not claim to have started a walkthrough');
   });
 });
 
-test('the example-study link row is absent when onOpenExample is not supplied', () => {
+test('no status offers the walkthrough on a study that did not come from the example', () => {
+  // The hole an earlier shape of this change left open. Gating only
+  // 'not-started' meant a non-example study still got Continue / Resume /
+  // Restart -- a tour OF THE EXAMPLE, reopened over the user's own work, in
+  // the one tab this change exists to keep the example out of. Upgrading
+  // users really can land here: the real tab's progress record is stored
+  // under the same unprefixed key it always was, so a walkthrough left paused
+  // before this change survives into a tab the example is no longer in.
+  for (const status of ['not-started', 'active', 'paused', 'completed']) {
+    withHomeContainer((main) => {
+      const cb = guidedCallbacks();
+      const opened = [];
+      appendGuidedEntry(main, {
+        guidedStatus: { status },
+        isExample: false,
+        onOpenExampleTab: (url) => opened.push(url),
+        ...cb,
+      });
+
+      const card = primaryCard(main);
+      assert.match(card.textContent, /practice tab/, `${status} should offer the practice tab`);
+      card.click();
+      assert.deepEqual(opened, ['?demo=1'], `${status} should open the practice tab`);
+      assert.equal(cb.calls.start.length, 0, `${status} must not start a walkthrough here`);
+      assert.equal(cb.calls.resume.length, 0, `${status} must not resume a walkthrough here`);
+      assert.equal(cb.calls.restart.length, 0, `${status} must not restart a walkthrough here`);
+    });
+  }
+});
+
+test('the example card opens the practice tab rather than replacing the study', () => {
+  withHomeContainer((main) => {
+    const opened = [];
+    const card = appendExampleLink(main, (url) => opened.push(url));
+
+    assert.ok(card, 'expected the example card to render');
+    assert.match(card.className, /home-card-featured/, 'it is the one featured card on this page');
+    assert.match(card.textContent, /Explore a completed example/);
+
+    card.click();
+    // A URL, not a lifecycle callback: nothing about this click touches the
+    // study open in this tab.
+    assert.deepEqual(opened, ['?demo=1']);
+  });
+});
+
+test('the example card is offered in your own tab and hidden inside the practice tab', () => {
+  // Driven through homeStep.render rather than appendExampleLink directly --
+  // unlike every other test in this file, which deliberately avoids render()
+  // because it also builds a real Study map. The gate under test lives in
+  // render() itself, so there is nowhere else to observe it, and the stub
+  // turns out to carry createStudyMap fine with an emptyExperiment() store.
+  //
+  // The bug: the practice tab kept offering "Explore a completed example",
+  // inviting the reader to open a practice tab while standing in one, looking
+  // at the very example it offered to show them. The Utilities menu item was
+  // gated for this; this card was missed.
+  const render = (isSandbox) => {
+    const { document: fakeDocument, install, restore } = createDomStub();
+    install();
+    try {
+      const main = fakeDocument.createElement('main');
+      homeStep.render(main, createStore(emptyExperiment()), {
+        router: { navigate: () => {}, current: () => 'home' },
+        onOpenExampleTab: () => {},
+        isSandbox,
+      });
+      return main.querySelectorAll('.home-card-title').map((el) => el.textContent);
+    } finally {
+      restore();
+    }
+  };
+
+  assert.ok(render(false).includes('Explore a completed example'), 'your own tab offers the example');
+  assert.equal(
+    render(true).includes('Explore a completed example'),
+    false,
+    'the practice tab must not offer to open the page you are already on'
+  );
+  // The walkthrough card survives in both -- this gate is about the example
+  // entry point only, not about emptying the page.
+  assert.ok(render(true).some((t) => /walkthrough/i.test(t)), 'the walkthrough card stays');
+});
+
+test('the example card is absent when no opener is supplied', () => {
   withHomeContainer((main) => {
     const result = appendExampleLink(main, undefined);
     assert.equal(result, null);
-    const link = main.querySelectorAll('.home-skip-link').find((el) => /Open the example study/.test(el.textContent));
-    assert.equal(link, undefined);
-    assert.equal(main.children.length, 0);
+    assert.equal(main.children.length, 0, 'no dead button, and no empty grid left behind');
   });
 });
