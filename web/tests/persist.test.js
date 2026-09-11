@@ -55,6 +55,31 @@ function makeQuotaExceededStorage() {
   };
 }
 
+// A backend that throws on every single member a real (locked-down, or
+// otherwise hostile) Storage implementation might refuse: reads, writes, AND
+// the length/key() enumeration clearAll relies on. Every exported function
+// that accepts an injected storage must degrade to its documented fallback
+// against this, never let the throw escape.
+function makeHostileStorage() {
+  return {
+    getItem() {
+      throw new Error('hostile getItem');
+    },
+    setItem() {
+      throw new Error('hostile setItem');
+    },
+    removeItem() {
+      throw new Error('hostile removeItem');
+    },
+    get length() {
+      throw new Error('hostile length');
+    },
+    key() {
+      throw new Error('hostile key');
+    },
+  };
+}
+
 test('saveExperiment writes a slot and lists it most-recent-first', () => {
   const storage = makeFakeStorage();
   const id = saveExperiment(emptyExperiment(), { storage });
@@ -302,6 +327,55 @@ test('clearAll removes every key this app owns', () => {
   assert.equal(changesSinceExport({ storage }), 0);
 });
 
+test('clearAll reports failure when a key it enumerated could not actually be removed', () => {
+  // The enumeration succeeds and removeItem is what throws -- the one shape a
+  // "collect first, delete second" sweep cannot notice on its own. removeKey
+  // deliberately suppresses the throw (a quota/security error must not crash
+  // the app), so without a returned result clearAll would report ok:true over
+  // data that is still sitting there, and main.js would then tell the user
+  // "Cleared all locally stored data." That is precisely the class of lie
+  // this result object exists to prevent.
+  const storage = makeFakeStorage();
+  saveExperiment(emptyExperiment(), { storage });
+  markChanged({ storage });
+  const stillThere = storage.length;
+  assert.ok(stillThere > 0, 'sanity: there is something to fail to remove');
+
+  storage.removeItem = () => {
+    throw new Error('removeItem blocked');
+  };
+  const quotaErrors = [];
+  const result = clearAll({ storage, onQuotaExceeded: (err) => quotaErrors.push(err) });
+
+  assert.equal(result.ok, false, 'a suppressed removeItem failure must not report success');
+  assert.deepEqual(result.removed, [], 'nothing was actually removed');
+  assert.ok(result.error instanceof Error);
+  assert.equal(storage.length, stillThere, 'the data really is still there');
+  assert.ok(quotaErrors.length > 0, 'the underlying error is still surfaced to the callback');
+});
+
+test('clearAll reports partial failure honestly, removing what it can', () => {
+  const storage = makeFakeStorage();
+  saveExperiment(emptyExperiment(), { storage });
+  markChanged({ storage });
+  const owned = [];
+  for (let i = 0; i < storage.length; i += 1) owned.push(storage.key(i));
+  assert.ok(owned.length > 1, 'sanity: need at least two owned keys to split the outcome');
+
+  const doomedButStuck = owned[0];
+  const realRemove = storage.removeItem.bind(storage);
+  storage.removeItem = (key) => {
+    if (key === doomedButStuck) throw new Error('removeItem blocked');
+    realRemove(key);
+  };
+  const result = clearAll({ storage });
+
+  assert.equal(result.ok, false);
+  assert.ok(!result.removed.includes(doomedButStuck), 'a key that survived is not listed as removed');
+  assert.ok(result.removed.length > 0, 'the keys that could go, went -- a partial clear still completes');
+  assert.equal(storage.getItem(doomedButStuck) !== null, true, 'the stuck key is genuinely still stored');
+});
+
 test('clearAll leaves foreign keys in the same storage untouched', () => {
   const storage = makeFakeStorage();
   saveExperiment(emptyExperiment(), { storage });
@@ -452,4 +526,89 @@ test('loadRecoverableSlot reports missing or unmigrateable selections without th
   assert.equal(unreadable.experiment, null);
   assert.match(unreadable.error.message, /newer than this app supports/);
   assert.equal(reported.id, badId);
+});
+
+// --- AUD-01: defaultBackend() and clearAll() must never let a hostile or
+// privacy-mode storage backend escape as an uncaught throw ------------------
+
+test('defaultBackend survives a globalThis.localStorage whose property access itself throws', () => {
+  // Privacy-mode browsers can make the *property access itself* throw (not
+  // merely return a value that later throws on use). defaultBackend() is a
+  // default parameter of every exported function here, so this has to be
+  // caught before any of those functions' own bodies ever run.
+  const hadOwnProperty = Object.prototype.hasOwnProperty.call(globalThis, 'localStorage');
+  const originalDescriptor = hadOwnProperty
+    ? Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    : undefined;
+
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    get() {
+      throw new Error('blocked');
+    },
+  });
+
+  try {
+    assert.doesNotThrow(() => listSaved());
+    assert.deepEqual(listSaved(), []);
+    assert.doesNotThrow(() => markChanged());
+    assert.doesNotThrow(() => clearAll());
+  } finally {
+    if (originalDescriptor) {
+      Object.defineProperty(globalThis, 'localStorage', originalDescriptor);
+    } else {
+      delete globalThis.localStorage;
+    }
+  }
+
+  // Confirm the environment was actually restored to its pre-test shape --
+  // other tests in this file rely on globalThis.localStorage being absent.
+  assert.equal(typeof globalThis.localStorage, 'undefined');
+});
+
+test('loadMostRecentRecoverable degrades to its documented no-recovery fallback against a hostile storage', () => {
+  const storage = makeHostileStorage();
+  const result = loadMostRecentRecoverable({ storage });
+  assert.deepEqual(result, { experiment: null, skippedCount: 0, totalSaved: 0 });
+});
+
+test('listSaved degrades to an empty list against a hostile storage', () => {
+  const storage = makeHostileStorage();
+  assert.deepEqual(listSaved({ storage }), []);
+});
+
+test('markChanged does not throw against a hostile storage', () => {
+  const storage = makeHostileStorage();
+  assert.doesNotThrow(() => markChanged({ storage }));
+});
+
+test('clearAll returns a success result naming exactly the STORAGE_PREFIX keys it removed', () => {
+  const storage = makeFakeStorage();
+  saveExperiment(emptyExperiment(), { storage });
+  saveExperiment(emptyExperiment(), { storage });
+  markChanged({ storage });
+  storage.setItem('someOtherApp.session', 'keep me');
+
+  const result = clearAll({ storage });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.error, null);
+  assert.ok(Array.isArray(result.removed));
+  assert.ok(result.removed.length > 0);
+  assert.ok(result.removed.every((key) => key.startsWith(STORAGE_PREFIX)));
+  // The foreign key is not among the removed keys and is still readable.
+  assert.ok(!result.removed.includes('someOtherApp.session'));
+  assert.equal(storage.getItem('someOtherApp.session'), 'keep me');
+  assert.deepEqual(listSaved({ storage }), []);
+});
+
+test('clearAll on a hostile (throwing) backend returns a failure result rather than throwing', () => {
+  const storage = makeHostileStorage();
+  let result;
+  assert.doesNotThrow(() => {
+    result = clearAll({ storage });
+  });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.removed, []);
+  assert.ok(result.error instanceof Error);
 });
