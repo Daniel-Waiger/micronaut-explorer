@@ -28,8 +28,13 @@ import { assayView, groupSeedLevels, removeAssay, scopeWrite, seedAssayGroups } 
 import { effectiveNamingFields, MAX_STUDY_ROWS, studyNameIssues } from '../../engine/plan.js';
 import { finalizeFields, renderName } from '../../engine/naming.js';
 import { shortId } from '../../core/ids.js';
-import { buildExperimentMap } from '../../engine/experimentMap.js';
-import { MEASUREMENT_STATUSES, measurementStatus, measurementStatusLabel } from '../../engine/measurementStatus.js';
+import {
+  MEASUREMENT_STATUS_FILTERS,
+  MEASUREMENT_STATUS_SCOPES,
+  MEASUREMENT_STATUS_TONES,
+  measurementStatus,
+  measurementStatusLabel,
+} from '../../engine/measurementStatus.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from '../../engine/namingConfig.js';
 
 // One row matches a query when any of the things a person would actually
@@ -95,16 +100,32 @@ function measurementReadout(assay) {
 }
 
 // measurementSystemSummary / measurementPlanningState / progressStateLabel
-// lived here to describe a measurement's state in prose on the old list. The
-// registry shows one status badge instead (engine/measurementStatus.js), which
-// is the single vocabulary a reader now has to learn, so they are gone rather
-// than kept as a second opinion.
+// lived here to describe a measurement's state in prose on the old list. That
+// prose collapsed three separate questions -- is it DEFINED, does its PLAN
+// still need a decision, do its export CHECKS pass -- into one word, which is
+// exactly what engine/measurementStatus.js now refuses to do: it reports
+// definition/plan/conformance as three scoped axes plus a `headline` (the
+// first axis not already at its best status) and that headline's `tone`. The
+// registry renders the headline as the row's main badge and the OTHER two
+// axes as muted chips in the same status cell (no new grid column -- see
+// app.css:4996's 7-column template), so the detail a reader used to lose is
+// visible again without a second, competing vocabulary.
 
 export const studyStep = {
   id: 'study',
   title: 'Measurements',
-  render(main, store, { showToast, router } = {}) {
+  render(main, store, { showToast, router, workflowProgress, getWorkflowProgress } = {}) {
     main.textContent = '';
+
+    // The render-time snapshot renderAssayList() reads for ordinary view
+    // changes (search/filter, delete) -- deliberately NOT recomputed per
+    // keystroke. store.setPath (the copy-groups path below) mutates `assays`
+    // IN PLACE, so main.js:497-501's `assays !== lastAssays` re-render guard
+    // never fires for it and this snapshot would go stale; that one path
+    // reassigns `currentProgress` via `getWorkflowProgress()` before
+    // re-rendering. See main.js's own comment on `getWorkflowProgress` for
+    // the producer side of this.
+    let currentProgress = workflowProgress && typeof workflowProgress === 'object' ? workflowProgress : {};
 
     const heading = document.createElement('h1');
     heading.className = 'step-heading';
@@ -182,6 +203,13 @@ export const studyStep = {
             : `Applied to ${applied} measurement(s).`
         );
       }
+      // store.setPath above mutates `assays` IN PLACE (core/store.js), so
+      // main.js:497-501's `assays !== lastAssays` re-render subscriber does
+      // NOT fire for this path and `currentProgress` would otherwise still
+      // hold the pre-copy snapshot. Re-derive it explicitly before
+      // re-rendering -- this is the one path that needs to, per this
+      // function's closure notes above.
+      if (getWorkflowProgress) currentProgress = getWorkflowProgress();
       renderAssayList();
     });
     main.appendChild(applyBtn);
@@ -215,11 +243,13 @@ export const studyStep = {
 
     const statusSelect = registrySelect(controls, {
       label: 'Status',
-      options: [
-        { value: 'all', label: 'All statuses' },
-        ...MEASUREMENT_STATUSES.map((status) => ({ value: status, label: measurementStatusLabel(status) })),
-      ],
+      // Fed straight from MEASUREMENT_STATUS_FILTERS (engine/measurementStatus.js)
+      // -- there is no second, hand-authored status vocabulary for this
+      // select to drift out of sync with.
+      options: [{ value: 'all', label: 'All statuses' }, ...MEASUREMENT_STATUS_FILTERS],
       onChange: (value) => {
+        // Each option's value is `scope:status` (e.g. 'plan:needs-decision');
+        // matched against that same scope on the row's status record below.
         statusFilter = value;
         renderAssayList();
       },
@@ -308,16 +338,28 @@ export const studyStep = {
       renderModalityOptions(assays);
       addBtn.disabled = assays.length >= MAX_STUDY_ROWS;
 
-      const map = buildExperimentMap(experiment);
-      const mappedById = new Map(
-        (Array.isArray(map.measurements) ? map.measurements : []).map((measurement) => [measurement.id, measurement])
-      );
+      // Read off `currentProgress` (the render-time snapshot, refreshed only
+      // on the copy-groups path -- see the closure notes above `let
+      // currentProgress` and inside applyBtn's click handler) rather than
+      // rebuilding a second, conformance-free map here.
+      const measurements = Array.isArray(currentProgress.map && currentProgress.map.measurements)
+        ? currentProgress.map.measurements
+        : [];
+      const mappedById = new Map(measurements.map((measurement) => [measurement.id, measurement]));
+      const progressAssays = Array.isArray(currentProgress.assays) ? currentProgress.assays : [];
+      const statusById = new Map(progressAssays.map((entry) => [entry.id, entry.status]));
 
       let shown = 0;
       assays.forEach((assay, index) => {
         const mapped = mappedById.get(assay.id) || null;
-        const status = measurementStatus(mapped);
-        if (statusFilter !== 'all' && status !== statusFilter) return;
+        // `measurementStatus(null)` is the module's own all-lowest fallback
+        // (definition:draft headline) for the case -- never expected in
+        // practice -- where this assay is absent from the progress snapshot.
+        const status = statusById.get(assay.id) || measurementStatus(null);
+        if (statusFilter !== 'all') {
+          const [scope, wantStatus] = statusFilter.split(':');
+          if (status[scope] !== wantStatus) return;
+        }
         if (modalityFilter !== 'all') {
           const modality = assay.acquisition && typeof assay.acquisition.modality === 'string' ? assay.acquisition.modality.trim() : '';
           if (modality !== modalityFilter) return;
@@ -349,13 +391,36 @@ export const studyStep = {
         nameCell.appendChild(readoutLine);
         row.appendChild(nameCell);
 
+        // One status cell, one status record: the headline badge plus the
+        // other two axes as muted chips -- no new grid column (app.css:4996's
+        // 7-column template stays untouched). Every label AND every data
+        // attribute below reads off this same `status` record, so a badge's
+        // text and its data-* attributes cannot disagree with each other.
         const statusCell = document.createElement('div');
         statusCell.className = 'measurement-registry-cell measurement-registry-status';
-        const badge = document.createElement('span');
-        badge.className = 'measurement-status-badge';
-        badge.dataset.status = status;
-        badge.textContent = measurementStatusLabel(status);
-        statusCell.appendChild(badge);
+        const badgeGroup = document.createElement('div');
+        badgeGroup.className = 'measurement-status-badges';
+        statusCell.appendChild(badgeGroup);
+
+        const headlineBadge = document.createElement('span');
+        headlineBadge.className = 'measurement-status-badge';
+        headlineBadge.dataset.scope = status.headline.scope;
+        headlineBadge.dataset.status = status.headline.status;
+        headlineBadge.dataset.tone = status.tone;
+        headlineBadge.textContent = measurementStatusLabel(status.headline.scope, status.headline.status);
+        badgeGroup.appendChild(headlineBadge);
+
+        for (const scope of MEASUREMENT_STATUS_SCOPES) {
+          if (scope === status.headline.scope) continue;
+          const scopedStatus = status[scope];
+          const chip = document.createElement('span');
+          chip.className = 'measurement-status-chip';
+          chip.dataset.scope = scope;
+          chip.dataset.status = scopedStatus;
+          chip.dataset.tone = (MEASUREMENT_STATUS_TONES[scope] && MEASUREMENT_STATUS_TONES[scope][scopedStatus]) || 'neutral';
+          chip.textContent = measurementStatusLabel(scope, scopedStatus);
+          badgeGroup.appendChild(chip);
+        }
         row.appendChild(statusCell);
 
         appendCell(row, 'measurement-registry-modality', mapped?.modality || '—');

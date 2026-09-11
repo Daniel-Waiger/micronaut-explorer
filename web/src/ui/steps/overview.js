@@ -535,7 +535,7 @@ export function createOverviewStep(kb) {
       const explainer = document.createElement('p');
       explainer.className = 'proposals-empty supporting-description';
       explainer.textContent =
-        'A deterministic review of this study, built entirely from what you’ve entered on the other steps -- nothing here is LLM-generated.';
+        'A deterministic review of this study -- every fact below comes from parameters you entered or from authored knowledge-pack content -- nothing here is LLM-generated.';
       main.appendChild(explainer);
 
       const doc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
@@ -621,7 +621,7 @@ export function createOverviewStep(kb) {
         toastMessage: 'Downloaded the file manifest as CSV.',
       });
       addDownloadButton({
-        label: 'Study data (.json)', fallbackName: 'study-overview', ext: 'json', mime: 'application/json', render: renderJson,
+        label: 'Study report data (.json, not importable)', fallbackName: 'study-overview', ext: 'json', mime: 'application/json', render: renderJson,
         toastMessage: 'Downloaded the study overview as JSON.',
       });
       const secondaryActions = document.createElement('div');
@@ -645,7 +645,7 @@ export function createOverviewStep(kb) {
         const ok = await copyToClipboard(renderLlmPrompt(freshDoc, freshTriage));
         if (showToast) showToast(ok
           ? 'Copied the prompt -- paste it into your own LLM. Nothing was sent from this app.'
-          : 'Could not copy automatically -- use Export study → Study data (.json) instead.');
+          : 'Could not copy automatically -- use Export study → Study report data (.json, not importable) instead.');
       });
       secondaryActions.appendChild(copyLlmBtn);
       const printBtn = document.createElement('button');
@@ -692,13 +692,15 @@ export function createOverviewStep(kb) {
 
       const conformanceHeading = document.createElement('h2');
       conformanceHeading.className = 'overview-node-title';
-      conformanceHeading.textContent = 'Planner checks';
+      conformanceHeading.textContent = 'Export checks';
       conformanceSection.appendChild(conformanceHeading);
 
       const verdict = document.createElement('div');
       verdict.className = `conformance-verdict conformance-${conformance.readiness}`;
       verdict.textContent = conformance.readiness === 'ready'
-        ? 'All planner checks complete'
+        ? (triage.counts.total > 0
+            ? `All export checks pass (${triage.counts.total} open decision${triage.counts.total === 1 ? '' : 's'} remain)`
+            : 'All export checks pass')
         : conformance.readiness === 'blocked'
           ? `Blocked: ${conformance.counts.blocked} issue(s) need correction before final export.`
           : `Needs review: ${conformance.counts.needsReview} incomplete or provisional item(s) remain.`;
@@ -706,7 +708,7 @@ export function createOverviewStep(kb) {
 
       const disclaimer = document.createElement('p');
       disclaimer.className = 'panel-empty';
-      disclaimer.textContent = 'Planner checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability.';
+      disclaimer.textContent = 'Export checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability, and they do not check your Study map decisions (research question, system, comparison mode, or experimental unit) -- see Decisions above for those.';
       conformanceSection.appendChild(disclaimer);
 
       const allConformanceIssues = reportIssues(conformance);

@@ -218,6 +218,14 @@ export function createWalkthroughController({
     hide();
   }
 
+  // "Use as template" below calls onAdoptExample, which main.js wires to
+  // appController.js's adoptExampleTemplate -- that function already guards
+  // itself with the shared isExampleOrigin(origin) predicate (accepts both
+  // 'example' and 'template') before patching meta.origin, so this action
+  // needs no second copy of that check here. It was reachable only via the
+  // identical root cause ui/steps/guide.js:101 had (a walkthrough that could
+  // never reach 'completed' status because Start was gated on the stale
+  // 'example'-only check); fixing that gate is what makes this button live.
   function renderCompletion() {
     const card = element(doc, 'section', 'guided-walkthrough-panel guided-walkthrough-complete');
     card.setAttribute('aria-label', 'Example walkthrough complete');

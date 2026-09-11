@@ -1,152 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderSpectralView, spectralViewCreateState } from '../src/ui/spectralView.js';
-
-class FakeClassList {
-  constructor(element) {
-    this.element = element;
-  }
-
-  values() {
-    return new Set((this.element.className || '').split(/\s+/).filter(Boolean));
-  }
-
-  write(values) {
-    this.element.className = [...values].join(' ');
-  }
-
-  add(...names) {
-    const values = this.values();
-    for (const name of names) values.add(name);
-    this.write(values);
-  }
-
-  remove(...names) {
-    const values = this.values();
-    for (const name of names) values.delete(name);
-    this.write(values);
-  }
-
-  contains(name) {
-    return this.values().has(name);
-  }
-
-  toggle(name, force) {
-    const values = this.values();
-    const enabled = force === undefined ? !values.has(name) : Boolean(force);
-    if (enabled) values.add(name);
-    else values.delete(name);
-    this.write(values);
-    return enabled;
-  }
-}
-
-class FakeElement {
-  constructor(name) {
-    this.localName = name;
-    this.children = [];
-    this.attributes = new Map();
-    this.listeners = new Map();
-    this.style = {};
-    this.className = '';
-    this.classList = new FakeClassList(this);
-    this.hidden = false;
-    this._text = '';
-  }
-
-  set textContent(value) {
-    this._text = String(value ?? '');
-    this.children = [];
-  }
-
-  get textContent() {
-    return this._text + this.children.map((child) => child.textContent).join('');
-  }
-
-  setAttribute(name, value) {
-    const text = String(value);
-    this.attributes.set(name, text);
-    if (name === 'class') this.className = text;
-  }
-
-  getAttribute(name) {
-    if (name === 'class') return this.className;
-    return this.attributes.has(name) ? this.attributes.get(name) : null;
-  }
-
-  append(...children) {
-    this.children.push(...children);
-  }
-
-  appendChild(child) {
-    this.children.push(child);
-    return child;
-  }
-
-  replaceChildren(...children) {
-    this._text = '';
-    this.children = [...children];
-  }
-
-  addEventListener(type, handler) {
-    const handlers = this.listeners.get(type) || [];
-    handlers.push(handler);
-    this.listeners.set(type, handlers);
-  }
-
-  dispatch(type, properties = {}) {
-    const event = {
-      type,
-      clientX: 0,
-      clientY: 0,
-      key: '',
-      defaultPrevented: false,
-      preventDefault() {
-        this.defaultPrevented = true;
-      },
-      ...properties,
-    };
-    for (const handler of this.listeners.get(type) || []) handler(event);
-    return event;
-  }
-
-  getBoundingClientRect() {
-    return { left: 0, top: 0, width: 720, height: 316 };
-  }
-
-  querySelector(selector) {
-    return this.querySelectorAll(selector)[0] || null;
-  }
-
-  querySelectorAll(selector) {
-    const results = [];
-    const className = selector.startsWith('.') ? selector.slice(1) : null;
-    const visit = (element) => {
-      for (const child of element.children) {
-        if (className ? child.classList.contains(className) : child.localName === selector) {
-          results.push(child);
-        }
-        visit(child);
-      }
-    };
-    visit(this);
-    return results;
-  }
-}
-
-class FakeDocument {
-  constructor() {
-    this.activeElement = null;
-  }
-
-  createElement(name) {
-    return new FakeElement(name);
-  }
-
-  createElementNS(_namespace, name) {
-    return new FakeElement(name);
-  }
-}
+import { createDomStub } from './domStub.js';
 
 function spectralEntry() {
   return {
@@ -163,9 +18,8 @@ function spectralEntry() {
 }
 
 test('interactive spectrum identifies, emphasizes, and independently toggles curves and filters', () => {
-  const originalDocument = globalThis.document;
-  const fakeDocument = new FakeDocument();
-  globalThis.document = fakeDocument;
+  const { document: fakeDocument, install, restore } = createDomStub();
+  install();
   try {
     const container = fakeDocument.createElement('div');
     const state = spectralViewCreateState();
@@ -219,14 +73,13 @@ test('interactive spectrum identifies, emphasizes, and independently toggles cur
     assert.equal(container.querySelector('.spectral-view-filter-group').getAttribute('aria-pressed'), 'false');
     assert.equal(container.querySelectorAll('.spectral-view-legend-button')[1].textContent.endsWith('Off'), true);
   } finally {
-    globalThis.document = originalDocument;
+    restore();
   }
 });
 
 test("a curve/filter with its own color renders in THAT color, overriding the rotating series palette but keeping its dash pattern", () => {
-  const originalDocument = globalThis.document;
-  const fakeDocument = new FakeDocument();
-  globalThis.document = fakeDocument;
+  const { document: fakeDocument, install, restore } = createDomStub();
+  install();
   try {
     const container = fakeDocument.createElement('div');
     const state = spectralViewCreateState();
@@ -246,14 +99,13 @@ test("a curve/filter with its own color renders in THAT color, overriding the ro
     // via inline style, it doesn't replace the class.
     assert.match(curveGroup.className, /spectral-view-series-0/);
   } finally {
-    globalThis.document = originalDocument;
+    restore();
   }
 });
 
 test('an entry with no/malformed color leaves the rotating series palette untouched (no inline style)', () => {
-  const originalDocument = globalThis.document;
-  const fakeDocument = new FakeDocument();
-  globalThis.document = fakeDocument;
+  const { document: fakeDocument, install, restore } = createDomStub();
+  install();
   try {
     const container = fakeDocument.createElement('div');
     const state = spectralViewCreateState();
@@ -264,14 +116,13 @@ test('an entry with no/malformed color leaves the rotating series palette untouc
     assert.equal(curveGroup.style.fill, undefined);
     assert.equal(curveGroup.style.stroke, undefined);
   } finally {
-    globalThis.document = originalDocument;
+    restore();
   }
 });
 
 test('Enter toggles a focused series and malformed interaction state degrades safely', () => {
-  const originalDocument = globalThis.document;
-  const fakeDocument = new FakeDocument();
-  globalThis.document = fakeDocument;
+  const { document: fakeDocument, install, restore } = createDomStub();
+  install();
   try {
     const container = fakeDocument.createElement('div');
     assert.doesNotThrow(() => renderSpectralView(container, [spectralEntry()], {}, {}));
@@ -280,14 +131,13 @@ test('Enter toggles a focused series and malformed interaction state degrades sa
     assert.equal(event.defaultPrevented, true);
     assert.equal(curve.getAttribute('aria-pressed'), 'true');
   } finally {
-    globalThis.document = originalDocument;
+    restore();
   }
 });
 
 test('co-centered filter values use distinct collision-aware label lanes', () => {
-  const originalDocument = globalThis.document;
-  const fakeDocument = new FakeDocument();
-  globalThis.document = fakeDocument;
+  const { document: fakeDocument, install, restore } = createDomStub();
+  install();
   try {
     const container = fakeDocument.createElement('div');
     const entries = [40, 50, 60].map((bandwidth, index) => ({
@@ -307,6 +157,6 @@ test('co-centered filter values use distinct collision-aware label lanes', () =>
       '525/60 nm',
     ]);
   } finally {
-    globalThis.document = originalDocument;
+    restore();
   }
 });

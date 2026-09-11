@@ -2,7 +2,7 @@ import { finalizeFields } from '../../engine/naming.js';
 import { BASE_TEMPLATE, NAMING_CONFIG } from '../../engine/namingConfig.js';
 import { DEFAULT_PROFILE, validateFields, validateTargetPath } from '../../engine/validation.js';
 import { editTagFor } from '../../core/provenance.js';
-import { formatReplicateToken } from '../../engine/conditions.js';
+import { formatReplicateToken, physicalSampleCount } from '../../engine/conditions.js';
 import { effectiveNamingFields, planFilenames } from '../../engine/plan.js';
 import { createAdvicePanel } from '../advice.js';
 import { assayById, assayView, scopeWrite } from '../../core/assay.js';
@@ -301,12 +301,20 @@ export function createNamingStep(kb) {
       'Downloads a bench schedule built from your timing answers above -- imports into Google Calendar, Outlook, or Apple Calendar with no login.';
     downloadScheduleBtn.addEventListener('click', () => {
       const view = currentExperimentView();
-      const sampleCount = planFilenames(view, NAMING_CONFIG).length;
+      // planFilenames(...).length is the planned FILE/acquisition-run count
+      // (one row per group x factor x biological replicate x TECHNICAL
+      // replicate); physicalSampleCount(view.design) is the physical-specimen
+      // count (technical axis excluded). Mounting a slide is a physical-
+      // sample operation, so it must scale by the latter, not the former --
+      // see engine/conditions.js's physicalSampleCount doc comment.
+      const acquisitionRunCount = planFilenames(view, NAMING_CONFIG).length;
+      const sampleCount = physicalSampleCount(view.design);
       const activeAssay = assayById(store.get(), assayId);
       const events = buildIcsSchedule({
         assayLabel: (activeAssay && activeAssay.label) || 'This assay',
         timing: view.timing,
         sampleCount,
+        acquisitionRunCount,
         // Tomorrow at 09:00 local -- a schedule dated "right now" would put
         // its first block in the past for whichever calendar app renders
         // it the moment the file is opened.

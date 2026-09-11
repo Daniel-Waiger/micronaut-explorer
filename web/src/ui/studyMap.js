@@ -194,7 +194,7 @@ export function createStudyMap({ store, router, getMap, document: suppliedDocume
     fieldset.appendChild(help);
     const currentMode = map.comparison?.mode || 'not-decided';
     for (const choice of [
-      ['groups', 'Compare groups or conditions'],
+      ['groups', 'Compares groups or treatments'],
       ['observational', 'Observational study'],
     ]) {
       const label = doc.createElement('label');

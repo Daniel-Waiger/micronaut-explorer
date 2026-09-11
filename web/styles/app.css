@@ -5045,9 +5045,20 @@ td, th { border-color: var(--line); }
   color: var(--muted);
 }
 
-/* State is carried by the text, never by colour alone. */
+/* State is carried by the text, never by colour alone: every badge/chip below
+   still renders its own status word (measurementStatusLabel), and `data-tone`
+   only ever adds a colour on top of that text. */
+.measurement-status-badges,
+.measurement-status-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 .measurement-status-badge {
   display: inline-block;
+  max-width: 100%;
   padding: 3px 10px;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -5055,20 +5066,58 @@ td, th { border-color: var(--line); }
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
-  white-space: nowrap;
+  /* Not nowrap: a narrow host column (the registry status cell, app.css:4996's
+     grid stays unchanged) can squeeze this flex item below its label's
+     single-line width. Letting the label itself wrap onto a second line here
+     is what keeps it from overflowing that column horizontally instead. */
+  overflow-wrap: anywhere;
 }
 
-.measurement-status-badge[data-status="needs-decision"] {
+.measurement-status-badge[data-tone="neutral"] {
+  border-color: var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+
+.measurement-status-badge[data-tone="progress"] {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.measurement-status-badge[data-tone="attention"] {
   border-color: color-mix(in srgb, var(--warn) 40%, var(--line));
   background: var(--warn-soft);
   color: var(--warn);
 }
 
-.measurement-status-badge[data-status="ready"] {
+.measurement-status-badge[data-tone="ok"] {
   border-color: color-mix(in srgb, var(--ok) 40%, var(--line));
   background: var(--ok-soft);
   color: var(--ok);
 }
+
+/* Chips are context for the headline badge, not a second headline -- flatter
+   background/border than the badge (both stay neutral regardless of tone)
+   and a smaller, lighter face, so only the text colour carries the tone and
+   the eye still lands on the headline badge first. */
+.measurement-status-chip {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.measurement-status-chip[data-tone="neutral"] { color: var(--muted); }
+.measurement-status-chip[data-tone="progress"] { color: var(--accent); }
+.measurement-status-chip[data-tone="attention"] { color: var(--warn); }
+.measurement-status-chip[data-tone="ok"] { color: var(--ok); }
 
 .field-readonly-value {
   flex: 1 1 240px;
