@@ -178,13 +178,13 @@
 const EMBEDDED = {
   "run": "app-review 2026-09-11",
   "orchestrator": "Claude Fable 5.1",
-  "active_model": "Claude Opus",
+  "active_model": "Claude Fable 5.1",
   "active_status": "running",
-  "phase": "Batch 2 of 3 — verification (resumed)",
+  "phase": "Batch 3 of 5 — synthesis",
   "state_note": "",
   "current_task": {
-    "id": "R1-R6",
-    "title": "Batch 1 reviews dispatched"
+    "id": "S1",
+    "title": "Synthesis: merge, re-scan, report, remediation graph"
   },
   "crit_title": "Open defects",
   "stats": [
@@ -213,6 +213,13 @@ const EMBEDDED = {
       "title": "spillover block reads free-text markers, not panel channels (R4-01, pending V4)",
       "body": "",
       "repro": ""
+    },
+    {
+      "id": "D7",
+      "location": "web/src/core/persist.js",
+      "title": "protected-slot ring starvation after 5 blank-study actions: autosaves silently self-evicted while shell says Saved (R5-01)",
+      "body": "",
+      "repro": ""
     }
   ],
   "tasks": [
@@ -229,8 +236,8 @@ const EMBEDDED = {
       "id": "R2",
       "phase": "Batch 1",
       "title": "In-app copy, manual and privacy claims vs behaviour",
-      "status": "verifying",
-      "by": "Opus",
+      "status": "done",
+      "by": "Opus verified",
       "depends_on": [],
       "batch": 1
     },
@@ -247,8 +254,8 @@ const EMBEDDED = {
       "id": "R4",
       "phase": "Batch 1",
       "title": "Live UX/UI: primary workflow in the built app",
-      "status": "verifying",
-      "by": "Opus",
+      "status": "done",
+      "by": "Opus verified",
       "depends_on": [],
       "batch": 1
     },
@@ -257,7 +264,7 @@ const EMBEDDED = {
       "phase": "Batch 1",
       "title": "Live UX/UI: utilities, edges and secondary pages",
       "status": "done",
-      "by": "delivered; agent cut off by Opus session limit after writing R5.json",
+      "by": "Opus verified",
       "depends_on": [],
       "batch": 1
     },
@@ -285,8 +292,8 @@ const EMBEDDED = {
       "id": "V2",
       "phase": "Batch 2",
       "title": "Adversarial verification of R2",
-      "status": "pending",
-      "by": "queued",
+      "status": "done",
+      "by": "Opus",
       "depends_on": [
         "R2"
       ],
@@ -307,8 +314,8 @@ const EMBEDDED = {
       "id": "V4",
       "phase": "Batch 2",
       "title": "Adversarial verification of R4",
-      "status": "pending",
-      "by": "queued",
+      "status": "done",
+      "by": "Opus",
       "depends_on": [
         "R4"
       ],
@@ -318,8 +325,8 @@ const EMBEDDED = {
       "id": "V5",
       "phase": "Batch 2",
       "title": "Adversarial verification of R5",
-      "status": "pending",
-      "by": "queued",
+      "status": "done",
+      "by": "Opus",
       "depends_on": [
         "R5"
       ],
@@ -340,8 +347,8 @@ const EMBEDDED = {
       "id": "S1",
       "phase": "Batch 3",
       "title": "Merge, re-scan, report, remediation graph, lessons, dashboard",
-      "status": "pending",
-      "by": "queued",
+      "status": "running",
+      "by": "Fable",
       "depends_on": [
         "V1",
         "V2",
@@ -401,9 +408,21 @@ const EMBEDDED = {
     {
       "time": "04:51:39",
       "msg": "OUTAGE 2026-09-12 00:50Z: Opus session limit killed R5 (after deliverables), V2, V4 (no output). Reset; V2/V4 re-dispatched, V5 dispatched, all Opus. Scope change: confirmed findings will be FIXED this run (Sonnet high executes, Opus red-teams, Fable final passes)"
+    },
+    {
+      "time": "05:11:00",
+      "msg": "V2 pass: 14 confirmed / 1 refuted (R2-10) / 1 partial; R2-01/02 downgraded blocking->major under stated policy (blocking = actionable-to-detriment falsehood or data loss); 5 new (changelog fully shredded; GitHub handoff dead end over file://; clear-all leaves 6 keys)"
+    },
+    {
+      "time": "05:13:24",
+      "msg": "V5 pass: 13/13 confirmed (R5-04 -> minor, same as R6-06); R5-01 blocking upheld with corrections (5 actions; deleting a Restore row prunes protection); 3 new (download+denied-clipboard modal contradicts itself; unbounded protected ring; Untitled aria labels)"
+    },
+    {
+      "time": "05:30:07",
+      "msg": "V4 pass: 18 confirmed / 0 refuted / 1 unverifiable; R4-01 blocking upheld (panel.js:236 reads naming.fields.markers, conformance.js:113 reads panel.channels = two paths one fact); R4-03 = R6-01/02/08 root cause; 4 new (non-Latin names -> UNSPECIFIED silently; unconfirmed interview text discarded). Batch 2 complete: 6/6 pass"
     }
   ],
-  "snapshot_at": "2026-09-12 04:51"
+  "snapshot_at": "2026-09-12 05:30"
 };
 /* CMA:EMBEDDED:END */
 
