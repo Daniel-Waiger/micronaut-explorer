@@ -652,3 +652,177 @@ Incidents: the Opus session limit (reset 00:50 UTC, 2026-09-12) killed R5 after 
 ## Screenshot index (ephemeral)
 
 `<scratch>/screens/r2/`, `r4/` (58), `r5/` (52), `<scratch>/verify/v4/screens/`, `v5/shots/` (24). Regenerated reference screenshots for the docs are produced at the end of the remediation run with `tools/capture_screenshots.py`.
+
+
+## Addendum — remediation run 2026-09-12 (fixes applied in this branch)
+
+User decision after the findings landed: fix the confirmed findings in the same run, with Sonnet (high effort) executing, Opus red-teaming each fix, and the orchestrator (Fable) doing final passes. Execution graph: `docs/plans/app-review-remediation-task-graph.json` (25 tasks, 7 batches). Final tree: **1011 JS tests / 88 Python tests passing, single-file build green**, 12 commits on `claude/eager-curie-8aqjwu` after the review commit.
+
+| | blocking | major | minor | nit | total |
+|---|---|---|---|---|---|
+| Fixed in this run | 5 | 26 | 49 | 18 | 98 |
+| Not scheduled (follow-ups / nits / unverified) | 0 | 0 | 7 | 12 | 19 |
+
+### Task outcomes (dashboard vocabulary: `done` = first try passed red-team; `resolved` = failed once and was repaired)
+
+| Task | Outcome | Note |
+|---|---|---|
+| A1 | resolved | Opus fail (bounds constant ≠ producer) → fixed by orchestrator |
+| A2 | resolved | Opus fail (variant ids vs canonical) → fixed by orchestrator; later made variant-aware on both sides after A3 red-team |
+| B1 | resolved | Opus pass; stale comment fixed by orchestrator |
+| B3 | resolved | Opus pass; vacuous drift regex + build export gate hardened by orchestrator |
+| E1 | resolved | Opus fail (issue never rendered; ASCII false positives; side channel) → Sonnet retry → Opus round-2 pass; total-loss gate fixed by orchestrator |
+| E2 | done | Opus pass |
+| A3 | resolved | Opus fail (canonical pair key collapsed family variants) → fixed by orchestrator (shared `fluorophoreEntryId`) |
+| B2 | resolved | Opus pass; rollback orphan + double slot fixed by orchestrator |
+| B4 | resolved | Opus fail (`[""]` not a clear; no heal) → retry → Opus round-2 fail (weak empty payload bypassed provenance) → fixed by orchestrator |
+| A4 | resolved | Opus fail (union of sources; dead re-entrancy guard; unsatisfiable R6-08 test) → fixed by orchestrator |
+| A2a | done | verified by orchestrator (suite + live) |
+| A2b | done | verified by orchestrator (suite + live) |
+| A2c | resolved | executor cut off (session limit) after writing code; orchestrator repaired a NUL byte and a duplicate top-level constant, wrote `panelStep.test.js`, verified live |
+| A5 | done | orchestrator (never dispatched before the outage) |
+| C2 | resolved | executor cut off; orchestrator verified live (Blocks export label, dedupe, toast, exports) |
+| C3 | done | orchestrator; live 400 px scroll + 15.4:1 contrast |
+| D1 | resolved | Opus pass; tick focus loss + false "three most recent" wording + unhandled import rejection fixed by orchestrator |
+| D2 | resolved | Opus fail (focus theft on failed copy; vacuous test; copy channel dead end) → retry → round-2 red-team cut off; orchestrator verified by tests + live modal |
+| D3 | done | Opus pass |
+| V1 | done | red-team cut off; orchestrator verified (guard falsification, live hero/footer both modes, changelog vs commits) |
+| V2 | done | red-team cut off; orchestrator verified live (87 `<li>` for 87 bullets) |
+| V3 | resolved | Opus fail (CI "one job"; walkthrough gate wording) → fixed by orchestrator |
+| V4 | resolved | Opus fail (TASKS claimed UI not yet landed) → wording fixed; claim held until the UI landed |
+| V5 | resolved | executor cut off; orchestrator finished the manual sentences |
+| V6 | done | red-team cut off; orchestrator verified (KB valid, selectAdvice spinning-disk/TIRF) |
+
+### Per-finding status
+
+| Finding | Severity | Status | Task |
+|---|---|---|---|
+| R4-01 | blocking | fixed | A1, A3, A2c |
+| R5-01 | blocking | fixed | B1 |
+| R6-04 | blocking | fixed | B2 |
+| R6-05 | blocking | fixed | B2 |
+| V6-NEW-01 | blocking | fixed | B2 |
+| R1-01 | major | fixed | V3, V4 |
+| R1-04 | major | fixed | V1 |
+| R2-01 | major | fixed | E2, D3 |
+| R2-02 | major | fixed | V1 |
+| R2-03 | major | fixed | D3 |
+| R2-04 | major | fixed | V2 |
+| R3-01 | major | fixed | V1 |
+| R4-02 | major | fixed | A2b |
+| R4-03 | major | fixed | A4, A2a, A2b |
+| R4-05 | major | fixed | C3 |
+| R4-06 | major | fixed | A2c |
+| R5-02 | major | fixed | D2 |
+| R5-03 | major | fixed | E2, D3 |
+| R6-01 | major | fixed | A4, A2b, A2c |
+| R6-02 | major | fixed | A4, A2a |
+| R6-07 | major | fixed | A5 |
+| R6-08 | major | fixed | A4 |
+| V1-N1 | major | fixed | V1 |
+| V2-NEW-01 | major | fixed | V2 |
+| V2-NEW-02 | major | fixed | D2 |
+| V2-NEW-03 | major | fixed | B3 |
+| V3-N1 | major | fixed | A2, A3, A2c |
+| V4-N1 | major | fixed | E1 |
+| V4-N2 | major | fixed | A2c |
+| V5-NEW-01 | major | fixed | D2 |
+| V6-NEW-03 | major | fixed | B4 |
+| R1-02 | minor | fixed | V4 |
+| R1-06 | minor | fixed | V3 |
+| R1-07 | minor | fixed | V3 |
+| R1-09 | minor | fixed | V4 |
+| R1-10 | minor | fixed | V1 |
+| R1-11 | minor | fixed | V1 |
+| R1-12 | minor | fixed | V3 |
+| R1-13 | minor | fixed | V3 |
+| R1-17 | minor | fixed | V1, V4 |
+| R2-05 | minor | fixed | V2 |
+| R2-06 | minor | fixed | V1 |
+| R2-07 | minor | fixed | V5 |
+| R2-08 | minor | fixed | V5 |
+| R2-09 | minor | fixed | V5 |
+| R2-11 | minor | fixed | D2 |
+| R3-02 | minor | follow-up | — |
+| R3-03 | minor | follow-up | — |
+| R3-04 | minor | fixed | A1, A2c |
+| R3-05 | minor | fixed | V6 |
+| R3-06 | minor | follow-up | — |
+| R3-07 | minor | fixed | V6 |
+| R3-10 | minor | fixed | V6 |
+| R3-11 | minor | fixed | V1 |
+| R3-12 | minor | follow-up | — |
+| R3-13 | minor | follow-up | — |
+| R4-04 | minor | fixed | A3, C2 |
+| R4-07 | minor | fixed | A3, C2 |
+| R4-08 | minor | follow-up | — |
+| R4-09 | minor | fixed | C2 |
+| R4-10 | minor | fixed | A2c |
+| R4-11 | minor | fixed | C3 |
+| R4-12 | minor | fixed | A2a |
+| R4-13 | minor | follow-up | — |
+| R4-14 | minor | fixed | C2 |
+| R5-04 | minor | fixed | D1 |
+| R5-05 | minor | fixed | V1 |
+| R5-06 | minor | fixed | V2 |
+| R5-07 | minor | fixed | D3 |
+| R5-08 | minor | fixed | D2 |
+| R5-09 | minor | fixed | B2 |
+| R5-10 | minor | fixed | D3 |
+| R6-06 | minor | fixed | D1 |
+| R6-09 | minor | fixed | B4 |
+| V1-N2 | minor | fixed | V3 |
+| V1-N3 | minor | fixed | V3 |
+| V1-N4 | minor | fixed | V4 |
+| V1-N5 | minor | fixed | V4 |
+| V2-NEW-04 | minor | fixed | E1 |
+| V2-NEW-05 | minor | fixed | D3 |
+| V3-N2 | minor | fixed | V6 |
+| V3-N3 | minor | fixed | V6 |
+| V3-N4 | minor | fixed | V1 |
+| V4-N3 | minor | fixed | A2c |
+| V5-NEW-02 | minor | fixed | B1 |
+| V6-NEW-02 | minor | fixed | B4 |
+| V6-NEW-04 | minor | fixed | D1 |
+| R1-14 | nit | fixed | V4 |
+| R1-15 | nit | fixed | V4 |
+| R1-16 | nit | fixed | V3 |
+| R1-18 | nit | fixed | V3 |
+| R1-19 | nit | fixed | V4 |
+| R2-12 | nit | fixed | A2c |
+| R2-13 | nit | fixed | V5 |
+| R2-14 | nit | follow-up | — |
+| R2-15 | nit | fixed | B3 |
+| R3-08 | nit | follow-up | — |
+| R3-09 | nit | follow-up | — |
+| R3-14 | nit | fixed | V6 |
+| R3-15 | nit | follow-up | — |
+| R3-16 | nit | fixed | V6 |
+| R3-17 | nit | follow-up | — |
+| R4-15 | nit | fixed | D1 |
+| R4-16 | nit | fixed | D1 |
+| R4-17 | nit | follow-up | — |
+| R4-18 | nit | follow-up | — |
+| R4-19 | nit | follow-up | — |
+| R4-20 | nit | follow-up | — |
+| R5-11 | nit | fixed | D3 |
+| R5-12 | nit | follow-up | — |
+| R5-13 | nit | fixed | V5 |
+| R6-03 | nit | fixed | C2 |
+| V1-N6 | nit | follow-up | — |
+| V3-N5 | nit | fixed | A1, A2c |
+| V4-N4 | nit | fixed | A2a |
+| V5-NEW-03 | nit | fixed | D1 |
+| V6-NEW-05 | nit | follow-up | — |
+
+### Follow-ups surfaced by the red-teams (not fixed here)
+- persist.js: a save whose ring-index write fails after a *protected-slot* eviction now restores the pre-save ring, but a save that fails on the *protected-slots key* write still reports failure while the write succeeded elsewhere; and restoring the oldest unprotected slot can evict that very slot (B1/B2 red-teams).
+- Review tiers a blocking non-Latin group error under "Can be assigned later" (`tierForField` knows `groups`, not `group`); the Name builder surface shows no sanitization message beside its own box; sanitization issues are not exported to the CSV manifest (E1 round 2).
+- Panel: a duplicate dye in two channels yields a `X|X` self-pair error that cannot be acknowledged by design (correct) but its message says "0 nm apart" rather than "the same fluorophore twice" (A3 red-team).
+- Shell: toast queue keeps the 3 most recent and does not de-duplicate; `destroy()` leaves the toast timer running; the 60-char research-question excerpt cuts mid-word (D1 red-team).
+- Feedback: on the Utilities-menu path focus returns to the Utilities toggle, not the menu item (the item is hidden once the menu closes) — a convention, flagged for a UX decision (D2 retry).
+- README's walkthrough sentence describes the origin gate correctly, but an imported practice backup can still reach the walkthrough outside `?demo=1` (V3 red-team).
+- Build tool: multi-line `export { … }` lists are now rejected by the output gate (falsification-tested) but not folded like imports are (B3 red-team).
+
+### Method (this run)
+Two session-limit outages interrupted the pipeline (00:50 UTC and 07:45 UTC). In the first, one reviewer and two verifiers were lost and re-run on the same model. In the second, three executors (A2c, C2, V5) and two red-teams (D2 round 2; V1+V2+V6) were killed with the reset three hours away; per lesson 42 the orchestrator substituted a declared warm-context loop — inspect what each interrupted agent left on disk, repair, write missing tests, run both suites and the build gate, drive the built artifact over http with CDP (headless Chromium cannot hold focus, so focus behaviour was proven in DOM-stub tests instead), and record the substitution per task on the dashboard and in the table above. A5 and C3 were never dispatched to an executor and were done by the orchestrator directly. Red-team verdicts and scripts live under the session scratch dir `review/redteam/`; they are not committed.

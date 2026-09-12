@@ -1,6 +1,7 @@
 # CMA pipeline lessons
 
-Maintained by the **cma-learner** stage after each execute run. Planner, executor
+Maintained by the **cma-learner** stage after each execute run. (2026-09-12: lessons 52–56 added
+after the app-review remediation run; 45/46/47 strengthened with new sightings.) Planner, executor
 and verifier agents MUST read this file before starting work and apply it. Keep it
 readable in one pass (~150 lines for A–D, ~40 for E): the learner merges/dedupes
 rather than appending, adds "seen N×" to recurring lessons, and deletes lessons that
@@ -248,7 +249,9 @@ Format per lesson: **practice — evidence — why it matters.**
     check that self-testing structurally cannot replace.
 45. **A subagent's "completed" status is not evidence of anything on its own — check its
     actual deliverables before believing it, especially when the report text looks even
-    slightly off.** — 2026-07-30: a dispatched executor's task-notification result was, verbatim,
+    slightly off.** — Seen 2× (2026-09-12: a session-limit kill is the inverse case — R5, A2c,
+    C2 and V5 reported NOTHING yet had complete or near-complete files on disk; inspecting the
+    deliverables, not the status, recovered all four). 2026-07-30: a dispatched executor's task-notification result was, verbatim,
     a nested `Agent({...})` tool-call it had apparently tried to make (to delegate its own
     required file-reading to a fresh sub-agent instead of reading the files itself) rather than
     a synthesized report; status still read "completed". A filesystem check (`ls` the task's
@@ -261,7 +264,9 @@ Format per lesson: **practice — evidence — why it matters.**
     malformed/garbled final result is itself a signal to distrust the status field next to it.
 46. **A UI-wiring task's "avoid full re-render to preserve focus" fix and "avoid stale
     closures" are in tension, and only driving the real interaction catches the collision.**
-    — 2026-07-30 (C1-6): a factor-editing row deliberately did NOT re-render its own inputs on
+    — Seen 3× (2026-09-12: D1's 30 s save-label tick rebuilt the Restore list and dropped keyboard
+    focus twice a minute; A4's refresh hook needed a 'pristine input' rule so a sibling repaint never
+    overwrites a box being typed in). 2026-07-30 (C1-6): a factor-editing row deliberately did NOT re-render its own inputs on
     every keystroke (an earlier fix in the same task, to stop each keystroke destroying focus)
     -- but that meant each field's input handler closed over the `factors` array snapshotted
     when the row was first drawn, not the store's current state. Editing the NAME then the
@@ -278,7 +283,9 @@ Format per lesson: **practice — evidence — why it matters.**
 
 47. **A source-transforming tool that parses line-by-line with anchored regexes treats the
     code formatter as an adversary -- and its output gate must assert the ABSENCE of the
-    forbidden construct, not merely that the transform ran.** — 2026-07-30: `build_single_file.py`
+    forbidden construct, not merely that the transform ran.** — Seen 2× (2026-09-12: the export
+    half — a wrapped `export { … }` list survived into the artifact with every gate green; an
+    `export` output gate was added and falsification-tested). 2026-07-30: `build_single_file.py`
     strips imports with `IMPORT_RE`, anchored `^...$` against ONE line. Adding a fourth name to
     an import list made Prettier wrap it across four lines; the wrapped form matched nothing,
     passed through verbatim, and the assembled *classic* script died at parse time on
@@ -356,6 +363,37 @@ Format per lesson: **practice — evidence — why it matters.**
     of this file) and leaves an unreviewed dependency list and unverified code sitting in the
     tree; if a second pipeline is ever worth trying, fold its findings into this file instead
     of letting it accumulate its own.
+
+52. **A retry is a NEW change and gets a NEW red-team; a red-team's proposed fix is a hypothesis,
+    not a spec.** — 2026-09-12: B4's retry closed both round-1 majors and introduced a data-loss
+    regression (an EMPTY payload from a WEAK writer bypassed canOverwrite) that only round 2
+    caught; separately the orchestrator adopted a round-1 suggestion (key spillover acks on
+    canonical ids) that A3's red-team then proved collapsed family variants — the right key was
+    variant-aware on BOTH sides through one shared `fluorophoreEntryId`. — The reviewer sees the
+    defect clearly and the fix vaguely; verify the mechanism of the fix with the same rigour as
+    the defect (lesson 20), and never skip round 2 because round 1 was thorough.
+53. **After an agent is killed mid-write, run the BUILD GATE before trusting anything: interrupted
+    writers leave syntactically valid files with semantic corpses.** — 2026-09-12: A2c's cut-off
+    left a literal NUL byte inside a string in questionControl.js (git showed the file as binary)
+    and a second private copy of a constant that the single-file build's duplicate-symbol gate
+    rejected; both suites' JS half was green throughout. — `node --check` and the unit suite do
+    not see what the concatenating build sees; the build is the cheapest oracle for a torn write.
+54. **Concurrent agents share one machine: kill only PIDs you started, and assign file REGIONS
+    when two tasks must touch one file.** — 2026-09-12: two agents `pkill`ed sibling servers by
+    name, producing a false 'modal never appeared' finding; A1 and A2 both edited panelAssembly.js
+    safely only because each was told its region and to use exact-string edits with a re-read
+    first. — A shared box turns a convenience command into a cross-agent fault injector.
+55. **Docs that describe code must be verified AFTER the code lands, and a docs sentence written
+    ahead of its code is a faulty claim even if the code is coming.** — 2026-09-12: V4's TASKS.md
+    entry stated the panel and Review agreed while A2c was still unwritten; the docs red-team
+    correctly failed it, and the claim was held back until the UI commit. — Sequence docs tasks
+    behind the code they narrate (lesson 5 for prose), or word them in the past tense of commits.
+56. **Headless Chromium cannot hold DOM focus and `.click()` never moves it; prove focus
+    behaviour in the DOM stub and use CDP for everything else — and stub `window.confirm` before
+    driving any control that may open a dialog.** — 2026-09-12: focus-restore probes returned
+    `body` for a fix that the stub test proved correct; an export click hung the CDP session on a
+    needs-review confirm until `window.confirm = () => true` was injected. — A live probe that
+    cannot observe the property under test is not a negative result, it is no result.
 
 ## E. This repo's invariants (microscopy-naming-assistant)
 

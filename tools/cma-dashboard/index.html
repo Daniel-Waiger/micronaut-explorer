@@ -176,18 +176,18 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "app-review 2026-09-11",
+  "run": "app-review remediation 2026-09-12",
   "orchestrator": "Claude Fable 5.1",
-  "active_model": "Claude Fable 5.1",
+  "active_model": "Claude Sonnet",
   "active_status": "done",
-  "phase": "Review run complete — 117 findings, 25 fix tasks",
+  "phase": "Run complete — 25/25 tasks (9 done, 16 resolved)",
   "state_note": "",
   "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "879 passed",
+      "v": "1011 passed",
       "tone": "ok"
     },
     {
@@ -196,244 +196,430 @@ const EMBEDDED = {
       "tone": "ok"
     },
     {
-      "k": "Findings",
-      "v": "117 (5 blocking / 26 major)",
-      "tone": "warn"
+      "k": "Version",
+      "v": "0.21.0 cut",
+      "tone": "ok"
     },
     {
-      "k": "Refuted",
-      "v": "5",
+      "k": "Commits",
+      "v": "12 on branch",
       "tone": "ok"
     }
   ],
-  "defects": [
-    {
-      "id": "D5",
-      "location": "web/src/core/appController.js",
-      "title": "restore/import take no eviction-protection snapshot; displaced study lost after 5 autosaves",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D6",
-      "location": "web/src/ui/steps/panel.js",
-      "title": "spillover block reads free-text markers, not panel channels (R4-01, pending V4)",
-      "body": "",
-      "repro": ""
-    },
-    {
-      "id": "D7",
-      "location": "web/src/core/persist.js",
-      "title": "protected-slot ring starvation after 5 blank-study actions: autosaves silently self-evicted while shell says Saved (R5-01)",
-      "body": "",
-      "repro": ""
-    }
-  ],
+  "defects": [],
   "tasks": [
     {
-      "id": "R1",
+      "id": "A1",
       "phase": "Batch 1",
-      "title": "Docs claims vs reality",
-      "status": "done",
-      "by": "Opus verified",
+      "title": "Engine: single fluorophore resolver + keep spectra note + export bounds",
+      "status": "resolved",
+      "by": "red-team fail -> fixed by orchestrator",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "R2",
+      "id": "A2",
       "phase": "Batch 1",
-      "title": "In-app copy, manual and privacy claims vs behaviour",
-      "status": "done",
-      "by": "Opus verified",
+      "title": "Schema/assay: spillover acknowledgement model (no version bump)",
+      "status": "resolved",
+      "by": "red-team fail -> fixed by orchestrator",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "R3",
+      "id": "B1",
       "phase": "Batch 1",
-      "title": "Scientific-data claims: spectra, references, advisor",
-      "status": "done",
-      "by": "Opus verified",
+      "title": "persist.js: bounded protected slots, truthful save return",
+      "status": "resolved",
+      "by": "Opus red-team pass; stale comment fixed by orchestrator",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "R4",
+      "id": "B3",
+      "phase": "Batch 2",
+      "title": "Scope-aware clearAll (owned key families), theme kept",
+      "status": "resolved",
+      "by": "Opus pass; drift test + build export gate hardened",
+      "depends_on": [
+        "B1"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "E1",
       "phase": "Batch 1",
-      "title": "Live UX/UI: primary workflow in the built app",
-      "status": "done",
-      "by": "Opus verified",
+      "title": "naming.js: non-Latin names raise a named error instead of silent UNSPECIFIED; path-length contract",
+      "status": "resolved",
+      "by": "Opus round 2 pass; total-loss gate fixed by orchestrator",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "R5",
+      "id": "E2",
       "phase": "Batch 1",
-      "title": "Live UX/UI: utilities, edges and secondary pages",
+      "title": "workflowProgress: export the walkthrough step count for copy to consume",
       "status": "done",
-      "by": "Opus verified",
+      "by": "Opus red-team pass",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "R6",
-      "phase": "Batch 1",
-      "title": "Adversarial code read of untested UI wiring",
-      "status": "done",
-      "by": "Opus verified",
+      "id": "A3",
+      "phase": "Batch 2",
+      "title": "conformance.js: use the resolver, honour acknowledgements, tag blocking issues with measurement + step",
+      "status": "resolved",
+      "by": "Opus fail -> pairKey made variant-aware by orchestrator",
+      "depends_on": [
+        "A1",
+        "A2"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "B2",
+      "phase": "Batch 2",
+      "title": "appController.js: one preserveOpenStudy() helper for restore/import/blank/example",
+      "status": "resolved",
+      "by": "Opus pass; rollback orphan + double-slot fixed by orchestrator",
+      "depends_on": [
+        "B1"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "B4",
+      "phase": "Batch 2",
+      "title": "Empty groups is a clear, not a lock; copy-groups counts and tooltip honest",
+      "status": "resolved",
+      "by": "2 Opus rounds; final regression fixed by orchestrator",
       "depends_on": [],
-      "batch": 1
+      "batch": 2
+    },
+    {
+      "id": "A4",
+      "phase": "Batch 3",
+      "title": "measurement.js: section-changed hook, derived-only refresh, live header badges",
+      "status": "resolved",
+      "by": "Opus fail -> hook fixed by orchestrator (most-recent source, drop-during-refresh, try/catch, max wait)",
+      "depends_on": [
+        "A3",
+        "B4"
+      ],
+      "batch": 3
+    },
+    {
+      "id": "A2a",
+      "phase": "Batch 4",
+      "title": "design.js: notify on commit, refresh derived only, invalid replicates stop the preview",
+      "status": "done",
+      "by": "Sonnet; verified by orchestrator (suite+live)",
+      "depends_on": [
+        "A4"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "A2b",
+      "phase": "Batch 4",
+      "title": "naming.js: notify on input, sync boxes from store under the pristine rule",
+      "status": "done",
+      "by": "Sonnet; verified by orchestrator (suite+live)",
+      "depends_on": [
+        "A4"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "A2c",
+      "phase": "Batch 4",
+      "title": "panel.js: derived-only repaint, resolver-fed spillover block, acknowledgements, focus, aria, badge, note",
+      "status": "resolved",
+      "by": "Sonnet cut off; orchestrator repaired NUL byte + duplicate symbol, wrote tests, verified live",
+      "depends_on": [
+        "A4"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "A5",
+      "phase": "Batch 5",
+      "title": "questions.json: one editor per replicate path",
+      "status": "done",
+      "by": "orchestrator (executor never dispatched before outage)",
+      "depends_on": [
+        "A2c"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "C2",
+      "phase": "Batch 4",
+      "title": "overview.js: name every blocker, label it, dedupe decisions, safe export filename, honest copy fallback",
+      "status": "resolved",
+      "by": "Sonnet cut off; orchestrator verified live (Blocks export, dedupe, toast, exports)",
+      "depends_on": [
+        "A3"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "C3",
+      "phase": "Batch 5",
+      "title": "CSS: 400px panel rows reachable; light-theme chart labels readable",
+      "status": "done",
+      "by": "orchestrator; verified live 400px + contrast 15.4:1",
+      "depends_on": [
+        "A2c"
+      ],
+      "batch": 5
+    },
+    {
+      "id": "D1",
+      "phase": "Batch 4",
+      "title": "shell.js: toast queue, ticking save label, distinguishable restore rows, cleared live region",
+      "status": "resolved",
+      "by": "Opus pass; moderates fixed by orchestrator",
+      "depends_on": [
+        "B2",
+        "B3"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "D2",
+      "phase": "Batch 3",
+      "title": "feedbackHandoff.js: GitHub reachable when copy fails, channel-correct text, focus trap",
+      "status": "resolved",
+      "by": "Sonnet retry; round-2 red-team killed; orchestrator verified (tests + live modal; focus by unit test)",
+      "depends_on": [],
+      "batch": 3
+    },
+    {
+      "id": "D3",
+      "phase": "Batch 3",
+      "title": "Guide/walkthrough copy: real step count, real nav list, plural, manual links",
+      "status": "done",
+      "by": "Opus red-team pass",
+      "depends_on": [
+        "E2"
+      ],
+      "batch": 3
     },
     {
       "id": "V1",
-      "phase": "Batch 2",
-      "title": "Adversarial verification of R1",
+      "phase": "Batch 6",
+      "title": "Cut 0.21.0: version, changelog, release-notes hero from one source, test guard",
       "status": "done",
-      "by": "Opus",
-      "depends_on": [
-        "R1"
-      ],
-      "batch": 2
+      "by": "red-team killed; orchestrator verified (version guard, live hero/footer, changelog vs commits)",
+      "depends_on": [],
+      "batch": 6
     },
     {
       "id": "V2",
-      "phase": "Batch 2",
-      "title": "Adversarial verification of R2",
+      "phase": "Batch 7",
+      "title": "Release-notes renderer: join soft-wrapped lines, fix relative links",
       "status": "done",
-      "by": "Opus",
+      "by": "red-team killed; orchestrator verified (87 li / 87 bullets live)",
       "depends_on": [
-        "R2"
+        "V1"
       ],
-      "batch": 2
+      "batch": 7
     },
     {
       "id": "V3",
-      "phase": "Batch 2",
-      "title": "Adversarial verification of R3",
-      "status": "done",
-      "by": "Opus",
-      "depends_on": [
-        "R3"
-      ],
-      "batch": 2
+      "phase": "Batch 6",
+      "title": "README.md: bring every claim in line with the code",
+      "status": "resolved",
+      "by": "Opus fail -> wording fixed by orchestrator",
+      "depends_on": [],
+      "batch": 6
     },
     {
       "id": "V4",
-      "phase": "Batch 2",
-      "title": "Adversarial verification of R4",
-      "status": "done",
-      "by": "Opus",
-      "depends_on": [
-        "R4"
-      ],
-      "batch": 2
+      "phase": "Batch 6",
+      "title": "ROADMAP.md, TASKS.md, .github comments: retire stale claims",
+      "status": "resolved",
+      "by": "Opus fail -> TASKS claim deferred until UI landed, wording fixed",
+      "depends_on": [],
+      "batch": 6
     },
     {
       "id": "V5",
-      "phase": "Batch 2",
-      "title": "Adversarial verification of R5",
-      "status": "done",
-      "by": "Opus",
-      "depends_on": [
-        "R5"
-      ],
-      "batch": 2
+      "phase": "Batch 6",
+      "title": "Manual + dev server parity: labels, alt text, manual images",
+      "status": "resolved",
+      "by": "Sonnet cut off; orchestrator finished manual sentences",
+      "depends_on": [],
+      "batch": 6
     },
     {
       "id": "V6",
-      "phase": "Batch 2",
-      "title": "Adversarial verification of R6",
+      "phase": "Batch 7",
+      "title": "Knowledge packs: internally consistent notes and rule wording",
       "status": "done",
-      "by": "Opus",
+      "by": "red-team killed; orchestrator verified (KB valid, selectAdvice)",
       "depends_on": [
-        "R6"
+        "V1"
       ],
-      "batch": 2
-    },
-    {
-      "id": "S1",
-      "phase": "Batch 3",
-      "title": "Merge, re-scan, report, remediation graph, lessons, dashboard",
-      "status": "done",
-      "by": "Fable",
-      "depends_on": [
-        "V1",
-        "V2",
-        "V3",
-        "V4",
-        "V5",
-        "V6"
-      ],
-      "batch": 3
+      "batch": 7
     }
   ],
   "log": [
     {
-      "time": "20:46:04",
-      "msg": "Run seeded from task graph; building dist + baseline suites"
-    },
-    {
-      "time": "20:46:53",
-      "msg": "dist built (1070286 B); JS 879/879; batch 1 dispatched to 6 Opus reviewers"
-    },
-    {
-      "time": "20:47:32",
-      "msg": "pytest installed; Python 88/88 baseline"
-    },
-    {
-      "time": "20:58:28",
-      "msg": "R6 done: 2 blocking/4 major/1 minor/2 nit, 10 repro tests failing; V6 dispatched"
-    },
-    {
-      "time": "20:59:54",
-      "msg": "R1 done: 0 blocking/8 major/8 minor/3 nit, 38 checked_ok; V1 dispatched"
-    },
-    {
-      "time": "21:02:23",
-      "msg": "R3 done: 0 blocking/6 major/7 minor/4 nit, 23 checked_ok; V3 dispatched"
-    },
-    {
-      "time": "21:07:53",
-      "msg": "R2 done: 2 blocking/4 major/5 minor/4 nit, 27 checked_ok; privacy claims hold at runtime. V2 dispatched. NOTE R2 killed+restarted a sibling dist server on :8811 mid-run"
-    },
-    {
-      "time": "21:10:47",
-      "msg": "V1 pass: 16 confirmed / 4 refuted (feedback label EXISTS live; 14 uncited are named via fetched changelog; repo is public; classic-final tag exists), 6 new findings"
-    },
-    {
-      "time": "21:13:58",
-      "msg": "R4 done: 1 blocking/6 major/8 minor/5 nit, 16 checked_ok, 58 screenshots, 0 console errors; V4 dispatched"
-    },
-    {
-      "time": "21:14:34",
-      "msg": "V6 pass: 9/9 confirmed, R6-04/05 upheld at blocking on a stronger mechanism (no protectFromAutomaticEviction), 5 new findings, 1 checked_ok falsified. NOTE V6 pkill'd sibling servers :8000/:8811 mid-run"
-    },
-    {
-      "time": "21:16:40",
-      "msg": "V3 pass: 17/17 confirmed (5 downgraded to minor, 2 to nit); R1-05 vs R3-01 settled: 14/14 named over http, 8/14 over file://; V3-N1 major: overlap flag is an export GATE that only deleting a channel clears"
-    },
-    {
-      "time": "04:51:39",
-      "msg": "OUTAGE 2026-09-12 00:50Z: Opus session limit killed R5 (after deliverables), V2, V4 (no output). Reset; V2/V4 re-dispatched, V5 dispatched, all Opus. Scope change: confirmed findings will be FIXED this run (Sonnet high executes, Opus red-teams, Fable final passes)"
-    },
-    {
-      "time": "05:11:00",
-      "msg": "V2 pass: 14 confirmed / 1 refuted (R2-10) / 1 partial; R2-01/02 downgraded blocking->major under stated policy (blocking = actionable-to-detriment falsehood or data loss); 5 new (changelog fully shredded; GitHub handoff dead end over file://; clear-all leaves 6 keys)"
-    },
-    {
-      "time": "05:13:24",
-      "msg": "V5 pass: 13/13 confirmed (R5-04 -> minor, same as R6-06); R5-01 blocking upheld with corrections (5 actions; deleting a Restore row prunes protection); 3 new (download+denied-clipboard modal contradicts itself; unbounded protected ring; Untitled aria labels)"
-    },
-    {
-      "time": "05:30:07",
-      "msg": "V4 pass: 18 confirmed / 0 refuted / 1 unverifiable; R4-01 blocking upheld (panel.js:236 reads naming.fields.markers, conformance.js:113 reads panel.channels = two paths one fact); R4-03 = R6-01/02/08 root cause; 4 new (non-Latin names -> UNSPECIFIED silently; unconfirmed interview text discarded). Batch 2 complete: 6/6 pass"
-    },
-    {
       "time": "06:33:54",
-      "msg": "S1 done: report docs/plans/app-review-2026-09-11.md + remediation graph (25 tasks / 7 batches) written"
+      "msg": "Remediation run seeded from task graph; batch F1 dispatched (5 Sonnet executors, high effort)"
+    },
+    {
+      "time": "06:35:46",
+      "msg": "E2 done (workflowProgress exports WALKTHROUGH_STEP_COUNT/describeWalkthroughLength); JS 880/880; red-team batched with F1"
+    },
+    {
+      "time": "06:37:54",
+      "msg": "A2 done (panel.spillover.acknowledged default, normalize/pruneSpilloverAcks, 6 tests); transient persist.test failure observed = B1 in flight"
+    },
+    {
+      "time": "06:38:24",
+      "msg": "B1 done (PROTECTED_CAP=3, truthful return, +3 tests, JS 886/886); Opus red-team dispatched"
+    },
+    {
+      "time": "06:39:18",
+      "msg": "A1 done (resolveMeasurementFluorophores, note kept, bounds exported, +7 tests); JS 891/891"
+    },
+    {
+      "time": "06:43:03",
+      "msg": "E1 done (non-Latin names -> named error/warning via a shared non-enumerable key; validateTargetPath documented as filename check); JS 899/899; red-team dispatched with the side-channel + design-step gap as targets"
+    },
+    {
+      "time": "06:45:15",
+      "msg": "B1 PASS (5 non-blocking problems: pre-existing rollback flaw -> follow-up; stale comment fixed in warm context; appController prose -> B2 prompt)"
+    },
+    {
+      "time": "06:45:33",
+      "msg": "B1 committed; F2 partial dispatch (B2, B3, B4)"
+    },
+    {
+      "time": "06:50:17",
+      "msg": "A1/A2 red-team: 2 real defects (bounds constant vs producer; ack ids variant vs canonical) fixed in warm context + boundary default for v6 saves; E2 pass. F1 engine files committed (assay.js held for B4). A3 dispatched"
+    },
+    {
+      "time": "06:54:14",
+      "msg": "E1 FAIL: issues die inside planFilenames (never rendered by design.js/conformance); 'GFP,DAPI' warns on its own separator; message quotes pre-uppercase token. Retry queued after A3 (conformance.js contention) with a plain sanitizationLossIssues export"
+    },
+    {
+      "time": "06:54:31",
+      "msg": "B2 done (preserveOpenStudy for restore/import/blank/example; import error humanized; prose honest; +4 test files/cases); red-team dispatched. B2 confirms D8 (storageScope export list) is B3's"
+    },
+    {
+      "time": "06:55:23",
+      "msg": "B4 done (empty array/object = clear in store.js; groupSeedLevels active-only; copy-groups excludes source, disabled when no groups); red-team dispatched on the widened clear rule"
+    },
+    {
+      "time": "06:57:17",
+      "msg": "B3 done (ownedScopedKeys, scoped clearAll, guided-state reload, scope-aware toast; Python 88/88 so D8 build-gate break cleared); red-team dispatched"
+    },
+    {
+      "time": "06:57:44",
+      "msg": "A3 done (conformance uses resolver + acks; issues carry assayId/assayLabel/stepId; isBlockingSeverity); red-team dispatched. E1 retry dispatched with red-team evidence"
+    },
+    {
+      "time": "07:02:38",
+      "msg": "B4 FAIL (2 major, 2 minor, 1 nit); provenance promise itself upheld (no WEAK writer can refill user-emptied paths). Retry dispatched"
+    },
+    {
+      "time": "07:03:55",
+      "msg": "B2 PASS (1 moderate, 3 minor): persist rollback now restores the pre-save ring; preserveOpenStudy cancels the pending timer and does ONE protected save. Minor #3/#4 and shell.js:378 wording -> D1 prompt"
+    },
+    {
+      "time": "07:05:16",
+      "msg": "B2 attacks re-run: 26/32 pass with orchestrator fixes vs 16/32 without; remaining 6 = red-team's documented minors/nits (mislabel on shell throw after import; missing-slot restore marks open study failed; restoring oldest unprotected slot evicts it) -> follow-ups in report"
+    },
+    {
+      "time": "07:08:18",
+      "msg": "A3 red-team: 2 blocking on family variants -> fluorophoreEntryId (canonical::variant) now shared by flagPanelOverlaps pairKey and acks; 'Assay N' fallback -> 'Measurement N'. B2+B3 committed 3c44de9. A3 commit waits for E1 retry (shared conformance.js)"
+    },
+    {
+      "time": "07:08:29",
+      "msg": "D2, D3 dispatched (D2 must not edit guide.js; D3 owns it)"
+    },
+    {
+      "time": "07:12:01",
+      "msg": "B4 retry done (isEmptyValue in provenance.js: recursive arrays, plain objects only; migrate() heals STRONG-over-empty design.groups slots; button state recomputed); red-team round 2 dispatched"
+    },
+    {
+      "time": "07:12:30",
+      "msg": "E1 retry done (sanitizationLossIssues export; planFilenames attaches per-row issues; design.js renders; conformance folds; letters/digits-only loss rule; final token quoted; live screenshots); red-team round 2 dispatched"
+    },
+    {
+      "time": "07:14:12",
+      "msg": "D3 done (five-step from E2, nav list = 5 real steps, plural verb, manual/index.html links, glossary five-stage); red-team batched with D2. D1 dispatched with B2's leftover minors"
+    },
+    {
+      "time": "07:17:31",
+      "msg": "D2 done (proceed not gated on copy; download fallback; channel-correct text; focus trap; openInNewTab); Guide handoff sentence applied by orchestrator; D2+D3 red-team dispatched"
+    },
+    {
+      "time": "07:22:01",
+      "msg": "E1 round 2 PASS (4 minors; #1 fixed in warm context; #2 tier, #3 name-builder surface, #4 export column -> follow-ups). A3+E1 committed"
+    },
+    {
+      "time": "07:23:11",
+      "msg": "B4 round 2 FAIL (WEAK empty payload bypassed canOverwrite) -> clearing exception restricted to STRONG writers + blank seed rows ignored; r2Attacks 9/9; committed. A4 dispatched"
+    },
+    {
+      "time": "07:23:42",
+      "msg": "F4 docs partial dispatch: V1 (0.21.0 cut + release-notes single source), V3 (README), V4 (ROADMAP/TASKS/.github). V5 waits on D2D3 commit + V1; V2/V6 depend on V1"
+    },
+    {
+      "time": "07:25:32",
+      "msg": "D1 done (toast queue, 30s ticker, restore-row labels, honest confirms, B2 minors #3/#4); study.js delete confirm aligned by orchestrator; red-team dispatched"
+    },
+    {
+      "time": "07:26:23",
+      "msg": "V3 done (README: 9 claims corrected with proofs); red-team batched with V1/V4"
+    },
+    {
+      "time": "07:26:53",
+      "msg": "D2D3 red-team: D3 PASS (manual mirrors of the feedback flow -> V5); D2 FAIL -> retry dispatched"
+    },
+    {
+      "time": "07:27:18",
+      "msg": "V4 done (17 rules, provenance paragraphs, blank first run, labels/visibility comments, TASKS review section); V3+V4 docs red-team dispatched"
+    },
+    {
+      "time": "07:31:02",
+      "msg": "A4 done (onSectionChanged hook, refreshHeader, isPageLive; 3 adopted cross-section cases red until A2a/b/c); A4 red-team + A2a/A2b/A2c/C2 dispatched"
+    },
+    {
+      "time": "07:32:28",
+      "msg": "V1 done (0.21.0; RELEASE constant drives hero/lede/footer; guard falsified; 'Previously in 0.19.0' section; Fixed list excludes unlanded UI work). V2 + V6 dispatched; V5 waits for V2"
+    },
+    {
+      "time": "07:36:25",
+      "msg": "D2 retry done (clipboard.js preserves focus for every caller; opener captured before await; copy channel offers download; download confirmation; non-vacuous test); red-team round 2 dispatched"
+    },
+    {
+      "time": "07:37:38",
+      "msg": "V6 done (overlapRules note honest about peak-only heuristics; DCFDA reason unified; sequential-scan scoped; pixel size; spinning-disk gets confocal rules; FMO 'three or more'; sources metadata)"
+    },
+    {
+      "time": "07:41:45",
+      "msg": "V2 done (foldContinuationLines; repo-relative links -> GitHub blob; 10 tests); V1+V2+V6 red-team + V5 dispatched. D1 PASS: tick no longer rebuilds Restore while menu open; confirm wording honest; import post-replace throw toasted"
+    },
+    {
+      "time": "10:54:49",
+      "msg": "OUTAGE 2 (07:45Z): session limit (Sonnet+Opus) killed A2c, C2, V5, D2r2 red-team, V1V2V6 red-team. Reset 10:50Z. Per lesson 42 the orchestrator (Fable) substitutes a declared warm-context loop: finish interrupted work, verify with the red-team scripts on disk, full suites, live CDP"
+    },
+    {
+      "time": "11:06:14",
+      "msg": "All 25 remediation tasks closed. Outage-2 substitutions declared per task. Final tree: JS 1011/1011, Python 88/88, build ok. Commits 2b34d2e fdb41ef 99eed97"
+    },
+    {
+      "time": "11:07:50",
+      "msg": "Report addendum + lessons 52-56 written; final commit next; push awaits user confirmation"
     }
   ],
-  "snapshot_at": "2026-09-12 06:33"
+  "snapshot_at": "2026-09-12 11:07"
 };
 /* CMA:EMBEDDED:END */
 
