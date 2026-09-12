@@ -31,6 +31,15 @@ export const STORAGE_SCHEMA_VERSION = 1;
 export const STORAGE_PREFIX = nsKey(`micronaut.v${STORAGE_SCHEMA_VERSION}.`);
 
 const RING_SIZE = 5;
+// At most this many of the ring's ids may be protected at once. Without a
+// cap, repeated protected saves (every "Start a blank study" / "Open the
+// example" click mints one) can fill the WHOLE ring with protected slots --
+// R5-01/V5-NEW-02: six blank-study clicks left a ring of six ids, six of
+// them protected, zero room for the next ordinary autosave, which then
+// silently discarded the user's actual edit while the UI still said "Saved
+// locally". RING_SIZE - 2 keeps at least two unprotected slots free for
+// ordinary autosaves no matter how many protected snapshots accumulate.
+const PROTECTED_CAP = RING_SIZE - 2;
 const RING_INDEX_KEY = STORAGE_PREFIX + 'ring';
 const PROTECTED_SLOTS_KEY = STORAGE_PREFIX + 'protectedSlots';
 const CHANGES_KEY = STORAGE_PREFIX + 'changesSinceExport';
@@ -104,9 +113,19 @@ function removeKey(storage, key, onQuotaExceeded) {
 
 /**
  * Save `experiment` into a fresh ring-buffer slot (a new id every call, not
- * keyed by experiment.meta.id) and evict the oldest slot(s) beyond
- * RING_SIZE. Returns the new slot id, or null if the write itself failed
- * (e.g. quota exceeded -- onQuotaExceeded still fires in that case).
+ * keyed by experiment.meta.id) and evict slot(s) so the invariant below
+ * holds after every non-null return. Returns the new slot id, or null if the
+ * write itself failed (e.g. quota exceeded -- onQuotaExceeded still fires in
+ * that case).
+ *
+ * INVARIANT: after every non-null-returning call, the ring holds at most
+ * RING_SIZE (5) ids, at most PROTECTED_CAP (3) of them protected, and the
+ * returned id is one of the ids in the ring (so it is immediately loadable).
+ * Protected slots are bounded FIRST (oldest protected evicted, never the id
+ * just saved), then the ring itself is bounded by evicting unprotected ids
+ * oldest-first (also never the id just saved) -- this is what stops a run of
+ * protected saves from starving ordinary autosaves of a place to land
+ * (R5-01/V5-NEW-02).
  */
 export function saveExperiment(experiment, {
   storage = defaultBackend(),
@@ -120,16 +139,54 @@ export function saveExperiment(experiment, {
   const ids = readRing(storage);
   ids.push(id);
   const protectedIds = new Set(readJSON(storage, PROTECTED_SLOTS_KEY, []));
-  if (protectFromAutomaticEviction) protectedIds.add(id);
+  let protectedChanged = false;
+  if (protectFromAutomaticEviction) {
+    protectedIds.add(id);
+    protectedChanged = true;
+  }
+  // Stale-marker hygiene: a protected id whose ring entry is already gone
+  // (deleted, or evicted before this bound existed) must not keep counting
+  // against PROTECTED_CAP forever.
+  for (const protectedId of [...protectedIds]) {
+    if (!ids.includes(protectedId)) {
+      protectedIds.delete(protectedId);
+      protectedChanged = true;
+    }
+  }
+
   const evicted = [];
+  // Bound protected slots first: at most PROTECTED_CAP of the ring's ids may
+  // be protected. Without this, protected saves alone (e.g. repeated "Start
+  // a blank study" clicks) could fill the whole ring and leave zero room
+  // for the next ordinary autosave.
+  while (ids.filter((candidate) => protectedIds.has(candidate)).length > PROTECTED_CAP) {
+    const evictionIndex = ids.findIndex((candidate) => protectedIds.has(candidate) && candidate !== id);
+    if (evictionIndex < 0) break;
+    const [victim] = ids.splice(evictionIndex, 1);
+    protectedIds.delete(victim);
+    protectedChanged = true;
+    evicted.push(victim);
+  }
+  // Then bound the ring itself: unprotected ids evict oldest-first, never the
+  // id just written. The ring never exceeds RING_SIZE; protected snapshots
+  // (at most PROTECTED_CAP of them) only decide WHICH slots age out, so
+  // example/reset activity cannot starve ordinary autosaves.
   while (ids.length > RING_SIZE) {
-    const evictionIndex = ids.findIndex((candidate) => !protectedIds.has(candidate));
-    // Protected snapshots are deliberately allowed to extend the recovery
-    // list beyond the ordinary five-slot ring. Example activity must never
-    // age out the user's study that was open before the example.
+    const evictionIndex = ids.findIndex((candidate) => !protectedIds.has(candidate) && candidate !== id);
     if (evictionIndex < 0) break;
     evicted.push(ids.splice(evictionIndex, 1)[0]);
   }
+
+  // Belt-and-braces: every eviction loop above explicitly excludes `id`, so
+  // this should be unreachable, but a future edit to either loop is exactly
+  // the kind of change that could silently break the "returned id is always
+  // loadable" half of the invariant -- never hand back an id the caller
+  // cannot load.
+  if (!ids.includes(id)) {
+    removeKey(storage, slotKey(id), onQuotaExceeded);
+    return null;
+  }
+
   if (!writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded)) {
     // A slot without a ring entry is unusable, so report this save as failed
     // rather than claiming recovery succeeded. Best-effort cleanup is itself
@@ -137,10 +194,12 @@ export function saveExperiment(experiment, {
     removeKey(storage, slotKey(id), onQuotaExceeded);
     return null;
   }
-  if (protectFromAutomaticEviction && !writeJSON(storage, PROTECTED_SLOTS_KEY, [...protectedIds], onQuotaExceeded)) {
-    // Without the protection marker this save would make a promise it cannot
-    // keep. Remove it from both the slot store and ring and report failure so
-    // callers can leave the user's current workspace untouched.
+  if (protectedChanged && !writeJSON(storage, PROTECTED_SLOTS_KEY, [...protectedIds], onQuotaExceeded)) {
+    // Without an accurate protection marker this save would make a promise
+    // it cannot keep (either protecting an id it didn't, or leaving a stale
+    // one that keeps counting against PROTECTED_CAP). Remove it from both
+    // the slot store and ring and report failure so callers can leave the
+    // user's current workspace untouched.
     removeKey(storage, slotKey(id), onQuotaExceeded);
     writeJSON(storage, RING_INDEX_KEY, ids.filter((candidate) => candidate !== id), onQuotaExceeded);
     return null;

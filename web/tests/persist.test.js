@@ -106,7 +106,13 @@ test('the ring buffer keeps exactly 5 entries and evicts oldest-first', () => {
   assert.notEqual(loadExperiment(ids[2], { storage }), null);
 });
 
-test('a user snapshot protected before opening demo data is never evicted by demo saves', () => {
+// Retitled from "...is never evicted by demo saves": with only a single
+// protected snapshot in play, it stays within PROTECTED_CAP (3) forever, so
+// it is in fact never evicted here -- but the module-wide guarantee is now
+// "at most PROTECTED_CAP protected slots survive", not "protected is
+// unbounded/permanent". See the PROTECTED_CAP tests below for the bound
+// itself.
+test('a single protected pre-demo snapshot survives many ordinary demo saves', () => {
   const storage = makeFakeStorage();
   const userStudy = emptyExperiment();
   userStudy.meta.title = 'My irreplaceable study';
@@ -121,6 +127,83 @@ test('a user snapshot protected before opening demo data is never evicted by dem
   assert.ok(listSaved({ storage }).includes(userId));
   assert.equal(loadExperiment(userId, { storage }).meta.title, 'My irreplaceable study');
   assert.equal(listSaved({ storage }).length, 5);
+});
+
+// R5-01/V5-NEW-02: repeated protected saves (e.g. clicking "Start a blank
+// study" over and over) used to grow the protected set without bound,
+// eventually filling the entire ring and leaving no room for an ordinary
+// autosave to land -- the save would report success (a non-null id) while
+// silently being unrecoverable moments later, or a LATER plain autosave
+// would be discarded outright. This test proves the bound: after any number
+// of protected saves, at most PROTECTED_CAP survive, the ring never exceeds
+// RING_SIZE, and -- critically -- every id this function returns is
+// immediately loadable via loadExperiment, never a promise the ring cannot
+// keep.
+test('protected saves are capped at PROTECTED_CAP and every returned id is immediately loadable', () => {
+  const storage = makeFakeStorage();
+  const returnedIds = [];
+  for (let i = 0; i < 8; i += 1) {
+    const experiment = emptyExperiment();
+    experiment.meta.title = `protected-${i}`;
+    const id = saveExperiment(experiment, { storage, protectFromAutomaticEviction: true });
+    assert.ok(id, `save ${i} must return a non-null id`);
+    returnedIds.push(id);
+    // The invariant holds after EVERY save, not just the last one.
+    assert.ok(loadExperiment(id, { storage }) !== null, `returned id ${i} must be loadable immediately`);
+    const ring = listSaved({ storage });
+    assert.ok(ring.length <= 5, `ring length ${ring.length} must never exceed 5 (save ${i})`);
+  }
+
+  const finalRing = listSaved({ storage });
+  // Every one of the 8 saves above was protected, so the ring can never grow
+  // past PROTECTED_CAP itself (a protected id is only ever evicted along
+  // with its ring entry) -- it converges to exactly 3, not 5, which is a
+  // stronger confirmation of the cap than "<= 5" alone would be.
+  assert.ok(finalRing.length <= 5, `ring length ${finalRing.length} must never exceed 5`);
+  assert.equal(finalRing.length, 3, 'an all-protected sequence converges to exactly PROTECTED_CAP');
+  const protectedInRing = finalRing.filter((rid) => returnedIds.includes(rid));
+  assert.ok(protectedInRing.length <= 3, `at most 3 protected ids may remain, got ${protectedInRing.length}`);
+
+  // After 8 protected saves, ordinary (unprotected) autosaves must still
+  // find room -- the whole point of PROTECTED_CAP -- rather than being
+  // unable to evict anything and silently vanishing. Three plain saves in a
+  // row: each one, at the moment it is made, survives loadExperiment and
+  // appears in listSaved (only up to RING_SIZE - PROTECTED_CAP = 2 of them
+  // can coexist with the 3 protected survivors at any one time, so an OLDER
+  // plain save can still be aged out by a newer one -- that is ordinary ring
+  // rotation, not the starvation bug this task fixes).
+  for (let i = 0; i < 3; i += 1) {
+    const plain = emptyExperiment();
+    plain.meta.title = `ordinary-autosave-${i}`;
+    const plainId = saveExperiment(plain, { storage });
+    assert.ok(plainId, `plain save ${i} must return an id`);
+    assert.ok(loadExperiment(plainId, { storage }) !== null, `plain save ${i} must be loadable`);
+    assert.ok(listSaved({ storage }).includes(plainId), `plain save ${i} must appear in listSaved`);
+  }
+});
+
+// Direct reviewer repro (a4f_ringstarve.py / R5-01): six protected saves
+// (six "Start a blank study" clicks) followed by one ordinary autosave. On
+// the pre-fix tree this fails -- six protected ids fill every ring slot,
+// there is nothing left to evict, and the plain save's id, though returned,
+// is not in the ring and is never seen by listSaved/loadMostRecentRecoverable
+// again once anything else is saved. Run this BEFORE the persist.js change
+// to confirm the failure, then after to confirm the fix.
+test('reviewer scenario: after 6 protected saves, a plain autosave survives and is loadable', () => {
+  const storage = makeFakeStorage();
+  for (let i = 0; i < 6; i += 1) {
+    const experiment = emptyExperiment();
+    experiment.meta.title = `blank-study-${i}`;
+    saveExperiment(experiment, { storage, protectFromAutomaticEviction: true });
+  }
+
+  const plain = emptyExperiment();
+  plain.meta.title = 'the actual edit the user just made';
+  const plainId = saveExperiment(plain, { storage });
+
+  assert.ok(plainId, 'the plain save must return an id');
+  assert.ok(loadExperiment(plainId, { storage }) !== null, 'the plain save must be loadable');
+  assert.ok(listSaved({ storage }).includes(plainId), 'the plain save must appear in listSaved');
 });
 
 test('only an explicit delete removes a protected pre-demo snapshot', () => {
