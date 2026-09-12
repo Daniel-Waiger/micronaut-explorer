@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-09-10
+Last updated: 2026-09-12
 
 Near-term worklist: [TASKS.md](TASKS.md). This file is the high-level direction.
 
@@ -26,14 +26,15 @@ ideas that were on its backlog, all now deferred.
   vertical slice that runs from `file://`.
 - **P1:** KB loader, predicate DSL, interview engine, deterministic free-text
   ingest, condition matrix → sample IDs.
-- **Modality advice:** 16 rules across STED / confocal / widefield / light-sheet /
-  SEM-TEM / Raman (`web/kb/advisor.json`), surfaced on the Describe / Design /
-  Naming steps.
+- **Modality advice:** 17 rules across STED / confocal / widefield / light-sheet /
+  SEM-TEM / Raman (`web/kb/advisor.json`), surfaced on the Research brief and the
+  measurement's Samples & design, Acquisition and Data plan sections.
 - **The assay tier (schema v3):** a study can hold several assays that share only a
   research question and a test article, each with its own modality / panel /
   specimen. All four commits shipped (N-assay UI, readout + controls vocabulary,
-  the exportable design document); the real Romo-Rico et al. oregano study is the
-  app's default. See [docs/plans/planner-web-assay-tier.md](docs/plans/planner-web-assay-tier.md).
+  the exportable design document); the real Romo-Rico et al. oregano study opens
+  only in the practice tab (`index.html?demo=1`) — a first run starts blank. See
+  [docs/plans/planner-web-assay-tier.md](docs/plans/planner-web-assay-tier.md).
 - **Study overview step:** a shareable study diagram (HTML + an in-app SVG map) + a
   deterministic walkthrough, plus a staged progression ladder (idea → advanced modality),
   exportable as Markdown/mermaid.
@@ -56,7 +57,8 @@ ideas that were on its backlog, all now deferred.
   a NEW `target` marker class distinct from `moiety`, fixes this) plus a new FMO control
   rule; the deploy workflow's own build pipeline was previously untested and unverified
   before publishing; `web/kb/markers.json`/`spectra.json` gained the default study's own
-  missing markers (`SYTO9`, `DCF`) plus a ~20-entry common-dye sweep.
+  missing markers (the SYTO family's `syto9` alias, and DCFDA's `dcf` alias) plus
+  a ~20-entry common-dye sweep.
 - **Alpha-pilot-readiness (Wave 1 — feedback path):** a "Copy feedback report" header
   button (build-independent: step, browser, KB health, full study as text) plus a GitHub
   issues link; a Google Form / non-GitHub-email link is wired but left for Daniel to fill
@@ -70,9 +72,11 @@ ideas that were on its backlog, all now deferred.
     exists.
   - **Bench card export:** a compact, print-oriented single-assay Markdown summary
     (channels, controls with reasons, two worked filenames), one per assay, on Overview.
-  - **Conformance check:** one pass/fail verdict for the whole study, composed from every
-    validator the app already runs per-step (design issues, naming-field patterns, path
-    length, spillover flags, cross-assay collisions) — surfaced on Overview.
+  - **Conformance check:** one readiness verdict for the whole study (blocked / needs
+    review / ready), composed from the validators the app runs per-step (design issues,
+    naming-field patterns, filename length, spillover flags, cross-assay collisions) —
+    surfaced on Review. It does not check scientific validity, statistical power,
+    ethics, biosafety or instrument suitability.
   - **"Export for your own LLM":** a copy-paste prompt (ground rules + the study as JSON +
     suggested questions) for whatever model the user already has open. The safer,
     zero-infrastructure stand-in for the in-app LLM seam below — this app never calls a
@@ -129,15 +133,20 @@ path there is nothing left to guard, which is a stronger guarantee than any vali
 The deterministic exact-text scan on Research brief stays — it is honest, cheap, and
 quotes what it matched.
 
-**⚠ Parked review — `web/kb/spectra.json` content.** Every fluorophore's excitation/
-emission peak values are Claude-drafted from common published references (same "Claude
-drafts, Daniel corrects" arrangement as `advisor.json`), not yet verified against FACSI's
-actual reference sources or filter sets. The two overlap thresholds
-(`emissionProximityNm`/`excitationProximityNm`) are likewise a judgment call pending
-review once `K-3` (instruments/objectives/lines/detectors) exists. Flagged in-app too (a
-persistent banner on the Color panel step). The pack grew substantially in Wave 0 (a
-~20-entry common-dye sweep, several new fluorophore families) — still entirely unreviewed
-and now a higher-priority review target given the added surface.
+**⚠ Parked review — `web/kb/spectra.json` content.** 143 of the pack's 157 entries are
+now `reviewStatus: "source-cited"` (a vendor or publication source recorded in the
+fluorophore-expansion pass of 2026-08-13 and 2026-09-05, see
+`docs/references/planner-fluorophore-sources.json`);
+14 remain Claude-drafted from common published references and are not yet verified
+against FACSI's actual reference sources or filter sets. None of it has been reviewed by
+a microscopy specialist. The two overlap thresholds (`emissionProximityNm`/
+`excitationProximityNm`) are likewise a judgment call pending review once `K-3`
+(instruments/objectives/lines/detectors) exists. Flagged in-app too — the Color panel
+step's banner picks one of three texts depending on the panel's own mix of cited vs.
+drafted entries (all-cited / all-drafted / mixed), not a single persistent claim. The
+pack grew substantially in Wave 0 (a ~20-entry common-dye sweep, several new fluorophore
+families) — still not specialist-reviewed and now a higher-priority review target given
+the added surface.
 
 ### Content — owned by Daniel, not code
 Authored in the knowledge pack (`web/kb/`): fluorophore identities and spectra,

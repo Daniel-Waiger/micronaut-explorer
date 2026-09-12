@@ -38,7 +38,7 @@
       "concept": "optical sectioning",
       "title": "Opening the pinhole trades optical sectioning for signal -- state it deliberately",
       "body": "The default pinhole size of 1 Airy Unit balances signal and out-of-focus light rejection. Opening it gathers more signal from a dim sample but lets in more out-of-focus blur, directly reducing your optical sectioning.",
-      "when": { "in": ["acquisition.modality", ["confocal"]] },
+      "when": { "in": ["acquisition.modality", ["confocal", "spinning-disk confocal"]] },
       "priority": 10
     },
     {
@@ -47,8 +47,8 @@
       "kind": "tip",
       "concept": "undersampling",
       "title": "Check your pixel size against Nyquist sampling before you commit to a design",
-      "body": "An undersampled pixel size throws away real optical resolution regardless of how good the objective is. The correct step size depends on numerical aperture and emission wavelength -- most acquisition software has a Nyquist calculator built in.",
-      "when": { "in": ["acquisition.modality", ["confocal"]] },
+      "body": "An undersampled pixel size throws away real optical resolution regardless of how good the objective is. The correct pixel size depends on numerical aperture and emission wavelength -- most acquisition software has a Nyquist calculator built in.",
+      "when": { "in": ["acquisition.modality", ["confocal", "spinning-disk confocal"]] },
       "priority": 20
     },
     {
@@ -57,8 +57,8 @@
       "kind": "pitfall",
       "concept": "spectral spillover",
       "title": "Overlapping emission spectra need sequential scanning, not simultaneous",
-      "body": "Simultaneous multi-laser scanning is faster but lets bleed-through between channels with overlapping emission masquerade as real colocalization. If your markers' emission spectra overlap, scan sequentially, one laser line at a time.",
-      "when": { "in": ["acquisition.modality", ["confocal"]] },
+      "body": "Simultaneous multi-laser scanning is faster but lets bleed-through between channels with overlapping emission masquerade as real colocalization. This works for dyes that are separable by excitation; if excitation peaks are also close, scanning sequentially will not separate them and the excitation-proximity warning applies instead. If your markers' emission spectra overlap but their excitation peaks do not, scan sequentially, one laser line at a time.",
+      "when": { "in": ["acquisition.modality", ["confocal", "spinning-disk confocal"]] },
       "priority": 30
     },
     {
