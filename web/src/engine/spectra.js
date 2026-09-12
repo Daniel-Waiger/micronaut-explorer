@@ -48,7 +48,7 @@
 
 import { splitMarkers } from './validation.js';
 import { kbMarker } from '../core/kb.js';
-import { normalizeChannels, channelSpectralField } from './panelAssembly.js';
+import { normalizeChannels, channelSpectralField, spilloverPairKey, fluorophoreEntryId } from './panelAssembly.js';
 
 export const SPECTRAL_STATES = [
   'unrecognized',
@@ -585,12 +585,40 @@ export function resolveMeasurementFluorophores(view, kb) {
  * that matter most first regardless of how close together their nm gaps
  * happen to be. An earlier version sorted by gap alone, which routinely put
  * a 2 nm excitation warning above a 12 nm emission error.
+ *
+ * `options.acknowledged` (optional): a normalized panelAssembly.js
+ * `normalizeSpilloverAcks()` array. An emission ERROR whose pairKey matches
+ * one of these (via the shared `spilloverPairKey`, order-independent) is
+ * downgraded to `severity: 'warning'`, gets ' -- acknowledged: <reason
+ * label>' appended to its message, and carries `acknowledged: true` on the
+ * returned record -- this is the ONLY thing that can turn the flag from a
+ * hard export block (conformance.js's BLOCKING_SEVERITIES) into a visible,
+ * still-present warning (V3-N1/A2's "keep the gate, make it clearable").
+ * Excitation warnings are never matched against acknowledgements -- they are
+ * already a warning and acknowledgement is specifically an emission-conflict
+ * decision.
  */
 const SEVERITY_RANK = { error: 0, warning: 1 };
 
-export function flagPanelOverlaps(entries, overlapRules) {
+const SPILLOVER_ACK_REASON_LABELS = {
+  'sequential-acquisition': 'sequential acquisition',
+  'filter-separated': 'filter-separated',
+  other: 'other',
+};
+
+function findSpilloverAck(acknowledged, pairKey) {
+  if (!Array.isArray(acknowledged)) return null;
+  for (const ack of acknowledged) {
+    if (!ack || !Array.isArray(ack.pair) || ack.pair.length !== 2) continue;
+    if (spilloverPairKey(ack.pair[0], ack.pair[1]) === pairKey) return ack;
+  }
+  return null;
+}
+
+export function flagPanelOverlaps(entries, overlapRules, options) {
   const known = entries.filter((e) => e.state === 'known');
   const rules = overlapRules || { emissionProximityNm: DEFAULT_EMISSION_PROXIMITY_NM, excitationProximityNm: DEFAULT_EXCITATION_PROXIMITY_NM };
+  const acknowledged = options && Array.isArray(options.acknowledged) ? options.acknowledged : [];
   const flags = [];
 
   for (let i = 0; i < known.length; i++) {
@@ -603,17 +631,27 @@ export function flagPanelOverlaps(entries, overlapRules) {
       const right = known[j];
       const [a, b] =
         (left.canonical || left.token) <= (right.canonical || right.token) ? [left, right] : [right, left];
-      const pairKey = [a.canonical, b.canonical].sort().join('|');
+      // Variant-aware (MITOTRACKER::mitotracker green), shared with the
+      // acknowledgement model -- see panelAssembly.js fluorophoreEntryId.
+      const pairKey = spilloverPairKey(fluorophoreEntryId(a), fluorophoreEntryId(b));
 
       const emissionGapNm = Math.abs(a.emissionPeakNm - b.emissionPeakNm);
       if (emissionGapNm < rules.emissionProximityNm) {
-        flags.push({
+        const flag = {
           field: 'panel',
           message: `${a.token} and ${b.token}: emission peaks ${emissionGapNm} nm apart (under the ${rules.emissionProximityNm} nm proximity threshold) -- likely to co-register in each other's detection window.`,
           severity: 'error',
           gap: emissionGapNm,
           pairKey,
-        });
+        };
+        const ack = findSpilloverAck(acknowledged, pairKey);
+        if (ack) {
+          const label = SPILLOVER_ACK_REASON_LABELS[ack.reason] || ack.reason;
+          flag.severity = 'warning';
+          flag.message = `${flag.message} -- acknowledged: ${label}`;
+          flag.acknowledged = true;
+        }
+        flags.push(flag);
       }
 
       const excitationGapNm = Math.abs(a.excitationPeakNm - b.excitationPeakNm);
@@ -632,7 +670,14 @@ export function flagPanelOverlaps(entries, overlapRules) {
   flags.sort(
     (x, y) => SEVERITY_RANK[x.severity] - SEVERITY_RANK[y.severity] || x.gap - y.gap || x.pairKey.localeCompare(y.pairKey)
   );
-  return flags.map(({ field, message, severity }) => ({ field, message, severity }));
+  // `pairKey` is kept (not stripped) so a caller -- conformance.js -- can
+  // classify/attribute a flag without recomputing it, and so a downstream
+  // acknowledgement UI can match a flag back to the pair it names.
+  // `acknowledged` is included only when true, so an unacknowledged flag's
+  // shape is unchanged from before this option existed.
+  return flags.map(({ field, message, severity, pairKey, acknowledged }) =>
+    acknowledged ? { field, message, severity, pairKey, acknowledged } : { field, message, severity, pairKey }
+  );
 }
 
 /**

@@ -41,7 +41,7 @@ import { ANTIBODY_CONJUGATION_MODES, channelSpectralField, normalizeChannels } f
  * what surfaced the duplicate.)
  */
 export function assayLabel(assay, index) {
-  return (assay && typeof assay.label === 'string' && assay.label.trim()) || `Assay ${index + 1}`;
+  return (assay && typeof assay.label === 'string' && assay.label.trim()) || `Measurement ${index + 1}`;
 }
 
 /**

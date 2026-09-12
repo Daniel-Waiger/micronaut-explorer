@@ -18,6 +18,7 @@ import {
   panelFluorophoreWriteValue,
   pruneSpilloverAcks,
   spilloverPairKey,
+  fluorophoreEntryId,
   FILTER_BANDWIDTH_BOUNDS_NM,
   reorderPanelChannels,
   seedChannelsFromMarkers,
@@ -379,8 +380,8 @@ test('pruneSpilloverAcks keeps an ack whose pair is present in either order and 
   const acks = [
     { pair: ['ALEXA488', 'FITC'], reason: 'other', at: 'a' },
     { pair: ['FITC', 'ALEXA488'], reason: 'other', at: 'b' }, // reverse order -- both still present
-    { pair: ['ALEXA488', 'MITOTRACKER::mitotracker green'], reason: 'other', at: 'c' }, // variant dedupe id -- NOT the ack key, absent
-    { pair: ['ALEXA488', 'MITOTRACKER'], reason: 'other', at: 'd' }, // canonical ids, same as flagPanelOverlaps' pairKey
+    { pair: ['ALEXA488', 'MITOTRACKER'], reason: 'other', at: 'c' }, // bare canonical of a VARIANT entry -- not its id, absent
+    { pair: ['ALEXA488', 'MITOTRACKER::mitotracker green'], reason: 'other', at: 'd' }, // the entry id, same as flagPanelOverlaps' pairKey
   ];
 
   const pruned = pruneSpilloverAcks(acks, entries);
@@ -395,16 +396,18 @@ test('pruneSpilloverAcks keeps an ack whose pair is present in either order and 
   assert.deepEqual(pruneSpilloverAcks(undefined, undefined), []);
 });
 
-test('spillover acks are keyed on CANONICAL ids (same as flagPanelOverlaps pairKey), so a family variant pair is prunable and matchable', () => {
-  const entries = [
-    { canonical: 'MITOTRACKER', variantKey: 'mitotracker green', status: 'known' },
-    { canonical: 'SYTO', variantKey: 'syto9', status: 'known' },
-  ];
-  const acks = normalizeSpilloverAcks([{ pair: ['SYTO', 'MITOTRACKER'], reason: 'sequential-acquisition', at: '2026-09-12T00:00:00.000Z' }]);
+test('spillover acks are keyed on VARIANT-AWARE entry ids shared with flagPanelOverlaps, so swapping a family member drops the ack', () => {
+  const green = { canonical: 'MITOTRACKER', variantKey: 'mitotracker green', status: 'known' };
+  const deepRed = { canonical: 'MITOTRACKER', variantKey: 'mitotracker deep red', status: 'known' };
+  const syto9 = { canonical: 'SYTO', variantKey: 'syto9', status: 'known' };
+  const syto60 = { canonical: 'SYTO', variantKey: 'syto60', status: 'known' };
+  assert.equal(fluorophoreEntryId(green), 'MITOTRACKER::mitotracker green');
+  assert.equal(fluorophoreEntryId({ canonical: 'FITC' }), 'FITC');
+  const acks = normalizeSpilloverAcks([{ pair: [fluorophoreEntryId(syto9), fluorophoreEntryId(green)], reason: 'sequential-acquisition', at: '2026-09-12T00:00:00.000Z' }]);
   assert.equal(acks.length, 1);
-  assert.deepEqual(acks[0].pair, ['MITOTRACKER', 'SYTO']);
-  assert.equal(spilloverPairKey('SYTO', 'MITOTRACKER'), 'MITOTRACKER|SYTO');
-  assert.equal(pruneSpilloverAcks(acks, entries).length, 1, 'a canonical-keyed ack must survive pruning against variant entries');
+  assert.equal(spilloverPairKey(acks[0].pair[0], acks[0].pair[1]), 'MITOTRACKER::mitotracker green|SYTO::syto9');
+  assert.equal(pruneSpilloverAcks(acks, [green, syto9]).length, 1, 'the acked pair is still present');
+  assert.equal(pruneSpilloverAcks(acks, [deepRed, syto60]).length, 0, 'a different pair of the SAME families must NOT inherit the ack (red-team A3-P1)');
   assert.deepEqual(normalizeSpilloverAcks([{ pair: ['X::v1', 'X::v1'], reason: 'other' }]), [], 'self-pairs are dropped');
   assert.equal(normalizeSpilloverAcks([{ pair: [' A ', 'B'], reason: 'other' }, { pair: ['B', 'A'], reason: 'other' }]).length, 1, 'trimmed + deduped');
   const [badAt] = normalizeSpilloverAcks([{ pair: ['A', 'B'], reason: 'other', at: 'not-a-date-at-all' }]);

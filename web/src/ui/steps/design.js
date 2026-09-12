@@ -473,6 +473,12 @@ export const designStep = {
       }
 
       const pathMessages = new Set();
+      // Sanitization-loss issues (V4-N1): the only place a group/factor
+      // level reaches naming.js is planFilenames (per row), so this is also
+      // the only place they can be shown -- deduped by field+message the
+      // same way pathMessages is, so N identical rows do not repeat one
+      // warning N times.
+      const sanitizationIssuesByKey = new Map();
       for (const entry of planned) {
         const row = entry.row;
         const rowEl = document.createElement('div');
@@ -506,6 +512,9 @@ export const designStep = {
             pathMessages.add(issue.message);
           }
         }
+        for (const issue of entry.issues || []) {
+          sanitizationIssuesByKey.set(`${issue.field}|${issue.message}`, issue);
+        }
         rowEl.appendChild(sampleIdEl);
         rowEl.appendChild(filenameEl);
 
@@ -521,6 +530,15 @@ export const designStep = {
         const li = document.createElement('li');
         li.className = 'issue issue-warning';
         li.textContent = `target_path: ${message}`;
+        issuesList.appendChild(li);
+      }
+      // Same element/class as the design issues above (`conditionIssues`)
+      // and the target_path warnings just above -- one issue-rendering
+      // convention, not a second one invented for this case.
+      for (const issue of sanitizationIssuesByKey.values()) {
+        const li = document.createElement('li');
+        li.className = 'issue issue-' + issue.severity;
+        li.textContent = `${issue.field}: ${issue.message}`;
         issuesList.appendChild(li);
       }
     }

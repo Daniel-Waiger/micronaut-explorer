@@ -20,6 +20,33 @@ function defaultProfile() {
   };
 }
 
+// --- V4-N1 (retry): validateFields deliberately does NOT compute or fold in
+// sanitization-loss issues (a group/factor level, or another naming field,
+// losing a real letter/digit when turned into a filename token) -- it is
+// only ever given the already-*finalized* fields, and the original
+// pre-sanitization value cannot be recovered from a sanitized token. That
+// responsibility belongs to naming.js's sanitizationLossIssues(raw, config),
+// called directly by engine/plan.js's planFilenames (which is the one place
+// a group/factor level's raw value is available) and attached to each
+// planned row; engine/conformance.js folds those into the study report
+// itself, not through validateFields. This test pins the negative half of
+// that contract: an ordinary own-enumerable field named exactly like the
+// OLD hidden channel is just a field, not a magic side-channel -- it must
+// not resurrect the old behaviour, and it must not crash.
+test('validateFields does not special-case a field literally named __namingSanitizationIssues', () => {
+  const profile = defaultProfile();
+  const fields = {
+    exptype: 'CT',
+    sample: 'E02',
+    magnification: 'X90',
+    markers: 'GFP',
+    notes: 'OK',
+    __namingSanitizationIssues: 'not-an-issues-array',
+  };
+  const issues = validateFields(fields, profile);
+  assert.deepEqual(issues, []);
+});
+
 test('validateFields happy path has no issues', () => {
   const profile = defaultProfile();
   const fields = {
@@ -150,4 +177,19 @@ test('validateTargetPath boundary is inclusive', () => {
 
   assert.deepEqual(validateTargetPath(exact), []);
   assert.equal(validateTargetPath(over).length, 1);
+});
+
+// --- V2-NEW-04: the contract is fixed as a FILENAME-length check, not a ---
+// full-path check, because every real caller (ui/steps/naming.js:469,
+// ui/steps/design.js:505, engine/conformance.js:107) has only ever passed a
+// bare filename, and this app has no target-directory field to prepend --
+// see validateTargetPath's own updated docstring for the full reasoning.
+// The old message's closing "Full path: '<path>'" contradicted its own
+// opening "This filename would be..." clause; fixed so both halves agree.
+test('validateTargetPath describes its input as a filename, not a full path', () => {
+  const longName = 'a'.repeat(MAX_PATH_LENGTH + 10) + '.tif';
+  const [issue] = validateTargetPath(longName);
+  assert.ok(issue.message.includes('This filename would be'), issue.message);
+  assert.ok(issue.message.includes(`Filename: '${longName}'`), issue.message);
+  assert.ok(!issue.message.includes('Full path'), issue.message);
 });

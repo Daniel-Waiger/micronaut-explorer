@@ -437,26 +437,33 @@ export function normalizeSpilloverAcks(raw) {
 }
 
 /**
+ * The id a spillover flag and an acknowledgement both use for one resolved
+ * fluorophore entry: its canonical name, plus `::<variantKey>` when it
+ * resolved to one specific family member. The variant half is load-bearing:
+ * MitoTracker Green and MitoTracker Deep Red share the canonical
+ * MITOTRACKER, and keying on canonicals alone let an acknowledgement recorded
+ * for one pair keep suppressing the flag after the user swapped to a
+ * different, genuinely conflicting pair (red-team A3-P1). `null` for anything
+ * that is not a resolved ('known') entry. engine/spectra.js imports this so
+ * flagPanelOverlaps' pairKey and pruneSpilloverAcks agree by construction.
+ */
+export function fluorophoreEntryId(entry) {
+  if (!entry || typeof entry.canonical !== 'string' || !entry.canonical) return null;
+  return entry.variantKey ? `${entry.canonical}::${entry.variantKey}` : entry.canonical;
+}
+
+/**
  * The ONE pair-key convention shared by acknowledgements and
- * engine/spectra.js's flagPanelOverlaps (which builds
- * `[a.canonical, b.canonical].sort().join('|')`): sorted CANONICAL ids joined
- * by '|'. Acknowledgements are keyed on canonicals -- not on the
- * `canonical::variantKey` dedupe id resolvePanel uses -- because the flag the
- * user acknowledges is itself keyed on canonicals; keying the two differently
- * left every family dye's flag permanently unclearable (red-team A2-P1).
+ * engine/spectra.js's flagPanelOverlaps: the two fluorophoreEntryId()s,
+ * sorted, joined by '|'. Acknowledgement `pair` members are entry ids (the
+ * strings a flag's pairKey splits into), never display names.
  */
 export function spilloverPairKey(a, b) {
   return [a, b].sort().join('|');
 }
 
-/**
- * The id an acknowledgement refers to for a resolved entry: its CANONICAL
- * name only (see spilloverPairKey). `null` for anything that isn't a
- * resolved ('known') entry.
- */
 function spilloverAckEntryId(entry) {
-  if (!entry || typeof entry.canonical !== 'string' || !entry.canonical) return null;
-  return entry.canonical;
+  return fluorophoreEntryId(entry);
 }
 
 /**

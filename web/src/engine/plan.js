@@ -17,7 +17,13 @@ import {
   expandConditions,
   formatReplicateToken,
 } from './conditions.js';
-import { finalizeFields, normalizeFields, renderName } from './naming.js';
+import {
+  finalizeFields,
+  normalizeFields,
+  renderName,
+  sanitizationLossIssue,
+  sanitizationLossIssues,
+} from './naming.js';
 import { assayView } from '../core/assay.js';
 
 // The extension every planned name inherits. The planner names files that do
@@ -54,8 +60,18 @@ export function effectiveNamingFields(experiment) {
  * Expand an experiment into its full ordered list of planned filenames.
  *
  * Returns one entry per condition row:
- *   { row, groupLabel, filename }            on success
+ *   { row, groupLabel, filename, issues }            on success
  *   { row, groupLabel: '', filename: null, error }  if the id scheme is broken
+ *
+ * `issues` is that row's sanitization-loss issues (naming.js's
+ * sanitizationLossIssues, computed against the SAME raw fields -- including
+ * this row's own group/factor label -- that produced `filename`) -- e.g. a
+ * group level written in a non-Latin script, which would otherwise vanish
+ * into `filename`'s 'UNSPECIFIED' placeholder with no visible explanation
+ * anywhere (V4-N1). This is the one place group/factor levels ever reach
+ * naming.js, so it is also the one place that can attach a named issue for
+ * them; ui/steps/design.js renders `issues` per row and
+ * engine/conformance.js folds them into the study report.
  *
  * A design axis OVERRIDES the corresponding manually-typed naming field, but
  * only where the design actually has an opinion. That asymmetry is the whole
@@ -93,6 +109,43 @@ export function planFilenames(experiment, config) {
     }
 
     const finalized = finalizeFields(PLAN_SOURCE_NAME, raw, config);
+
+    // Sanitization-loss issues (V4-N1): checked against `namingFields`
+    // directly for every axis EXCEPT group/factor levels. Those must be
+    // checked against the RAW per-axis values (row.group, each
+    // row.factorLevels entry) instead of raw.group/groupLabel -- by the time
+    // groupLabel exists, conditions.js's buildGroupLabel has already run
+    // each segment through its OWN sanitizeToken call and joined them, so
+    // the very information a loss issue needs to name (e.g. '对照组') is
+    // already gone. This is the exact producer->consumer gap V4-N1 names:
+    // finalizeFields never sees a group/factor level's true raw text unless
+    // it is checked here, before buildGroupLabel/buildSampleId run.
+    //
+    // Every axis that feeds the single 'group' filename token is uppercased
+    // together with it (config.uppercaseFields includes 'group'), so each
+    // axis is checked AS IF it carried that casing rule too -- while keeping
+    // its own field name (e.g. 'genotype', not 'group') so the rendered
+    // issue can say which value is the problem.
+    const lossFields = { ...namingFields };
+    const axisIssues = [];
+    if (groupLabel) {
+      delete lossFields.group;
+      const groupUppercase = (config.uppercaseFields || []).includes('group');
+      const axisEntries = [];
+      if (row.group !== null && row.group !== undefined) axisEntries.push(['group', row.group]);
+      for (const [factorName, level] of Object.entries(row.factorLevels || {})) {
+        axisEntries.push([factorName, level]);
+      }
+      for (const [axisField, axisValue] of axisEntries) {
+        const axisConfig =
+          groupUppercase && !(config.uppercaseFields || []).includes(axisField)
+            ? { ...config, uppercaseFields: [...config.uppercaseFields, axisField] }
+            : config;
+        const issue = sanitizationLossIssue(axisField, axisValue, axisConfig);
+        if (issue) axisIssues.push(issue);
+      }
+    }
+
     return {
       row,
       // Displayed through the SAME casing authority the filename goes
@@ -100,6 +153,7 @@ export function planFilenames(experiment, config) {
       // embedded in its own filename (lesson 49).
       groupLabel: groupLabel ? normalizeFields({ group: groupLabel }, config).group : '',
       filename: renderName(finalized, config),
+      issues: [...sanitizationLossIssues(lossFields, config), ...axisIssues],
     };
   });
 }

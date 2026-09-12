@@ -520,6 +520,55 @@ test('flagPanelOverlaps never throws on an empty or malformed overlapRules', () 
   assert.doesNotThrow(() => flagPanelOverlaps([known('A', 'A', 400, 500)], {}));
 });
 
+test('flagPanelOverlaps keeps pairKey on every returned flag (A2/A3 wiring: the ack-matching key)', () => {
+  const entries = [known('A', 'A', 400, 500), known('B', 'B', 460, 510)];
+  const flags = flagPanelOverlaps(entries, { emissionProximityNm: 25, excitationProximityNm: 20 });
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].pairKey, 'A|B');
+});
+
+test('flagPanelOverlaps: an acknowledged pair (order-independent) downgrades ONLY its emission error to a warning, appends the reason label, and marks acknowledged: true', () => {
+  const entries = [known('A', 'A', 400, 500), known('B', 'B', 460, 510)];
+  const rules = { emissionProximityNm: 25, excitationProximityNm: 20 };
+  const acknowledged = [{ pair: ['B', 'A'], reason: 'filter-separated', at: '2026-01-01T00:00:00.000Z' }];
+
+  const bare = flagPanelOverlaps(entries, rules);
+  assert.equal(bare[0].severity, 'error');
+  assert.equal(bare[0].acknowledged, undefined);
+
+  const acked = flagPanelOverlaps(entries, rules, { acknowledged });
+  assert.equal(acked.length, 1);
+  assert.equal(acked[0].severity, 'warning');
+  assert.equal(acked[0].acknowledged, true);
+  assert.match(acked[0].message, /acknowledged: filter-separated$/);
+  assert.equal(acked[0].pairKey, 'A|B');
+});
+
+test('flagPanelOverlaps: an acknowledgement for a DIFFERENT pair leaves an unacked error error, and never touches excitation-only warnings', () => {
+  const entries = [known('A', 'A', 400, 500), known('B', 'B', 460, 510), known('C', 'C', 415, 700)];
+  const rules = { emissionProximityNm: 25, excitationProximityNm: 20 };
+  const flags = flagPanelOverlaps(entries, rules, { acknowledged: [{ pair: ['X', 'Y'], reason: 'other' }] });
+  assert.equal(flags.find((f) => f.pairKey === 'A|B').severity, 'error');
+
+  const excitationOnly = [known('A', 'A', 400, 500), known('B', 'B', 415, 600)];
+  const excitationFlags = flagPanelOverlaps(excitationOnly, rules, {
+    acknowledged: [{ pair: ['A', 'B'], reason: 'other' }],
+  });
+  assert.equal(excitationFlags.length, 1);
+  assert.equal(excitationFlags[0].severity, 'warning');
+  assert.equal(excitationFlags[0].acknowledged, undefined, 'excitation warnings are not the acknowledgement target');
+});
+
+test('flagPanelOverlaps never throws on a malformed `acknowledged` option', () => {
+  const entries = [known('A', 'A', 400, 500), known('B', 'B', 460, 510)];
+  const rules = { emissionProximityNm: 25, excitationProximityNm: 20 };
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, undefined));
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, null));
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, {}));
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, { acknowledged: 'nope' }));
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, { acknowledged: [null, {}, { pair: ['A'] }] }));
+});
+
 // --- derivePanelFacts: the panel-level facts engine/controls.js gates on ---
 // (fixes a real, verified defect: every 'panel'-kind control rule shared
 // ONE predicate, so an isotype/secondary-antibody control fired on panels

@@ -204,6 +204,54 @@ test('planFilenames does not mutate the experiment it plans from', () => {
   assert.equal(JSON.stringify(exp), before);
 });
 
+// --- V4-N1 (retry): each row's `issues` is where a group/factor level's
+// sanitization loss is surfaced -- the ONE place naming.js ever sees a
+// group/factor level at all. docs/plans/app-review-remediation-task-graph.json
+// task E1; docs/plans/app-review-2026-09-11.md finding V4-N1.
+
+test('a non-Latin group level attaches a named error issue to every row it appears in', () => {
+  const exp = experimentWith({
+    design: { groups: { levels: ['对照组'] } },
+    fields: { date: '2026-06-15', sample: 'E02' },
+  });
+  const planned = planFilenames(exp, planConfig());
+  assert.equal(planned.length, 1);
+  const issue = planned[0].issues.find((i) => i.field === 'group');
+  assert.ok(issue, JSON.stringify(planned[0].issues));
+  assert.equal(issue.severity, 'error');
+  assert.ok(issue.message.includes('对照组'), issue.message);
+  assert.match(issue.message, /Latin/);
+});
+
+test('a partially non-Latin factor level attaches a warning naming the dropped characters and the FINAL (uppercased) segment', () => {
+  const exp = experimentWith({
+    design: { factors: [{ name: 'genotype', levels: ['Contrôle-α'] }] },
+    fields: { date: '2026-06-15', sample: 'E02' },
+  });
+  const planned = planFilenames(exp, planConfig());
+  assert.equal(planned.length, 1);
+  const issue = planned[0].issues.find((i) => i.field === 'genotype');
+  assert.ok(issue, JSON.stringify(planned[0].issues));
+  assert.equal(issue.severity, 'warning');
+  assert.ok(issue.message.includes('ô'), issue.message);
+  assert.ok(issue.message.includes('α'), issue.message);
+  // 'genotype' feeds the single 'group' filename token, which IS uppercased
+  // (planConfig's uppercaseFields includes 'group') -- so the quoted segment
+  // must be uppercase too, matching what the row's own filename embeds.
+  assert.ok(issue.message.includes("'CONTRLE-'"), issue.message);
+  assert.ok(!issue.message.includes('Contrle-'), issue.message);
+  assert.ok(planned[0].filename.includes('CONTRLE-'), planned[0].filename);
+});
+
+test('ordinary ASCII markers/modality text attaches no sanitization issue (regression: no false positive on the app\'s own separators)', () => {
+  const exp = experimentWith({
+    fields: { date: '2026-06-15', sample: 'E02', markers: 'GFP,DAPI', modality: 'Zeiss LSM 880 (Airyscan)' },
+  });
+  const planned = planFilenames(exp, planConfig());
+  assert.equal(planned.length, 1);
+  assert.deepEqual(planned[0].issues, []);
+});
+
 // --- studyNameIssues: cross-assay collision detection ---------------------
 
 /** A study with N assays, each given the naming.fields needed to compute a

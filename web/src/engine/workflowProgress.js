@@ -255,7 +255,7 @@ export function deriveWorkflowProgress(experiment, conformance, questions = []) 
 
     return {
       id: assay && assay.id,
-      label: (assay && assay.label) || `Assay ${index + 1}`,
+      label: (assay && assay.label) || `Measurement ${index + 1}`,
       readiness: report && report.readiness,
       steps: { project, design, microscopy, naming, measurement, overview },
       state: aggregate([project.state, design.state, microscopy.state, naming.state, overview.state]),

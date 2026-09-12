@@ -56,13 +56,26 @@ export function splitMarkers(markersValue) {
 }
 
 /**
- * Warn (never truncate) when a full target path would exceed Windows'
- * MAX_PATH limit (260 characters).
+ * Warn (never truncate) when a FILENAME alone is already long enough to risk
+ * exceeding Windows' combined-path MAX_PATH limit (260 characters).
  *
- * This must be checked against the FULL path (directory + filename), not
- * just the filename, since it is the combined length that Win32 rejects.
- * Severity is "warning", not "error": the path may still work (long-path
- * opt-in, WSL, a non-Windows filesystem), so this must never silently block
+ * V2-NEW-04: this function's contract used to claim it must be "checked
+ * against the FULL path (directory + filename)", and its message said
+ * "Full path:". Neither was true: this app has no target-directory field
+ * anywhere (nothing to prepend -- `grep -rn "targetDir\|outputDir\|directory"
+ * web/src` turns up nothing but this file's own former comment), and all
+ * three real callers (ui/steps/naming.js, ui/steps/design.js,
+ * engine/conformance.js) have only ever passed a bare planned FILENAME.
+ * Rather than invent a directory-template feature nobody asked for just to
+ * make the old contract true, the contract is fixed in the smaller
+ * direction: this checks the filename itself against MAX_PATH_LENGTH as a
+ * conservative proxy. A filename already at or over 260 characters
+ * guarantees the full path will exceed it wherever it lands; one under 260
+ * still leaves headroom that the (unmodeled) directory eats into, so this
+ * cannot promise the full path is safe -- only that the filename itself
+ * is not obviously already doomed. Severity stays "warning", not "error":
+ * the path may still work (long-path opt-in, WSL, a non-Windows
+ * filesystem, a shallow enough folder), so this must never silently block
  * or mutate a plan -- it only surfaces the risk for the user to judge.
  */
 export function validateTargetPath(pathString) {
@@ -74,8 +87,8 @@ export function validateTargetPath(pathString) {
     validationIssue(
       'target_path',
       `This filename would be ${pathStr.length} characters long, which is longer than Windows ` +
-        `allows (${MAX_PATH_LENGTH}). Shorten one of the naming fields, or move the files to a ` +
-        `folder closer to your drive's root. Full path: '${pathStr}'`,
+        `allows for a full file path (${MAX_PATH_LENGTH}). Shorten one of the naming fields, or move ` +
+        `the files to a folder closer to your drive's root. Filename: '${pathStr}'`,
       'warning'
     ),
   ];
@@ -83,6 +96,19 @@ export function validateTargetPath(pathString) {
 
 export function validateFields(fields, profile) {
   const issues = [];
+
+  // Sanitization-loss issues (a group/factor level or naming field that
+  // loses a real letter/digit -- or all of them -- when turned into a
+  // filename token) are NOT folded in here: they are computed straight from
+  // the pre-sanitization value by naming.js's sanitizationLossIssues(raw,
+  // config), which validateFields has no access to (only the already
+  // *finalized* fields are passed in here, and the original value cannot be
+  // recovered from its sanitized token). engine/plan.js's planFilenames
+  // calls sanitizationLossIssues itself and attaches the result to each
+  // planned row as `issues`; ui/steps/design.js renders those, and
+  // engine/conformance.js folds them into the study report alongside this
+  // function's own issues. See docs/plans/app-review-remediation-task-graph.json
+  // task E1 and docs/plans/app-review-2026-09-11.md finding V4-N1.
 
   const exptype = String(fields.exptype ?? '').toUpperCase();
   if (
