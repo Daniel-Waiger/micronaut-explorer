@@ -6,6 +6,7 @@ import {
   emptyExperiment,
   migrate,
 } from '../src/core/schema.js';
+import { validateImportedExperiment } from '../src/core/importValidate.js';
 
 const EMPTY_STUDY_CONTEXT = {
   system: '',
@@ -529,7 +530,7 @@ test('migrate v5->v6 leaves an assay that already has its own groups untouched',
   assert.deepEqual(migrated.assays[0].design.groups, { levels: ['ALREADY-SET'] });
 });
 
-test('migrate v5->v6 never overwrites an assay whose empty groups are already a deliberate, STRONG-tagged user edit', () => {
+test('migrate v5->v6 never overwrites an assay whose empty groups are already a deliberate, STRONG-tagged user edit -- and heals the legacy STRONG-empty slot so it is no longer locked', () => {
   const base = emptyExperiment();
   const id = base.assays[0].id;
   const v5 = {
@@ -542,8 +543,18 @@ test('migrate v5->v6 never overwrites an assay whose empty groups are already a 
     },
   };
   const migrated = migrate(v5);
+  // migrateV5toV6 itself still refuses to seed from groupVocabulary while
+  // the slot reads STRONG (canOverwrite mirrors setValueAtPath's own rule):
+  // the empty levels are left exactly as the user's STRONG edit recorded
+  // them, not silently replaced by the legacy vocabulary.
   assert.deepEqual(migrated.assays[0].design.groups, { levels: [] });
-  assert.deepEqual(migrated.provenance.slots[`assay:${id}.design.groups`], { tag: 'user', detail: null });
+  // But schema.js's load-boundary normalizeEmptySlotProvenance (B4 /
+  // V6-NEW-03 / lesson 37) heals that STRONG-tagged EMPTY slot to 'default'
+  // (WEAK) in the same pass: a deliberately-cleared axis is never truly
+  // STRONG under isEmptyValue's rule, so a save made before that rule
+  // existed must not stay locked out of every future WEAK "copy groups"
+  // refill forever, with no user action able to clear it.
+  assert.deepEqual(migrated.provenance.slots[`assay:${id}.design.groups`], { tag: 'default', detail: null });
 });
 
 test('migrate v5->v6 drops groupVocabulary and its provenance slot entirely when there is nothing to seed', () => {
@@ -560,4 +571,44 @@ test('migrate v5->v6 drops groupVocabulary and its provenance slot entirely when
   const migrated = migrate(v5);
   assert.ok(!('groupVocabulary' in migrated));
   assert.ok(!('groupVocabulary' in migrated.provenance.slots));
+});
+
+// --- panel.spillover: additive default, no schemaVersion bump (V3-N1) ----
+
+test('a v6 export without panel.spillover imports with acknowledged: [] (no schemaVersion bump needed)', () => {
+  const base = emptyExperiment();
+  const legacyAssay = { ...base.assays[0], panel: { targets: [], channels: [] } }; // pre-A2 shape: no spillover key at all
+  const legacyExport = { ...base, schemaVersion: SCHEMA_VERSION, assays: [legacyAssay] };
+
+  // migrate() is a no-op here since the file already claims the current
+  // version (the `while (version < SCHEMA_VERSION)` loop never runs) --
+  // validateImportedExperiment is what actually merges in the new default,
+  // via sanitizeAssay's `{...base[key], ...raw[key]}` spread per container.
+  const migrated = migrate(legacyExport);
+  const { experiment, issues } = validateImportedExperiment(migrated);
+
+  assert.deepEqual(
+    experiment.assays[0].panel.spillover,
+    { acknowledged: [] },
+    'a legacy assay with no panel.spillover key at all must import with the additive default'
+  );
+  assert.ok(!issues.some((i) => i.severity === 'fatal'));
+});
+
+test('a v6 SAVE (not import) without panel.spillover gets acknowledged: [] at the migrate() boundary', () => {
+  const base = emptyExperiment();
+  const legacy = { ...base, assays: [{ ...base.assays[0], panel: { targets: [], channels: [] } }] };
+  const out = migrate(legacy);
+  assert.deepEqual(out.assays[0].panel.spillover, { acknowledged: [] });
+  assert.equal(out.assays[0].panel.channels, legacy.assays[0].panel.channels, 'other panel fields untouched');
+  assert.strictEqual(migrate(base), base, 'identity preserved when nothing needs filling');
+});
+
+test('migrate() skips an unknown provenance tag on a design.groups slot instead of throwing (Copilot review, PR #20)', () => {
+  const base = emptyExperiment();
+  const key = `assay:${base.assays[0].id}.design.groups`;
+  const withBadTag = { ...base, provenance: { ...(base.provenance || {}), slots: { ...((base.provenance || {}).slots || {}), [key]: { tag: 'totally-made-up-tag' } } } };
+  let out;
+  assert.doesNotThrow(() => { out = migrate(withBadTag); });
+  assert.equal(out.provenance.slots[key].tag, 'totally-made-up-tag', 'left for the validator to drop');
 });

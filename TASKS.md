@@ -1,6 +1,6 @@
 # Open tasks — Micronaut Planner
 
-Last updated: 2026-09-10
+Last updated: 2026-09-12
 
 > Near-term worklist. `ROADMAP.md` holds the long-range "why"; authoritative
 > scope for any listed item lives in its plan doc under `docs/plans/`.
@@ -86,12 +86,43 @@ Old `#/design`, `#/panel`, `#/naming` links still resolve.
 
 Lives in the knowledge pack (`web/kb/`); see the K-1…K-7 list and the parked
 review of `web/kb/advisor.json` wording in [ROADMAP.md](ROADMAP.md).
-`web/kb/spectra.json` remains the highest-priority review target — it is
-Claude-drafted, still flagged unreviewed in-app, and grew substantially.
+`web/kb/spectra.json` remains the highest-priority review target — 143 of its 157
+entries are now source-cited, 14 remain Claude-drafted, and none has been reviewed
+by a microscopy specialist.
 
 ## Known and deliberately not fixed
 
-- The browser's automatic `/favicon.ico` request 404s when served from a plain
-  static server. Cosmetic, console-only, pre-existing.
+- ~~The browser's automatic `/favicon.ico` request 404s when served from a plain
+  static server.~~ Resolved: `web/index.html:23` ships an inline SVG data-URI
+  favicon, so no `/favicon.ico` request is made at all (confirmed via the static
+  server's access log across repeat page loads).
 - `core/onboarding.js`'s `completed` key is now vestigial (the modal it gated is
   gone). The module still serves `experience`, so it stays.
+
+## App review 2026-09-11
+
+Full findings: [docs/plans/app-review-2026-09-11.md](docs/plans/app-review-2026-09-11.md).
+Remediation plan/status: [docs/plans/app-review-remediation-task-graph.json](docs/plans/app-review-remediation-task-graph.json).
+This run's fixes so far (see `git log --oneline 6524fed..HEAD`): bounded, truthful
+autosave-ring protection so it can never starve a slot; the displaced study is
+preserved on restore/import instead of silently discarded; scope-aware "Clear all
+stored data"; an emptied field is treated as a clear, not a permanent lock, and
+copy-groups reports honestly; one fluorophore resolver and a spillover-acknowledgement
+model shared by conformance and the Color panel, so Review and the panel agree
+and a false lock can be acknowledged and cleared; the Measurement page refreshes
+sibling sections and header badges after an edit; Review names every blocker;
+non-Latin filename segments are reported instead of silently becoming
+UNSPECIFIED; feedback handoff works when the clipboard is blocked; Guide copy,
+release notes (0.21.0), README/ROADMAP/manual claims and knowledge-pack wording
+corrected; shell toasts queue, the save label ticks, Restore rows are
+distinguishable.
+A fifth batch (W1–W4, after PR review) fixed the 19 minor/nit follow-ups:
+release-notes/manual wording and counts (R3-02/03/08/09/12, V1-N6, R2-14),
+pack-level provenance for advisor/controls plus wording and the `pi` alias
+(R3-13/15/17, R3-06, R4-18), select placeholders, an ISO date helper, a Study
+title field and a skip link (R4-13/19/20, R5-12), one status vocabulary for
+nav entry, pill and registry (R4-08), and a pre-existing "Readout: null" on
+Review. Still deferred (see the review doc's Appendix B): ECFP/EGFP/mRuby2
+spectra records (R3-03 data), per-rule sourcing of advisor/controls numbers
+(R3-13), a Study-map step-count mismatch reachable only in one profile
+(R4-17), advisor coverage for two-photon and TIRF (V3-N2, partial), and R1-15.

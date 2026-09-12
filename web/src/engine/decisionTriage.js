@@ -111,10 +111,33 @@ export function classifyConformanceIssue(rawIssue) {
   };
 }
 
+// Duplicate conformance items (same measurement, same check, same message)
+// must never reach Review as two rows -- lesson 37 (a gate its own review
+// cannot satisfy reads as broken) applies just as much to a decision that
+// silently doubles as it does to one that silently vanishes. Key on the
+// issue's own identity (assayId + section + field + message), NOT list
+// position, since map order + per-assay + cross-assay concatenation is the
+// one place two independently-correct producers could ever coincide. A
+// cross-assay issue's `assayId` is explicit `null` (conformance.js); fold it
+// into the same bucket as `undefined` so both read as "study-level", not as
+// two different unscoped groups.
+function conformanceDedupeKey(item) {
+  const assayKey = item.assayId === null || item.assayId === undefined ? 'null' : item.assayId;
+  return `${assayKey}|${item.section}|${item.field}|${item.message}`;
+}
+
 function conformanceItems(conformance) {
   const report = asObject(conformance);
   const items = [];
+  const seen = new Set();
   const assays = Array.isArray(report.assays) ? report.assays : [];
+
+  function pushDeduped(item) {
+    const key = conformanceDedupeKey(item);
+    if (seen.has(key)) return;
+    seen.add(key);
+    items.push(item);
+  }
 
   for (const assay of assays) {
     const assayReport = asObject(assay);
@@ -122,7 +145,7 @@ function conformanceItems(conformance) {
     for (const issue of issues) {
       // Spreading copies the issue, retaining its exact severity and section;
       // it never annotates the conformance object in place.
-      items.push({
+      pushDeduped({
         ...classifyConformanceIssue(issue),
         source: 'conformance',
         assayId: assayIdForIssue(issue, assayReport.id),
@@ -132,7 +155,7 @@ function conformanceItems(conformance) {
 
   const crossAssayIssues = Array.isArray(report.crossAssayIssues) ? report.crossAssayIssues : [];
   for (const issue of crossAssayIssues) {
-    items.push({
+    pushDeduped({
       ...classifyConformanceIssue(issue),
       source: 'conformance',
       assayId: assayIdForIssue(issue, null),

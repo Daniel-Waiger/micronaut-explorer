@@ -18,8 +18,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { studyStep } from '../src/ui/steps/study.js';
+import { designStep } from '../src/ui/steps/design.js';
 import { createStore } from '../src/core/store.js';
-import { emptyExperiment } from '../src/core/schema.js';
+import { emptyExperiment, migrate } from '../src/core/schema.js';
 import { shortId } from '../src/core/ids.js';
 import { checkConformance } from '../src/engine/conformance.js';
 import { deriveWorkflowProgress } from '../src/engine/workflowProgress.js';
@@ -256,6 +257,263 @@ test('copy-groups mutates `assays` IN PLACE, yet the badges still reflect the ne
     // headline moves on to the next axis not yet at its best.
     assert.equal(badgeAfter.dataset.scope, 'conformance');
     assert.equal(badgeAfter.dataset.status, 'needs-review');
+  } finally {
+    restore();
+  }
+});
+
+// --- B4: empty groups is a CLEAR, not a lock (V6-NEW-03, R6-09, V6-NEW-02) --
+
+test('V6-NEW-03: a measurement whose groups were added then removed is reachable by copy-groups', () => {
+  // Adopted from the verifier's repro (scratch: verify/v6/emptyGroupsLock.test.js).
+  // Mechanism: design.js's writeGroups writes {levels: []} with tag 'user'
+  // when the last group row is removed. Before this fix, core/store.js's
+  // clearing exception only treated '' / null / undefined as a clear, so the
+  // empty ARRAY was stored STRONG and canOverwrite (provenance.js) refused
+  // the later WEAK 'kb-default' copy-groups write forever (lesson 37: no user
+  // action could ever clear it short of retyping a group by hand).
+  const stub = createDomStub();
+  stub.install();
+  try {
+    const experiment = emptyExperiment();
+    experiment.assays[0].label = 'Assay one';
+    experiment.assays[0].readoutText = 'cell viability';
+    experiment.assays[0].design.groups.levels = ['CTL', 'TREATED'];
+    const idB = shortId();
+    experiment.assays.push({
+      ...JSON.parse(JSON.stringify(experiment.assays[0])),
+      id: idB,
+      label: 'Assay two',
+      design: { groups: { levels: ['TEMP'] }, factors: [], biologicalReplicates: 1, technicalReplicates: 1, idScheme: '', conditions: [] },
+    });
+    experiment.studyContext.comparisonMode = 'groups';
+    const store = createStore(experiment);
+
+    // Assay two's user removes its only group, on its own Samples & design page.
+    experiment.activeAssayId = idB;
+    const kb = realKb();
+    const designHost = document.createElement('div');
+    designStep.render(designHost, store, { advisor: kb.advisor, router: null });
+    const removeBtn = designHost.querySelectorAll('button').find((b) => b.textContent === 'Remove');
+    assert.ok(removeBtn, 'the group row has a Remove button');
+    removeBtn.click();
+    assert.deepEqual(store.get().assays[1].design.groups.levels, [], 'assay two now visibly has no groups');
+    assert.equal(
+      store.get().provenance.slots[`assay:${idB}.design.groups`].tag,
+      'default',
+      'the empty array is tagged WEAK (default), not the STRONG tag the caller passed'
+    );
+
+    // Back on Measurements, make assay ONE (with groups) active, then click
+    // the button that exists for exactly this.
+    store.get().activeAssayId = experiment.assays[0].id;
+    const toasts = [];
+    const main = document.createElement('div');
+    studyStep.render(main, store, {
+      showToast: (m) => toasts.push(m),
+      router: { navigate() {} },
+      workflowProgress: progressFor(store.get(), kb),
+      getWorkflowProgress: () => progressFor(store.get(), kb),
+    });
+    main.querySelectorAll('button').find((b) => b.textContent === 'Copy groups to measurements that have none').click();
+
+    assert.deepEqual(
+      store.get().assays[1].design.groups.levels,
+      ['CTL', 'TREATED'],
+      `assay two still has no groups after the copy. Toast said: ${JSON.stringify(toasts)}`
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
+test('a one-measurement study reports 0 applied / 0 skipped, never "skipped 1" for the source itself', () => {
+  const experiment = emptyExperiment();
+  experiment.assays[0].label = 'Only assay';
+  experiment.assays[0].design.groups.levels = ['CTL', 'TREATED'];
+  const kb = realKb();
+  const store = createStore(experiment);
+  const { main, toasts, restore } = renderStudy(store, kb);
+  try {
+    const applyBtn = findButton(main, 'Copy groups to measurements that have none');
+    assert.ok(applyBtn);
+    assert.equal(applyBtn.disabled, false, 'the source measurement itself has groups');
+    applyBtn.click();
+    assert.equal(toasts[toasts.length - 1], 'Applied to 0 measurement(s).');
+    assert.doesNotMatch(toasts[toasts.length - 1], /skipped 1/);
+  } finally {
+    restore();
+  }
+});
+
+test('with the active measurement lacking groups, the copy button is disabled and no OTHER measurement is copied from', () => {
+  const { experiment, idA, idB } = buildExperiment();
+  // Reverse the fixture: the ACTIVE assay (one) has no groups, but the
+  // other (two) does -- groupSeedLevels must NOT fall back to assay two.
+  experiment.assays[0].design.groups.levels = [];
+  experiment.assays[1].design.groups.levels = ['CTL', 'TREATED'];
+  experiment.activeAssayId = idA;
+  const kb = realKb();
+  const store = createStore(experiment);
+  const { main, toasts, restore } = renderStudy(store, kb);
+  try {
+    const applyBtn = findButton(main, 'Copy groups to measurements that have none');
+    assert.ok(applyBtn);
+    assert.equal(applyBtn.disabled, true, 'the active measurement (assay one) has no groups of its own');
+    // The DOM stub does not enforce `disabled` on a raw .click() the way a
+    // real browser would, so the click handler still runs here -- but it
+    // must still refuse to fall back to assay two's groups: the click
+    // handler's own early-return (levels.length === 0) is what actually
+    // protects assay two, independent of the disabled attribute.
+    applyBtn.click();
+    assert.deepEqual(store.get().assays[0].design.groups.levels, [], 'assay one is untouched');
+    assert.deepEqual(store.get().assays[1].design.groups.levels, ['CTL', 'TREATED'], 'assay two is untouched -- no fallback copy happened');
+  } finally {
+    restore();
+  }
+});
+
+// ---------------------------------------------------------------- B4 retry
+// The first attempt's isEmptyValue only treated an empty ARRAY as a clear,
+// so `{levels: ['']}` -- written by ONE "Add group" click on an otherwise-
+// empty groups list (design.js's writeGroups: `[...levels, '']`), or by
+// blanking the text of the single remaining row -- was still tagged STRONG
+// and reopened the exact V6-NEW-03 lock one keystroke over. isEmptyValue is
+// now recursive over array elements too (an array is empty iff every
+// element is), so this shape is a clear like `{levels: []}` already was.
+test('B4 retry: one "Add group" click on an empty groups list is a clear, not a new lock', () => {
+  const stub = createDomStub();
+  stub.install();
+  try {
+    const experiment = emptyExperiment();
+    experiment.assays[0].label = 'Assay one';
+    experiment.assays[0].design.groups.levels = ['CTL', 'TREATED'];
+    const idB = shortId();
+    experiment.assays.push({
+      ...JSON.parse(JSON.stringify(experiment.assays[0])),
+      id: idB,
+      label: 'Assay two',
+      design: { groups: { levels: [] }, factors: [], biologicalReplicates: 1, technicalReplicates: 1, idScheme: '', conditions: [] },
+    });
+    experiment.studyContext.comparisonMode = 'groups';
+    experiment.activeAssayId = idB;
+    const store = createStore(experiment);
+    const kb = realKb();
+
+    const designHost = document.createElement('div');
+    designStep.render(designHost, store, { advisor: kb.advisor, router: null });
+    designHost.querySelectorAll('button').find((b) => b.textContent === 'Add group').click();
+    assert.deepEqual(store.get().assays[1].design.groups.levels, [''], 'the blank row is written, visibly');
+    assert.equal(
+      store.get().provenance.slots[`assay:${idB}.design.groups`].tag,
+      'default',
+      'a lone blank row is a clear (WEAK), not a STRONG user edit'
+    );
+
+    store.get().activeAssayId = experiment.assays[0].id;
+    const toasts = [];
+    const main = document.createElement('div');
+    studyStep.render(main, store, {
+      showToast: (m) => toasts.push(m),
+      router: { navigate() {} },
+      workflowProgress: progressFor(store.get(), kb),
+      getWorkflowProgress: () => progressFor(store.get(), kb),
+    });
+    main.querySelectorAll('button').find((b) => b.textContent === 'Copy groups to measurements that have none').click();
+    assert.deepEqual(
+      store.get().assays[1].design.groups.levels,
+      ['CTL', 'TREATED'],
+      `assay two should be refillable by copy-groups. Toast said: ${JSON.stringify(toasts)}`
+    );
+  } finally {
+    stub.restore();
+  }
+});
+
+// A study saved BEFORE this fix carries `provenance.slots['assay:<id>.
+// design.groups'] = {tag:'user'}` over `levels: []` -- exactly what the
+// pre-fix store wrote when a user cleared a groups list. schema.js's
+// migrate() must heal that slot at the load boundary (normalizeEmptySlot
+// Provenance) so copy-groups can fill it, driven through the REAL study
+// step exactly as a user would use it.
+test('B4 retry: a study saved before this fix is healed by migrate() and copy-groups can then fill it', () => {
+  const stub = createDomStub();
+  stub.install();
+  try {
+    const saved = emptyExperiment();
+    const idA = saved.assays[0].id;
+    Object.assign(saved.assays[0], { label: 'Assay one', readoutText: 'cell viability' });
+    saved.assays[0].design.groups.levels = ['CTL', 'TREATED'];
+    const idB = shortId();
+    saved.assays.push({
+      ...JSON.parse(JSON.stringify(saved.assays[0])),
+      id: idB,
+      label: 'Assay two',
+      design: { groups: { levels: [] }, factors: [], biologicalReplicates: 1, technicalReplicates: 1, idScheme: '', conditions: [] },
+    });
+    saved.activeAssayId = idA;
+    saved.studyContext.comparisonMode = 'groups';
+    // Exactly what the pre-fix store wrote when the user removed the last row.
+    saved.provenance.slots[`assay:${idB}.design.groups`] = { tag: 'user', detail: null };
+
+    const loaded = migrate(JSON.parse(JSON.stringify(saved)));
+    assert.equal(
+      loaded.provenance.slots[`assay:${idB}.design.groups`].tag,
+      'default',
+      'migrate() heals the legacy STRONG-tagged empty slot to WEAK'
+    );
+
+    const store = createStore(loaded);
+    const kb = realKb();
+    const toasts = [];
+    const main = document.createElement('div');
+    studyStep.render(main, store, {
+      showToast: (m) => toasts.push(m),
+      router: { navigate() {} },
+      workflowProgress: progressFor(store.get(), kb),
+      getWorkflowProgress: () => progressFor(store.get(), kb),
+    });
+    main.querySelectorAll('button').find((b) => b.textContent === 'Copy groups to measurements that have none').click();
+    assert.deepEqual(
+      store.get().assays[1].design.groups.levels,
+      ['CTL', 'TREATED'],
+      `a study saved before this fix must not stay locked forever. Toast said: ${JSON.stringify(toasts)}`
+    );
+    assert.doesNotMatch(toasts[toasts.length - 1], /skipped 1/);
+  } finally {
+    stub.restore();
+  }
+});
+
+// applyBtn.disabled/title used to be computed ONCE at render and never
+// recomputed: deleting the active, groupless measurement reassigns
+// activeAssayId (core/assay.js's removeAssay) to one that HAS groups, but
+// study.js's Delete handler only called renderAssayList(), which never
+// touched applyBtn -- so the button stayed disabled, with the "add some
+// groups first" tooltip, for a measurement that could now use it.
+test('B4 retry: deleting the active groupless measurement re-enables the copy button for the newly-active one', () => {
+  const { experiment, idA, idB } = buildExperiment();
+  experiment.assays[0].design.groups.levels = []; // active (assay one) has none
+  experiment.assays[1].design.groups.levels = ['CTL', 'TREATED']; // assay two has groups
+  experiment.activeAssayId = idA;
+  const kb = realKb();
+  const store = createStore(experiment);
+  const { main, restore } = renderStudy(store, kb);
+  try {
+    const applyBtn = findButton(main, 'Copy groups to measurements that have none');
+    assert.equal(applyBtn.disabled, true, 'correctly disabled at render time');
+
+    const realConfirm = window.confirm;
+    window.confirm = () => true;
+    try {
+      findButton(main, 'Delete').click();
+    } finally {
+      window.confirm = realConfirm;
+    }
+
+    assert.equal(store.get().assays.length, 1);
+    assert.equal(store.get().activeAssayId, idB, 'removeAssay reassigned active to assay two');
+    assert.equal(applyBtn.disabled, false, 'the now-active measurement has groups -- the button must recompute, not stay stale');
   } finally {
     restore();
   }

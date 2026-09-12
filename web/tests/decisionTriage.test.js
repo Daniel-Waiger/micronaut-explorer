@@ -159,3 +159,48 @@ test('is total, deterministic, and does not mutate map or conformance inputs', (
     total: 0,
   });
 });
+
+// R4-04/R4-07 (C2): a duplicate conformance issue -- same measurement, same
+// check, same message -- must reach Review as ONE decision row, not two.
+// Keyed on the issue's own identity (assayId|section|field|message), not
+// list position, since it must survive independently of WHERE the duplicate
+// entered (a genuinely repeated per-assay issue, or the same issue counted
+// once via assays[] and again via crossAssayIssues).
+test('an exact-duplicate conformance issue for the same measurement collapses to one decision row', () => {
+  const duplicateIssue = { section: 'panel', field: 'panel', message: 'ALEXA488 and FITC: emission peaks 1 nm apart', severity: 'error', assayId: 'measurement-2' };
+  const conformance = {
+    assays: [{ id: 'measurement-2', issues: [duplicateIssue, { ...duplicateIssue }] }],
+  };
+  const items = decisionTriage({}, conformance).groups.flatMap((group) => group.items);
+  const matches = items.filter((item) => item.message === duplicateIssue.message);
+  assert.equal(matches.length, 1, `expected exactly one row for the duplicated issue; saw ${matches.length}`);
+});
+
+// Two DIFFERENT measurements with textually IDENTICAL issue text (a common
+// case: neither has answered "Imaging modality" yet) are not duplicates of
+// each other -- they must both survive, distinguished by assayId.
+test('the same message for two different measurements is not deduplicated away', () => {
+  const conformance = {
+    assays: [
+      { id: 'measurement-1', issues: [{ section: 'incomplete', field: 'modality', message: 'modality is not answered yet.', severity: 'warning' }] },
+      { id: 'measurement-2', issues: [{ section: 'incomplete', field: 'modality', message: 'modality is not answered yet.', severity: 'warning' }] },
+    ],
+  };
+  const items = decisionTriage({}, conformance).groups.flatMap((group) => group.items);
+  const matches = items.filter((item) => item.message === 'modality is not answered yet.');
+  assert.equal(matches.length, 2);
+  assert.deepEqual(matches.map((item) => item.assayId).sort(), ['measurement-1', 'measurement-2']);
+});
+
+// A cross-assay issue's assayId is explicit `null` (conformance.js); it must
+// dedupe against another cross-assay duplicate using that same null identity
+// (the A3 red-team handoff: treat null like undefined when grouping), not
+// read as an "unscoped" bucket distinct from a per-assay item lacking
+// assayId altogether.
+test('cross-assay duplicates (assayId: null) dedupe against each other', () => {
+  const crossIssue = { section: 'cross-assay', field: 'exptype', message: 'duplicate base name', severity: 'error', assayId: null };
+  const conformance = { assays: [], crossAssayIssues: [crossIssue, { ...crossIssue }] };
+  const items = decisionTriage({}, conformance).groups.flatMap((group) => group.items);
+  const matches = items.filter((item) => item.message === crossIssue.message);
+  assert.equal(matches.length, 1);
+});

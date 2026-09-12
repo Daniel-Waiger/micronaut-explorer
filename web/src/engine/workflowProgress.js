@@ -34,6 +34,39 @@ export const OPTIONAL_WORKFLOW = Object.freeze([
   Object.freeze({ id: 'guide', label: 'Guide' }),
 ]);
 
+// The example walkthrough (engine/guidedExample.js) maps PRIMARY_WORKFLOW
+// one-to-one into its steps, so PRIMARY_WORKFLOW.length IS the walkthrough's
+// step count. Exporting it here (rather than leaving each consumer to count
+// or, worse, hard-code it) keeps copy like guide.js's "n-step walkthrough"
+// wording tied to the one place the shape can change (see docs/plans
+// app-review-2026-09-11.md R2-01/R5-03: that copy drifted to a stale
+// "seven-step" after this list was cut down to five).
+export const WALKTHROUGH_STEP_COUNT = PRIMARY_WORKFLOW.length;
+
+const SMALL_NUMBER_WORDS = Object.freeze({
+  1: 'one',
+  2: 'two',
+  3: 'three',
+  4: 'four',
+  5: 'five',
+  6: 'six',
+  7: 'seven',
+  8: 'eight',
+  9: 'nine',
+  10: 'ten',
+});
+
+/**
+ * English "n-step" description of the walkthrough's current length, e.g.
+ * 'five-step' for a 5-entry PRIMARY_WORKFLOW. Falls back to the numeral for
+ * counts outside the small-number word map so this never throws or renders
+ * blank as the workflow shape changes.
+ */
+export function describeWalkthroughLength() {
+  const word = SMALL_NUMBER_WORDS[WALKTHROUGH_STEP_COUNT];
+  return `${word || WALKTHROUGH_STEP_COUNT}-step`;
+}
+
 function hasValue(value) {
   return value !== null && value !== undefined && (typeof value !== 'string' || value.trim() !== '');
 }
@@ -222,7 +255,7 @@ export function deriveWorkflowProgress(experiment, conformance, questions = []) 
 
     return {
       id: assay && assay.id,
-      label: (assay && assay.label) || `Assay ${index + 1}`,
+      label: (assay && assay.label) || `Measurement ${index + 1}`,
       readiness: report && report.readiness,
       steps: { project, design, microscopy, naming, measurement, overview },
       state: aggregate([project.state, design.state, microscopy.state, naming.state, overview.state]),

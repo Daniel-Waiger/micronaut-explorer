@@ -16,7 +16,7 @@
 // header-only CSV, never a blank string and never a thrown error.
 
 const HEADER = [
-  'assay',
+  'measurement',
   'modality',
   'group',
   'factors',

@@ -2,9 +2,11 @@
 #
 # On every push to main that touches the web app (or this workflow), this
 # builds the single-file artifact and pushes it to the SEPARATE public repo
-# Daniel-Waiger/micronaut-planner, whose GitHub Pages then rebuilds. The
-# source repo (this one) stays private; only the compiled index.html is
-# published. See the `planner-alpha-deploy` memory / README for the rationale.
+# Daniel-Waiger/micronaut-planner, whose GitHub Pages then rebuilds. This repo
+# (the source) is itself public too — the split exists so the Pages repo holds
+# only the compiled index.html plus the docs pages, never the source tree,
+# issue history, or dev-only workflow noise. See the `planner-alpha-deploy`
+# memory / README for the rationale.
 #
 # ONE-TIME SETUP (required before this can push):
 #   1. Create a token that can write to the deploy repo. Recommended: a

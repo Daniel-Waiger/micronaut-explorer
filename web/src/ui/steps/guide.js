@@ -23,7 +23,11 @@
 //
 // Deliberately describes the workflow and concepts, not a numbered tutorial:
 // the app is usable outside-in. The optional guided example is a separate
-// seven-step aid; Guide remains reference material, not an eighth step.
+// aid, its length tied to PRIMARY_WORKFLOW via engine/workflowProgress.js's
+// describeWalkthroughLength() (currently five-step); Guide remains reference
+// material, not one more step in that walkthrough. Note this "five-step"
+// names the example WALKTHROUGH, a different five from the Review execution
+// LADDER described in the manual (glossary-faq.html / review-exports.html).
 //
 // The walkthrough-start gate below shares core/appController.js's
 // isExampleOrigin(origin) rather than re-deriving the example/template
@@ -43,6 +47,7 @@
 // unreachable the day the in-tab example was removed.
 
 import { isExampleOrigin } from '../../core/appController.js';
+import { describeWalkthroughLength } from '../../engine/workflowProgress.js';
 import { openInNewTab, SANDBOX_URL } from '../newTab.js';
 
 /**
@@ -148,6 +153,7 @@ export const guideStep = {
     // the walkthrough was not written for. One check at the top is what makes
     // "the walkthrough only runs on the example" true for every status rather
     // than for one of them.
+    const walkthroughLength = describeWalkthroughLength();
     const guideAction = !isExample
       ? {
           label: 'Explain the workflow',
@@ -159,19 +165,19 @@ export const guideStep = {
         ? {
             label: 'Resume example walkthrough',
             callback: onResumeGuided,
-            title: 'Resume the optional seven-step example walkthrough without changing this study.',
+            title: `Resume the optional ${walkthroughLength} example walkthrough without changing this study.`,
           }
         : guideStatus === 'completed'
           ? {
               label: 'Restart example walkthrough',
               callback: onRestartGuided,
-              title: 'Restart the optional seven-step example walkthrough from its first step.',
+              title: `Restart the optional ${walkthroughLength} example walkthrough from its first step.`,
             }
           : guideStatus === 'not-started'
             ? {
                 label: 'Start example walkthrough',
                 callback: onStartGuided,
-                title: 'Open the optional seven-step example walkthrough without changing this study.',
+                title: `Open the optional ${walkthroughLength} example walkthrough without changing this study.`,
               }
             : {
                 label: 'Explain the workflow',
@@ -259,7 +265,7 @@ export const guideStep = {
         para(
           c,
           'For a guided example, start at Study map — it can open, resume, or restart the optional ' +
-            'seven-step walkthrough. This list is a quick reference for what each ' +
+            `${walkthroughLength} example walkthrough. This list is a quick reference for what each ` +
             'step in the left nav means. Use the steps in any order — the app works outside-in — ' +
             'and note a study can hold several measurements, switched with the tab row at the top.'
         );
@@ -267,13 +273,14 @@ export const guideStep = {
           ['Study map', 'Whole study: question, system or material, comparison structure, measurements, and experimental unit.'],
           ['Research brief', 'Whole-study narrative plus the active measurement’s readout, specimen, and intended observation.'],
           ['Measurements', 'Measurement list, names, and reusable comparison labels.'],
-          ['Samples & design', 'Per measurement: groups or factors, independent and technical replicates, and conditions.'],
           [
-            'Acquisition',
-            'Per measurement: instrument, modality, magnification, markers, spectral-overlap check, ' +
-              'and an optional panel editor.',
+            'The open measurement',
+            'Whichever measurement you opened, in three sections on one page: Samples & design ' +
+              '(groups or factors, independent and technical replicates, and conditions), Acquisition ' +
+              '(instrument, modality, magnification, markers, spectral-overlap check, and an optional ' +
+              'panel editor), and Data plan (filename template and fields, plus the bench-schedule ' +
+              '.ics export).',
           ],
-          ['Data plan', 'Per measurement: filename template and fields, plus the bench-schedule (.ics) export.'],
           ['Review', 'Whole-study summary: study map, conformance check, controls, and planned files.'],
         ]);
       })
@@ -380,7 +387,8 @@ export const guideStep = {
             'email or a GitHub issue. “Open GitHub issue” next to it copies that same report, then ' +
             'opens GitHub’s new-issue page labeled feedback — the link itself carries no feedback, ' +
             'browser details, or study data, so paste the copied report into the issue yourself. ' +
-            'Neither ever sends anything on its own.'
+            'If your browser blocks the copy, the button still opens GitHub and offers a download ' +
+            'of the report instead, so you can attach it. Neither ever sends anything on its own.'
         );
       })
     );
@@ -389,7 +397,7 @@ export const guideStep = {
     manualPara.className = 'guide-para';
     manualPara.append('This page is a quick reference. For a longer, step-by-step walkthrough of every screen, see the ');
     const manualLink = document.createElement('a');
-    manualLink.href = 'manual/';
+    manualLink.href = 'manual/index.html';
     manualLink.target = '_blank';
     manualLink.rel = 'noopener noreferrer';
     manualLink.textContent = 'full user manual';

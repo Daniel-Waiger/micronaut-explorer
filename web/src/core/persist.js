@@ -1,7 +1,7 @@
 import { uuid } from './ids.js';
 import { migrate } from './schema.js';
 import { validateImportedExperiment } from './importValidate.js';
-import { nsKey } from './storageScope.js';
+import { nsKey, STORAGE_SCOPE, makeNsKey, ownedScopedKeys } from './storageScope.js';
 
 // localStorage is a CONVENIENCE, never the record of truth: two users on a
 // shared-scope PC share one storage bucket under file://, IT can clear
@@ -31,6 +31,15 @@ export const STORAGE_SCHEMA_VERSION = 1;
 export const STORAGE_PREFIX = nsKey(`micronaut.v${STORAGE_SCHEMA_VERSION}.`);
 
 const RING_SIZE = 5;
+// At most this many of the ring's ids may be protected at once. Without a
+// cap, repeated protected saves (every "Start a blank study" / "Open the
+// example" click mints one) can fill the WHOLE ring with protected slots --
+// R5-01/V5-NEW-02: six blank-study clicks left a ring of six ids, six of
+// them protected, zero room for the next ordinary autosave, which then
+// silently discarded the user's actual edit while the UI still said "Saved
+// locally". RING_SIZE - 2 keeps at least two unprotected slots free for
+// ordinary autosaves no matter how many protected snapshots accumulate.
+const PROTECTED_CAP = RING_SIZE - 2;
 const RING_INDEX_KEY = STORAGE_PREFIX + 'ring';
 const PROTECTED_SLOTS_KEY = STORAGE_PREFIX + 'protectedSlots';
 const CHANGES_KEY = STORAGE_PREFIX + 'changesSinceExport';
@@ -86,8 +95,9 @@ function writeJSON(storage, key, value, onQuotaExceeded) {
 }
 
 // Returns whether the key is actually gone. Callers that report success to a
-// user (clearAll -> main's "Cleared all locally stored data" toast) cannot
-// tell a real deletion from a suppressed failure otherwise -- removeItem can
+// user (clearAll -> appController's scope-aware "Cleared this tab's stored
+// data" toast) cannot tell a real deletion from a suppressed failure otherwise
+// -- removeItem can
 // throw on a backend this module does not control, and a silently swallowed
 // throw is how "all your data is cleared" gets said over data that is still
 // there.
@@ -104,9 +114,19 @@ function removeKey(storage, key, onQuotaExceeded) {
 
 /**
  * Save `experiment` into a fresh ring-buffer slot (a new id every call, not
- * keyed by experiment.meta.id) and evict the oldest slot(s) beyond
- * RING_SIZE. Returns the new slot id, or null if the write itself failed
- * (e.g. quota exceeded -- onQuotaExceeded still fires in that case).
+ * keyed by experiment.meta.id) and evict slot(s) so the invariant below
+ * holds after every non-null return. Returns the new slot id, or null if the
+ * write itself failed (e.g. quota exceeded -- onQuotaExceeded still fires in
+ * that case).
+ *
+ * INVARIANT: after every non-null-returning call, the ring holds at most
+ * RING_SIZE (5) ids, at most PROTECTED_CAP (3) of them protected, and the
+ * returned id is one of the ids in the ring (so it is immediately loadable).
+ * Protected slots are bounded FIRST (oldest protected evicted, never the id
+ * just saved), then the ring itself is bounded by evicting unprotected ids
+ * oldest-first (also never the id just saved) -- this is what stops a run of
+ * protected saves from starving ordinary autosaves of a place to land
+ * (R5-01/V5-NEW-02).
  */
 export function saveExperiment(experiment, {
   storage = defaultBackend(),
@@ -118,18 +138,66 @@ export function saveExperiment(experiment, {
   if (!ok) return null;
 
   const ids = readRing(storage);
+  // Kept verbatim so a failed index write can put the ring back EXACTLY as it
+  // was -- including any slot the loops below decided to evict. Rolling back
+  // to the post-eviction list instead orphaned a (possibly protected) slot
+  // while the caller told the user "nothing was changed" (red-team B1-P1/B2-P1).
+  const originalIds = [...ids];
   ids.push(id);
-  const protectedIds = new Set(readJSON(storage, PROTECTED_SLOTS_KEY, []));
-  if (protectFromAutomaticEviction) protectedIds.add(id);
+  // Corrupt or hand-edited metadata must degrade, not throw: only an array
+  // of string ids counts, anything else reads as "nothing protected".
+  const rawProtected = readJSON(storage, PROTECTED_SLOTS_KEY, []);
+  const protectedIds = new Set(
+    Array.isArray(rawProtected) ? rawProtected.filter((slotId) => typeof slotId === 'string') : []
+  );
+  let protectedChanged = !Array.isArray(rawProtected) || rawProtected.length !== protectedIds.size;
+  if (protectFromAutomaticEviction) {
+    protectedIds.add(id);
+    protectedChanged = true;
+  }
+  // Stale-marker hygiene: a protected id whose ring entry is already gone
+  // (deleted, or evicted before this bound existed) must not keep counting
+  // against PROTECTED_CAP forever.
+  for (const protectedId of [...protectedIds]) {
+    if (!ids.includes(protectedId)) {
+      protectedIds.delete(protectedId);
+      protectedChanged = true;
+    }
+  }
+
   const evicted = [];
+  // Bound protected slots first: at most PROTECTED_CAP of the ring's ids may
+  // be protected. Without this, protected saves alone (e.g. repeated "Start
+  // a blank study" clicks) could fill the whole ring and leave zero room
+  // for the next ordinary autosave.
+  while (ids.filter((candidate) => protectedIds.has(candidate)).length > PROTECTED_CAP) {
+    const evictionIndex = ids.findIndex((candidate) => protectedIds.has(candidate) && candidate !== id);
+    if (evictionIndex < 0) break;
+    const [victim] = ids.splice(evictionIndex, 1);
+    protectedIds.delete(victim);
+    protectedChanged = true;
+    evicted.push(victim);
+  }
+  // Then bound the ring itself: unprotected ids evict oldest-first, never the
+  // id just written. The ring never exceeds RING_SIZE; protected snapshots
+  // (at most PROTECTED_CAP of them) only decide WHICH slots age out, so
+  // example/reset activity cannot starve ordinary autosaves.
   while (ids.length > RING_SIZE) {
-    const evictionIndex = ids.findIndex((candidate) => !protectedIds.has(candidate));
-    // Protected snapshots are deliberately allowed to extend the recovery
-    // list beyond the ordinary five-slot ring. Example activity must never
-    // age out the user's study that was open before the example.
+    const evictionIndex = ids.findIndex((candidate) => !protectedIds.has(candidate) && candidate !== id);
     if (evictionIndex < 0) break;
     evicted.push(ids.splice(evictionIndex, 1)[0]);
   }
+
+  // Belt-and-braces: every eviction loop above explicitly excludes `id`, so
+  // this should be unreachable, but a future edit to either loop is exactly
+  // the kind of change that could silently break the "returned id is always
+  // loadable" half of the invariant -- never hand back an id the caller
+  // cannot load.
+  if (!ids.includes(id)) {
+    removeKey(storage, slotKey(id), onQuotaExceeded);
+    return null;
+  }
+
   if (!writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded)) {
     // A slot without a ring entry is unusable, so report this save as failed
     // rather than claiming recovery succeeded. Best-effort cleanup is itself
@@ -137,12 +205,16 @@ export function saveExperiment(experiment, {
     removeKey(storage, slotKey(id), onQuotaExceeded);
     return null;
   }
-  if (protectFromAutomaticEviction && !writeJSON(storage, PROTECTED_SLOTS_KEY, [...protectedIds], onQuotaExceeded)) {
-    // Without the protection marker this save would make a promise it cannot
-    // keep. Remove it from both the slot store and ring and report failure so
-    // callers can leave the user's current workspace untouched.
+  if (protectedChanged && !writeJSON(storage, PROTECTED_SLOTS_KEY, [...protectedIds], onQuotaExceeded)) {
+    // Without an accurate protection marker this save would make a promise
+    // it cannot keep (either protecting an id it didn't, or leaving a stale
+    // one that keeps counting against PROTECTED_CAP). Remove it from both
+    // the slot store and ring and report failure so callers can leave the
+    // user's current workspace untouched.
     removeKey(storage, slotKey(id), onQuotaExceeded);
-    writeJSON(storage, RING_INDEX_KEY, ids.filter((candidate) => candidate !== id), onQuotaExceeded);
+    // Restore the PRE-save ring (evicted ids included): their slot keys were
+    // never removed, so the previous state is fully intact.
+    writeJSON(storage, RING_INDEX_KEY, originalIds, onQuotaExceeded);
     return null;
   }
   for (const oldId of evicted) removeKey(storage, slotKey(oldId), onQuotaExceeded);
@@ -224,39 +296,56 @@ export function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceed
   removeKey(storage, slotKey(id), onQuotaExceeded);
   const ids = readRing(storage).filter((existingId) => existingId !== id);
   writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded);
-  const protectedIds = readJSON(storage, PROTECTED_SLOTS_KEY, [])
-    .filter((existingId) => existingId !== id);
+  const rawProtected = readJSON(storage, PROTECTED_SLOTS_KEY, []);
+  const protectedIds = (Array.isArray(rawProtected) ? rawProtected : [])
+    .filter((existingId) => typeof existingId === 'string' && existingId !== id);
   writeJSON(storage, PROTECTED_SLOTS_KEY, protectedIds, onQuotaExceeded);
 }
 
 /**
- * Delete EVERY key this app owns -- all ring slots, the ring index, and the
- * change counter -- so the next load genuinely starts from emptyExperiment().
+ * Delete EVERY key this app owns for one scope -- all ring slots, the ring
+ * index, the change counter, AND the key families that live outside
+ * STORAGE_PREFIX (guided-walkthrough progress, onboarding answers,
+ * nav-collapsed, the advisor debug toggle -- see storageScope.js's
+ * ownedScopedKeys) -- so the next load genuinely starts fresh in every way
+ * the app's own "Clear all stored data" copy promises (V2-NEW-03: those four
+ * families used to survive silently, and the guided-progress one is
+ * user-observable -- a reload kept offering "Continue walkthrough").
+ * THEME IS DELIBERATELY NOT SWEPT: storageScope.js's SHARED_KEYS treats
+ * micronaut.theme as shared across scopes on purpose (a remembered
+ * light/dark choice carries no study data), and clearing one scope must
+ * never flip the other scope's theme.
  *
- * Keys are matched by STORAGE_PREFIX rather than reconstructed from the ring
- * index, because a slot orphaned by an earlier interrupted write would survive
- * an index-driven sweep and then be picked up by the next listSaved() -- a
+ * `scope` defaults to STORAGE_SCOPE (this tab's own scope) but a caller may
+ * target a specific scope explicitly. Ring/prefix keys are matched by
+ * STORAGE_PREFIX rather than reconstructed from the ring index, because a
+ * slot orphaned by an earlier interrupted write would survive an
+ * index-driven sweep and then be picked up by the next listSaved() -- a
  * "start over" that silently restores the old experiment is worse than none.
- * Foreign keys sharing the same storage are left untouched.
+ * The owned-but-unprefixed keys are matched by exact membership, not prefix,
+ * so this can never accidentally widen into a foreign key. Foreign keys
+ * sharing the same storage are left untouched either way.
  *
  * Returns an explicit result -- { ok, removed, error } -- instead of
  * undefined: storage.length/storage.key(i) below are unguarded reads into a
  * backend this module does not control (a privacy-mode browser, a hostile or
  * incomplete Storage shim), and a caller that cannot tell "actually cleared"
  * from "silently did nothing" has no honest way to report success to the
- * user. `removed` lists the STORAGE_PREFIX keys this call attempted to
- * delete (empty on failure); `error` is the caught exception on failure,
- * otherwise null.
+ * user. `removed` lists the keys this call attempted to delete (empty on
+ * failure); `error` is the caught exception on failure, otherwise null.
  */
-export function clearAll({ storage = defaultBackend(), onQuotaExceeded } = {}) {
+export function clearAll({ storage = defaultBackend(), onQuotaExceeded, scope = STORAGE_SCOPE } = {}) {
   if (!storage) {
     return { ok: false, removed: [], error: new Error('No storage backend is available.') };
   }
+  const scopedPrefix = makeNsKey(scope)(`micronaut.v${STORAGE_SCHEMA_VERSION}.`);
+  const ownedUnprefixed = new Set(ownedScopedKeys(scope));
   const doomed = [];
   try {
     for (let i = 0; i < storage.length; i += 1) {
       const key = storage.key(i);
-      if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX)) {
+      if (typeof key !== 'string') continue;
+      if (key.startsWith(scopedPrefix) || ownedUnprefixed.has(key)) {
         doomed.push(key);
       }
     }

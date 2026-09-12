@@ -39,7 +39,7 @@
       <section>
         <h2 id="where-your-data-lives">Where your data lives</h2>
         <p>Micronaut Planner is 100% client-side. There is no server, no account, and no sync — your study is autosaved into this browser's own local storage, on this one device. Nothing you type is ever uploaded anywhere, and no language model is ever called by the app itself.</p>
-        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Local storage is a convenience, not a permanent record: it can be cleared by the browser, isn't shared between machines, and is lost entirely in a private/incognito window. Treat it as a working copy, and use <a href="#backups">Download project backup</a> whenever the work matters.</p></div>
+        <div class="callout why"><p><strong>🔍 Why it works this way.</strong> Local storage is a convenience, not a permanent record: it can be cleared by the browser, isn't shared between machines, and is lost entirely in a private/incognito window. Treat it as a working copy, and use <a href="#backups">Project backup</a> whenever the work matters.</p></div>
         <div class="callout warn"><p><strong>⚠️ Careful.</strong> Opening Micronaut on a different computer, or a different browser on the same computer, starts you with a blank study — nothing "follows you." Move your work across with a project backup file, covered below.</p></div>
       </section>
 
@@ -75,13 +75,13 @@
           <img src="images/10-settings-storage.png" alt="The Settings screen, showing Project backup, Import project backup, Start a blank study and Clear all stored data buttons, with a note explaining what clearing removes and that it applies to the tab you run it from." loading="lazy"
                onerror="this.closest('.shot').classList.add('pending')">
           <div class="ph">Snapshot pending — the Settings screen's backup and storage controls.</div>
-          <figcaption><strong>Settings</strong> gathers every storage action in one row: the two backup actions, a blank start, and the one destructive control, each with its consequences written next to it.</figcaption>
+          <figcaption><strong>Settings</strong> gathers every storage action in one row: the two backup actions, a blank start, and the one destructive control, each with its consequences written next to it. Shown in the practice tab (the teal bar at the top); your own study looks the same without it.</figcaption>
         </figure>
 
         <h2 id="backups">Project backups: export and import</h2>
         <p>A project backup is a single <code>.json</code> file holding your entire study. It's the one copy that survives clearing your browser's storage, moving to a new computer, or sharing your plan with a collaborator.</p>
         <ol class="steps">
-          <li>Open <strong>Settings</strong> (or the <strong>Utilities</strong> menu) and click <strong>Download project backup</strong> (Utilities calls it "Export project backup" — same action). This downloads a <code>.json</code> file immediately; there's no dialog to fill in.</li>
+          <li>Open <strong>Settings</strong> (or the <strong>Utilities</strong> menu) and click <strong>Project backup (.micronaut.json, importable)</strong> (Utilities calls it "Export project backup" — same action). This downloads a <code>.json</code> file immediately; there's no dialog to fill in.</li>
           <li>To bring a backup back in, click <strong>Import project backup</strong> (Settings or Utilities) and choose the file.</li>
           <li>A successful import replaces your currently open study with the imported one, and that becomes the study now being autosaved.</li>
         </ol>
@@ -104,10 +104,10 @@
 
       <section>
         <h2 id="clear-all">Clear all stored data</h2>
-        <p>Settings also has <strong>Clear all stored data</strong> — the one destructive action in the app, and the only one guarded by a two-click "arm" instead of a single confirmation dialog: the first click changes the button's own label to "Click again to permanently clear all stored data" and arms it for a few seconds; a second click within that window actually clears everything, while letting the arming time out on its own disarms it again with no effect.</p>
+        <p>Settings also has <strong>Clear all stored data</strong> — the one destructive action in the app, and the only one guarded by a two-click "arm" instead of a single confirmation dialog: the first click changes the button's own label to "Click again to permanently clear all stored data" and arms it for a few seconds; a second click within that window clears every key this tab's scope owns, while letting the arming time out on its own disarms it again with no effect.</p>
         <ul>
-          <li>In the tab you run it from, it removes every locally saved version (the entire Restore history) — freeing up storage space if it's full or corrupted. Run it from the practice tab and only the practice tab's saved versions are cleared; your own study's history, in your own tab, is untouched.</li>
-          <li>It does <strong>not</strong> touch the study currently open in your browser tab. Your open work is safe, and Micronaut immediately writes it into the now-empty history as a fresh save, so autosaving resumes right away.</li>
+          <li>In the tab you run it from, it removes every locally saved version (the entire Restore history), walkthrough progress and onboarding answers for that scope — freeing up storage space if it's full or corrupted. Run it from the practice tab and only the practice tab's data is cleared; your own study's history, progress and answers, in your own tab, are untouched.</li>
+          <li>It does <strong>not</strong> touch the study currently open in your browser tab, and it does not touch your color theme — theme is shared across tabs on purpose and is kept either way. Your open work is safe, and Micronaut immediately writes it into the now-empty history as a fresh save, so autosaving resumes right away.</li>
         </ul>
         <div class="callout tip"><p><strong>💡 Tip.</strong> If you want to keep anything from your Restore history, download a project backup of it first — clearing removes that history for good, with no undo.</p></div>
         <h3 id="storage-full">If storage fails</h3>
@@ -132,7 +132,7 @@
               <tr><td><strong>Copy feedback package</strong></td><td>Copies the whole block to your clipboard, to paste wherever you're sharing feedback.</td></tr>
               <tr><td><strong>Download feedback package</strong></td><td>Downloads it as <code>micronaut-feedback.txt</code> (and also copies it), so you can attach the file instead of pasting text.</td></tr>
               <tr><td><strong>Email feedback</strong></td><td>Only appears at all once a real recipient address is configured — currently it is not, so this button is not shown. Even when available, the app never places your feedback or study data into the email link itself; it copies the package and expects you to paste it into the message body yourself, since a pre-filled mail link would get silently cut off after a couple thousand characters.</td></tr>
-              <tr><td><strong>Open GitHub issue</strong></td><td>Copies the package, then opens a prefilled new-issue page (with the "feedback" label already applied) on GitHub. The GitHub link itself carries no feedback text, browser details, or study data — you paste the copied package into the issue body yourself, after signing in if needed.</td></tr>
+              <tr><td><strong>Open GitHub issue</strong></td><td>Copies the package, then opens a prefilled new-issue page (with the "feedback" label already applied) on GitHub. The GitHub link itself carries no feedback text, browser details, or study data — you paste the copied package into the issue body yourself, after signing in if needed. If your browser blocks the copy (common when the page is opened as a local file), the button still opens GitHub and the dialog offers <strong>Download feedback package</strong> so you can attach the file instead.</td></tr>
             </tbody>
           </table>
         </div>

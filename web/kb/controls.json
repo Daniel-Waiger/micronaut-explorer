@@ -1,5 +1,7 @@
 {
   "version": 1,
+  "reviewStatus": "claude-drafted",
+  "note": "Every rule in this pack (which controls are suggested, and why) was drafted by Claude from general microscopy/cell-biology practice, not sourced from a specific citation, and has not been reviewed by a microscopy specialist. Treat it as a starting point to check against your own protocol, the same posture web/kb/spectra.json's overlapRules note takes toward its own thresholds.",
   "rules": [
     {
       "id": "panel-unstained-control",
@@ -21,7 +23,7 @@
       "id": "panel-fmo-control",
       "kind": "panel",
       "title": "Fluorescence-minus-one (FMO) controls",
-      "why": "Once a panel passes about three colors, spectral spillover from every OTHER channel can shift where a real positive/negative boundary sits on a given channel -- a single-stain control alone does not show you that shifted boundary. An FMO sample (every fluorophore except the one you're gating on) does: it reproduces the real spillover background, so the gate you draw on the full panel is honest.",
+      "why": "Once a panel reaches three or more colours, spectral spillover from every OTHER channel can shift where a real positive/negative boundary sits on a given channel -- a single-stain control alone does not show you that shifted boundary. An FMO sample (every fluorophore except the one you're gating on) does: it reproduces the real spillover background, so the gate you draw on the full panel is honest.",
       "when": { "all": [{ "eq": ["panel.derived.hasMarkersDeclared", true] }, { "gt": ["panel.derived.fluorophoreCount", 2] }] },
       "priority": 25
     },

@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > entries below record what shipped before it was parked. The active web Planner tracks
 > its day-to-day status in [ROADMAP.md](ROADMAP.md) and [TASKS.md](TASKS.md), and its
 > releases in [web/release-notes/CHANGELOG.md](web/release-notes/CHANGELOG.md), not here.
+> This file has never cut a version — everything it records has always lived, and still
+> lives, under a single `[Unreleased]` heading below.
 
 ## [Unreleased]
 

@@ -196,6 +196,21 @@ export function createAppController({
     notifyToast(message);
   }
 
+  // The word this app uses for a saved study's own origin -- see
+  // withOrigin/isExampleOrigin above -- for the ONE case a title still has to
+  // be manufactured (V5-NEW-03: identical 'Untitled study' rows are otherwise
+  // indistinguishable). Both 'example' and 'template' describe the shipped
+  // example -- see isExampleOrigin's own comment on why both values exist --
+  // so they share one label here too. 'draft'/'user'/anything else falls
+  // through to the final 'Untitled study' default below, same as before this
+  // change: those origins carry no more identity than a blank study does.
+  const ORIGIN_TITLE = Object.freeze({
+    blank: 'Blank study',
+    example: 'Example study',
+    template: 'Example study',
+    imported: 'Imported study',
+  });
+
   function recoveryEntries() {
     // The shell receives display-only data, never a persistence backend. It
     // therefore cannot accidentally load, mutate, or clear localStorage on
@@ -203,9 +218,24 @@ export function createAppController({
     // below.
     return persist.listSaved().map((id) => {
       const raw = persist.loadExperiment(id);
-      const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
+      const explicitTitle = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
         ? raw.meta.title.trim()
-        : 'Untitled study';
+        : '';
+      // meta.title is the one place a user can name a study; researchQuestion
+      // is the next-best identifying fact anyone has actually typed, so a
+      // slot with no title still gets something recognizable rather than
+      // jumping straight to a generic label. Truncated at 60 chars -- a menu
+      // row, not a full-text surface.
+      const researchQuestionTitle = !explicitTitle
+        && typeof raw?.researchQuestion === 'string'
+        && raw.researchQuestion.trim()
+        ? raw.researchQuestion.trim().slice(0, 60)
+        : '';
+      const origin = raw?.meta?.origin;
+      const title = explicitTitle
+        || researchQuestionTitle
+        || ORIGIN_TITLE[origin]
+        || 'Untitled study';
       // Read raw, un-migrated meta.updatedAt directly (this function never
       // calls migrate()) rather than fabricating one: every slot saved
       // before this change genuinely has no updatedAt, and reporting `null`
@@ -214,7 +244,7 @@ export function createAppController({
       // type (a number, an object) is normalized to `null` the same way,
       // since it is not a value anything downstream should render as a date.
       const savedAt = typeof raw?.meta?.updatedAt === 'string' ? raw.meta.updatedAt : null;
-      return { id, title, savedAt };
+      return { id, title, savedAt, origin };
     });
   }
 
@@ -234,31 +264,64 @@ export function createAppController({
 
   async function importProjectBackup(file) {
     if (!file) return;
+    // B2 red-team (problem 3): the try used to wrap everything through the
+    // success toast, so a throw from store.replace/setSaveState/
+    // notifyRecoveryEntries -- a SHELL error, after the import already
+    // succeeded and is live in the store -- was caught here and reported as
+    // "it is not a valid Micronaut project backup," while the indicator was
+    // left stuck on 'saving' (setSaveState never ran). Narrowed to cover only
+    // the parse/validate step: a bad FILE is the one thing this catch may
+    // still legitimately explain, and it does so before the open study is
+    // touched at all. Anything that throws after that point is a bug in this
+    // module or its collaborators, not a bad file, and must propagate as
+    // such rather than being misattributed.
+    let imported;
+    let issues;
     try {
-      const { experiment: imported, issues } = await persist.importFromFile(file);
-      store.replace(withOrigin(imported, 'imported'));
-      // replace() schedules the ordinary autosave subscriber. Clear any
-      // earlier lifecycle failure immediately; that subscriber will keep the
-      // status at saving, then replace it with saved or a storage failure.
-      setSaveState({ status: 'saving', error: null });
-      // core/importValidate.js sanitizes rather than rejects most shape
-      // problems (a malformed provenance slot, an assay reset to defaults)
-      // so the rest of a real backup is never thrown away over one bad
-      // corner -- but a sanitized field is exactly the kind of change a
-      // project owner needs to notice, not one that should vanish into the
-      // console alone.
-      if (Array.isArray(issues) && issues.length > 0) {
-        issues.forEach((issue) => logger.warn('Project import:', issue.message));
-        notifyToast(
-          `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details.`
-        );
-      } else {
-        notifyToast('Project imported. It is now the study being autosaved.');
-      }
-    } catch (err) {
-      reportPersistentLifecycleFailure(
-        `Could not import that project: ${err && err.message ? err.message : 'invalid file'}`
+      const result = await persist.importFromFile(file);
+      imported = result.experiment;
+      issues = result.issues;
+    } catch {
+      // R5-09: the raw JSON.parse message ("Unexpected token ... in JSON at
+      // position N") used to leak into the save indicator via
+      // reportPersistentLifecycleFailure. A bad file never touched the open
+      // study, so it must not read as a persistent lifecycle failure of it --
+      // report a fixed, user-facing message as a toast only, and leave
+      // saveState exactly as it was.
+      notifyToast('Could not import that file: it is not a valid Micronaut project backup.');
+      return;
+    }
+    // Parse succeeded -- a bad file must never displace or snapshot the open
+    // study, which is why preserveOpenStudy only runs once we have a real
+    // imported experiment in hand (same read-then-replace-across-the-
+    // debounce-window hazard restoreRecoverySlot and startBlankStudy guard
+    // below).
+    if (
+      !preserveOpenStudy(
+        'Could not preserve your current study, so that import was not applied. Nothing was changed.'
+      )
+    ) {
+      return;
+    }
+    store.replace(withOrigin(imported, 'imported'));
+    // replace() schedules the ordinary autosave subscriber. Clear any
+    // earlier lifecycle failure immediately; that subscriber will keep the
+    // status at saving, then replace it with saved or a storage failure.
+    setSaveState({ status: 'saving', error: null });
+    notifyRecoveryEntries();
+    // core/importValidate.js sanitizes rather than rejects most shape
+    // problems (a malformed provenance slot, an assay reset to defaults)
+    // so the rest of a real backup is never thrown away over one bad
+    // corner -- but a sanitized field is exactly the kind of change a
+    // project owner needs to notice, not one that should vanish into the
+    // console alone.
+    if (Array.isArray(issues) && issues.length > 0) {
+      issues.forEach((issue) => logger.warn('Project import:', issue.message));
+      notifyToast(
+        `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details. The study you had open was kept in Restore.`
       );
+    } else {
+      notifyToast('Project imported. It is now the study being autosaved. The study you had open was kept in Restore.');
     }
   }
 
@@ -267,14 +330,34 @@ export function createAppController({
       onUnreadable: (slotId, err) => logger.error(`Could not restore autosave ${slotId}:`, err),
     });
     if (!experiment) {
-      reportPersistentLifecycleFailure(
-        `Could not restore that version: ${error ? error.message : 'it is unavailable'}`
-      );
+      // B2 red-team (problem 4), R5-09's sibling one call site over: the
+      // study currently open is perfectly healthy -- only the RESTORE SLOT
+      // being requested is unreadable/gone. Routing that through
+      // reportPersistentLifecycleFailure flips the save indicator of the
+      // healthy open study to 'failed', exactly the "a non-save event
+      // written onto the save-state surface" complaint R5-09 was filed
+      // against. A toast is the right (and only) surface for this: it says
+      // nothing about whether the OPEN study is safely saved, because
+      // nothing about that has changed.
+      notifyToast(`Could not restore that version: ${error ? error.message : 'it is unavailable'}`);
+      return false;
+    }
+    // Same read-then-replace-across-the-debounce-window hazard startBlankStudy
+    // and openExampleStudy guard against: a pending autosave timer still holds
+    // a closure over the study open BEFORE this restore, and would otherwise
+    // fire after store.replace() below and persist the RESTORED study over the
+    // ring slot that should hold the displaced study.
+    if (
+      !preserveOpenStudy(
+        'Could not preserve your current study, so that version was not restored. Nothing was changed.'
+      )
+    ) {
       return false;
     }
     store.replace(experiment);
     setSaveState({ status: 'saving', error: null });
-    notifyToast('Restored the selected previous version.');
+    notifyRecoveryEntries();
+    notifyToast('Restored the selected previous version. The study you had open was kept in Restore.');
     return true;
   }
 
@@ -304,6 +387,18 @@ export function createAppController({
    * old version fired the success toast unconditionally, and downgraded a
    * failed re-save to `{ status: 'unsaved', error: null }` -- silently
    * discarding the very error it should have surfaced).
+   *
+   * V2-NEW-03: persist.js's clearAll now also sweeps this scope's
+   * guided-walkthrough progress, onboarding answers, nav-collapsed and
+   * advisor-debug keys (theme is deliberately excluded -- it is shared
+   * across scopes on purpose). Clearing storage out from under
+   * guidedProgressState without also resetting the IN-MEMORY copy this
+   * module holds (see getGuidedState() above) would leave the walkthrough
+   * looking mid-progress until the next reload even though its storage key
+   * is gone -- so reload it from the now-empty storage the same way
+   * construction time does. The toast is scope-aware: this is no longer a
+   * blanket "all locally stored data" claim in the practice tab, where only
+   * that tab's keys are touched.
    */
   function clearAllStoredData() {
     const clearResult = persist.clearAll({ onQuotaExceeded: reportStorageFailure });
@@ -313,6 +408,7 @@ export function createAppController({
       );
       return false;
     }
+    guidedProgressState = guided.load(primaryWorkflow, { onError: reportGuidedStorageFailure });
     const savedId = persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure });
     notifyRecoveryEntries();
     if (!savedId) {
@@ -322,8 +418,52 @@ export function createAppController({
       return false;
     }
     setSaveState({ status: 'saved', savedAt: now(), error: null });
-    notifyToast('Cleared all locally stored data. Your open study is unaffected, and saving has resumed.');
+    notifyToast(
+      isSandbox
+        ? "Cleared this practice tab's stored data (saved versions, walkthrough progress, onboarding answers). Theme is kept."
+        : "Cleared this tab's stored data (saved versions, walkthrough progress, onboarding answers). Theme is kept."
+    );
     return true;
+  }
+
+  /**
+   * Shared by every lifecycle action that replaces the in-memory study
+   * (openExampleStudy, startBlankStudy, restoreRecoverySlot,
+   * importProjectBackup): flush any pending debounced autosave -- so the
+   * study about to be displaced, not whatever replaces it, is what the timer
+   * persists -- then take a snapshot of it protected from ordinary ring
+   * eviction.
+   *
+   * "Protected" is a priority, not a permanent hold: persist.js caps
+   * protected slots at PROTECTED_CAP (3 of the ring's 5 slots), so this
+   * snapshot stays available until three MORE protected saves push it out,
+   * not forever. Callers whose copy promises "kept in Restore" must phrase
+   * that as describing the next few actions, not an unlimited guarantee.
+   *
+   * Returns the new slot id, or null (having already reported the failure
+   * via reportPersistentLifecycleFailure(abortMessage)) when the snapshot
+   * could not be taken -- callers must abort without replacing the study.
+   */
+  function preserveOpenStudy(abortMessage) {
+    // The protected save IS the flush: cancel a pending debounced autosave
+    // instead of running it, then write the current study once as a
+    // protected slot. Flushing first and THEN saving wrote the same study
+    // into two of the five ring slots on every displacement (red-team B2-P2).
+    if (saveTimer !== null) {
+      timers.clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
+      onQuotaExceeded: reportStorageFailure,
+      protectFromAutomaticEviction: true,
+    });
+    if (!protectedId) {
+      reportPersistentLifecycleFailure(abortMessage);
+      return null;
+    }
+    setSaveState({ status: 'saved', savedAt: now(), error: null });
+    notifyRecoveryEntries();
+    return protectedId;
   }
 
   // Opening the example is an explicit request, so it arrives as ordinary
@@ -350,37 +490,19 @@ export function createAppController({
       return false;
     }
 
-    // A pending debounced autosave timer holds a closure over store.get()
-    // that fires 500ms after the *last* edit, whenever that lands relative to
-    // this call. Without flushing it first, store.replace() below runs while
-    // that timer is still pending, and it then fires AFTER the replace, reads
-    // store.get() fresh (now the example), and persists the example over the
-    // ring slot that should hold the practice edit the user made just before
-    // clicking reset -- the exact bug documented on startBlankStudy above,
-    // reproduced here because this function has the identical shape
-    // (read-then-replace across a debounce window). startBlankStudy already
-    // calls flushAutosave() for this reason; this was the same latent bug,
-    // just not yet triggered because nothing had exercised this path with a
-    // pending timer.
-    flushAutosave();
-
-    // Preserve the exact current state synchronously, before replace() can
-    // expose example data to the autosave subscriber. This snapshot is
-    // protected from normal ring eviction: since this function is now only
-    // reachable from the sandbox tab, "the current state" here is always the
-    // sandbox's own prior practice activity, never the user's real study --
-    // but the protection is the same one openExampleStudy always used, so
-    // browsing or editing the example still can never delete whatever
-    // practice work came before it. If durable preservation is unavailable,
-    // do not switch workspaces at all.
-    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
-      onQuotaExceeded: reportStorageFailure,
-      protectFromAutomaticEviction: true,
-    });
-    if (!protectedId) {
-      reportPersistentLifecycleFailure(
+    // preserveOpenStudy flushes any pending debounced autosave (so its
+    // closure persists the study about to be displaced, not the example that
+    // replaces it) and takes a snapshot protected from ordinary ring
+    // eviction, capped at PROTECTED_CAP -- see preserveOpenStudy's docstring.
+    // Since this function is now only reachable from the sandbox tab, "the
+    // current state" here is always the sandbox's own prior practice
+    // activity, never the user's real study. If durable preservation is
+    // unavailable, do not switch workspaces at all.
+    if (
+      !preserveOpenStudy(
         'Could not preserve your current practice state, so the example was not reopened. Download a project backup or free storage, then try again.'
-      );
+      )
+    ) {
       return false;
     }
     const example = createExampleStudy();
@@ -403,30 +525,29 @@ export function createAppController({
    * store.get() fresh, and persisted the new BLANK study into the ring
    * instead of the edit the user had just made -- while
    * ui/steps/settings.js's confirm dialog promises "Your current work
-   * remains available in Restore." Two changes close the window:
-   *   1. flushAutosave() cancels that pending timer and runs its save
-   *      synchronously, against the CURRENT (still edited) study, before
-   *      anything else happens.
-   *   2. The same protected-snapshot pattern openExampleStudy already uses
-   *      guarantees that edited study a slot immune to ring eviction, and
-   *      aborts the whole operation (never replaces the live study) if that
-   *      snapshot can't be taken.
+   * remains available in Restore." preserveOpenStudy closes the window in
+   * one call:
+   *   1. It cancels that pending timer and runs its save synchronously,
+   *      against the CURRENT (still edited) study, before anything else
+   *      happens.
+   *   2. It gives that edited study a slot protected from ORDINARY ring
+   *      eviction -- but protected slots are capped at PROTECTED_CAP (3 of
+   *      the ring's 5 slots, see persist.js), so this snapshot stays
+   *      available only until three MORE protected saves push it out, not
+   *      forever. It aborts the whole operation (never replaces the live
+   *      study) if the snapshot can't be taken at all.
    */
   function startBlankStudy() {
-    flushAutosave();
-    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
-      onQuotaExceeded: reportStorageFailure,
-      protectFromAutomaticEviction: true,
-    });
-    if (!protectedId) {
-      reportPersistentLifecycleFailure(
+    if (
+      !preserveOpenStudy(
         'Could not preserve your current study, so a blank study was not started. Download a project backup or free storage, then try again.'
-      );
+      )
+    ) {
       return false;
     }
     store.replace(createEmptyStudy());
     notifyRecoveryEntries();
-    notifyToast('Started a blank study. Your previous versions remain available in Restore.');
+    notifyToast('Started a blank study. Your previous version was kept in Restore.');
     return true;
   }
 

@@ -82,6 +82,36 @@ test('one bad rule does not silence the rest of the pack', () => {
   assert.equal(issues.length, 1);
 });
 
+// R3-13: advisor.json shipped with NO provenance model at all (unlike
+// spectra.json's per-fluorophore/overlapRules reviewStatus) -- a
+// knowledge-pack design gap, not just a text fix. The loader must actually
+// carry a pack-level reviewStatus/note through rather than silently drop
+// them, on every shape this loader accepts (well-formed, explicit, and
+// absent/malformed defaulting).
+test('a well-formed pack carries its pack-level reviewStatus/note through, not just per-rule fields', () => {
+  const { reviewStatus, note } = loadAdvisorRules({
+    version: 1,
+    reviewStatus: 'source-cited',
+    note: 'Every number here was checked against a cited reference.',
+    rules: [validRule()],
+  });
+  assert.equal(reviewStatus, 'source-cited');
+  assert.equal(note, 'Every number here was checked against a cited reference.');
+});
+
+test('a pack with no reviewStatus/note defaults reviewStatus to claude-drafted and note to undefined', () => {
+  const { reviewStatus, note } = loadAdvisorRules({ version: 1, rules: [validRule()] });
+  assert.equal(reviewStatus, 'claude-drafted');
+  assert.equal(note, undefined);
+});
+
+test('an absent/malformed pack still reports a reviewStatus (claude-drafted) rather than undefined', () => {
+  for (const raw of [undefined, null, {}, 'nope']) {
+    const { reviewStatus } = loadAdvisorRules(raw);
+    assert.equal(reviewStatus, 'claude-drafted');
+  }
+});
+
 // --- Loader: field-by-field validation -------------------------------------
 
 test('missing or blank id is dropped and reported by index', () => {
@@ -516,6 +546,13 @@ test('no path anywhere in the real KB (questions.json or advisor.json) uses an a
 test('the real web/kb/advisor.json loads with ZERO issues', () => {
   const { issues } = loadAdvisorRules(realAdvisorRaw);
   assert.deepEqual(issues, []);
+});
+
+test('the real web/kb/advisor.json carries a pack-level reviewStatus/note the loader does not drop (R3-13)', () => {
+  const { reviewStatus, note } = loadAdvisorRules(realAdvisorRaw);
+  assert.equal(reviewStatus, 'claude-drafted');
+  assert.equal(typeof note, 'string');
+  assert.ok(note.length > 0);
 });
 
 test('selectAdvice(rules, emptyExperiment(), surface) is EMPTY for every surface', () => {

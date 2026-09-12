@@ -18,6 +18,13 @@ export async function copyToClipboard(text) {
       // fall through to the execCommand fallback
     }
   }
+  // select() below moves focus onto the textarea (that's what lets
+  // execCommand('copy') read it), and removing the focused node afterward
+  // drops focus to <body> -- silently stealing focus from whatever the user
+  // had focused (e.g. the button they clicked) for every caller of this
+  // fallback, not just the feedback handoff modal (lesson 44: fix the class,
+  // not one instance). Save and restore it around the fallback.
+  const previouslyFocused = document.activeElement;
   const textarea = document.createElement('textarea');
   textarea.value = text;
   textarea.style.position = 'fixed';
@@ -31,5 +38,8 @@ export async function copyToClipboard(text) {
     ok = false;
   }
   document.body.removeChild(textarea);
+  if (previouslyFocused && previouslyFocused !== document.body && typeof previouslyFocused.focus === 'function') {
+    previouslyFocused.focus();
+  }
   return ok;
 }

@@ -54,24 +54,34 @@ export const ANTIBODY_CONJUGATION_MODES = new Set(['antibody-direct', 'antibody-
 // Color-panel patch: a qualitative default detection-filter suggestion, shown
 // pre-filled in the filter inputs (ui/steps/panel.js) the moment a channel's
 // fluorophore resolves, rather than an empty pair waiting on the user to look
-// up their own numbers first. WIDTH_NM=30 is the midpoint of the "20-40 nm
-// wide" range spectra.json's own overlapRules note already documents for
-// typical bandpass emission filters -- same domain-judgment posture as that
-// note and spectra.js's peak-proximity thresholds, not a claim about any real
-// vendor part. Centered on the EMISSION peak: `filterCenterNm`/
-// `filterBandwidthNm` describe the detection filter the user's camera/PMT
-// actually looks through, which observes emitted light, not excitation.
-const DEFAULT_FILTER_BANDWIDTH_NM = 30;
+// up their own numbers first. The width is spectra.json's own
+// overlapRules.filterBandDefaultNm (R3-17) -- ONE documented home for that
+// constant, read here rather than re-declared as a private literal, so this
+// module and the pack's own note can never drift (lesson 40; see
+// spectra.js's loadSpectraKb for the parsing/bounds/default). Falling back to
+// FALLBACK_FILTER_BANDWIDTH_NM only covers a caller that (against every
+// production path) hands in no overlapRules at all -- loadSpectraKb() itself
+// already defaults a missing/invalid pack value to the same number. Centered
+// on the EMISSION peak: `filterCenterNm`/`filterBandwidthNm` describe the
+// detection filter the user's camera/PMT actually looks through, which
+// observes emitted light, not excitation.
+const FALLBACK_FILTER_BANDWIDTH_NM = 30;
+
+function filterBandwidthNm(overlapRules) {
+  const value = overlapRules && overlapRules.filterBandDefaultNm;
+  return typeof value === 'number' && Number.isFinite(value) ? value : FALLBACK_FILTER_BANDWIDTH_NM;
+}
 
 /**
  * The default (unedited) filter suggestion for a channel whose fluorophore
  * resolved to a known emission peak -- `null` when it didn't, so a caller
  * never renders a fabricated center wavelength for a fluorophore this app
- * has no spectral data for.
+ * has no spectral data for. `overlapRules` is engine/spectra.js's
+ * loadSpectraKb() `overlapRules` shape (optional -- see FALLBACK above).
  */
-export function defaultChannelFilterPair(emissionPeakNm) {
+export function defaultChannelFilterPair(emissionPeakNm, overlapRules) {
   if (typeof emissionPeakNm !== 'number' || !Number.isFinite(emissionPeakNm)) return null;
-  return { filterCenterNm: Math.round(emissionPeakNm), filterBandwidthNm: DEFAULT_FILTER_BANDWIDTH_NM };
+  return { filterCenterNm: Math.round(emissionPeakNm), filterBandwidthNm: filterBandwidthNm(overlapRules) };
 }
 
 /**
@@ -81,10 +91,10 @@ export function defaultChannelFilterPair(emissionPeakNm) {
  * decision here prevents the form from showing a suggested filter that the
  * spectrum silently omits.
  */
-export function effectiveChannelFilterPair(channel, emissionPeakNm) {
+export function effectiveChannelFilterPair(channel, emissionPeakNm, overlapRules) {
   const saved = normalizePanelFilterPair(channel || {});
   if (saved.filterCenterNm !== null) return saved;
-  return defaultChannelFilterPair(emissionPeakNm);
+  return defaultChannelFilterPair(emissionPeakNm, overlapRules);
 }
 
 /**
@@ -202,6 +212,16 @@ export function emptyChannel(id) {
   };
 }
 
+// The detection-filter BANDWIDTH rule `normalizePanelFilterPair` enforces
+// below, exported so ui/steps/panel.js validates/renders against this ONE
+// source instead of repeating literals (V3-N5). The lower bound is
+// EXCLUSIVE: any positive width is stored (0.5 nm is accepted, 0 is not);
+// the upper bound is inclusive. The normalizer reads these same fields, so
+// the constant cannot drift from the producer (red-team A1-P1). A filter
+// CENTER's plausible range is the 300-900 nm window engine/spectra.js
+// exports as MIN/MAX_PLAUSIBLE_PEAK_NM.
+export const FILTER_BANDWIDTH_BOUNDS_NM = Object.freeze({ minExclusiveNm: 0, maxNm: 300 });
+
 // Detection filters are deliberately an all-or-nothing user statement: a
 // center without a bandwidth (or vice versa) cannot honestly describe a band.
 // Keep this local so the serialized channel shape has one normalization rule.
@@ -215,8 +235,8 @@ function normalizePanelFilterPair(entry) {
     center <= 900 &&
     typeof bandwidth === 'number' &&
     Number.isFinite(bandwidth) &&
-    bandwidth > 0 &&
-    bandwidth <= 300
+    bandwidth > FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm &&
+    bandwidth <= FILTER_BANDWIDTH_BOUNDS_NM.maxNm
   ) {
     return { filterCenterNm: center, filterBandwidthNm: bandwidth };
   }
@@ -361,4 +381,118 @@ export function seedChannelsFromMarkers(resolvePanelResult, markersKb, kbMarker,
         conjugateDye: conjugation === 'tag-ligand' ? entry.token : '',
       };
     });
+}
+
+// --- Spillover acknowledgements (V3-N1): panel.spillover.acknowledged ----
+//
+// A spectral-overlap flag (spectra.js's flagPanelOverlaps) that a person has
+// reviewed and accepted -- e.g. two dyes with close emission peaks that are
+// actually fine because they're never imaged in the same acquisition, or are
+// separated by a hardware filter the tool has no way to know about. Recording
+// that decision downgrades the flag from a hard export block to a visible
+// warning (conformance.js/A3 wires this in); it must NOT silently make the
+// overlap disappear, and it must NOT survive a panel edit that changes which
+// two dyes are actually paired (pruneSpilloverAcks, below).
+
+const SPILLOVER_ACK_REASONS = new Set(['sequential-acquisition', 'filter-separated', 'other']);
+
+function isNonEmptySpilloverPairMember(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Validate and normalize a raw `panel.spillover.acknowledged` array. TOTAL:
+ * never throws. A surviving entry has: `pair` (its two dye ids, SORTED so
+ * ['A','B'] and ['B','A'] are the same acknowledgement regardless of which
+ * order the flag or the user encountered them in), `reason` restricted to the
+ * app's three enumerated choices, an optional string `notes`, and `at` (an
+ * ISO timestamp -- the entry's own recorded time, or "now" when absent or the
+ * wrong type). A malformed entry (wrong pair shape/types, unrecognized or
+ * missing reason, or not an object at all) is dropped rather than repaired --
+ * this is reviewable user-entered state, not authored KB content, matching
+ * normalizeChannels' posture above.
+ */
+export function normalizeSpilloverAcks(raw) {
+  if (!Array.isArray(raw)) return [];
+  const acks = [];
+  const seenPairs = new Set();
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const pair = entry.pair;
+    if (
+      !Array.isArray(pair) ||
+      pair.length !== 2 ||
+      !isNonEmptySpilloverPairMember(pair[0]) ||
+      !isNonEmptySpilloverPairMember(pair[1])
+    ) {
+      continue;
+    }
+    const sortedPair = [pair[0].trim(), pair[1].trim()].sort();
+    // A dye cannot be acknowledged against itself, and one pair is one
+    // acknowledgement (the first recorded wins).
+    if (sortedPair[0] === sortedPair[1]) continue;
+    const key = spilloverPairKey(sortedPair[0], sortedPair[1]);
+    if (seenPairs.has(key)) continue;
+    if (typeof entry.reason !== 'string' || !SPILLOVER_ACK_REASONS.has(entry.reason)) continue;
+
+    const at = typeof entry.at === 'string' && Number.isFinite(Date.parse(entry.at))
+      ? entry.at
+      : new Date().toISOString();
+    const ack = { pair: sortedPair, reason: entry.reason, at };
+    if (typeof entry.notes === 'string') ack.notes = entry.notes;
+    seenPairs.add(key);
+    acks.push(ack);
+  }
+  return acks;
+}
+
+/**
+ * The id a spillover flag and an acknowledgement both use for one resolved
+ * fluorophore entry: its canonical name, plus `::<variantKey>` when it
+ * resolved to one specific family member. The variant half is load-bearing:
+ * MitoTracker Green and MitoTracker Deep Red share the canonical
+ * MITOTRACKER, and keying on canonicals alone let an acknowledgement recorded
+ * for one pair keep suppressing the flag after the user swapped to a
+ * different, genuinely conflicting pair (red-team A3-P1). `null` for anything
+ * that is not a resolved ('known') entry. engine/spectra.js imports this so
+ * flagPanelOverlaps' pairKey and pruneSpilloverAcks agree by construction.
+ */
+export function fluorophoreEntryId(entry) {
+  if (!entry || typeof entry.canonical !== 'string' || !entry.canonical) return null;
+  return entry.variantKey ? `${entry.canonical}::${entry.variantKey}` : entry.canonical;
+}
+
+/**
+ * The ONE pair-key convention shared by acknowledgements and
+ * engine/spectra.js's flagPanelOverlaps: the two fluorophoreEntryId()s,
+ * sorted, joined by '|'. Acknowledgement `pair` members are entry ids (the
+ * strings a flag's pairKey splits into), never display names.
+ */
+export function spilloverPairKey(a, b) {
+  return [a, b].sort().join('|');
+}
+
+function spilloverAckEntryId(entry) {
+  return fluorophoreEntryId(entry);
+}
+
+/**
+ * Drop any acknowledgement whose two dye ids are not BOTH still present among
+ * the panel's current resolved `entries` -- editing a channel so it resolves
+ * to a different dye must make the old acknowledgement stop applying rather
+ * than silently keep suppressing a flag about a pair that no longer exists.
+ * TOTAL: never throws; malformed input degrades to "prune everything".
+ */
+export function pruneSpilloverAcks(acks, entries) {
+  const list = Array.isArray(acks) ? acks : [];
+  const validEntries = Array.isArray(entries) ? entries : [];
+  const liveIds = new Set(validEntries.map(spilloverAckEntryId).filter(Boolean));
+  return list.filter(
+    (ack) =>
+      ack &&
+      Array.isArray(ack.pair) &&
+      ack.pair.length === 2 &&
+      liveIds.has(ack.pair[0]) &&
+      liveIds.has(ack.pair[1])
+  );
 }

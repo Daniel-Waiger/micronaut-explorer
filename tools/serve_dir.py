@@ -84,24 +84,26 @@ class _NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def translate_path(self, path: str) -> str:
-        # web/release-notes/images/ no longer exists on disk -- like
-        # tools/build_single_file.py does for dist/release-notes/images/,
-        # the release-notes page's screenshots are assembled from
-        # docs/images/ instead of duplicated. The build step performs that
-        # assembly for dist/, but this dev server has no build step, so it
-        # maps the request path directly instead. Only fires when serving a
-        # directory literally named `web` (mirroring
+        # Neither web/release-notes/images/ nor web/manual/images/ exists on
+        # disk -- like tools/build_single_file.py does for dist/, both the
+        # release-notes page's and the manual's screenshots are assembled
+        # from docs/images/ instead of duplicated. The build step performs
+        # that assembly for dist/, but this dev server has no build step, so
+        # it maps each request path directly instead. Only fires when serving
+        # a directory literally named `web` (mirroring
         # _regenerate_stale_kb_dev_js's guard) -- `dist` already has real
-        # files on disk at this path, and other directories have no
-        # release-notes/ page to serve at all.
+        # files on disk at these paths, and other directories have neither
+        # page to serve at all.
         if Path(self.directory).resolve().name == "web":
             parsed = path.split("?", 1)[0].split("#", 1)[0]
-            if parsed.startswith("/release-notes/images/"):
-                name = parsed[len("/release-notes/images/"):]
-                if name and "/" not in name:
-                    docs_image = Path(self.directory).resolve().parent / "docs" / "images" / name
-                    if docs_image.is_file():
-                        return str(docs_image)
+            for prefix in ("/release-notes/images/", "/manual/images/"):
+                if parsed.startswith(prefix):
+                    name = parsed[len(prefix):]
+                    if name and "/" not in name:
+                        docs_image = Path(self.directory).resolve().parent / "docs" / "images" / name
+                        if docs_image.is_file():
+                            return str(docs_image)
+                    break
         return super().translate_path(path)
 
 

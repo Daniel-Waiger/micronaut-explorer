@@ -10,8 +10,7 @@ The active project is the web **Planner** (`web/`).
 | **Micronaut Planner** (`web/`) | A static, zero-install browser app for planning a microscopy study: what you're asking, what you'll measure, and the files, controls and conditions that follow from it — decided before you're at the microscope. No upload, no install, no server, and no model is ever called. | **Active** |
 
 Micronaut Classic, an earlier metadata-aware file renamer, was archived at tag
-`classic-final` and `_archive/micronaut-classic-2026-08-18.tar.gz` — see
-ROADMAP.md for why.
+`classic-final` — see ROADMAP.md for why.
 
 ---
 
@@ -58,9 +57,10 @@ Utilities
   answer the study question: search it, filter by status or modality, and open one
   to plan it. A measurement is one observation or analysis; some disciplines call
   it an assay. Each row shows a single headline badge drawn from three
-  independently scoped statuses — definition, plan, and export conformance — never
-  one collapsed word; see [docs/plans/status-scopes.md](docs/plans/status-scopes.md)
-  for the full model.
+  independently scoped statuses — definition, plan, and export conformance —
+  plus the other two axes as muted chips beside it, never one collapsed word;
+  see [docs/plans/status-scopes.md](docs/plans/status-scopes.md) for the full
+  model.
 - **Measurement** — opening a row gives you that measurement's whole plan on one
   scroll, because these three decide each other:
   - *Samples & design* — groups, replication, and the conditions they generate.
@@ -69,7 +69,11 @@ Utilities
     rules knowledge base (`web/kb/advisor.json`), plus the **Color panel**: a
     qualitative spectral-spillover advisor over the measurement's fluorophores
     (excitation/emission peak-proximity flags, not a spectral-overlap integral;
-    content is Claude-drafted and flagged unreviewed in `web/kb/spectra.json`). An
+    of the 157 entries in `web/kb/spectra.json`, 143 cite a vendor or publication
+    source and 14 remain Claude-drafted and are badged unreviewed in-app — none
+    is specialist-reviewed; the source URLs themselves live in
+    [docs/references/planner-fluorophore-sources.json](docs/references/planner-fluorophore-sources.json),
+    not in the shipped knowledge pack). An
     optional structured panel editor lets you name each channel's target and
     conjugation mode (direct antibody / indirect / genetically encoded / a
     direct-binding probe / self-labeling tag) — the fact-precise alternative to the
@@ -79,10 +83,13 @@ Utilities
     Classic's naming/validation logic ported to JS, plus a one-click **Download
     schedule (.ics)** export of the measurement's timing (built from the same
     timing interview) that imports into any calendar app.
-- **Review** — a shareable study diagram, a conformance check (one pass/fail
-  verdict composed from every validator the app already runs), a deterministic
-  walkthrough, a staged progression ladder (idea → advanced modality), and
-  downloads: Markdown, an SVG study map, a CSV file manifest, a raw-data JSON
+- **Review** — a shareable study diagram, export checks (a pass/needs-review/
+  blocked verdict built from the app's own validators — it does not validate
+  scientific validity, statistical power, ethics approval, biosafety, or
+  instrument suitability, and it does not check your Study map decisions;
+  see Decisions for those), a deterministic walkthrough, a staged progression
+  ladder (idea → advanced modality), and downloads: Markdown, an SVG study
+  map, a CSV file manifest, a raw-data JSON
   dump, a per-measurement print-oriented bench card, and a separate **Copy prompt for
   your own LLM** action (+ the study as JSON) for discussing the finished plan
   in whatever LLM you already use.
@@ -90,7 +97,11 @@ Utilities
 ### Utilities
 
 - **Guide / walkthrough** — an in-app user guide, plus a deterministic guided
-  walkthrough over the shipped example study; always in the step nav.
+  walkthrough over the shipped example study; the entry point is always in the
+  step nav, but the walkthrough itself only runs over a study that originated
+  from the shipped example, which the app opens in the practice tab
+  (`index.html?demo=1`) against its own storage, never against your real
+  study.
 - **Backup, restore, and settings** — export or import a project backup, and clear
   locally stored data.
 - **Feedback** — a page that collects what you were doing, the current page,
@@ -167,8 +178,11 @@ python tools/build_single_file.py --web-dir web --out dist
 
 This inlines CSS, JS, and the knowledge pack into `dist/index.html` — one file you
 can double-click (`file://`) or host anywhere, with identical bytes either way. The
-build enforces hard gates (no `fetch()`, no `type="module"`, no duplicate exports,
-no import cycles, size ceiling) so the shipped artifact can't silently break.
+build enforces hard gates (no `fetch()`, `XMLHttpRequest`, `WebSocket()`,
+`navigator.sendBeacon`, or `EventSource()`; no top-level `await`; no
+`type="module"` or static `import` statement surviving into the assembled
+output; no duplicate top-level exports; no import cycles; a size ceiling) so
+the shipped artifact can't silently break and can't silently reach the network.
 
 Serve the built output the same way:
 
@@ -200,10 +214,14 @@ web/                         Micronaut Planner (static browser app)
                              measurement (composes design + panel + naming),
                              overview, guide, feedback, settings
   kb/                        knowledge pack (markers, stages, controls, advisor, spectra, …)
+  styles/                    app.css (inlined into dist/index.html at build)
+  manual/                    the in-app user guide's own static pages
+  release-notes/             CHANGELOG.md and the release-notes web page
   tests/                     node --test suite (zero npm deps)
 
 tools/build_single_file.py   Planner inliner → dist/index.html
 tools/serve_dir.py           static dev server (PORT-aware)
+tests/                       Python build-pipeline and browser e2e tests (pytest)
 docs/                        plans, cma-lessons, images
 ```
 
@@ -220,7 +238,10 @@ node --test web/tests/*.test.js
 
 CI runs the JS suite plus the Planner's own Python build-pipeline tests
 (`tests/test_single_file_build.py`, `tests/test_kb_json_valid.py`,
-`tests/test_regex_conformance.py`) — see
+`tests/test_regex_conformance.py`, `tests/test_browser_cdp.py`) as two jobs
+(`web-test` and `test`), and a separate browser end-to-end job (`tests/test_e2e_flows.py`) that is made to
+fail outright if no Chrome/Chromium is present on the runner, rather than
+silently skipping and reporting green — see
 [.github/workflows/ci.yml](.github/workflows/ci.yml).
 
 ## Getting help, reporting a problem

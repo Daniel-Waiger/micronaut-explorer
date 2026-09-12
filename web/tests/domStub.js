@@ -124,6 +124,7 @@ class FakeElement {
     return event;
   }
   click() { return this.dispatch('click'); }
+  select() {}
   focus() { if (this.ownerDocument) this.ownerDocument.activeElement = this; }
   getBoundingClientRect() { return { left: 0, top: 0, width: 720, height: 316 }; }
   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }

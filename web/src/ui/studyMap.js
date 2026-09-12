@@ -492,6 +492,29 @@ export function createStudyMap({ store, router, getMap, document: suppliedDocume
     }
   }
 
+  // R4-19: nothing anywhere in the workflow ever set meta.title, so every
+  // Restore-list row and every export read the hard 'Untitled study'
+  // fallback (appController.recoveryEntries/projectFilename both already
+  // prefer meta.title the moment something writes it). Placed above BOTH
+  // the intake questions and the summary -- not inside appendSummary alone
+  // -- so it is visible on a brand-new study's very first visit, not only
+  // after all five orientation questions are answered. Same `write()`
+  // commit pattern (tag 'user'/'user_edited' via editTagFor) every other
+  // map field already uses, so a re-edit is provenance-tagged identically
+  // to correcting the research question or system field.
+  function appendTitleField(host) {
+    const value = studyMapText(store.get().meta?.title);
+    const field = input(doc, {
+      id: 'study-map-title',
+      label: 'Study title',
+      value,
+      placeholder: 'e.g. Drought effects on tomato roots',
+      help: 'Shown in Utilities > Restore and used to name exported files.',
+      onInput: (next) => write('meta.title', next, 'meta.title'),
+    });
+    host.appendChild(field.row);
+  }
+
   function refresh() {
     if (destroyed) return;
     const map = mapForCurrentStudy();
@@ -499,6 +522,7 @@ export function createStudyMap({ store, router, getMap, document: suppliedDocume
     if (intakeStep === null) intakeStep = inferred;
     if (intakeStep !== null && intakeStep >= ORIENTATION_QUESTIONS.length) intakeStep = null;
     element.replaceChildren();
+    appendTitleField(element);
     if (intakeStep === null) appendSummary(element, map);
     else appendIntake(element, map, intakeStep);
   }

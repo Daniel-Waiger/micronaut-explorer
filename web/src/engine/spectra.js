@@ -48,6 +48,7 @@
 
 import { splitMarkers } from './validation.js';
 import { kbMarker } from '../core/kb.js';
+import { normalizeChannels, channelSpectralField, spilloverPairKey, fluorophoreEntryId } from './panelAssembly.js';
 
 export const SPECTRAL_STATES = [
   'unrecognized',
@@ -87,13 +88,23 @@ const SPECTRAL_VIEW_DEFAULT_EMISSION_FWHM_NM = 50;
 const SPECTRAL_VIEW_MIN_FWHM_NM = 5;
 const SPECTRAL_VIEW_MAX_FWHM_NM = 300;
 
+// R3-17: the suggested detection-filter bandwidth (engine/panelAssembly.js's
+// defaultChannelFilterPair) used to be a private literal there, sourced only
+// in a code comment to this pack's own overlapRules note. It now has ONE
+// documented home -- overlapRules.filterBandDefaultNm in spectra.json --
+// and panelAssembly.js reads the value THIS loader returns rather than its
+// own copy, so the two can never drift (lesson 40). Bounds reuse the same
+// plausible-FWHM range as schematicEmissionFwhmNm: a detection-filter
+// bandwidth outside 5-300 nm is a data-entry error, not a real filter.
+const DEFAULT_FILTER_BAND_NM = 30;
+
 // Peak plausibility (Decision: content is hand-drafted and hand-edited, so a
 // type check alone lets a transposed digit through clean). The visible
 // spectrum plus a safety margin into near-UV/near-IR, where FACSI-relevant
 // dyes/FPs/indicators actually live; anything outside it is far more likely
 // a typo than a real fluorophore this app should be advising on.
-const MIN_PLAUSIBLE_PEAK_NM = 300;
-const MAX_PLAUSIBLE_PEAK_NM = 900;
+export const MIN_PLAUSIBLE_PEAK_NM = 300;
+export const MAX_PLAUSIBLE_PEAK_NM = 900;
 
 /**
  * A Stokes shift is always positive (emission is always redder / lower-
@@ -197,6 +208,12 @@ function normalizeFluorophoreEntry(canonical, entry, issues) {
 
   const reviewStatus =
     typeof entry.reviewStatus === 'string' && entry.reviewStatus.trim() ? entry.reviewStatus.trim() : DEFAULT_REVIEW_STATUS;
+  // Free-text curatorial context (e.g. DCFDA's oxidized-product caveat) --
+  // absent, not a fabricated empty string, when the entry has none. Kept
+  // through both shapes below and threaded by resolveMarkerToken so a
+  // consumer (panel.js row title, R3-04) can show it without re-reading
+  // spectra.json itself.
+  const note = typeof entry.note === 'string' && entry.note.trim() ? entry.note.trim() : undefined;
 
   if (entry.isFamily === true) {
     const rawVariants = entry.variants;
@@ -211,7 +228,7 @@ function normalizeFluorophoreEntry(canonical, entry, issues) {
       if (normalized) variants[variantKey.toLowerCase()] = normalized;
     }
     if (Object.keys(variants).length === 0) return null;
-    return { isFamily: true, reviewStatus, variants };
+    return { isFamily: true, reviewStatus, ...(note !== undefined ? { note } : {}), variants };
   }
 
   const excitationPeakNm = entry.excitationPeakNm;
@@ -237,8 +254,8 @@ function normalizeFluorophoreEntry(canonical, entry, issues) {
     );
   }
   return fwhmIsPlausible(entry.emissionFwhmNm)
-    ? { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm, emissionFwhmNm: entry.emissionFwhmNm }
-    : { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm };
+    ? { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm, emissionFwhmNm: entry.emissionFwhmNm, ...(note !== undefined ? { note } : {}) }
+    : { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm, ...(note !== undefined ? { note } : {}) };
 }
 
 /**
@@ -318,12 +335,33 @@ export function loadSpectraKb(raw) {
     );
   }
 
+  const rawFilterBandDefaultNm = rawOverlapRules.filterBandDefaultNm;
+  const validFilterBandDefaultNm =
+    typeof rawFilterBandDefaultNm === 'number' &&
+    Number.isFinite(rawFilterBandDefaultNm) &&
+    rawFilterBandDefaultNm >= SPECTRAL_VIEW_MIN_FWHM_NM &&
+    rawFilterBandDefaultNm <= SPECTRAL_VIEW_MAX_FWHM_NM;
+  const filterBandDefaultNm = validFilterBandDefaultNm ? rawFilterBandDefaultNm : DEFAULT_FILTER_BAND_NM;
+  // Optional for old/synthetic packs, same posture as schematicEmissionFwhmNm
+  // just above: absence is a backwards-compatible default, a present-but-
+  // invalid value is reported because silently accepting it would reshape
+  // every channel's suggested filter band.
+  if (rawFilterBandDefaultNm !== undefined && !validFilterBandDefaultNm) {
+    issues.push(
+      spectraIssue(
+        'overlapRules',
+        `overlapRules.filterBandDefaultNm must be ${SPECTRAL_VIEW_MIN_FWHM_NM}-${SPECTRAL_VIEW_MAX_FWHM_NM} nm -- defaulting to ${filterBandDefaultNm}`
+      )
+    );
+  }
+
   return {
     fluorophores,
     overlapRules: {
       emissionProximityNm,
       excitationProximityNm,
       schematicEmissionFwhmNm,
+      filterBandDefaultNm,
       reviewStatus: overlapReviewStatus,
     },
     issues,
@@ -411,6 +449,10 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
       // schematic width instead.
       emissionFwhmNm: variant.emissionFwhmNm,
       reviewStatus: spectraEntry.reviewStatus,
+      // The note lives on the whole family entry, not per variant (spectra.json
+      // has no per-variant note field) -- so every variant of a noted family
+      // carries the same family-level note through.
+      ...(spectraEntry.note !== undefined ? { note: spectraEntry.note } : {}),
     };
   }
 
@@ -422,6 +464,7 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
     emissionPeakNm: spectraEntry.emissionPeakNm,
     emissionFwhmNm: spectraEntry.emissionFwhmNm,
     reviewStatus: spectraEntry.reviewStatus,
+    ...(spectraEntry.note !== undefined ? { note: spectraEntry.note } : {}),
   };
 }
 
@@ -516,6 +559,51 @@ export function resolvePanel(markersFieldText, markerIndex, markersKb, fluoropho
 }
 
 /**
+ * Resolve ONE measurement's fluorophores from whichever source is
+ * authoritative for it: the structured `panel.channels` (engine/panelAssembly.js)
+ * when at least one channel has a spectral field filled in, else the
+ * free-text `naming.fields.markers` field via resolvePanel above. This is the
+ * SAME choice engine/conformance.js's spillover check made inline (its own
+ * producer of the gate); moving it here gives every consumer -- conformance,
+ * and later the panel-step UI itself -- one shared answer to "what
+ * fluorophores does this measurement actually have" instead of two paths
+ * that can silently disagree (docs/cma-lessons.md lesson 49/R4-01).
+ *
+ * `kb` is the same shape checkConformance receives: `{index, markersKb,
+ * spectra}` (`index` is core/kb.js's indexKb() alias table, `spectra` is this
+ * module's loadSpectraKb() fluorophores map).
+ *
+ * Returns `{source: 'channels'|'markers', panelState, entries}`.
+ * `source: 'channels'` entries additionally carry `channelId` (the owning
+ * channel's stable id) so a UI consumer can attribute a flag back to the row
+ * that caused it; `source: 'markers'` entries have no such id (the free-text
+ * field has no per-entry identity to attribute to).
+ */
+export function resolveMeasurementFluorophores(view, kb) {
+  const markerIndex = kb && kb.index;
+  const markersKb = kb && kb.markersKb;
+  const fluorophores = kb && kb.spectra;
+
+  const channels = normalizeChannels(view && view.panel && view.panel.channels);
+  if (channels.length > 0) {
+    const entries = channels
+      .map((channel) => ({ channel, spectralField: channelSpectralField(channel).trim() }))
+      .filter(({ spectralField }) => Boolean(spectralField))
+      .map(({ channel, spectralField }) => ({
+        ...resolveMarkerToken(spectralField, markerIndex, markersKb, fluorophores),
+        channelId: channel.id,
+      }));
+    // Channels win only when at least one of them names a dye. A structured
+    // row whose fluorophore is still blank must not silence a populated
+    // Markers field (Copilot review on PR #20).
+    if (entries.length > 0) return { source: 'channels', panelState: 'has-entries', entries };
+  }
+
+  const markersText = (view && view.naming && view.naming.fields && view.naming.fields.markers) || '';
+  return { source: 'markers', ...resolvePanel(markersText, markerIndex, markersKb, fluorophores) };
+}
+
+/**
  * The pairwise qualitative overlap check (Decision 2): every unordered pair
  * of 'known' entries, flagged on emission-peak proximity (severity 'error')
  * and independently on excitation-peak proximity (severity 'warning').
@@ -531,12 +619,42 @@ export function resolvePanel(markersFieldText, markerIndex, markersKb, fluoropho
  * that matter most first regardless of how close together their nm gaps
  * happen to be. An earlier version sorted by gap alone, which routinely put
  * a 2 nm excitation warning above a 12 nm emission error.
+ *
+ * `options.acknowledged` (optional): a normalized panelAssembly.js
+ * `normalizeSpilloverAcks()` array. An emission ERROR whose pairKey matches
+ * one of these (via the shared `spilloverPairKey`, order-independent) is
+ * downgraded to `severity: 'warning'`, gets ' -- acknowledged: <reason
+ * label>' appended to its message, and carries `acknowledged: true` on the
+ * returned record -- this is the ONLY thing that can turn the flag from a
+ * hard export block (conformance.js's BLOCKING_SEVERITIES) into a visible,
+ * still-present warning (V3-N1/A2's "keep the gate, make it clearable").
+ * Excitation warnings are never matched against acknowledgements -- they are
+ * already a warning and acknowledgement is specifically an emission-conflict
+ * decision.
  */
 const SEVERITY_RANK = { error: 0, warning: 1 };
 
-export function flagPanelOverlaps(entries, overlapRules) {
+// Exported so ui/steps/panel.js renders the same reason label the flag
+// message carries (one source; the build forbids a second private copy).
+export const SPILLOVER_ACK_REASON_LABELS = Object.freeze({
+  'sequential-acquisition': 'sequential acquisition',
+  'filter-separated': 'filter-separated',
+  other: 'other',
+});
+
+function findSpilloverAck(acknowledged, pairKey) {
+  if (!Array.isArray(acknowledged)) return null;
+  for (const ack of acknowledged) {
+    if (!ack || !Array.isArray(ack.pair) || ack.pair.length !== 2) continue;
+    if (spilloverPairKey(ack.pair[0], ack.pair[1]) === pairKey) return ack;
+  }
+  return null;
+}
+
+export function flagPanelOverlaps(entries, overlapRules, options) {
   const known = entries.filter((e) => e.state === 'known');
   const rules = overlapRules || { emissionProximityNm: DEFAULT_EMISSION_PROXIMITY_NM, excitationProximityNm: DEFAULT_EXCITATION_PROXIMITY_NM };
+  const acknowledged = options && Array.isArray(options.acknowledged) ? options.acknowledged : [];
   const flags = [];
 
   for (let i = 0; i < known.length; i++) {
@@ -548,25 +666,37 @@ export function flagPanelOverlaps(entries, overlapRules) {
       const left = known[i];
       const right = known[j];
       const [a, b] =
-        (left.canonical || left.token) <= (right.canonical || right.token) ? [left, right] : [right, left];
-      const pairKey = [a.canonical, b.canonical].sort().join('|');
+        (fluorophoreEntryId(left) || left.token) <= (fluorophoreEntryId(right) || right.token)
+          ? [left, right]
+          : [right, left];
+      // Variant-aware (MITOTRACKER::mitotracker green), shared with the
+      // acknowledgement model -- see panelAssembly.js fluorophoreEntryId.
+      const pairKey = spilloverPairKey(fluorophoreEntryId(a), fluorophoreEntryId(b));
 
       const emissionGapNm = Math.abs(a.emissionPeakNm - b.emissionPeakNm);
       if (emissionGapNm < rules.emissionProximityNm) {
-        flags.push({
+        const flag = {
           field: 'panel',
-          message: `${a.token} and ${b.token}: emission peaks ${emissionGapNm} nm apart (under the ${rules.emissionProximityNm} nm proximity threshold) -- likely to co-register in each other's detection window.`,
+          message: `${a.token} and ${b.token}: emission peaks ${emissionGapNm} nm apart (peak-to-peak distance under the ${rules.emissionProximityNm} nm threshold; curve widths are not considered) -- likely to co-register in each other's detection window.`,
           severity: 'error',
           gap: emissionGapNm,
           pairKey,
-        });
+        };
+        const ack = findSpilloverAck(acknowledged, pairKey);
+        if (ack) {
+          const label = SPILLOVER_ACK_REASON_LABELS[ack.reason] || ack.reason;
+          flag.severity = 'warning';
+          flag.message = `${flag.message} -- acknowledged: ${label}`;
+          flag.acknowledged = true;
+        }
+        flags.push(flag);
       }
 
       const excitationGapNm = Math.abs(a.excitationPeakNm - b.excitationPeakNm);
       if (excitationGapNm < rules.excitationProximityNm) {
         flags.push({
           field: 'panel',
-          message: `${a.token} and ${b.token}: excitation peaks ${excitationGapNm} nm apart (under the ${rules.excitationProximityNm} nm proximity threshold) -- likely both excited by a single laser line.`,
+          message: `${a.token} and ${b.token}: excitation peaks ${excitationGapNm} nm apart (peak-to-peak distance under the ${rules.excitationProximityNm} nm threshold; curve widths are not considered) -- likely both excited by a single laser line.`,
           severity: 'warning',
           gap: excitationGapNm,
           pairKey,
@@ -578,7 +708,14 @@ export function flagPanelOverlaps(entries, overlapRules) {
   flags.sort(
     (x, y) => SEVERITY_RANK[x.severity] - SEVERITY_RANK[y.severity] || x.gap - y.gap || x.pairKey.localeCompare(y.pairKey)
   );
-  return flags.map(({ field, message, severity }) => ({ field, message, severity }));
+  // `pairKey` is kept (not stripped) so a caller -- conformance.js -- can
+  // classify/attribute a flag without recomputing it, and so a downstream
+  // acknowledgement UI can match a flag back to the pair it names.
+  // `acknowledged` is included only when true, so an unacknowledged flag's
+  // shape is unchanged from before this option existed.
+  return flags.map(({ field, message, severity, pairKey, acknowledged }) =>
+    acknowledged ? { field, message, severity, pairKey, acknowledged } : { field, message, severity, pairKey }
+  );
 }
 
 /**

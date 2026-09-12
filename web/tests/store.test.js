@@ -108,6 +108,41 @@ test('clearing a field tags the slot default (WEAK), not the caller-supplied tag
   assert.equal(slot.tag, 'default');
 });
 
+test('B4/V6-NEW-03: writing an empty ARRAY is a clear too, not a STRONG write', () => {
+  const store = createStore(emptyExperiment());
+  store.setPath('assays[0].design.factors', [{ name: 'genotype', levels: ['WT'] }], 'user');
+
+  const ok = store.setPath('assays[0].design.factors', [], 'user');
+
+  assert.equal(ok, true);
+  assert.deepEqual(store.getPath('assays[0].design.factors'), []);
+  assert.equal(
+    store.get().provenance.slots['assays[0].design.factors'].tag,
+    'default',
+    'an empty array clears to WEAK, same as an empty string'
+  );
+});
+
+test('B4/V6-NEW-03: writing an object whose only value is an empty array (e.g. {levels: []}) is also a clear', () => {
+  // design.js's writeGroups always writes the WHOLE {levels:[...]} object,
+  // never a bare array -- removing the last group row writes {levels: []}.
+  // Before this fix, that object was not recognized as "empty" (only '' /
+  // null / undefined / a bare empty array were), so it was tagged STRONG and
+  // permanently refused every later WEAK "copy groups from another
+  // measurement" write (lesson 37's deadlock; see V6-NEW-03).
+  const store = createStore(emptyExperiment());
+  store.setPath('assays[0].design.groups', { levels: ['CTL'] }, 'user');
+
+  const ok = store.setPath('assays[0].design.groups', { levels: [] }, 'user');
+
+  assert.equal(ok, true);
+  assert.deepEqual(store.getPath('assays[0].design.groups'), { levels: [] });
+  assert.equal(store.get().provenance.slots['assays[0].design.groups'].tag, 'default');
+
+  const refill = store.setPath('assays[0].design.groups', { levels: ['TREATED'] }, 'kb-default');
+  assert.equal(refill, true, 'a later WEAK write can now fill the cleared slot');
+});
+
 test('a cleared (WEAK-tagged) slot can be freely refilled by any source afterward', () => {
   const store = createStore(emptyExperiment());
   store.setPath('naming.fields.sample', 'E02', 'user');
@@ -226,4 +261,14 @@ test('clearing a value still tags default (WEAK) at slotKey, not at path', () =>
   store.setPath('assays[0].acquisition.modality', 'STED', 'user', { slotKey: 'assay:a1.acquisition.modality' });
   store.setPath('assays[0].acquisition.modality', '', 'user', { slotKey: 'assay:a1.acquisition.modality' });
   assert.equal(store.get().provenance.slots['assay:a1.acquisition.modality'].tag, 'default');
+});
+
+test('an EMPTY payload from a WEAK writer never overwrites a STRONG value (red-team B4 round 2)', async () => {
+  const { createStore } = await import('../src/core/store.js');
+  const s = createStore({ design: { groups: { levels: ['WT', 'KO'] } }, provenance: { slots: {} } });
+  assert.equal(s.setPath('design.groups', { levels: ['WT', 'KO'] }, 'user'), true);
+  assert.equal(s.setPath('design.groups', { levels: [''] }, 'kb-default'), false, 'weak empty write refused');
+  assert.deepEqual(s.get().design.groups.levels, ['WT', 'KO']);
+  assert.equal(s.setPath('design.groups', { levels: [''] }, 'user'), true, 'the user may still clear their own field');
+  assert.equal(s.get().provenance.slots['design.groups'].tag, 'default');
 });

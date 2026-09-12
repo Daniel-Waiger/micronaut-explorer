@@ -1,5 +1,7 @@
 {
   "version": 1,
+  "reviewStatus": "claude-drafted",
+  "note": "Every rule in this pack (titles, bodies, and the numbers inside them -- resolution figures, thresholds, rules of thumb) was drafted by Claude from general microscopy practice, not sourced from a specific citation, and has not been reviewed by a microscopy specialist. Treat it as a starting point to check against your own protocol and instrument, the same posture web/kb/spectra.json's overlapRules note takes toward its own thresholds.",
   "rules": [
     {
       "id": "sted-photostability",
@@ -38,7 +40,7 @@
       "concept": "optical sectioning",
       "title": "Opening the pinhole trades optical sectioning for signal -- state it deliberately",
       "body": "The default pinhole size of 1 Airy Unit balances signal and out-of-focus light rejection. Opening it gathers more signal from a dim sample but lets in more out-of-focus blur, directly reducing your optical sectioning.",
-      "when": { "in": ["acquisition.modality", ["confocal"]] },
+      "when": { "in": ["acquisition.modality", ["confocal", "spinning-disk confocal"]] },
       "priority": 10
     },
     {
@@ -47,8 +49,8 @@
       "kind": "tip",
       "concept": "undersampling",
       "title": "Check your pixel size against Nyquist sampling before you commit to a design",
-      "body": "An undersampled pixel size throws away real optical resolution regardless of how good the objective is. The correct step size depends on numerical aperture and emission wavelength -- most acquisition software has a Nyquist calculator built in.",
-      "when": { "in": ["acquisition.modality", ["confocal"]] },
+      "body": "An undersampled pixel size throws away real optical resolution regardless of how good the objective is. The correct pixel size depends on numerical aperture and emission wavelength -- most acquisition software has a Nyquist calculator built in. If you set the smallest feature you need to resolve instead, the 'set your pixel size from the smallest feature' rule derives the same Nyquist pixel size from that feature size rather than from NA/wavelength -- treat the two as one decision viewed from different starting points, not two separate checks.",
+      "when": { "in": ["acquisition.modality", ["confocal", "spinning-disk confocal"]] },
       "priority": 20
     },
     {
@@ -57,8 +59,8 @@
       "kind": "pitfall",
       "concept": "spectral spillover",
       "title": "Overlapping emission spectra need sequential scanning, not simultaneous",
-      "body": "Simultaneous multi-laser scanning is faster but lets bleed-through between channels with overlapping emission masquerade as real colocalization. If your markers' emission spectra overlap, scan sequentially, one laser line at a time.",
-      "when": { "in": ["acquisition.modality", ["confocal"]] },
+      "body": "Simultaneous multi-laser scanning is faster but lets bleed-through between channels with overlapping emission masquerade as real colocalization. This works for dyes that are separable by excitation; if excitation peaks are also close, scanning sequentially will not separate them and the excitation-proximity warning applies instead. If your markers' emission spectra overlap but their excitation peaks do not, scan sequentially, one laser line at a time.",
+      "when": { "in": ["acquisition.modality", ["confocal", "spinning-disk confocal"]] },
       "priority": 30
     },
     {
@@ -167,7 +169,7 @@
       "kind": "tip",
       "concept": "undersampling",
       "title": "Set your pixel size from the smallest feature you need to resolve, not the other way around",
-      "body": "As a rule of thumb (not a strict requirement), sample at roughly 2 to 3 times finer than the smallest feature that matters -- Nyquist sampling. A common practical figure is about 2.3x the feature size, since the true optical resolution of a system is rarely known exactly at acquisition time. Undersampling throws away detail the optics can actually deliver; oversampling mostly costs storage and time.",
+      "body": "As a rule of thumb (not a strict requirement), sample at roughly 2 to 3 times finer than the smallest feature that matters -- Nyquist sampling. A common practical figure is about 2.3x the feature size, since the true optical resolution of a system is rarely known exactly at acquisition time. Undersampling throws away detail the optics can actually deliver; oversampling mostly costs storage and time. This is the same Nyquist pixel size confocal's own 'check your pixel size against Nyquist sampling' rule derives from numerical aperture and emission wavelength instead -- a feature-size estimate when you don't yet know your real resolving power, not a second, competing number.",
       "when": { "exists": "acquisition.smallestFeatureNm" },
       "priority": 15
     }

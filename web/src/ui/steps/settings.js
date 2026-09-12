@@ -12,10 +12,11 @@ function settingsButton(label, onClick, className = 'copy-button') { const node 
 /**
  * A two-click "are you sure" button, for an action too destructive for the
  * plain window.confirm() used elsewhere in this app (New study / Restore
- * both explicitly say "your current work remains available in Restore" --
- * clearing storage is the one action that is NOT true for, since it deletes
- * the restore ring itself). Reset to example used to belong in that same
- * list -- back when opening the example replaced whatever study was on
+ * both explicitly say the current work is kept in Restore, with the three
+ * most recent protected from automatic clean-up -- see persist.js's
+ * PROTECTED_CAP -- clearing storage is the one action that is NOT true for,
+ * since it deletes the restore ring itself). Reset to example used to belong
+ * in that same list -- back when opening the example replaced whatever study was on
  * screen, its confirm dialog carried the identical promise. Now that opening
  * the example opens the separate practice tab (?demo=1, core/storageScope.js)
  * instead, it never touches the study open here at all, so there is nothing
@@ -60,9 +61,9 @@ export const settingsStep = {
     const intro = document.createElement('p'); intro.className = 'proposals-empty supporting-description'; intro.textContent = 'Project backups and storage management are kept here. Restore (previous saved versions) and the color theme are in the header/nav Utilities menu.';
     const actions = document.createElement('div'); actions.className = 'overview-secondary-actions';
     actions.append(settingsButton('Project backup (.micronaut.json, importable)', () => options.onExportProject?.()));
-    const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.addEventListener('change', () => { const selected = file.files?.[0]; file.value = ''; if (selected) Promise.resolve(options.onImportProject?.(selected)); });
+    const file = document.createElement('input'); file.type = 'file'; file.accept = '.json,application/json'; file.hidden = true; file.addEventListener('change', () => { const selected = file.files?.[0]; file.value = ''; if (selected) Promise.resolve(options.onImportProject?.(selected)).catch((err) => { console.error('Import completed but the page failed to refresh:', err); options.showToast?.('The project was imported, but the page could not refresh -- reload to see it.'); }); });
     actions.append(settingsButton('Import project backup', () => file.click()), file);
-    actions.append(settingsButton('Start a blank study', () => { if (window.confirm('Start a blank study? Your current work remains available in Restore.')) options.onNewBlank?.(); }));
+    actions.append(settingsButton('Start a blank study', () => { if (window.confirm('Start a blank study? Your current work is kept as a protected snapshot in Restore (Restore keeps five versions; the most recent snapshots are protected first).')) options.onNewBlank?.(); }));
     if (options.onClearAllStorage) {
       actions.append(armedButton(
         'Clear all stored data',
@@ -72,7 +73,7 @@ export const settingsStep = {
     }
     const storageNote = document.createElement('p');
     storageNote.className = 'proposals-empty supporting-description';
-    storageNote.textContent = 'Clearing stored data removes every locally saved version (Restore) for this tab and frees up storage space if it is full or corrupted. It does not affect the study currently open — download a project backup first if you want to keep it.';
+    storageNote.textContent = 'Clearing stored data removes the previously saved versions (Restore), walkthrough progress and onboarding answers for this tab, and frees up storage space if it is full or corrupted. Theme is kept. The study currently open is unaffected and is saved again as the first new version — download a project backup first if you want an off-browser copy.';
     const version = document.createElement('p');
     version.className = 'proposals-empty supporting-description';
     version.textContent = `Version ${APP_VERSION}`;

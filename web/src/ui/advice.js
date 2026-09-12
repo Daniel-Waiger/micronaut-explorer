@@ -23,7 +23,7 @@
 
 import { selectAdvice, summarizeTrigger } from '../engine/advisor.js';
 import { describePredicate } from '../engine/predicate.js';
-import { nsKey } from '../core/storageScope.js';
+import { ADVISOR_DEBUG_KEY } from '../core/storageScope.js';
 
 const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 
@@ -54,8 +54,9 @@ const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 // developer convenience toggled by hand in DevTools, and without scoping,
 // turning it on in the practice tab (or vice versa) would silently turn on
 // raw-predicate debug output in the OTHER tab too, since both would otherwise
-// read the exact same localStorage key.
-const ADVISOR_DEBUG_KEY = nsKey('micronaut.advisorDebug');
+// read the exact same localStorage key. The key itself lives in
+// storageScope.js (imported above) so persist.js's clearAll sweep and this
+// module can never disagree about its spelling (lesson 40).
 
 function advisorDebugEnabled() {
   try {
@@ -164,6 +165,17 @@ export function createAdvicePanel(advisor, surface, { defaultExpanded = true } =
   heading.className = 'advice-heading reveal-summary';
   heading.textContent = 'Guidance';
   section.appendChild(heading);
+
+  // R3-13: advisor.json carries no per-rule provenance (only spectra.json
+  // does), yet every rule here is claude-drafted content just the same. One
+  // static caption, not a per-note badge -- surfaced ONCE per panel, reusing
+  // the same 'unreviewed' vocabulary ui/steps/panel.js's spectral badges use
+  // (REVIEW_STATUS_LABELS['claude-drafted']) so a reader sees one message
+  // about this app's guidance, not two independently-worded ones.
+  const caption = document.createElement('p');
+  caption.className = 'advice-caption';
+  caption.textContent = 'This guidance is unreviewed: drafted by Claude from general microscopy practice, not yet checked by a microscopy specialist.';
+  section.appendChild(caption);
 
   const list = document.createElement('div');
   list.className = 'advice-list';

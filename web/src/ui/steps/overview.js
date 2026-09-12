@@ -23,7 +23,7 @@ import { renderMarkdown } from '../../engine/render/markdown.js';
 import { renderCsv } from '../../engine/render/csv.js';
 import { renderJson } from '../../engine/render/json.js';
 import { renderBenchCard } from '../../engine/render/benchcard.js';
-import { checkConformance } from '../../engine/conformance.js';
+import { checkConformance, isBlockingSeverity } from '../../engine/conformance.js';
 import { buildExperimentMap } from '../../engine/experimentMap.js';
 import { decisionTriage } from '../../engine/decisionTriage.js';
 import { renderLlmPrompt } from '../../engine/render/llmprompt.js';
@@ -231,7 +231,14 @@ function reviewDecisionText(item) {
     const reason = reviewMapValue(item.reason, 'Needs review.');
     return `${label} — ${reason}`;
   }
-  return issueText(item);
+  // Conformance-sourced items carry the owning measurement's display name
+  // (assayLabel) -- R4-07: two undefined measurements produce textually
+  // identical issue text ("Imaging modality — not answered yet"), and
+  // without the measurement named alongside it a user cannot tell the two
+  // apart or which one to go fix. `null` marks a study-wide (cross-assay)
+  // issue, which names no single measurement.
+  const prefix = typeof item?.assayLabel === 'string' && item.assayLabel ? `${item.assayLabel}: ` : '';
+  return `${prefix}${issueText(item)}`;
 }
 
 function renderReviewDecisionGroups(parent, triage, navigateDecision) {
@@ -261,6 +268,13 @@ function renderReviewDecisionGroups(parent, triage, navigateDecision) {
     for (const item of group.items) {
       const li = document.createElement('li');
       li.className = 'issue issue-' + (item.severity || 'warning');
+      if (isBlockingSeverity(item.severity)) {
+        const blocksLabel = document.createElement('span');
+        blocksLabel.className = 'issue-blocks-label';
+        blocksLabel.textContent = 'Blocks export';
+        li.appendChild(blocksLabel);
+        li.appendChild(document.createTextNode(' '));
+      }
       const text = reviewDecisionText(item);
       if (item.routeId && typeof navigateDecision === 'function') {
         const link = document.createElement('button');
@@ -307,10 +321,34 @@ function issueText(issue) {
 
 function reportIssues(report) {
   const assayIssues = (report.assays || []).flatMap((assay, index) =>
-    (assay.issues || []).map((issue) => ({ ...issue, assayLabel: reviewMeasurementLabel(assay.label, index + 1) }))
+    (assay.issues || []).map((issue) => ({
+      ...issue,
+      assayLabel: reviewMeasurementLabel(assay.label, index + 1),
+      blocking: isBlockingSeverity(issue.severity),
+    }))
   );
-  const crossAssay = (report.crossAssayIssues || []).map((issue) => ({ ...issue, assayLabel: 'Across measurements' }));
+  const crossAssay = (report.crossAssayIssues || []).map((issue) => ({
+    ...issue,
+    assayLabel: 'Across measurements',
+    blocking: isBlockingSeverity(issue.severity),
+  }));
   return [...assayIssues, ...crossAssay];
+}
+
+/**
+ * A filename base that is never empty and never only dashes -- the same
+ * fallback rule appController.js's projectFilename already applies to the
+ * project backup name (R6-03). A title of only whitespace, only punctuation,
+ * or a non-Latin script collapses to '' or '-' under the ASCII-only
+ * sanitizer; both must fall back to the caller's default rather than ship as
+ * a bare '-.md'.
+ */
+function sanitizeFilenameBase(title, fallback) {
+  const sanitized = String(title || '')
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return sanitized || fallback;
 }
 
 /**
@@ -337,6 +375,17 @@ function renderControlsNode(parent, controls) {
   heading.className = 'overview-node-title';
   heading.textContent = 'Controls';
   box.appendChild(heading);
+
+  // R3-13: controls.json carries no per-rule provenance either, and this is
+  // the one place its recommendations render. One static caption, reusing
+  // the same 'unreviewed' vocabulary ui/steps/panel.js's spectral badges use
+  // (REVIEW_STATUS_LABELS['claude-drafted']) and ui/advice.js's own caption,
+  // so a reader sees one message about drafted-not-specialist-reviewed
+  // guidance, not independently-worded ones on different screens.
+  const caption = document.createElement('p');
+  caption.className = 'overview-controls-caption';
+  caption.textContent = 'This guidance is unreviewed: drafted by Claude from general microscopy practice, not yet checked by a microscopy specialist.';
+  box.appendChild(caption);
 
   if (controls.panel.length > 0) {
     const groupLabel = document.createElement('div');
@@ -562,7 +611,13 @@ export function createOverviewStep(kb) {
         const freshReport = checkConformance(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
         const issues = reportIssues(freshReport);
         if (freshReport.readiness === 'blocked') {
-          if (showToast) showToast(`Export blocked: ${freshReport.counts.blocked} blocking issue(s) need correction first.`);
+          // R4-04: name the blocker, not just its count -- a toast a user
+          // cannot act on reads as a dead end (lesson 37).
+          const blocking = issues.filter((issue) => issue.blocking);
+          const [first, ...rest] = blocking;
+          const named = first ? `${first.assayLabel}: ${issueText(first)}` : 'a blocking issue needs correction first.';
+          const more = rest.length > 0 ? ` (+${rest.length} more)` : '';
+          if (showToast) showToast(`Export blocked: ${named}${more}`);
           return false;
         }
         if (freshReport.readiness === 'needs-review') {
@@ -596,7 +651,7 @@ export function createOverviewStep(kb) {
         btn.addEventListener('click', () => {
           if (!permitFinalExport()) return;
           const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
-          const filename = `${(freshDoc.study.title || fallbackName).replace(/[^A-Za-z0-9_-]+/g, '-')}.${ext}`;
+          const filename = `${sanitizeFilenameBase(freshDoc.study.title, fallbackName)}.${ext}`;
           downloadTextFile(render(freshDoc), filename, mime);
           if (showToast) showToast(toastMessage);
         });
@@ -642,12 +697,38 @@ export function createOverviewStep(kb) {
           buildExperimentMap(store.get(), { conformance: freshConformance }),
           freshConformance
         );
-        const ok = await copyToClipboard(renderLlmPrompt(freshDoc, freshTriage));
-        if (showToast) showToast(ok
-          ? 'Copied the prompt -- paste it into your own LLM. Nothing was sent from this app.'
-          : 'Could not copy automatically -- use Export study → Study report data (.json, not importable) instead.');
+        const promptText = renderLlmPrompt(freshDoc, freshTriage);
+        const ok = await copyToClipboard(promptText);
+        if (ok) {
+          llmPromptFallback.hidden = true;
+          if (showToast) showToast('Copied the prompt -- paste it into your own LLM. Nothing was sent from this app.');
+        } else {
+          llmPromptTextarea.value = promptText;
+          llmPromptFallback.hidden = false;
+          llmPromptTextarea.focus();
+          llmPromptTextarea.select();
+          if (showToast) showToast('Could not copy automatically -- the prompt text is shown below for you to select and copy by hand.');
+        }
       });
       secondaryActions.appendChild(copyLlmBtn);
+      // R4-14: a copy failure must offer the SAME content another way, not a
+      // different artifact. The JSON export is not the prompt text, so it is
+      // not an equivalent fallback (clipboard.js's own standing rule) -- show
+      // the actual prompt in a read-only textarea the user can select and
+      // copy by hand.
+      const llmPromptFallback = document.createElement('div');
+      llmPromptFallback.className = 'overview-llm-prompt-fallback';
+      llmPromptFallback.hidden = true;
+      const llmPromptLabel = document.createElement('p');
+      llmPromptLabel.className = 'panel-empty';
+      llmPromptLabel.textContent = 'Automatic copy failed. Select all the text below and copy it by hand:';
+      llmPromptFallback.appendChild(llmPromptLabel);
+      const llmPromptTextarea = document.createElement('textarea');
+      llmPromptTextarea.className = 'overview-llm-prompt-textarea';
+      llmPromptTextarea.readOnly = true;
+      llmPromptTextarea.setAttribute('aria-label', 'LLM prompt text');
+      llmPromptFallback.appendChild(llmPromptTextarea);
+      secondaryActions.appendChild(llmPromptFallback);
       const printBtn = document.createElement('button');
       printBtn.type = 'button';
       printBtn.className = 'copy-button';
@@ -706,12 +787,49 @@ export function createOverviewStep(kb) {
           : `Needs review: ${conformance.counts.needsReview} incomplete or provisional item(s) remain.`;
       conformanceSection.appendChild(verdict);
 
+      const allConformanceIssues = reportIssues(conformance);
+
+      // R4-04/R4-07: a "Blocked" verdict must NAME what blocks it, right
+      // here, not just carry a count -- the same rule lesson 37 states for
+      // any gate ("what user action clears it?"). Only blocking issues are
+      // listed here (the full mixed severity set is Decisions, below); each
+      // link reuses the same navigateDecision route/measurement-switch A3
+      // already computes, so clicking one goes straight to the field that
+      // needs fixing.
+      if (conformance.readiness === 'blocked') {
+        const blockingIssues = allConformanceIssues.filter((issue) => issue.blocking);
+        const blockingList = document.createElement('ul');
+        blockingList.className = 'issues-list';
+        for (const issue of blockingIssues) {
+          const li = document.createElement('li');
+          li.className = 'issue issue-error';
+          const blocksLabel = document.createElement('span');
+          blocksLabel.className = 'issue-blocks-label';
+          blocksLabel.textContent = 'Blocks export';
+          li.appendChild(blocksLabel);
+          li.appendChild(document.createTextNode(' '));
+          const text = `${issue.assayLabel}: ${issueText(issue)}`;
+          if (issue.routeId && typeof router !== 'undefined' && router) {
+            const link = document.createElement('button');
+            link.type = 'button';
+            link.className = 'conformance-issue-link';
+            link.textContent = text;
+            link.title = 'Go to the workspace that owns this decision.';
+            link.addEventListener('click', () => navigateDecision(issue));
+            li.appendChild(link);
+          } else {
+            li.appendChild(document.createTextNode(text));
+          }
+          blockingList.appendChild(li);
+        }
+        conformanceSection.appendChild(blockingList);
+      }
+
       const disclaimer = document.createElement('p');
       disclaimer.className = 'panel-empty';
       disclaimer.textContent = 'Export checks do not validate scientific validity, statistical power, ethics approval, biosafety, or instrument suitability, and they do not check your Study map decisions (research question, system, comparison mode, or experimental unit) -- see Decisions above for those.';
       conformanceSection.appendChild(disclaimer);
 
-      const allConformanceIssues = reportIssues(conformance);
       if (allConformanceIssues.length === 0) {
         const clean = document.createElement('p');
         clean.className = 'panel-empty';
@@ -734,7 +852,7 @@ export function createOverviewStep(kb) {
           // download a stale assay snapshot after an intervening edit.
           const freshDoc = buildStudyDocument(store.get(), kb, NAMING_CONFIG, BASE_TEMPLATE);
           const freshAssay = freshDoc.assays.find((candidate) => candidate.id === assayForCard.id) || assayForCard;
-          const filename = `${(freshAssay.label || 'bench-card').replace(/[^A-Za-z0-9_-]+/g, '-')}-bench-card.md`;
+          const filename = `${sanitizeFilenameBase(freshAssay.label, 'bench-card')}-bench-card.md`;
           downloadTextFile(renderBenchCard(freshAssay), filename, 'text/markdown');
           if (showToast) showToast(`Downloaded the bench card for "${freshAssay.label}".`);
         });

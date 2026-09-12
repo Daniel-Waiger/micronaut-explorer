@@ -46,6 +46,7 @@ test('emptyAssay carries the given id and mirrors the v2 per-assay slice shape',
   assert.deepEqual(a.design.groups, { levels: [] });
   assert.equal(a.design.biologicalReplicates, null);
   assert.deepEqual(a.naming, { fields: {} });
+  assert.deepEqual(a.panel.spillover, { acknowledged: [] });
 });
 
 test('assayIndexById finds the right index, or -1 for an unknown/missing id', () => {
@@ -279,11 +280,18 @@ test('groupSeedLevels prefers the active assay\'s own groups', () => {
   assert.deepEqual(groupSeedLevels(study), ['ACTIVE']);
 });
 
-test('groupSeedLevels falls back to the first OTHER assay with groups when the active one has none', () => {
+// B4/V6-NEW-02: this used to fall back to the first OTHER assay in the study
+// with groups when the active one had none. That fallback is gone --
+// ui/steps/study.js's "Copy groups to measurements that have none" button is
+// titled and tooltipped as copying the ACTIVE measurement's groups, so a
+// silent fallback to a different, unnamed measurement's groups was a real
+// (if confusing) surprise, not a feature. groupSeedLevels now reads ONLY the
+// active assay; study.js disables the button instead when it has none.
+test('groupSeedLevels does NOT fall back to another assay when the active one has no groups', () => {
   const active = emptyAssay('a1');
   const other = { ...emptyAssay('a2'), design: { ...emptyAssay('a2').design, groups: { levels: ['OTHER'] } } };
   const study = studyWith({ assays: [active, other], activeAssayId: 'a1' });
-  assert.deepEqual(groupSeedLevels(study), ['OTHER']);
+  assert.deepEqual(groupSeedLevels(study), []);
 });
 
 test('groupSeedLevels returns [] when no assay in the study has groups yet', () => {

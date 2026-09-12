@@ -99,6 +99,20 @@ test('guided copy is presentation-only and never mutates the supplied study', ()
   assert.equal(JSON.stringify(study), before);
 });
 
+test('the Study-map summary uses the correct verb for one measurement vs several (R5-11)', () => {
+  const settings = options();
+  const study = createDefaultStudy();
+
+  study.assays = [study.assays[0]];
+  const one = getGuidedExampleStep(study, 'home', settings);
+  assert.match(one.exampleSummary, /^1 measurement is currently included/);
+  assert.doesNotMatch(one.exampleSummary, /1 measurement are/);
+
+  study.assays = [study.assays[0], { ...study.assays[0], id: 'second-assay' }];
+  const many = getGuidedExampleStep(study, 'home', settings);
+  assert.match(many.exampleSummary, /^2 measurements are currently included/);
+});
+
 test('malformed input is total and uses study-now wording outside explicit example origin', () => {
   const settings = options();
   for (const malformed of [undefined, null, {}, 'not a study', 42]) {

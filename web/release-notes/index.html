@@ -102,16 +102,25 @@
 <body>
 
 <!--
-  The hero and Highlights cards below are hand-written, not derived from
-  CHANGELOG.md -- see the note right before the changelog-rendering script
-  near the bottom of this file for why. Update them on each release worth a
-  headline.
+  The hero eyebrow/lede and the Highlights heading below are hand-written,
+  not derived from CHANGELOG.md -- see the note right before the
+  changelog-rendering script near the bottom of this file for why. What they
+  DO share with the footer is one constant, RELEASE, defined at the top of
+  that same script: it is the single place this page's headline version and
+  date live, and every one of the four surfaces version.test.js checks
+  (APP_VERSION, the newest CHANGELOG.md heading, this RELEASE literal, and
+  the footer fallback text) has to move together or the test fails. Update
+  RELEASE and the Highlights cards on each release worth a headline; when you
+  do, move the outgoing release's hero paragraph and cards down into a new
+  dated "Previously in X.Y.Z" section rather than deleting them, so a past
+  release's story stops being presented as the current one without being
+  lost.
 -->
 <header class="hero">
   <div class="wrap">
-    <span class="eyebrow">Release 0.19.0 · 05 Sep 2026</span>
+    <span class="eyebrow" id="hero-eyebrow">Release 0.21.0 · 12 Sep 2026</span>
     <h1>Micronaut Planner — what's new</h1>
-    <p class="lede">0.19.0 is a spectral-data release. Every one of the 85 fluorophores that had only ever been drafted was checked against a manufacturer or curator source, and 26 of them turned out to be wrong -- including Alexa Fluor 488 and DRAQ5, whose stored emission was off by 16 nm. Those values are corrected and cited. 143 of the pack’s 157 entries now carry a source; the 14 that do not are named below, because an honest gap is more useful than a confident guess.</p>
+    <p class="lede" id="hero-lede">0.21.0 is a correctness release: restoring a previous version, importing a backup, and the autosave ring itself no longer risk quietly dropping the study you had open, and "Clear all stored data" now actually clears everything it says it does, scoped to the tab you run it from. The spillover check that gates export reads your panel the same way the Panel step displays it, names every blocking measurement so you can jump straight to it, and lets you record a per-pair acknowledgement when two dyes really do have to share a panel. A handful of copy and arithmetic errors on this very page, and elsewhere in the app, are also corrected.</p>
     <div class="cta">
       <a class="btn btn-primary" href="../index.html">▶ Open the app</a>
       <a class="btn btn-ghost" href="#changelog">Full changelog</a>
@@ -124,12 +133,27 @@
 <section>
   <div class="wrap">
     <h2>Highlights</h2>
-    <p class="section-sub">What 0.19.0 changes.</p>
+    <p class="section-sub" id="highlights-sub">What 0.21.0 changes.</p>
     <div class="cards">
-      <div class="card"><div class="ic">🔬</div><h3>26 spectral values were wrong, and are now fixed</h3><p>Alexa Fluor 488 was stored as 490/525 nm; Thermo’s own table says 495/519. DRAQ5’s emission was 16 nm low. ATTO 633 was 6 nm out. Each corrected value now carries the manufacturer page it came from, with the date it was read.</p></div>
-      <div class="card"><div class="ic">📖</div><h3>143 of 157 entries now cite a source</h3><p>Up from 72. Seven whole probe families -- MitoTracker, LysoTracker, SYTOX, BODIPY, CellMask, LIVE/DEAD and SYTO -- had every variant sourced, so the family can finally be marked as cited rather than drafted.</p></div>
-      <div class="card"><div class="ic">🚧</div><h3>14 entries deliberately stay uncited</h3><p>Cy2, Cy7 and TRITC had no primary source worth citing; DCFDA’s source gives a range, not a peak. Nine more are ambiguous names rather than bad numbers -- see below.</p></div>
-      <div class="card"><div class="ic">🏷️</div><h3>Some names mean more than one dye</h3><p><code>CFP</code> stores the values of ECFP; <code>GFP</code> stores EGFP’s; <code>IRFP</code> stores iRFP713’s; <code>mRuby</code> stores the original, not mRuby2. The numbers are real, but the key doesn’t say which variant it means. Left alone for now, because renaming a key would break saved studies.</p></div>
+      <div class="card"><div class="ic">🛟</div><h3>Restore, import and autosave can no longer lose your study</h3><p>Restoring a saved version or importing a backup now protects the study you had open before replacing it, instead of leaving it to a 500ms autosave window or a full autosave ring. A failed import now says plainly that the file wasn't a valid backup, rather than printing a raw parser error.</p></div>
+      <div class="card"><div class="ic">🧹</div><h3>"Clear all stored data" now clears everything it names</h3><p>The walkthrough progress, onboarding answers and other app state it used to leave behind are now swept along with your saved versions -- scoped to the tab you run it from. Your theme is kept, on purpose, and Settings says so.</p></div>
+      <div class="card"><div class="ic">🔬</div><h3>The spillover check reads the same panel you see</h3><p>Export's spillover gate now resolves fluorophores exactly the way the Panel step does -- Panel assembly first, the Markers field only as a fallback -- so a measurement can't read "blocked" in one place and clear in the other. Every blocking issue names the measurement it belongs to.</p></div>
+      <div class="card"><div class="ic">🤝</div><h3>Spillover conflicts can now be acknowledged</h3><p>When two dyes really do have to share a panel, record why (sequential acquisition, filter-separated, or your own reason) and the block downgrades to a visible warning instead of hiding it. The acknowledgement is tied to that exact pair and is withdrawn automatically the moment either dye changes.</p></div>
+      <div class="card"><div class="ic">🈳</div><h3>Non-Latin names no longer vanish silently</h3><p>A group name or factor level that a filename can't represent used to become <code>UNSPECIFIED</code> with no explanation. It now still gets a safe placeholder, but Design and Review also name exactly which value lost its characters and where.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="previously-0-19-0">
+  <div class="wrap">
+    <h2>Previously in 0.19.0</h2>
+    <p class="section-sub">A spectral-data release, 05 Sep 2026 -- kept here for the record, not presented as current.</p>
+    <p class="lede">0.19.0 was a spectral-data release. Every one of the 85 fluorophores that had only ever been drafted was checked against a manufacturer or curator source, and 26 of them turned out to be wrong -- including Alexa Fluor 488, off by 6 nm, and DRAQ5, whose stored emission was off by 16 nm. Those values were corrected and cited. 143 of the pack’s 157 top-level entries now carry a source; counted at the level a user actually picks a fluorophore (8 of those entries are families expanding into 41 named variants, 190 selectable spectra in total), 174 are cited and 16 stay drafted. The 14 top-level entries that stay drafted are Cy2, Cy7, TRITC, DCFDA (H2DCFDA), CFP, GFP, IRFP, mRuby, BFP, YFP, GCaMP, miRFP, Hoechst and ER-Tracker — named here so this page is complete on its own, and detailed in the <a href="https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/web/release-notes/CHANGELOG.md#0190---2026-09-05" target="_blank" rel="noopener noreferrer">full 0.19.0 changelog entry</a>, because an honest gap is more useful than a confident guess.</p>
+    <div class="cards">
+      <div class="card"><div class="ic">🔬</div><h3>26 spectral values were wrong, and are now fixed</h3><p>Alexa Fluor 488 was stored as 490/525 nm; Thermo’s own table says 495/519, a 6 nm miss. DRAQ5’s emission was 16 nm low. ATTO 633 was 6 nm out. Each corrected value now carries the manufacturer page it came from, with the date it was read.</p></div>
+      <div class="card"><div class="ic">📖</div><h3>143 of 157 top-level entries now cite a source</h3><p>Up from 72. Seven whole probe families -- MitoTracker, LysoTracker, SYTOX, BODIPY, CellMask, LIVE/DEAD and SYTO -- had every variant sourced, so the family can finally be marked as cited rather than drafted. Counted per selectable spectrum rather than per top-level entry (the 8 families expand into 41 named variants), that’s 174 of 190 cited.</p></div>
+      <div class="card"><div class="ic">🚧</div><h3>14 entries deliberately stay uncited</h3><p>Cy2, Cy7 and TRITC had no primary source worth citing; DCFDA (H2DCFDA)’s source gives a range, not a peak, and so does ER-Tracker’s Blue-White DPX variant, which is why that family stays uncited too. The other nine -- CFP, GFP, IRFP, mRuby, BFP, YFP, GCaMP, miRFP and Hoechst -- see the next card and the <a href="https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/web/release-notes/CHANGELOG.md#0190---2026-09-05" target="_blank" rel="noopener noreferrer">0.19.0 changelog entry on GitHub</a> for the full reasoning behind all fourteen.</p></div>
+      <div class="card"><div class="ic">🏷️</div><h3>Some names mean more than one dye</h3><p><code>CFP</code>, <code>GFP</code> and <code>mRuby</code> each store one value under a key that could mean several real variants, and the pack carries no note saying which one, nor a reference record for one in this repo yet. <code>IRFP</code> is the exception: its note names it as iRFP713, and that value is backed by a citation. All four remain flagged unreviewed. <code>BFP</code>, <code>YFP</code> and <code>miRFP</code> are similarly generic keys. <code>Hoechst</code> and <code>GCaMP</code> are different: the pack’s own notes name Hoechst specifically as Hoechst 33342 and describe every GCaMP variant as sharing one spectrum, so neither is an ambiguous name — they simply haven’t been checked against a source yet. Left alone for now, because renaming a key would break saved studies.</p></div>
       <div class="card"><div class="ic">⚠️</div><h3>Cited still isn’t specialist-reviewed</h3><p>A cited entry means its two peak values match a source we fetched and recorded. It does not mean a microscopist checked it, and the Gaussian curve widths in the spectral view remain estimates throughout.</p></div>
     </div>
   </div>
@@ -152,8 +176,8 @@
       </figure>
       <figure class="shot">
         <img src="images/04-measurement-acquisition.png" width="1440" height="2500" loading="lazy"
-             alt="Acquisition panel for a measurement, showing fluorophore channels seeded from the markers field, an unreviewed-badge spectral overlap chart, and the structured panel-assembly editor.">
-        <figcaption><strong>Acquisition</strong> — fluorophore channels, the spillover check, and the spectral view, each flagged as source-cited or unreviewed rather than asserted as fact.</figcaption>
+             alt="Acquisition panel for a measurement, showing fluorophore channels seeded from the markers field, a source-cited-badge spectral overlap chart, and the structured panel-assembly editor.">
+        <figcaption><strong>Acquisition</strong> — fluorophore channels, the spillover check, and the spectral view, each carrying its provenance badge (cited source, or unreviewed for the 14 still-drafted entries) rather than asserted as fact.</figcaption>
       </figure>
     </div>
   </div>
@@ -186,24 +210,54 @@
 
 <footer>
   <div class="wrap row">
-    <!-- Fallback shown when fetch(./CHANGELOG.md) is blocked (e.g. file://);
-         overwritten by the script below when the fetch succeeds. Bump this
-         by hand alongside web/src/core/version.js on every release. -->
-    <div>Micronaut Planner · <span id="footer-version">v0.19.0</span></div>
+    <!-- Static fallback for this literal, in case the script below never
+         runs; the script itself derives this from RELEASE (defined there)
+         rather than trusting this markup, so under file:// -- where
+         fetch(./CHANGELOG.md) is blocked and can never overwrite it with the
+         real newest version -- this still ends up correct instead of stuck
+         on a stale release. Bump this by hand alongside RELEASE below and
+         web/src/core/version.js on every release. -->
+    <div>Micronaut Planner · <span id="footer-version">v0.21.0</span></div>
     <div><a href="../index.html">Open the app</a> · <a href="#changelog">Changelog</a> · <a href="https://github.com/Daniel-Waiger/micronaut-explorer">Source</a></div>
   </div>
 </footer>
 
 <script>
   (function () {
+    // Single source for this page's headline version/date -- the hero
+    // eyebrow, lede-adjacent copy and Highlights subtitle below all read it,
+    // and it is also the footer's fallback (see the catch handler at the
+    // bottom of this script), so all four surfaces move together on a
+    // release rather than being able to drift independently. Bump this
+    // alongside web/src/core/version.js's APP_VERSION and the newest
+    // CHANGELOG.md heading (web/tests/version.test.js checks all three plus
+    // the static footer fallback above agree).
+    var RELEASE = { version: '0.21.0', date: '12 Sep 2026' };
+    var eyebrow = document.getElementById('hero-eyebrow');
+    if (eyebrow) eyebrow.textContent = 'Release ' + RELEASE.version + ' · ' + RELEASE.date;
+    var highlightsSub = document.getElementById('highlights-sub');
+    if (highlightsSub) highlightsSub.textContent = 'What ' + RELEASE.version + ' changes.';
+    var footerVersion = document.getElementById('footer-version');
+    if (footerVersion) footerVersion.textContent = 'v' + RELEASE.version;
     var CL_GH = 'https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/web/release-notes/CHANGELOG.md';
     function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
-    // Only http(s)/mailto and same-site-relative links are ever emitted as a
-    // real href -- anything else (javascript:, data:, etc.) degrades to '#'
-    // rather than being rendered, since this string reaches the page via
-    // innerHTML.
-    var SAFE_HREF_RE = /^(https?:|mailto:|#|\.{0,2}\/)/i;
-    function safeHref(url){ return SAFE_HREF_RE.test(url) ? url : '#'; }
+    // Only http(s)/mailto/#-anchor links are ever emitted AS-IS; a relative
+    // path (CHANGELOG.md's own hand-written links are all of the
+    // ../../ROADMAP.md shape, since it lives two directories below the repo
+    // root) is rewritten to the equivalent absolute GitHub blob URL instead,
+    // because deploy.yml and build_single_file.py ship only index.html plus
+    // the release-notes/ and manual/ folders -- a repo-relative link out of
+    // that tree 404s wherever this page is actually served (R2-05/R5-06).
+    // Anything else (javascript:, data:, etc.) degrades to '#' rather than
+    // being rendered, since this string reaches the page via innerHTML.
+    var GITHUB_BLOB_BASE = 'https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/';
+    var ABSOLUTE_HREF_RE = /^(https?:|mailto:|#)/i;
+    var RELATIVE_HREF_RE = /^\.{0,2}\//;
+    function safeHref(url){
+      if (ABSOLUTE_HREF_RE.test(url)) return url;
+      if (RELATIVE_HREF_RE.test(url)) return GITHUB_BLOB_BASE + url.replace(/^(?:\.\.\/|\.\/|\/)+/, '');
+      return '#';
+    }
     function inline(s){
       return esc(s)
         .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -213,11 +267,46 @@
           return '<a href="' + safeHref(url) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>';
         });
     }
+    // CHANGELOG.md is hand-wrapped at ~80 columns, so a single bullet or
+    // paragraph spans several raw source lines with no blank line between
+    // them. The render() loop below is line-oriented, so it must see one
+    // LOGICAL line per bullet/paragraph or every wrapped continuation line
+    // renders as its own orphaned <p> outside the list (V2-NEW-01/R2-04 --
+    // lesson 47's "fold logical statements before matching", one level up
+    // from a source-code formatter to hand-wrapped prose). A line starts a
+    // NEW logical line when it is blank, a heading (#/##/###), or an
+    // unindented bullet (-/*); every other non-blank line folds onto the
+    // PREVIOUS logical line (joined by a single space) as long as that
+    // previous line was itself non-blank/non-heading -- so both a bullet's
+    // wrapped continuation and a plain paragraph's wrapped continuation
+    // fold, while a blank line or a heading always starts fresh. An indented
+    // nested bullet (e.g. "  - Wave 0: ...") is not itself a list-item
+    // trigger (render()'s bullet regex is unindented-only, unchanged here)
+    // so it folds onto its parent item's <li> instead of becoming its own
+    // orphaned <p> -- an existing, deliberate limitation (this renderer has
+    // never supported nested lists) that folding must not make worse.
+    function foldContinuationLines(md){
+      var lines = md.replace(/\r/g, '').split('\n').map(function (l){ return l.replace(/\s+$/, ''); });
+      var logical = [];
+      var canContinue = false;
+      lines.forEach(function (line){
+        var isBlank = !line.trim();
+        var isHeading = /^#{1,6}\s+/.test(line);
+        var isBullet = /^[-*]\s+/.test(line);
+        if (canContinue && !isBlank && !isHeading && !isBullet) {
+          var idx = logical.length - 1;
+          logical[idx] = logical[idx] + ' ' + line.replace(/^\s+/, '');
+        } else {
+          logical.push(line);
+        }
+        canContinue = !isBlank && !isHeading;
+      });
+      return logical.join('\n');
+    }
     function render(md){
       var out = '', inList = false;
       function closeList(){ if (inList){ out += '</ul>'; inList = false; } }
-      md.replace(/\r/g, '').split('\n').forEach(function (raw){
-        var line = raw.replace(/\s+$/, '');
+      foldContinuationLines(md).split('\n').forEach(function (line){
         if (/^#\s+/.test(line)) { closeList(); return; }                    // drop the "# Changelog" title
         if (/^##\s+/.test(line)) { closeList(); out += '<h3 class="cl-ver">' + inline(line.replace(/^##\s+/, '')) + '</h3>'; return; }
         if (/^###\s+/.test(line)) { closeList(); out += '<h4 class="cl-cat">' + inline(line.replace(/^###\s+/, '')) + '</h4>'; return; }
@@ -237,7 +326,16 @@
         var m = md.match(/^##\s+\[(?!Unreleased\])([^\]]+)\]/m);
         if (m) document.getElementById('footer-version').textContent = 'v' + m[1];
       })
-      .catch(function (){ body.innerHTML = '<p>Couldn’t load the changelog here — <a href="' + CL_GH + '" target="_blank" rel="noopener noreferrer">read it on GitHub</a>.</p>'; });
+      .catch(function (){
+        // Under file://, this fetch is always blocked, so this is the normal
+        // path there, not an error case -- the footer keeps the RELEASE
+        // fallback set above (never the stale hard-coded literal this used
+        // to be), and both the hero's and the "14 uncited" card's own
+        // pointers to "below" are real links to the same GitHub file, so a
+        // reader here still reaches the content that fetch could not bring
+        // in (V1-N6/V3-N4).
+        body.innerHTML = '<p>Couldn’t load the changelog here — <a href="' + CL_GH + '" target="_blank" rel="noopener noreferrer">read it on GitHub</a>.</p>';
+      });
   })();
 </script>
 

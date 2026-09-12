@@ -9,6 +9,8 @@ that existing history, not a scheme that was tracked from day one.
 
 ## [Unreleased]
 
+## [0.21.0] - 2026-09-12
+
 ### Added
 - Opening the shipped example study now opens it in a second browser tab —
   a practice tab, at `index.html?demo=1` — running its own separate copy of
@@ -97,10 +99,116 @@ that existing history, not a scheme that was tracked from day one.
   acquisition runs (acquisition) instead of reporting one count for both.
 
 ### Fixed
+- Review's **Readout:** line read `null` for any readout you typed yourself.
+  The label was looked up by the stored readout id, which only the shipped
+  example study ever sets; it is now resolved from the text the interview
+  actually recorded.
+- The nav entry for the measurement you have open now shows that
+  measurement's own status (Draft / Needs a decision / Blocked …), the same
+  headline the Measurements registry row and the switcher pill show, instead
+  of an aggregate across every measurement in a different vocabulary.
+- Drop-downs start on a disabled "Choose…" placeholder rather than a blank
+  row that could be re-selected; the Data plan's date picker shows the ISO
+  form that will actually appear in filenames; the Study map has a Study
+  title field, so entries in Utilities › Restore are no longer all
+  "Untitled study"; a "Skip to content" link is the first Tab stop on every
+  page.
+- Spillover flag messages now say what they measure: the peak-to-peak
+  distance under the threshold, with curve widths not considered. The 30 nm
+  default filter band the spectral view draws is now declared in the
+  spectra pack (`overlapRules.filterBandDefaultNm`) rather than hard-coded.
+- The advisor and controls packs carry a pack-level review status, and the
+  Guidance and Controls panels say so: this guidance is drafted, not yet
+  checked by a microscopy specialist. Typing `PI` in the markers field now
+  resolves to propidium iodide.
+- The 0.19.0 notes no longer claim which variant CFP, GFP and mRuby store
+  (no note or reference record exists for them), give the cited/drafted
+  counts both per top-level entry (143/157) and per selectable spectrum
+  (174/190), and name the 14 uncited entries on the page itself. Manual
+  captions say the screenshots show the practice tab.
+- The Measurement page now refreshes its sibling sections after an edit:
+  renaming a group updates the Data plan's Group row and filename previews,
+  typing markers updates the Acquisition colour panel and spectral view, and
+  the header status badges follow the work instead of freezing at the state
+  the page was opened in. Inputs you are typing in are never overwritten by
+  that refresh. Biological/technical replicates have one editor (Samples &
+  design); the duplicate Acquisition questions are gone.
+- The Color panel's spillover check reads the Panel assembly channels (the
+  same source Review uses), so the two can no longer disagree; each flagged
+  pair carries an **Acknowledge this pair** control (sequential acquisition,
+  filter-separated, other) that downgrades the block to a warning and is
+  withdrawn automatically when either dye changes. Review lists every blocker
+  by measurement and text with a visible "Blocks export" label and a link,
+  lists each decision once, and the export toast names the first blocker.
+- Panel a11y and layout: the conjugation select and remove button name their
+  fluorophore, keyboard focus survives moving a channel, provenance badges
+  read "cited source" instead of the raw enum, each fluorophore's authored
+  note shows as a tooltip, channel rows scroll instead of being clipped at
+  phone width, and spectral peak labels use the page ink colour.
+- A measurement with no acquisition date renders the `UNKNOWN` placeholder,
+  never `1970-01-01`, in previews, the registry row and every export.
+
 - `localStorage` access throughout persistence is now guarded against a
   throwing storage backend, `clearAll` reports a real result instead of
   `undefined`, and starting a blank study no longer loses just-typed work to
   the 500ms autosave window.
+- The autosave ring could starve itself: five "Start a blank study" actions
+  in a row protected every slot, so the very next ordinary autosave was
+  evicted by its own eviction pass while the shell still reported "Saved
+  locally". Protected snapshots are now capped at three, the oldest
+  protected snapshot is evicted first once that cap is exceeded, and the
+  slot just written is never evicted by its own save.
+- Restoring a previous version or importing a backup could silently drop
+  the study you had open: if either landed inside the 500ms autosave
+  window, or five autosaves happened before you noticed the swap, the
+  displaced study was gone with nothing in Restore to bring it back. Both
+  actions (and starting blank or opening the example) now flush the
+  pending autosave and write one protected snapshot of the current study
+  first, aborting with nothing changed if that snapshot fails. A failed
+  save index write also restores the pre-save ring exactly instead of
+  orphaning an evicted slot. Importing a file that isn't a valid project
+  backup now says so in plain language instead of printing the raw
+  `JSON.parse` error into the save indicator.
+- "Clear all stored data" now also sweeps the app's own un-prefixed keys
+  for the tab it's run from — walkthrough progress, onboarding answers,
+  nav-rail collapse state, the advisor debug flag — so a clear that
+  reported success no longer left "Continue walkthrough" or onboarding
+  answers behind; the app's saved theme is deliberately left alone. Settings
+  and the manual's Saving, Backups & Privacy chapter now describe what is
+  actually cleared, and that the theme is kept.
+- The spectral-overlap check that gates export now reads a measurement's
+  fluorophores the same way the Panel step displays them — Panel assembly's
+  channels first, the free-text Markers field only as a fallback — instead
+  of the two disagreeing about which dyes are even in the panel. A
+  measurement can no longer read "blocked" on Review while Panel assembly
+  shows no conflict, or the reverse. Export checks now name every blocking
+  issue by measurement and let you jump straight to it, rather than only
+  reporting a bare pass/fail. Where two dyes really do sit too close to
+  separate, you can record a per-pair acknowledgement (sequential
+  acquisition, filter-separated, or another reason of your own) that
+  downgrades the block to a visible warning instead of hiding it — the
+  acknowledgement is tied to that specific pair of dyes and is withdrawn
+  automatically if either one is swapped out.
+- Group names, factor levels and other user-typed values that use
+  non-Latin or symbol-only text no longer collapse into a silent
+  `UNSPECIFIED` in exported filenames. The naming engine now reports
+  exactly which value lost its characters and where, and the Design step
+  and Review surface that report instead of leaving a reader to notice the
+  placeholder on their own.
+- The feedback package handoff no longer dead-ends when the browser refuses
+  the clipboard write: the email and GitHub issue channels still offer to
+  open the destination and download the same package to attach or paste in
+  by hand, and the download channel's own confirmation no longer claims a
+  copy that didn't happen.
+- The Guide step's example-walkthrough copy no longer hard-codes "seven-step"
+  for a walkthrough that is actually five steps long; the count is now read
+  from the same step list the walkthrough runs.
+- The release notes page's hero, lede and footer version now come from one
+  source instead of three that could drift independently: an arithmetic
+  slip ("Nine more" for what is actually ten more spectra entries), a
+  mismatched nanometer figure attached to the wrong dye, and a partial list
+  of the still-missing Alexa dyes are all corrected, and the 0.19.0 spectral
+  story is now dated as history rather than presented as the current release.
 
 ## [0.20.0] - 2026-09-07
 
@@ -141,33 +249,48 @@ that existing history, not a scheme that was tracked from day one.
   (681 nm against BioStatus's 697 nm for the DNA-bound dye). Nine ATTO dyes
   were out by 1-6 nm, and Calcein, CFSE, FITC, Nile Red, propidium iodide,
   TMRE, TMRM, Texas Red, DyLight 650, SYTO 9 and SYTO 85 were each out by a
-  few nm. If you planned a panel around one of these, its spillover flags
-  and spectral-view curves will shift slightly.
+  few nm (Nile Red the most, by 8 nm). Alexa Fluor 405, 514, 532 and 647
+  round out the 26. If you planned a panel around one of these, its
+  spillover flags and spectral-view curves will shift slightly.
 
 ### Changed
-- 143 of the pack's 157 fluorophore entries now cite a source, up from 72.
-  Every remaining drafted entry was checked against a vendor or curator
-  page, and each corrected or confirmed value is recorded in
+- 143 of the pack's 157 top-level fluorophore entries now cite a source, up
+  from 72. Counted at the level a user actually picks a fluorophore -- 8 of
+  those 157 entries are families that expand into 41 named variants, for
+  190 selectable spectra in total -- 174 are cited and 16 are still
+  drafted. Every remaining drafted entry was checked against a vendor or
+  curator page, and each corrected or confirmed value is recorded in
   docs/references/planner-fluorophore-sources.json with the URL it came
   from and the date it was read.
 - Seven probe families -- MitoTracker, LysoTracker, SYTOX, BODIPY,
   CellMask, LIVE/DEAD and SYTO -- had every one of their variants sourced,
   so the family is no longer marked as drafted. ER-Tracker still is: its
   Blue-White DPX variant has an emission range rather than a peak, and a
-  family is only as cited as its least-documented member.
+  family is only as cited as its least-documented member (its other two
+  variants, Green and Red, are individually cited).
 
 ### Known gaps
-- 14 entries are deliberately still marked as drafted rather than being
-  quietly upgraded. Cy2, Cy7 and TRITC had no primary source worth citing
-  (and TRITC is not one defined compound); H2DCFDA's source gives a range
-  instead of a peak.
-- The other ten are ambiguous names rather than wrong numbers. CFP stores
-  the values of ECFP, GFP stores EGFP's, IRFP stores iRFP713's, and mRuby
-  stores the original rather than the mRuby2 in wider use today; BFP,
-  YFP, GCaMP, miRFP and Hoechst are similarly generic, and ER-Tracker's
-  ambiguous variant is the eighth family's blocker. The keys are left as
-  they are for now, since renaming one would break studies that already
-  use it.
+- 14 top-level entries (16 once ER-Tracker's three variants are each
+  counted on their own) are deliberately still marked as drafted rather
+  than being quietly upgraded. Cy2, Cy7 and TRITC had no primary source
+  worth citing (and TRITC is not one defined compound); DCFDA (H2DCFDA)'s
+  stored peaks are for the oxidized, fluorescent DCF product -- the
+  non-fluorescent loading form has no meaningful peak until intracellular
+  oxidation converts it. ER-Tracker's Blue-White DPX variant has the same
+  problem as DCFDA: its source gives an emission range, not a peak.
+- The other nine store a single value under a key that could mean more
+  than one real variant. CFP, GFP and mRuby carry no note in the pack
+  saying which variant their numbers describe, and no reference record for
+  one exists in this repo yet; IRFP is the exception -- its note names it
+  as iRFP713, the most common near-infrared iRFP variant, and that value
+  is the one of the four backed by a citation in
+  docs/references/planner-fluorophore-sources.json. BFP, YFP and miRFP are
+  similarly generic keys. Hoechst and GCaMP are not ambiguous names --
+  the pack's own note for Hoechst names it specifically as Hoechst 33342,
+  and GCaMP's note says every named variant (6f/6s/7/...) shares
+  essentially one spectrum -- they simply haven't been checked against a
+  source yet. The keys are left as they are for now, since renaming one
+  would break studies that already use it.
 - A cited entry means its two peak values match a source that was fetched
   and recorded. It does not mean a microscopy specialist has reviewed it,
   and the Gaussian curve widths used by the spectral view are still

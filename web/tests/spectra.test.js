@@ -11,7 +11,19 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { loadKb, indexKb } from '../src/core/kb.js';
-import { derivePanelFacts, flagPanelOverlaps, loadSpectraKb, resolveMarkerToken, resolvePanel, SPECTRAL_STATES } from '../src/engine/spectra.js';
+import { realKb } from './fixtures.js';
+import {
+  derivePanelFacts,
+  flagPanelOverlaps,
+  loadSpectraKb,
+  MAX_PLAUSIBLE_PEAK_NM,
+  MIN_PLAUSIBLE_PEAK_NM,
+  resolveMarkerToken,
+  resolveMeasurementFluorophores,
+  resolvePanel,
+  SPECTRAL_STATES,
+} from '../src/engine/spectra.js';
+import { FILTER_BANDWIDTH_BOUNDS_NM } from '../src/engine/panelAssembly.js';
 
 // A small, self-consistent synthetic marker KB: one plain dye (ALEXA488-like),
 // one family with two variants (a MitoTracker-like), one tag (a HaloTag-
@@ -509,6 +521,55 @@ test('flagPanelOverlaps never throws on an empty or malformed overlapRules', () 
   assert.doesNotThrow(() => flagPanelOverlaps([known('A', 'A', 400, 500)], {}));
 });
 
+test('flagPanelOverlaps keeps pairKey on every returned flag (A2/A3 wiring: the ack-matching key)', () => {
+  const entries = [known('A', 'A', 400, 500), known('B', 'B', 460, 510)];
+  const flags = flagPanelOverlaps(entries, { emissionProximityNm: 25, excitationProximityNm: 20 });
+  assert.equal(flags.length, 1);
+  assert.equal(flags[0].pairKey, 'A|B');
+});
+
+test('flagPanelOverlaps: an acknowledged pair (order-independent) downgrades ONLY its emission error to a warning, appends the reason label, and marks acknowledged: true', () => {
+  const entries = [known('A', 'A', 400, 500), known('B', 'B', 460, 510)];
+  const rules = { emissionProximityNm: 25, excitationProximityNm: 20 };
+  const acknowledged = [{ pair: ['B', 'A'], reason: 'filter-separated', at: '2026-01-01T00:00:00.000Z' }];
+
+  const bare = flagPanelOverlaps(entries, rules);
+  assert.equal(bare[0].severity, 'error');
+  assert.equal(bare[0].acknowledged, undefined);
+
+  const acked = flagPanelOverlaps(entries, rules, { acknowledged });
+  assert.equal(acked.length, 1);
+  assert.equal(acked[0].severity, 'warning');
+  assert.equal(acked[0].acknowledged, true);
+  assert.match(acked[0].message, /acknowledged: filter-separated$/);
+  assert.equal(acked[0].pairKey, 'A|B');
+});
+
+test('flagPanelOverlaps: an acknowledgement for a DIFFERENT pair leaves an unacked error error, and never touches excitation-only warnings', () => {
+  const entries = [known('A', 'A', 400, 500), known('B', 'B', 460, 510), known('C', 'C', 415, 700)];
+  const rules = { emissionProximityNm: 25, excitationProximityNm: 20 };
+  const flags = flagPanelOverlaps(entries, rules, { acknowledged: [{ pair: ['X', 'Y'], reason: 'other' }] });
+  assert.equal(flags.find((f) => f.pairKey === 'A|B').severity, 'error');
+
+  const excitationOnly = [known('A', 'A', 400, 500), known('B', 'B', 415, 600)];
+  const excitationFlags = flagPanelOverlaps(excitationOnly, rules, {
+    acknowledged: [{ pair: ['A', 'B'], reason: 'other' }],
+  });
+  assert.equal(excitationFlags.length, 1);
+  assert.equal(excitationFlags[0].severity, 'warning');
+  assert.equal(excitationFlags[0].acknowledged, undefined, 'excitation warnings are not the acknowledgement target');
+});
+
+test('flagPanelOverlaps never throws on a malformed `acknowledged` option', () => {
+  const entries = [known('A', 'A', 400, 500), known('B', 'B', 460, 510)];
+  const rules = { emissionProximityNm: 25, excitationProximityNm: 20 };
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, undefined));
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, null));
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, {}));
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, { acknowledged: 'nope' }));
+  assert.doesNotThrow(() => flagPanelOverlaps(entries, rules, { acknowledged: [null, {}, { pair: ['A'] }] }));
+});
+
 // --- derivePanelFacts: the panel-level facts engine/controls.js gates on ---
 // (fixes a real, verified defect: every 'panel'-kind control rule shared
 // ONE predicate, so an isotype/secondary-antibody control fired on panels
@@ -836,4 +897,107 @@ test('ledger-backed pairs respect the real overlap thresholds for error, warning
     overlapRules
   );
   assert.deepEqual(separatedFlags, []);
+});
+
+// --- resolveMeasurementFluorophores: one resolver for both sources (R4-01) --
+
+test('resolveMeasurementFluorophores prefers structured channels over the free-text markers field, and both routes flag the same overlap', () => {
+  const { kb: markersKb } = loadKb(realMarkersRaw);
+  const markerIndex = indexKb(markersKb);
+  const { fluorophores: spectra, overlapRules } = loadSpectraKb(realSpectraRaw);
+  const kb = { index: markerIndex, markersKb, spectra };
+
+  const withChannels = resolveMeasurementFluorophores(
+    {
+      panel: {
+        channels: [
+          { id: 'c1', fluorophore: 'ALEXA488', conjugation: 'direct-probe' },
+          { id: 'c2', fluorophore: 'FITC', conjugation: 'direct-probe' },
+        ],
+      },
+      naming: { fields: { markers: '' } },
+    },
+    kb
+  );
+  assert.equal(withChannels.source, 'channels');
+  assert.equal(withChannels.panelState, 'has-entries');
+  assert.equal(withChannels.entries.length, 2);
+  assert.deepEqual(withChannels.entries.map((e) => e.channelId), ['c1', 'c2']);
+  const channelFlags = flagPanelOverlaps(withChannels.entries, overlapRules);
+  assert.equal(channelFlags.filter((f) => f.severity === 'error').length, 1);
+
+  const withMarkers = resolveMeasurementFluorophores(
+    { panel: { channels: [] }, naming: { fields: { markers: 'ALEXA488-FITC' } } },
+    kb
+  );
+  assert.equal(withMarkers.source, 'markers');
+  assert.equal(withMarkers.entries.length, 2);
+  assert.ok(withMarkers.entries.every((e) => e.channelId === undefined));
+  const markerFlags = flagPanelOverlaps(withMarkers.entries, overlapRules);
+  assert.equal(markerFlags.filter((f) => f.severity === 'error').length, 1);
+});
+
+test('resolveMeasurementFluorophores never throws on malformed view/kb', () => {
+  assert.doesNotThrow(() => resolveMeasurementFluorophores(undefined, undefined));
+  assert.doesNotThrow(() => resolveMeasurementFluorophores({}, {}));
+  assert.doesNotThrow(() => resolveMeasurementFluorophores(null, null));
+});
+
+// --- note passthrough (R3-04): loadSpectraKb / resolveMarkerToken ----------
+
+test("a spectra.json entry's note (DCFDA) is carried through loadSpectraKb and resolveMarkerToken verbatim", () => {
+  const { kb: markersKb } = loadKb(realMarkersRaw);
+  const markerIndex = indexKb(markersKb);
+  const { fluorophores } = loadSpectraKb(realSpectraRaw);
+
+  // Read the literal text from the JSON itself (lesson 40) rather than
+  // retyping it, so a future edit to the note can't silently desync this test.
+  const jsonNote = realSpectraRaw.fluorophores.DCFDA.note;
+  assert.equal(typeof jsonNote, 'string');
+  assert.ok(jsonNote.length > 0);
+
+  assert.equal(fluorophores.DCFDA.note, jsonNote);
+  const resolved = resolveMarkerToken('DCFDA', markerIndex, markersKb, fluorophores);
+  assert.equal(resolved.state, 'known');
+  assert.equal(resolved.note, jsonNote);
+});
+
+test('an entry with no note has no `note` key on the normalized/resolved records', () => {
+  const { fluorophores } = loadSpectraKb({
+    version: 1,
+    fluorophores: { NONOTE: { excitationPeakNm: 490, emissionPeakNm: 525 } },
+  });
+  assert.equal('note' in fluorophores.NONOTE, false);
+  const { markerIndex, markersKb } = fixtures();
+  const resolved = resolveMarkerToken('DYEA', markerIndex, markersKb, fixtures().fluorophores);
+  assert.equal('note' in resolved, false);
+});
+
+// --- exported constants (V3-N5): numbers/arrays ----------------------------
+
+test('MIN/MAX_PLAUSIBLE_PEAK_NM and FILTER_BANDWIDTH_BOUNDS_NM are exported with sane shapes', () => {
+  assert.equal(typeof MIN_PLAUSIBLE_PEAK_NM, 'number');
+  assert.equal(typeof MAX_PLAUSIBLE_PEAK_NM, 'number');
+  assert.ok(MIN_PLAUSIBLE_PEAK_NM < MAX_PLAUSIBLE_PEAK_NM);
+  assert.equal(typeof FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm, 'number');
+  assert.equal(typeof FILTER_BANDWIDTH_BOUNDS_NM.maxNm, 'number');
+  assert.ok(FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm < FILTER_BANDWIDTH_BOUNDS_NM.maxNm);
+});
+
+test('resolveMeasurementFluorophores falls back to the Markers field when no channel names a dye (Copilot review, PR #20)', () => {
+  const kb = realKb();
+  const view = { panel: { channels: [{ id: 'c1', target: 'Nuclei', fluorophore: '', conjugation: 'direct-probe' }] }, naming: { fields: { markers: 'ALEXA488-FITC' } } };
+  const resolved = resolveMeasurementFluorophores(view, { index: kb.index, markersKb: kb.markersKb, spectra: kb.spectra });
+  assert.equal(resolved.source, 'markers');
+  assert.equal(resolved.entries.filter((e) => e.state === 'known').length, 2);
+});
+
+test('flagPanelOverlaps orders a family-variant pair deterministically regardless of input order (Copilot review, PR #20)', () => {
+  const kb = realKb();
+  const args = { index: kb.index, markersKb: kb.markersKb, spectra: kb.spectra };
+  const a = resolveMarkerToken('MitoTracker Green', args.index, args.markersKb, args.spectra);
+  const b = resolveMarkerToken('MitoTracker Deep Red', args.index, args.markersKb, args.spectra);
+  const one = flagPanelOverlaps([a, b], kb.overlapRules).map((f) => f.message);
+  const two = flagPanelOverlaps([b, a], kb.overlapRules).map((f) => f.message);
+  assert.deepEqual(one, two);
 });

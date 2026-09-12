@@ -1,5 +1,5 @@
 import { getPath, setPath } from './paths.js';
-import { canOverwrite, tagSlot } from './provenance.js';
+import { canOverwrite, isEmptyValue, tagSlot, tierOf } from './provenance.js';
 
 // The Experiment store: a single mutable root object plus subscriber
 // notification. Reads/writes address the object with the same dot/bracket
@@ -78,9 +78,22 @@ export function createStore(initialExperiment) {
    * every future WEAK/PROVISIONAL write (a KB default, an LLM suggestion)
    * forever. There is no user action that could ever clear a lock like
    * that, which is exactly the deadlock repo lesson 37 warns against.
+   *
+   * "Empty" is defined by provenance.js's isEmptyValue (imported above, and
+   * reused unchanged by core/schema.js's load-boundary heal -- see
+   * normalizeEmptySlotProvenance there -- so the write-time rule and the
+   * heal for studies saved under an older rule can never drift apart). See
+   * that function's docstring for the exact boundary (recursive
+   * arrays/plain-objects, Date and other class instances excluded).
    */
   function setValueAtPath(path, value, tag, { slotKey = path } = {}) {
-    const isClearing = value === '' || value === null || value === undefined;
+    // The clearing exception is an escape hatch for the USER (a STRONG
+    // writer emptying their own field must not lock the slot, lesson 37). It
+    // is never a licence for a WEAK writer: an empty payload from kb-default
+    // or a free-text scan still goes through canOverwrite, otherwise a blank
+    // seed row could wipe hand-typed groups on every other measurement
+    // (red-team B4 round 2).
+    const isClearing = isEmptyValue(value) && tierOf(tag) === 'STRONG';
     const effectiveTag = isClearing ? 'default' : tag;
     if (!isClearing) {
       const existingTag = state.provenance?.slots?.[slotKey]?.tag ?? null;

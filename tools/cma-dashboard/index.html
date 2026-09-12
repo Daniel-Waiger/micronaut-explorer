@@ -176,428 +176,489 @@
 // before. The neutral object here is just the never-run-yet placeholder.
 /* CMA:EMBEDDED:BEGIN */
 const EMBEDDED = {
-  "run": "audit-remediation",
-  "orchestrator": "Claude Opus 5",
-  "active_model": "Claude Opus 5",
-  "active_status": "idle",
-  "phase": "",
+  "run": "app-review remediation 2026-09-12",
+  "orchestrator": "Claude Fable 5.1",
+  "active_model": "Claude Sonnet",
+  "active_status": "running",
+  "phase": "Batch F5 — follow-ups (19 minor/nit findings)",
   "state_note": "",
-  "current_task": null,
+  "current_task": {
+    "id": "F5",
+    "title": "W1-W4 dispatched to Sonnet (high effort); orchestrator verifies"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "839 passed",
+      "v": "1039",
       "tone": "ok"
     },
     {
       "k": "Python tests",
-      "v": "85 passed",
+      "v": "88",
       "tone": "ok"
     },
     {
-      "k": "Batch",
-      "v": "9 of 9"
-    },
-    {
-      "k": "Tasks",
-      "v": "22 of 22",
+      "k": "Version",
+      "v": "0.21.0 cut",
       "tone": "ok"
     },
     {
-      "k": "E2E",
-      "v": "7 passed",
+      "k": "Commits",
+      "v": "12 on branch",
       "tone": "ok"
     }
   ],
-  "defects": [
-    {
-      "id": "D4",
-      "location": "web/src/core/persist.js:245",
-      "title": "clearAll returned ok:true over suppressed removeItem failures - could announce a clear that did not happen",
-      "body": "",
-      "repro": ""
-    }
-  ],
+  "defects": [],
   "tasks": [
     {
-      "id": "AUD-01",
+      "id": "A1",
       "phase": "Batch 1",
-      "title": "Guard persist.js storage access and make clearAll report truthfully",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "Engine: single fluorophore resolver + keep spectra note + export bounds",
+      "status": "resolved",
+      "by": "red-team fail -> fixed by orchestrator",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "AUD-02",
+      "id": "A2",
       "phase": "Batch 1",
-      "title": "Separate physical samples from acquisition runs in the ICS schedule",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "Schema/assay: spillover acknowledgement model (no version bump)",
+      "status": "resolved",
+      "by": "red-team fail -> fixed by orchestrator",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "AUD-03",
+      "id": "B1",
       "phase": "Batch 1",
-      "title": "Let an observational study complete the Measurements step",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "persist.js: bounded protected slots, truthful save return",
+      "status": "resolved",
+      "by": "Opus red-team pass; stale comment fixed by orchestrator",
       "depends_on": [],
       "batch": 1
     },
     {
-      "id": "AUD-04",
-      "phase": "Batch 1",
-      "title": "Consolidate the duplicated DOM stub into one shared test helper",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [],
-      "batch": 1
-    },
-    {
-      "id": "AUD-05",
-      "phase": "Batch 1",
-      "title": "Delete the stale readout comment in core/assay.js",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [],
-      "batch": 1
-    },
-    {
-      "id": "AUD-06",
+      "id": "B3",
       "phase": "Batch 2",
-      "title": "Rewrite measurementStatus into three explicitly scoped axes",
+      "title": "Scope-aware clearAll (owned key families), theme kept",
+      "status": "resolved",
+      "by": "Opus pass; drift test + build export gate hardened",
+      "depends_on": [
+        "B1"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "E1",
+      "phase": "Batch 1",
+      "title": "naming.js: non-Latin names raise a named error instead of silent UNSPECIFIED; path-length contract",
+      "status": "resolved",
+      "by": "Opus round 2 pass; total-loss gate fixed by orchestrator",
+      "depends_on": [],
+      "batch": 1
+    },
+    {
+      "id": "E2",
+      "phase": "Batch 1",
+      "title": "workflowProgress: export the walkthrough step count for copy to consume",
       "status": "done",
-      "by": "Sonnet",
+      "by": "Opus red-team pass",
+      "depends_on": [],
+      "batch": 1
+    },
+    {
+      "id": "A3",
+      "phase": "Batch 2",
+      "title": "conformance.js: use the resolver, honour acknowledgements, tag blocking issues with measurement + step",
+      "status": "resolved",
+      "by": "Opus fail -> pairKey made variant-aware by orchestrator",
+      "depends_on": [
+        "A1",
+        "A2"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "B2",
+      "phase": "Batch 2",
+      "title": "appController.js: one preserveOpenStudy() helper for restore/import/blank/example",
+      "status": "resolved",
+      "by": "Opus pass; rollback orphan + double-slot fixed by orchestrator",
+      "depends_on": [
+        "B1"
+      ],
+      "batch": 2
+    },
+    {
+      "id": "B4",
+      "phase": "Batch 2",
+      "title": "Empty groups is a clear, not a lock; copy-groups counts and tooltip honest",
+      "status": "resolved",
+      "by": "2 Opus rounds; final regression fixed by orchestrator",
       "depends_on": [],
       "batch": 2
     },
     {
-      "id": "AUD-07",
+      "id": "A4",
       "phase": "Batch 3",
-      "title": "Compute each measurement's status inside deriveWorkflowProgress",
-      "status": "done",
-      "by": "Sonnet",
+      "title": "measurement.js: section-changed hook, derived-only refresh, live header badges",
+      "status": "resolved",
+      "by": "Opus fail -> hook fixed by orchestrator (most-recent source, drop-during-refresh, try/catch, max wait)",
       "depends_on": [
-        "AUD-03",
-        "AUD-06"
+        "A3",
+        "B4"
       ],
       "batch": 3
     },
     {
-      "id": "AUD-08",
+      "id": "A2a",
       "phase": "Batch 4",
-      "title": "Extract main.js's lifecycle into a testable appController",
+      "title": "design.js: notify on commit, refresh derived only, invalid replicates stop the preview",
       "status": "done",
-      "by": "Sonnet",
+      "by": "Sonnet; verified by orchestrator (suite+live)",
       "depends_on": [
-        "AUD-01"
+        "A4"
       ],
       "batch": 4
     },
     {
-      "id": "AUD-09",
-      "phase": "Batch 5",
-      "title": "Shell: one measurement vocabulary on the pill, honest footer and compass labels",
+      "id": "A2b",
+      "phase": "Batch 4",
+      "title": "naming.js: notify on input, sync boxes from store under the pristine rule",
       "status": "done",
-      "by": "Sonnet",
+      "by": "Sonnet; verified by orchestrator (suite+live)",
       "depends_on": [
-        "AUD-07"
+        "A4"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "A2c",
+      "phase": "Batch 4",
+      "title": "panel.js: derived-only repaint, resolver-fed spillover block, acknowledgements, focus, aria, badge, note",
+      "status": "resolved",
+      "by": "Sonnet cut off; orchestrator repaired NUL byte + duplicate symbol, wrote tests, verified live",
+      "depends_on": [
+        "A4"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "A5",
+      "phase": "Batch 5",
+      "title": "questions.json: one editor per replicate path",
+      "status": "done",
+      "by": "orchestrator (executor never dispatched before outage)",
+      "depends_on": [
+        "A2c"
       ],
       "batch": 5
     },
     {
-      "id": "AUD-10",
-      "phase": "Batch 5",
-      "title": "Measurements registry: scoped status badges without staleness",
-      "status": "done",
-      "by": "Sonnet",
+      "id": "C2",
+      "phase": "Batch 4",
+      "title": "overview.js: name every blocker, label it, dedupe decisions, safe export filename, honest copy fallback",
+      "status": "resolved",
+      "by": "Sonnet cut off; orchestrator verified live (Blocks export, dedupe, toast, exports)",
       "depends_on": [
-        "AUD-07",
-        "AUD-04",
-        "AUD-08"
+        "A3"
+      ],
+      "batch": 4
+    },
+    {
+      "id": "C3",
+      "phase": "Batch 5",
+      "title": "CSS: 400px panel rows reachable; light-theme chart labels readable",
+      "status": "done",
+      "by": "orchestrator; verified live 400px + contrast 15.4:1",
+      "depends_on": [
+        "A2c"
       ],
       "batch": 5
     },
     {
-      "id": "AUD-11",
-      "phase": "Batch 5",
-      "title": "Measurement header: three badges for three scopes",
-      "status": "done",
-      "by": "Sonnet",
+      "id": "D1",
+      "phase": "Batch 4",
+      "title": "shell.js: toast queue, ticking save label, distinguishable restore rows, cleared live region",
+      "status": "resolved",
+      "by": "Opus pass; moderates fixed by orchestrator",
       "depends_on": [
-        "AUD-07",
-        "AUD-08"
+        "B2",
+        "B3"
       ],
-      "batch": 5
+      "batch": 4
     },
     {
-      "id": "AUD-12",
-      "phase": "Batch 5",
-      "title": "Study Map: offer the walkthrough Start action that never existed",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-04",
-        "AUD-08"
-      ],
-      "batch": 5
+      "id": "D2",
+      "phase": "Batch 3",
+      "title": "feedbackHandoff.js: GitHub reachable when copy fails, channel-correct text, focus trap",
+      "status": "resolved",
+      "by": "Sonnet retry; round-2 red-team killed; orchestrator verified (tests + live modal; focus by unit test)",
+      "depends_on": [],
+      "batch": 3
     },
     {
-      "id": "AUD-13",
-      "phase": "Batch 5",
-      "title": "Un-gate the walkthrough and correct the Guide's stale instructions",
+      "id": "D3",
+      "phase": "Batch 3",
+      "title": "Guide/walkthrough copy: real step count, real nav list, plural, manual links",
       "status": "done",
-      "by": "Sonnet",
+      "by": "Opus red-team pass",
       "depends_on": [
-        "AUD-04",
-        "AUD-08"
+        "E2"
       ],
-      "batch": 5
+      "batch": 3
     },
     {
-      "id": "AUD-14",
-      "phase": "Batch 5",
-      "title": "Wire the two schedule counts through the Data plan step",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-02",
-        "AUD-04",
-        "AUD-08"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-15",
-      "phase": "Batch 5",
-      "title": "Review: honest provenance, honest export verdict, honest download labels",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-07",
-        "AUD-08"
-      ],
-      "batch": 5
-    },
-    {
-      "id": "AUD-16",
+      "id": "V1",
       "phase": "Batch 6",
-      "title": "Style the scoped status badges",
+      "title": "Cut 0.21.0: version, changelog, release-notes hero from one source, test guard",
       "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-09",
-        "AUD-10",
-        "AUD-11"
-      ],
+      "by": "red-team killed; orchestrator verified (version guard, live hero/footer, changelog vs commits)",
+      "depends_on": [],
       "batch": 6
     },
     {
-      "id": "AUD-17",
-      "phase": "Batch 9",
-      "title": "Assert app copy and manual copy agree",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-15",
-        "AUD-20"
-      ],
-      "batch": 9
-    },
-    {
-      "id": "AUD-18",
+      "id": "V2",
       "phase": "Batch 7",
-      "title": "Extract the stdlib Chrome DevTools driver into a reusable module",
+      "title": "Release-notes renderer: join soft-wrapped lines, fix relative links",
       "status": "done",
-      "by": "Sonnet",
-      "depends_on": [],
+      "by": "red-team killed; orchestrator verified (87 li / 87 bullets live)",
+      "depends_on": [
+        "V1"
+      ],
       "batch": 7
     },
     {
-      "id": "AUD-19",
-      "phase": "Batch 8",
-      "title": "Browser end-to-end suite against the built artifact",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-18",
-        "AUD-13",
-        "AUD-08"
-      ],
-      "batch": 8
+      "id": "V3",
+      "phase": "Batch 6",
+      "title": "README.md: bring every claim in line with the code",
+      "status": "resolved",
+      "by": "Opus fail -> wording fixed by orchestrator",
+      "depends_on": [],
+      "batch": 6
     },
     {
-      "id": "AUD-20",
-      "phase": "Batch 8",
-      "title": "Correct the manual's status, readiness and provenance chapters",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-15",
-        "AUD-12",
-        "AUD-13",
-        "AUD-06"
-      ],
-      "batch": 8
+      "id": "V4",
+      "phase": "Batch 6",
+      "title": "ROADMAP.md, TASKS.md, .github comments: retire stale claims",
+      "status": "resolved",
+      "by": "Opus fail -> TASKS claim deferred until UI landed, wording fixed",
+      "depends_on": [],
+      "batch": 6
     },
     {
-      "id": "AUD-21",
-      "phase": "Batch 8",
-      "title": "Replace the step-count drift with a hierarchy, and record the status scopes",
-      "status": "done",
-      "by": "Sonnet",
-      "depends_on": [
-        "AUD-06",
-        "AUD-15"
-      ],
-      "batch": 8
+      "id": "V5",
+      "phase": "Batch 6",
+      "title": "Manual + dev server parity: labels, alt text, manual images",
+      "status": "resolved",
+      "by": "Sonnet cut off; orchestrator finished manual sentences",
+      "depends_on": [],
+      "batch": 6
     },
     {
-      "id": "AUD-22",
-      "phase": "Rename the comparison choice away from collapsed group/condition wording:UI consumers",
-      "title": "",
+      "id": "V6",
+      "phase": "Batch 7",
+      "title": "Knowledge packs: internally consistent notes and rule wording",
       "status": "done",
-      "by": "Sonnet"
+      "by": "red-team killed; orchestrator verified (KB valid, selectAdvice)",
+      "depends_on": [
+        "V1"
+      ],
+      "batch": 7
+    },
+    {
+      "id": "W1",
+      "phase": "F5 follow-ups",
+      "title": "Release notes and changelog wording (R3-02/03/08/09/12, V1-N6, R2-14)",
+      "status": "done",
+      "by": "Fable verified"
+    },
+    {
+      "id": "W2",
+      "phase": "F5 follow-ups",
+      "title": "Knowledge-pack provenance + wording, PI alias (R3-13/15/17/06, R4-18)",
+      "status": "done",
+      "by": "Fable verified"
+    },
+    {
+      "id": "W3",
+      "phase": "F5 follow-ups",
+      "title": "UI: select placeholder, ISO date hint, study title, skip link, comment (R4-13/19/20, R5-12, V6-NEW-05)",
+      "status": "done",
+      "by": "Fable verified (skip-link target moved into shell.js)"
+    },
+    {
+      "id": "W4",
+      "phase": "F5 follow-ups",
+      "title": "One status vocabulary for nav, pill and registry (R4-08)",
+      "status": "done",
+      "by": "Fable verified live: Draft/Needs a decision/Blocked"
     }
   ],
   "log": [
     {
-      "time": "22:14:40",
-      "msg": "AUD-18 pulled forward: no deps, file-disjoint from AUD-06 and the DAG work"
+      "time": "06:33:54",
+      "msg": "Remediation run seeded from task graph; batch F1 dispatched (5 Sonnet executors, high effort)"
     },
     {
-      "time": "22:15:47",
-      "msg": "Batch 1 complete and verified on disk (5/5)"
+      "time": "06:35:46",
+      "msg": "E2 done (workflowProgress exports WALKTHROUGH_STEP_COUNT/describeWalkthroughLength); JS 880/880; red-team batched with F1"
     },
     {
-      "time": "22:15:47",
-      "msg": "DAG view live; board state re-asserted after re-seed"
+      "time": "06:37:54",
+      "msg": "A2 done (panel.spillover.acknowledged default, normalize/pruneSpilloverAcks, 6 tests); transient persist.test failure observed = B1 in flight"
     },
     {
-      "time": "22:16:26",
-      "msg": "AUD-06 done: 3 scoped axes, 784 JS passing"
+      "time": "06:38:24",
+      "msg": "B1 done (PROTECTED_CAP=3, truthful return, +3 tests, JS 886/886); Opus red-team dispatched"
     },
     {
-      "time": "22:16:26",
-      "msg": "D1 opened: consumers stale by design until batch 5"
+      "time": "06:39:18",
+      "msg": "A1 done (resolveMeasurementFluorophores, note kept, bounds exported, +7 tests); JS 891/891"
     },
     {
-      "time": "22:22:40",
-      "msg": "AUD-07 done: per-assay status attached in engine; 788 JS passing"
+      "time": "06:43:03",
+      "msg": "E1 done (non-Latin names -> named error/warning via a shared non-enumerable key; validateTargetPath documented as filename check); JS 899/899; red-team dispatched with the side-channel + design-step gap as targets"
     },
     {
-      "time": "22:26:47",
-      "msg": "AUD-18 done: stdlib CDP driver extracted; 26 new py tests, zero deps"
+      "time": "06:45:15",
+      "msg": "B1 PASS (5 non-blocking problems: pre-existing rollback flaw -> follow-up; stale comment fixed in warm context; appController prose -> B2 prompt)"
     },
     {
-      "time": "22:37:25",
-      "msg": "AUD-08 done: main.js 544->359 lines; 3 behaviour fixes landed"
+      "time": "06:45:33",
+      "msg": "B1 committed; F2 partial dispatch (B2, B3, B4)"
     },
     {
-      "time": "22:37:25",
-      "msg": "AUD-22 added: comparison radio copy was missing from the graph"
+      "time": "06:50:17",
+      "msg": "A1/A2 red-team: 2 real defects (bounds constant vs producer; ack ids variant vs canonical) fixed in warm context + boundary default for v6 saves; E2 pass. F1 engine files committed (assay.js held for B4). A3 dispatched"
     },
     {
-      "time": "22:39:33",
-      "msg": "Batch 5 dispatched: 8 file-disjoint Sonnet agents; AUD-10+AUD-11 clear defect D1"
+      "time": "06:54:14",
+      "msg": "E1 FAIL: issues die inside planFilenames (never rendered by design.js/conformance); 'GFP,DAPI' warns on its own separator; message quotes pre-uppercase token. Retry queued after A3 (conformance.js contention) with a plain sanitizationLossIssues export"
     },
     {
-      "time": "22:41:27",
-      "msg": "AUD-11 done: three scoped badges on measurement header"
+      "time": "06:54:31",
+      "msg": "B2 done (preserveOpenStudy for restore/import/blank/example; import error humanized; prose honest; +4 test files/cases); red-team dispatched. B2 confirms D8 (storageScope export list) is B3's"
     },
     {
-      "time": "22:42:12",
-      "msg": "AUD-22 done: 'Compares groups or treatments'"
+      "time": "06:55:23",
+      "msg": "B4 done (empty array/object = clear in store.js; groupSeedLevels active-only; copy-groups excludes source, disabled when no groups); red-team dispatched on the widened clear rule"
     },
     {
-      "time": "22:42:12",
-      "msg": "dist/ lock errors seen again during pytest - AUD-19's tmp_path fix is load-bearing"
+      "time": "06:57:17",
+      "msg": "B3 done (ownedScopedKeys, scoped clearAll, guided-state reload, scope-aware toast; Python 88/88 so D8 build-gate break cleared); red-team dispatched"
     },
     {
-      "time": "22:42:58",
-      "msg": "AUD-15 done: provenance + export-checks verdict + download labels"
+      "time": "06:57:44",
+      "msg": "A3 done (conformance uses resolver + acks; issues carry assayId/assayLabel/stepId; isBlockingSeverity); red-team dispatched. E1 retry dispatched with red-team evidence"
     },
     {
-      "time": "22:42:58",
-      "msg": "AUD-20 scope widened: glossary-faq.html also carries stale provenance copy"
+      "time": "07:02:38",
+      "msg": "B4 FAIL (2 major, 2 minor, 1 nit); provenance promise itself upheld (no WEAK writer can refill user-emptied paths). Retry dispatched"
     },
     {
-      "time": "22:44:52",
-      "msg": "AUD-12 done: Start action exists on Study Map for the first time"
+      "time": "07:03:55",
+      "msg": "B2 PASS (1 moderate, 3 minor): persist rollback now restores the pre-save ring; preserveOpenStudy cancels the pending timer and does ONE protected save. Minor #3/#4 and shell.js:378 wording -> D1 prompt"
     },
     {
-      "time": "22:47:36",
-      "msg": "AUD-14 done: mounting scales by samples, acquisition by runs (falsification-tested)"
+      "time": "07:05:16",
+      "msg": "B2 attacks re-run: 26/32 pass with orchestrator fixes vs 16/32 without; remaining 6 = red-team's documented minors/nits (mislabel on shell throw after import; missing-slot restore marks open study failed; restoring oldest unprotected slot evicts it) -> follow-ups in report"
     },
     {
-      "time": "22:47:36",
-      "msg": "D2 found by AUD-14, fixed warm-context in domStub.js and verified"
+      "time": "07:08:18",
+      "msg": "A3 red-team: 2 blocking on family variants -> fluorophoreEntryId (canonical::variant) now shared by flagPanelOverlaps pairKey and acks; 'Assay N' fallback -> 'Measurement N'. B2+B3 committed 3c44de9. A3 commit waits for E1 retry (shared conformance.js)"
     },
     {
-      "time": "22:48:29",
-      "msg": "AUD-09 + AUD-13 done; nav stateLabel vocabulary preserved as required"
+      "time": "07:08:29",
+      "msg": "D2, D3 dispatched (D2 must not edit guide.js; D3 owns it)"
     },
     {
-      "time": "22:48:29",
-      "msg": "Removed guideStep's local append monkeypatch - redundant after the D2 domStub fix"
+      "time": "07:12:01",
+      "msg": "B4 retry done (isEmptyValue in provenance.js: recursive arrays, plain objects only; migrate() heals STRONG-over-empty design.groups slots; button state recomputed); red-team round 2 dispatched"
     },
     {
-      "time": "22:52:24",
-      "msg": "D1 CLEARED: built artifact boots in headless Chrome, zero console errors"
+      "time": "07:12:30",
+      "msg": "E1 retry done (sanitizationLossIssues export; planFilenames attaches per-row issues; design.js renders; conformance folds; letters/digits-only loss rule; final token quoted; live screenshots); red-team round 2 dispatched"
     },
     {
-      "time": "22:52:24",
-      "msg": "Verified live: 'Start example walkthrough' present; registry badges render"
+      "time": "07:14:12",
+      "msg": "D3 done (five-step from E2, nav list = 5 real steps, plural verb, manual/index.html links, glossary five-stage); red-team batched with D2. D1 dispatched with B2's leftover minors"
     },
     {
-      "time": "22:58:35",
-      "msg": "AUD-21: README hierarchy + status-scopes.md + TASKS/ROADMAP refresh + CHANGELOG entry; 832 JS + 52 Py green"
+      "time": "07:17:31",
+      "msg": "D2 done (proceed not gated on copy; download fallback; channel-correct text; focus trap; openInNewTab); Guide handoff sentence applied by orchestrator; D2+D3 red-team dispatched"
     },
     {
-      "time": "23:00:45",
-      "msg": "AUD-20 done: manual reconciled across 6 pages incl. rewritten quizzes"
+      "time": "07:22:01",
+      "msg": "E1 round 2 PASS (4 minors; #1 fixed in warm context; #2 tier, #3 name-builder surface, #4 export column -> follow-ups). A3+E1 committed"
     },
     {
-      "time": "23:00:56",
-      "msg": "AUD-16 done: tone-based badges, WCAG-checked, pre-existing nowrap overflow fixed"
+      "time": "07:23:11",
+      "msg": "B4 round 2 FAIL (WEAK empty payload bypassed canOverwrite) -> clearing exception restricted to STRONG writers + blank seed rows ignored; r2Attacks 9/9; committed. A4 dispatched"
     },
     {
-      "time": "23:02:39",
-      "msg": "AUD-21: Opus verifier found status-scopes.md:71-75 misstated plan-axis mechanism (plan requires definition=defined per measurementStatus.js:135) + unearned web/manual/ claim at :3; both fixed and re-verified green (832 JS / 52 Py)"
+      "time": "07:23:42",
+      "msg": "F4 docs partial dispatch: V1 (0.21.0 cut + release-notes single source), V3 (README), V4 (ROADMAP/TASKS/.github). V5 waits on D2D3 commit + V1; V2/V6 depend on V1"
     },
     {
-      "time": "23:03:19",
-      "msg": "AUD-21 done: hierarchy replaces step counts; status-scopes.md added"
+      "time": "07:25:32",
+      "msg": "D1 done (toast queue, 30s ticker, restore-row labels, honest confirms, B2 minors #3/#4); study.js delete confirm aligned by orchestrator; red-team dispatched"
     },
     {
-      "time": "23:03:19",
-      "msg": "D3 fixed: corrected serve_dir usage in 4 plan docs"
+      "time": "07:26:23",
+      "msg": "V3 done (README: 9 claims corrected with proofs); red-team batched with V1/V4"
     },
     {
-      "time": "23:07:28",
-      "msg": "AUD-17 done: copy-consistency guard, all 5 assertions falsification-proven"
+      "time": "07:26:53",
+      "msg": "D2D3 red-team: D3 PASS (manual mirrors of the feedback flow -> V5); D2 FAIL -> retry dispatched"
     },
     {
-      "time": "23:20:10",
-      "msg": "AUD-19 done: 7 e2e tests; git-worktree proof they fail against HEAD"
+      "time": "07:27:18",
+      "msg": "V4 done (17 rules, provenance paragraphs, blank first run, labels/visibility comments, TASKS review section); V3+V4 docs red-team dispatched"
     },
     {
-      "time": "23:20:10",
-      "msg": "Opus gate: 837 JS + 85 py green; artifact boots clean; pill and registry now agree live"
+      "time": "07:31:02",
+      "msg": "A4 done (onSectionChanged hook, refreshHeader, isPageLive; 3 adopted cross-section cases red until A2a/b/c); A4 red-team + A2a/A2b/A2c/C2 dispatched"
     },
     {
-      "time": "23:23:54",
-      "msg": "Code review: 2 findings, both fixed and regression-tested"
+      "time": "07:32:28",
+      "msg": "V1 done (0.21.0; RELEASE constant drives hero/lede/footer; guard falsified; 'Previously in 0.19.0' section; Fixed list excludes unlanded UI work). V2 + V6 dispatched; V5 waits for V2"
     },
     {
-      "time": "23:23:54",
-      "msg": "RUN COMPLETE: 22/22 tasks, 839 JS + 85 py + 7 e2e green"
+      "time": "07:36:25",
+      "msg": "D2 retry done (clipboard.js preserves focus for every caller; opener captured before await; copy channel offers download; download confirmation; non-vacuous test); red-team round 2 dispatched"
+    },
+    {
+      "time": "07:37:38",
+      "msg": "V6 done (overlapRules note honest about peak-only heuristics; DCFDA reason unified; sequential-scan scoped; pixel size; spinning-disk gets confocal rules; FMO 'three or more'; sources metadata)"
+    },
+    {
+      "time": "07:41:45",
+      "msg": "V2 done (foldContinuationLines; repo-relative links -> GitHub blob; 10 tests); V1+V2+V6 red-team + V5 dispatched. D1 PASS: tick no longer rebuilds Restore while menu open; confirm wording honest; import post-replace throw toasted"
+    },
+    {
+      "time": "10:54:49",
+      "msg": "OUTAGE 2 (07:45Z): session limit (Sonnet+Opus) killed A2c, C2, V5, D2r2 red-team, V1V2V6 red-team. Reset 10:50Z. Per lesson 42 the orchestrator (Fable) substitutes a declared warm-context loop: finish interrupted work, verify with the red-team scripts on disk, full suites, live CDP"
+    },
+    {
+      "time": "11:06:14",
+      "msg": "All 25 remediation tasks closed. Outage-2 substitutions declared per task. Final tree: JS 1011/1011, Python 88/88, build ok. Commits 2b34d2e fdb41ef 99eed97"
+    },
+    {
+      "time": "11:07:50",
+      "msg": "Report addendum + lessons 52-56 written; final commit next; push awaits user confirmation"
+    },
+    {
+      "time": "13:10:33",
+      "msg": "User: fix the 19 remaining findings with Sonnet high effort. R4-17 excluded (unreachable state). Verification by the orchestrator (suites + live CDP)"
+    },
+    {
+      "time": "13:25:45",
+      "msg": "Batch F5 done: 18 follow-ups fixed (R4-17 unreachable); orchestrator fixed pre-existing 'Readout: null' in studydoc.js"
     }
   ],
-  "snapshot_at": "2026-09-10 23:23"
+  "snapshot_at": "2026-09-12 13:25"
 };
 /* CMA:EMBEDDED:END */
 

@@ -39,8 +39,19 @@ function baseNameFor(store, assayId) {
 export const designStep = {
   id: 'design',
   title: 'Samples & design',
-  render(main, store, { advisor, router, embedded = false } = {}) {
+  render(main, store, { advisor, router, embedded = false, onSectionChanged } = {}) {
     main.textContent = '';
+
+    // measurement.js's cross-section refresh hook (A4/A2a; see
+    // docs/cma-lessons.md 46/49/50): called once, synchronously, right after
+    // EVERY write below actually lands in the store, naming this section so
+    // the coalescing timer never re-fires refresh() on the section that just
+    // wrote (it already repainted itself). `onSectionChanged` is undefined
+    // for a standalone render (design.js mounted outside the Measurement
+    // page) -- guarded at every call site, never assumed present.
+    function notifyChanged() {
+      onSectionChanged?.('design');
+    }
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
     // one assay and no switcher exists yet, so the active assay never
@@ -125,6 +136,7 @@ export const designStep = {
       const { path, slotKey } = scopeWrite(store.get(), 'design.factors', assayId);
       store.setPath(path, factors, 'user', { slotKey });
       renderConditions();
+      notifyChanged();
     }
 
     function writeFactorsStructure(factors) {
@@ -132,6 +144,7 @@ export const designStep = {
       store.setPath(path, factors, 'user', { slotKey });
       renderFactors();
       renderConditions();
+      notifyChanged();
     }
 
     // Every level here is one GROUP; a sample belongs to exactly one -- kept
@@ -144,6 +157,7 @@ export const designStep = {
       const { path, slotKey } = scopeWrite(store.get(), 'design.groups', assayId);
       store.setPath(path, { levels }, 'user', { slotKey });
       renderConditions();
+      notifyChanged();
     }
 
     // Two write paths, same reasoning as writeFactorsData/writeFactorsStructure
@@ -158,6 +172,15 @@ export const designStep = {
       writeGroups(levels);
       renderGroups();
     }
+
+    // The pristine rule (docs/cma-lessons.md 46): refresh() only overwrites a
+    // scalar input's displayed value when it is neither focused nor holding
+    // an unconfirmed edit -- i.e. its current value still equals whatever
+    // this section itself last painted into it. Tracked per field so a
+    // naming/panel-driven refresh never clobbers a value the user is mid-
+    // typing in THIS section while some other section's write fires the
+    // coalesced timer.
+    const lastPainted = { organism: '', bioRep: '', techRep: '', idScheme: '' };
 
     const organismRow = document.createElement('label');
     organismRow.className = 'field-row';
@@ -175,6 +198,8 @@ export const designStep = {
       const { path, slotKey } = scopeWrite(store.get(), 'specimen.organism', assayId);
       const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
       store.setPath(path, organismInput.value, existingTag ? 'user_edited' : 'user', { slotKey });
+      lastPainted.organism = organismInput.value;
+      notifyChanged();
     });
     organismRow.appendChild(organismInput);
     main.appendChild(organismRow);
@@ -226,7 +251,7 @@ export const designStep = {
     // Two INDEPENDENT axes, each optional -- not every sample has both kinds
     // of replicate, and some (SEM/TEM/Raman) commonly have neither. Blank on
     // either input means that axis is omitted, not "default to 1".
-    function makeReplicatesRow(label, storePath, hint) {
+    function makeReplicatesRow(label, storePath, hint, lastPaintedKey) {
       const row = document.createElement('label');
       row.className = 'field-row';
       const labelEl = document.createElement('span');
@@ -244,6 +269,8 @@ export const designStep = {
         const { path, slotKey } = scopeWrite(store.get(), storePath, assayId);
         store.setPath(path, raw === '' ? null : Number(raw), 'user', { slotKey });
         renderConditions();
+        lastPainted[lastPaintedKey] = input.value;
+        notifyChanged();
       });
       row.appendChild(input);
       main.appendChild(row);
@@ -253,12 +280,14 @@ export const designStep = {
     const bioRepInput = makeReplicatesRow(
       'Biological / independent replicates',
       'design.biologicalReplicates',
-      "How many independently assigned or sampled units you have. Leave blank if this doesn't apply to your experiment."
+      "How many independently assigned or sampled units you have. Leave blank if this doesn't apply to your experiment.",
+      'bioRep'
     );
     const techRepInput = makeReplicatesRow(
       'Technical replicates',
       'design.technicalReplicates',
-      "How many technical replicates you have -- repeat measurements of the SAME sample. Leave blank if this doesn't apply."
+      "How many technical replicates you have -- repeat measurements of the SAME sample. Leave blank if this doesn't apply.",
+      'techRep'
     );
 
     const idSchemeRow = document.createElement('label');
@@ -430,9 +459,48 @@ export const designStep = {
       });
     }
 
+    // An explicit-but-invalid replicate count (<=0, non-integer) is NOT the
+    // same as an omitted one (null/undefined, meaning "this axis doesn't
+    // apply") -- see engine/conditions.js effectiveReplicateCount, which
+    // silently falls back to 1 for the invalid case so the row EXPANSION
+    // never throws. That fallback is right for the engine (it must degrade,
+    // not crash) but wrong for THIS preview: showing 'bio=B01' rows for a
+    // biologicalReplicates of -5 tells the researcher their invalid entry
+    // was accepted (V4-N4). So this UI-only guard renders the validation
+    // error conditionIssues already produces and skips the preview build
+    // entirely, rather than showing rows built from a silently-substituted 1.
+    function isValidReplicateValue(raw) {
+      return raw === null || raw === undefined || (typeof raw === 'number' && Number.isInteger(raw) && raw >= 1);
+    }
+
     function renderConditions() {
       const design = currentDesign();
-      const issues = conditionIssues(design);
+      let issues = conditionIssues(design);
+
+      // R4-12: an 'Add group' row with no name yet is a normal, in-progress
+      // state, not an authoring mistake -- conditionIssues() (rightly) still
+      // flags each blank level as "invalid" (buildSampleId would otherwise
+      // choke on it) AND, because two blank labels collide, also flags them
+      // as producing an "identical name segment" -- but that second warning
+      // is only ever true BECAUSE the rows are still blank, so it is noise
+      // until the researcher actually names the groups. Reworded/suppressed
+      // here (display-only) rather than in engine/conditions.js: the engine's
+      // job is to report every real fact, and "more than one row is still
+      // blank" is exactly the fact this UI already shows via the invalid-
+      // level prompt below.
+      const groupLevels = design.groups?.levels || [];
+      const emptyGroupCount = groupLevels.filter((level) => level === '').length;
+      issues = issues
+        .filter((issue) => !(
+          emptyGroupCount >= 2 &&
+          issue.field === 'factors' &&
+          issue.message.startsWith('Multiple condition rows produce the identical name segment')
+        ))
+        .map((issue) => (
+          issue.field === 'groups' && /^Group has an invalid level at position \d+/.test(issue.message)
+            ? { ...issue, message: 'Give this group a name to include it in the design.' }
+            : issue
+        ));
 
       // renderConditions() is the verified funnel EVERY write path in this
       // step actually calls -- factor edits, group/replicate edits, the id
@@ -456,6 +524,18 @@ export const designStep = {
       baseNameValue.textContent = baseNameFor(store, assayId);
 
       conditionsTable.textContent = '';
+
+      // V4-N4: an explicit invalid replicate count means the whole preview is
+      // built on a value the researcher must fix first -- render nothing but
+      // the issues above rather than rows that silently substituted 1.
+      if (!isValidReplicateValue(design.biologicalReplicates) || !isValidReplicateValue(design.technicalReplicates)) {
+        const invalid = document.createElement('p');
+        invalid.className = 'conditions-empty';
+        invalid.textContent = 'No rows to show -- fix the replicate count issue above.';
+        conditionsTable.appendChild(invalid);
+        return;
+      }
+
       // The SAME planner the Name builder renders its table from, so the two
       // steps cannot drift: one implementation, two views of it.
       const planned = planFilenames(assayView(store.get(), assayId), NAMING_CONFIG);
@@ -473,6 +553,12 @@ export const designStep = {
       }
 
       const pathMessages = new Set();
+      // Sanitization-loss issues (V4-N1): the only place a group/factor
+      // level reaches naming.js is planFilenames (per row), so this is also
+      // the only place they can be shown -- deduped by field+message the
+      // same way pathMessages is, so N identical rows do not repeat one
+      // warning N times.
+      const sanitizationIssuesByKey = new Map();
       for (const entry of planned) {
         const row = entry.row;
         const rowEl = document.createElement('div');
@@ -506,6 +592,9 @@ export const designStep = {
             pathMessages.add(issue.message);
           }
         }
+        for (const issue of entry.issues || []) {
+          sanitizationIssuesByKey.set(`${issue.field}|${issue.message}`, issue);
+        }
         rowEl.appendChild(sampleIdEl);
         rowEl.appendChild(filenameEl);
 
@@ -523,6 +612,15 @@ export const designStep = {
         li.textContent = `target_path: ${message}`;
         issuesList.appendChild(li);
       }
+      // Same element/class as the design issues above (`conditionIssues`)
+      // and the target_path warnings just above -- one issue-rendering
+      // convention, not a second one invented for this case.
+      for (const issue of sanitizationIssuesByKey.values()) {
+        const li = document.createElement('li');
+        li.className = 'issue issue-' + issue.severity;
+        li.textContent = `${issue.field}: ${issue.message}`;
+        issuesList.appendChild(li);
+      }
     }
 
     function renderAll() {
@@ -531,6 +629,10 @@ export const designStep = {
       bioRepInput.value = design.biologicalReplicates ?? '';
       techRepInput.value = design.technicalReplicates ?? '';
       idSchemeInput.value = design.idScheme || '';
+      lastPainted.organism = organismInput.value;
+      lastPainted.bioRep = bioRepInput.value;
+      lastPainted.techRep = techRepInput.value;
+      lastPainted.idScheme = idSchemeInput.value;
       renderGroups();
       renderFactors();
       renderConditions();
@@ -540,8 +642,41 @@ export const designStep = {
       const { path, slotKey } = scopeWrite(store.get(), 'design.idScheme', assayId);
       store.setPath(path, idSchemeInput.value, 'user', { slotKey });
       renderConditions();
+      lastPainted.idScheme = idSchemeInput.value;
+      notifyChanged();
     });
 
+    // The cross-section refresh contract (A4/A2a): NEVER rebuild the
+    // group/factor list DOM here -- that would destroy focus/caret on
+    // whichever row a sibling section's write happens to coalesce with (see
+    // docs/cma-lessons.md 46, the exact stale-closure-vs-focus collision this
+    // task exists to avoid). Only the derived, read-only surfaces
+    // (organism/replicate/idScheme boxes under the pristine rule, plus the
+    // base name + condition-row table) are safe to recompute here.
+    function syncScalarInputs() {
+      const view = assayView(store.get(), assayId);
+      const design = currentDesign();
+
+      function syncOne(input, key, nextValue) {
+        if (document.activeElement === input) return; // user is mid-edit here; never clobber
+        if (input.value !== lastPainted[key]) return; // an un-committed local edit is sitting in the box
+        input.value = nextValue;
+        lastPainted[key] = nextValue;
+      }
+
+      syncOne(organismInput, 'organism', view.specimen?.organism || '');
+      syncOne(bioRepInput, 'bioRep', design.biologicalReplicates ?? '');
+      syncOne(techRepInput, 'techRep', design.technicalReplicates ?? '');
+      syncOne(idSchemeInput, 'idScheme', design.idScheme || '');
+    }
+
+    function refresh() {
+      syncScalarInputs();
+      renderConditions();
+    }
+
     renderAll();
+
+    return { id: 'design', refresh };
   },
 };

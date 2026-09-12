@@ -133,6 +133,27 @@ body {
   font: 15px/1.55 var(--sans);
 }
 
+/* R5-12: the skip link is the FIRST focusable element on every route
+   (index.html, before #app) -- offscreen until it receives keyboard focus,
+   then pinned above everything else (the feature-tour dialog included) so
+   it is never obscured. */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: 8px;
+  z-index: 1300;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
 #app {
   display: flex;
   flex-direction: column;
@@ -497,6 +518,15 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
+/* R4-20: the ISO value a native <input type=date> will actually contribute
+   to the filename -- shown beside the DATE field on the Data plan because
+   the picker itself renders in the browser's locale order (e.g.
+   '03/14/2026') while every other date-shaped surface in the app is ISO. */
+.naming-date-iso {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* The name-builder-style field interview (ui/fieldInterview.js, zen-planner
    Phase 1 feedback): a box with its labelled confirmation action directly
    beneath it, replacing the earlier full-sentence question + Answer/Skip
@@ -639,18 +669,32 @@ button:focus-visible {
 .nav-theme-toggle:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 2px; }
 
 .field-commit-row > .field-input,
-.field-commit-row > .duration-control {
+.field-commit-row > .duration-control,
+.field-commit-row > .question-control-wrapper {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.field-commit-row > .question-control-group {
+/* Every control now sits inside .question-control-wrapper (the Unsaved cue's
+   host), so the row's direct-child rules apply to the wrapper and the
+   wrapper's children take the full width the row used to give them. */
+.question-control-wrapper > .field-input,
+.question-control-wrapper > .duration-control,
+.question-control-wrapper > .question-control-group {
+  width: 100%;
+  min-width: 0;
+}
+
+.field-commit-row > .question-control-group,
+.question-control-wrapper > .question-control-group {
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .field-commit-row > .question-control-group .field-input,
-.field-commit-row > .question-control-group .question-other-input {
+.field-commit-row > .question-control-group .question-other-input,
+.question-control-wrapper .question-control-group .field-input,
+.question-control-wrapper .question-control-group .question-other-input {
   width: 100%;
   min-width: 0;
 }
@@ -806,6 +850,17 @@ button:focus-visible {
   text-transform: uppercase;
   color: var(--muted);
   margin: 0 0 8px;
+}
+
+/* R3-13: one static caption per panel, not a per-note badge -- see
+   ui/advice.js's own comment. Sized like spectral-view-caption/overview-
+   controls-empty (both `13px`/`var(--muted)`), the app's existing small-print
+   convention, not a new visual weight. */
+.advice-caption {
+  max-width: 76ch;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 10px;
 }
 
 .advice-list {
@@ -1915,6 +1970,15 @@ button:focus-visible {
   font-style: italic;
 }
 
+/* R3-13: mirrors ui/advice.js's .advice-caption -- one static, plain (not
+   italic) caption for the whole Controls block. */
+.overview-controls-caption {
+  max-width: 76ch;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
 .overview-controls-group-label {
   font-size: 12.5px;
   color: var(--muted);
@@ -2049,6 +2113,10 @@ button:focus-visible {
   pointer-events: none;
 }
 .spectral-view-peak-value { font-size: 10px; font-weight: 650; }
+/* C3 / review R4-11: peak labels inherited the fluorophore colour from the
+   curve group and fell to 1.5:1 contrast on the light plot background; the
+   swatch and curve keep the colour, the text uses the page ink. */
+.spectral-view-peak-name, .spectral-view-peak-value { fill: var(--ink); }
 .spectral-view-filter-label { font-size: 10.5px; }
 .spectral-view-data.spectral-view-active .spectral-view-curve {
   stroke-width: 5;
@@ -3195,6 +3263,14 @@ td, th { border-color: var(--line); }
 }
 
 .microscopy-section { margin: 12px 0; }
+/* C3 / review R4-05: at phone width the channel rows were wider than their
+   card and the section's overflow: clip hid the right-hand controls with no
+   way to scroll to them. The card scrolls horizontally and, under 560px, the
+   main row wraps instead of overflowing. */
+.panel-channel-card { overflow-x: auto; }
+@media (max-width: 560px) {
+  .panel-channel-main { flex-wrap: wrap; align-items: center; }
+}
 .microscopy-section-summary,
 .overview-assay-summary,
 .overview-export-summary {

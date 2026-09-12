@@ -75,6 +75,33 @@ test('one bad rule does not silence the rest of the pack', () => {
   assert.equal(issues.length, 1);
 });
 
+// R3-13: controls.json shipped with NO provenance model at all, same gap as
+// advisor.json. The loader must carry a pack-level reviewStatus/note
+// through rather than silently drop them.
+test('a well-formed pack carries its pack-level reviewStatus/note through, not just per-rule fields', () => {
+  const { reviewStatus, note } = loadControlRules({
+    version: 1,
+    reviewStatus: 'source-cited',
+    note: 'Every control here was checked against a cited reference.',
+    rules: [validRule()],
+  });
+  assert.equal(reviewStatus, 'source-cited');
+  assert.equal(note, 'Every control here was checked against a cited reference.');
+});
+
+test('a pack with no reviewStatus/note defaults reviewStatus to claude-drafted and note to undefined', () => {
+  const { reviewStatus, note } = loadControlRules({ version: 1, rules: [validRule()] });
+  assert.equal(reviewStatus, 'claude-drafted');
+  assert.equal(note, undefined);
+});
+
+test('an absent/malformed pack still reports a reviewStatus (claude-drafted) rather than undefined', () => {
+  for (const raw of [undefined, null, {}, 'nope']) {
+    const { reviewStatus } = loadControlRules(raw);
+    assert.equal(reviewStatus, 'claude-drafted');
+  }
+});
+
 test('missing or blank id is dropped and reported', () => {
   const noId = validRule();
   delete noId.id;
@@ -261,6 +288,13 @@ test('the real web/kb/readouts.json loads with ZERO issues', () => {
 test('the real web/kb/controls.json loads with ZERO issues', () => {
   const { issues } = loadControlRules(controlsRaw);
   assert.deepEqual(issues, []);
+});
+
+test('the real web/kb/controls.json carries a pack-level reviewStatus/note the loader does not drop (R3-13)', () => {
+  const { reviewStatus, note } = loadControlRules(controlsRaw);
+  assert.equal(reviewStatus, 'claude-drafted');
+  assert.equal(typeof note, 'string');
+  assert.ok(note.length > 0);
 });
 
 test('selectControls(rules, emptyExperiment()) is EMPTY -- no advice before the user has told the app anything', () => {

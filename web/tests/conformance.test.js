@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { checkConformance } from '../src/engine/conformance.js';
 import { createDefaultStudy } from '../src/core/defaultStudy.js';
 import { emptyExperiment } from '../src/core/schema.js';
+import { emptyAssay } from '../src/core/assay.js';
 import { NAMING_CONFIG, BASE_TEMPLATE, realKb } from './fixtures.js';
 
 test('the real oregano default study needs review instead of falsely claiming export readiness', () => {
@@ -30,6 +31,36 @@ test('every issue carries a section naming which check produced it', () => {
   assert.ok(allIssues.length > 0);
   assert.ok(allIssues.every((i) => typeof i.section === 'string' && i.section.length > 0));
   assert.ok(allIssues.some((i) => i.section === 'design'));
+});
+
+// --- V4-N1 (retry): a non-Latin group/factor level is the one place
+// naming.js only ever sees a group/factor label -- planFilenames -- so this
+// pins that checkConformance (which Review is built on) actually surfaces
+// it, closing the producer->consumer gap the first E1 attempt missed
+// (the value reached finalizeFields only inside planFilenames, whose
+// result was discarded before Review's own finalizeFields(effectiveNaming
+// Fields(view)) call, which never contains design.groups.levels at all).
+test('a non-Latin group level reaches the conformance report through planFilenames, not just study-level naming fields', () => {
+  const study = createDefaultStudy();
+  study.assays[0].design = { ...study.assays[0].design, groups: { levels: ['对照组'] } };
+  const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const allIssues = report.assays.flatMap((a) => a.issues);
+  const hit = allIssues.find((i) => i.field === 'group' && i.severity === 'error');
+  assert.ok(hit, JSON.stringify(allIssues, null, 2));
+  assert.ok(hit.message.includes('对照组'), hit.message);
+  assert.match(hit.message, /Latin/);
+  // Attributed like every other conformance issue (lesson: R4-04/R4-07).
+  assert.equal(hit.assayId, study.assays[0].id);
+  assert.ok(typeof hit.stepId === 'string' || hit.stepId === null);
+});
+
+test('ordinary ASCII markers/instrument text produces no sanitization-loss issue in the conformance report', () => {
+  const study = createDefaultStudy();
+  study.assays[0].naming = { ...study.assays[0].naming, fields: { ...study.assays[0].naming?.fields, markers: 'GFP,DAPI' } };
+  study.assays[0].acquisition = { ...study.assays[0].acquisition, modality: 'Zeiss LSM 880 (Airyscan)' };
+  const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+  const allIssues = report.assays.flatMap((a) => a.issues);
+  assert.ok(!allIssues.some((i) => /lost the character/.test(i.message || '')), JSON.stringify(allIssues, null, 2));
 });
 
 test('an error-severity issue anywhere fails the gate; the report still lists every assay', () => {
@@ -126,4 +157,113 @@ test('deterministic: same study in, deep-equal report out', () => {
     checkConformance(study, kb, NAMING_CONFIG, BASE_TEMPLATE),
     checkConformance(study, kb, NAMING_CONFIG, BASE_TEMPLATE)
   );
+});
+
+// --- panel spillover: resolver parity, acknowledgements, issue attribution --
+// (R4-01, V3-N1, R4-04, R4-07 foundations)
+
+function panelIssuesFor(report, assayId) {
+  const assay = report.assays.find((a) => a.id === assayId);
+  return assay.issues.filter((i) => i.section === 'panel');
+}
+
+test('R4-01: a channels-only measurement and a markers-only measurement with the same 1nm-apart pair are BOTH readiness blocked, each with one panel issue naming both dyes', () => {
+  const channelsAssay = {
+    ...emptyAssay('channels-only'),
+    panel: {
+      ...emptyAssay('channels-only').panel,
+      channels: [
+        { id: 'c1', fluorophore: 'ALEXA488', conjugation: 'direct-probe' },
+        { id: 'c2', fluorophore: 'FITC', conjugation: 'direct-probe' },
+      ],
+    },
+  };
+  const markersAssay = {
+    ...emptyAssay('markers-only'),
+    naming: { fields: { markers: 'ALEXA488-FITC' } },
+  };
+  const study = { ...emptyExperiment(), assays: [channelsAssay, markersAssay] };
+  const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+
+  assert.equal(report.readiness, 'blocked');
+  for (const assayId of ['channels-only', 'markers-only']) {
+    const assay = report.assays.find((a) => a.id === assayId);
+    assert.equal(assay.readiness, 'blocked', assayId);
+    const panelIssues = panelIssuesFor(report, assayId);
+    const errorIssues = panelIssues.filter((i) => i.severity === 'error');
+    assert.equal(errorIssues.length, 1, assayId);
+    assert.match(errorIssues[0].message, /ALEXA488/, assayId);
+    assert.match(errorIssues[0].message, /FITC/, assayId);
+  }
+  // The two resolution routes agree byte-for-byte on the blocking message.
+  assert.equal(
+    panelIssuesFor(report, 'channels-only').find((i) => i.severity === 'error').message,
+    panelIssuesFor(report, 'markers-only').find((i) => i.severity === 'error').message
+  );
+});
+
+test('V3-N1: acknowledging the pair (reverse order on purpose) downgrades the flag to warning/needs-review; an un-acked control assay in the same study stays blocked', () => {
+  const acked = {
+    ...emptyAssay('acked'),
+    panel: {
+      ...emptyAssay('acked').panel,
+      channels: [
+        { id: 'c1', fluorophore: 'ALEXA488', conjugation: 'direct-probe' },
+        { id: 'c2', fluorophore: 'FITC', conjugation: 'direct-probe' },
+      ],
+      spillover: { acknowledged: [{ pair: ['FITC', 'ALEXA488'], reason: 'filter-separated', at: '2026-01-01T00:00:00.000Z' }] },
+    },
+  };
+  const unacked = {
+    ...emptyAssay('unacked'),
+    panel: {
+      ...emptyAssay('unacked').panel,
+      channels: [
+        { id: 'c1', fluorophore: 'ALEXA488', conjugation: 'direct-probe' },
+        { id: 'c2', fluorophore: 'FITC', conjugation: 'direct-probe' },
+      ],
+    },
+  };
+  const study = { ...emptyExperiment(), assays: [acked, unacked] };
+  const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+
+  const ackedReport = report.assays.find((a) => a.id === 'acked');
+  assert.equal(ackedReport.readiness, 'needs-review');
+  const ackedPanelIssues = panelIssuesFor(report, 'acked');
+  assert.ok(ackedPanelIssues.every((i) => i.severity !== 'error'), JSON.stringify(ackedPanelIssues));
+  assert.ok(ackedPanelIssues.some((i) => /acknowledged/.test(i.message)));
+
+  const unackedReport = report.assays.find((a) => a.id === 'unacked');
+  assert.equal(unackedReport.readiness, 'blocked', 'non-vacuous: the un-acked control assay is unaffected');
+  assert.ok(panelIssuesFor(report, 'unacked').some((i) => i.severity === 'error'));
+
+  assert.equal(report.readiness, 'blocked', 'the study is still blocked overall by the unacked assay');
+});
+
+test('R4-04/R4-07: every issue in a two-measurement study carries assayId, assayLabel and a stepId (routeId)', () => {
+  const first = { ...emptyAssay('m1'), label: 'Measurement one' };
+  const second = {
+    ...emptyAssay('m2'),
+    label: 'Measurement two',
+    design: { ...emptyAssay('m2').design, groups: { levels: ['CTL', 'CTL'] } },
+  };
+  const study = { ...emptyExperiment(), assays: [first, second] };
+  const report = checkConformance(study, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
+
+  const allIssues = report.assays.flatMap((a) => a.issues);
+  assert.ok(allIssues.length > 0);
+  for (const issue of allIssues) {
+    assert.equal(typeof issue.assayId, 'string', JSON.stringify(issue));
+    assert.ok(issue.assayId.length > 0);
+    assert.equal(typeof issue.assayLabel, 'string', JSON.stringify(issue));
+    assert.ok(issue.assayLabel.length > 0);
+    assert.equal(typeof issue.stepId, 'string', JSON.stringify(issue));
+    assert.ok(issue.stepId.length > 0);
+    assert.equal(issue.stepId, issue.routeId, 'stepId is the same identity decisionTriage calls routeId');
+  }
+  // Attribution actually distinguishes the two measurements, not a shared default.
+  const m1Ids = new Set(allIssues.filter((i) => i.assayId === 'm1').map((i) => i.assayLabel));
+  const m2Ids = new Set(allIssues.filter((i) => i.assayId === 'm2').map((i) => i.assayLabel));
+  assert.ok(m1Ids.has('Measurement one'));
+  assert.ok(m2Ids.has('Measurement two'));
 });

@@ -23,7 +23,9 @@ import { loadSpectraKb } from './spectra.js';
 
 /**
  * Shape the raw KB object into { index, markersKb, questions, advisor,
- * readouts, controlRules, stages, stageRules, spectra, overlapRules, issues }.
+ * advisorReviewStatus, advisorNote, readouts, controlRules,
+ * controlsReviewStatus, controlsNote, stages, stageRules, spectra,
+ * overlapRules, issues }.
  *
  * `raw` is globalThis.__MICRONAUT_KB__ (or an already-defaulted `{}`):
  * an object keyed by filename stem -- `raw.markers`, `raw.questions`,
@@ -49,9 +51,13 @@ export function shapeAppKb(raw) {
   const { kb: markersKb, issues: markerIssues } = loadKb(source.markers);
   const index = indexKb(markersKb);
   const questions = Array.isArray(source.questions) ? source.questions : [];
-  const { rules: advisor, issues: advisorIssues } = loadAdvisorRules(source.advisor);
+  const { rules: advisor, reviewStatus: advisorReviewStatus, note: advisorNote, issues: advisorIssues } = loadAdvisorRules(
+    source.advisor,
+  );
   const { readouts, issues: readoutIssues } = loadReadouts(source.readouts);
-  const { rules: controlRules, issues: controlIssues } = loadControlRules(source.controls);
+  const { rules: controlRules, reviewStatus: controlsReviewStatus, note: controlsNote, issues: controlIssues } = loadControlRules(
+    source.controls,
+  );
   const { stages, rules: stageRules, issues: stageIssues } = loadStages(source.stages);
   const { fluorophores: spectra, overlapRules, issues: spectraIssues } = loadSpectraKb(source.spectra);
 
@@ -60,8 +66,12 @@ export function shapeAppKb(raw) {
     markersKb,
     questions,
     advisor,
+    advisorReviewStatus,
+    advisorNote,
     readouts,
     controlRules,
+    controlsReviewStatus,
+    controlsNote,
     stages,
     stageRules,
     spectra,

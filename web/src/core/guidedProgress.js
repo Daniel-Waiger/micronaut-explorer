@@ -6,13 +6,19 @@
 // second registry here. Storage is a convenience and every read/write is
 // total so a blocked preference store cannot prevent the app from booting.
 
-import { nsKey } from './storageScope.js';
+import { nsKey, GUIDED_PROGRESS_KEY_BASE } from './storageScope.js';
 
 export const GUIDED_PROGRESS_VERSION = 1;
 // Namespaced so the practice tab tracks its own walkthrough progress rather
 // than overwriting (or resuming) the real study's -- an example run through
 // the guide must not leave the user's own tab paused mid-step, or vice versa.
-export const GUIDED_PROGRESS_KEY = nsKey(`micronaut.guidedProgress.v${GUIDED_PROGRESS_VERSION}`);
+//
+// The bare key literal lives in storageScope.js (GUIDED_PROGRESS_KEY_BASE),
+// not here, so persist.js's clearAll can sweep it without importing this
+// module (lesson 40 -- one source, no retyped literal to drift). If
+// GUIDED_PROGRESS_VERSION above is ever bumped, GUIDED_PROGRESS_KEY_BASE in
+// storageScope.js must be bumped to match -- it is not derived automatically.
+export const GUIDED_PROGRESS_KEY = nsKey(GUIDED_PROGRESS_KEY_BASE);
 
 const STATUSES = new Set(['not-started', 'active', 'paused', 'completed']);
 const RECORD_KEYS = ['version', 'status', 'currentStepId', 'completedStepIds', 'completedAt'];
