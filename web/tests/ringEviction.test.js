@@ -11,10 +11,10 @@
 // core/appController.js -- no fake persistence anywhere.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as persistMod from '/home/user/micronaut-explorer/web/src/core/persist.js';
-import { createAppController } from '/home/user/micronaut-explorer/web/src/core/appController.js';
-import { createStore } from '/home/user/micronaut-explorer/web/src/core/store.js';
-import { emptyExperiment } from '/home/user/micronaut-explorer/web/src/core/schema.js';
+import * as persistMod from '../src/core/persist.js';
+import { createAppController } from '../src/core/appController.js';
+import { createStore } from '../src/core/store.js';
+import { emptyExperiment } from '../src/core/schema.js';
 
 function memStorage() {
   const m = new Map();

@@ -15,9 +15,9 @@
 // replace (fails pre-fix)" test, so the contrast is like-for-like.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createAppController } from '/home/user/micronaut-explorer/web/src/core/appController.js';
-import { createStore } from '/home/user/micronaut-explorer/web/src/core/store.js';
-import { emptyExperiment } from '/home/user/micronaut-explorer/web/src/core/schema.js';
+import { createAppController } from '../src/core/appController.js';
+import { createStore } from '../src/core/store.js';
+import { emptyExperiment } from '../src/core/schema.js';
 
 function withTitle(experiment, title) {
   return { ...experiment, meta: { ...experiment.meta, title } };
