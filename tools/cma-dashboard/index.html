@@ -179,13 +179,10 @@ const EMBEDDED = {
   "run": "app-review 2026-09-11",
   "orchestrator": "Claude Fable 5.1",
   "active_model": "Claude Fable 5.1",
-  "active_status": "running",
-  "phase": "Batch 3 of 5 — synthesis",
+  "active_status": "done",
+  "phase": "Review run complete — 117 findings, 25 fix tasks",
   "state_note": "",
-  "current_task": {
-    "id": "S1",
-    "title": "Synthesis: merge, re-scan, report, remediation graph"
-  },
+  "current_task": null,
   "crit_title": "Open defects",
   "stats": [
     {
@@ -196,6 +193,16 @@ const EMBEDDED = {
     {
       "k": "Python tests",
       "v": "88 passed",
+      "tone": "ok"
+    },
+    {
+      "k": "Findings",
+      "v": "117 (5 blocking / 26 major)",
+      "tone": "warn"
+    },
+    {
+      "k": "Refuted",
+      "v": "5",
       "tone": "ok"
     }
   ],
@@ -347,7 +354,7 @@ const EMBEDDED = {
       "id": "S1",
       "phase": "Batch 3",
       "title": "Merge, re-scan, report, remediation graph, lessons, dashboard",
-      "status": "running",
+      "status": "done",
       "by": "Fable",
       "depends_on": [
         "V1",
@@ -420,9 +427,13 @@ const EMBEDDED = {
     {
       "time": "05:30:07",
       "msg": "V4 pass: 18 confirmed / 0 refuted / 1 unverifiable; R4-01 blocking upheld (panel.js:236 reads naming.fields.markers, conformance.js:113 reads panel.channels = two paths one fact); R4-03 = R6-01/02/08 root cause; 4 new (non-Latin names -> UNSPECIFIED silently; unconfirmed interview text discarded). Batch 2 complete: 6/6 pass"
+    },
+    {
+      "time": "06:33:54",
+      "msg": "S1 done: report docs/plans/app-review-2026-09-11.md + remediation graph (25 tasks / 7 batches) written"
     }
   ],
-  "snapshot_at": "2026-09-12 05:30"
+  "snapshot_at": "2026-09-12 06:33"
 };
 /* CMA:EMBEDDED:END */
 

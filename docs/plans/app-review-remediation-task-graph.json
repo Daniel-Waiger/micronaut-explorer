@@ -1,0 +1,467 @@
+{
+  "run": "app-review remediation 2026-09-12",
+  "objective": "Fix the findings confirmed by the app-review 2026-09-11 run (docs/plans/app-review-2026-09-11.md): data-loss in restore/import/autosave ring; measurement page never refreshing sibling sections; spillover check reading the wrong source and gating export invisibly; release-notes/version drift; false or stale user-facing copy and docs; a11y/responsive defects. Sonnet (high effort) executes one task per dispatch; Opus red-teams each; Fable does final passes.",
+  "orchestrator": "Claude Fable 5.1 (warm context)",
+  "executor": "Claude Sonnet (high effort)",
+  "verifier": "Claude Opus (red team)",
+  "required_reading": [
+    "docs/cma-lessons.md",
+    "docs/plans/app-review-2026-09-11.md"
+  ],
+  "global_invariants": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code.",
+  "user_decisions": {
+    "version": "cut 0.21.0 and move [Unreleased] under it",
+    "spillover_gate": "keep the export gate; make it visible (Review names blockers) and clearable (per-pair acknowledgement downgrades to warning)",
+    "push": "no push until the run ends and the user confirms"
+  },
+  "scratch_root": "/tmp/claude-0/-home-user-micronaut-explorer/a80dbc89-fcb8-5bfc-9e3d-7cbdbc363be2/scratchpad/review",
+  "batch_labels": [
+    "F1 foundations (engine/data)",
+    "F2 engine consumers + core",
+    "F3a UI: measurement hook, feedback, guide",
+    "F3b UI: sections, review, shell",
+    "F3c UI: questions, CSS",
+    "F4a docs/version",
+    "F4b renderer + KB"
+  ],
+  "batches": [
+    [
+      "A1",
+      "A2",
+      "B1",
+      "E1",
+      "E2"
+    ],
+    [
+      "A3",
+      "B2",
+      "B3",
+      "B4"
+    ],
+    [
+      "A4",
+      "D2",
+      "D3"
+    ],
+    [
+      "A2a",
+      "A2b",
+      "A2c",
+      "C2",
+      "D1"
+    ],
+    [
+      "A5",
+      "C3"
+    ],
+    [
+      "V1",
+      "V3",
+      "V4",
+      "V5"
+    ],
+    [
+      "V2",
+      "V6"
+    ]
+  ],
+  "tasks": [
+    {
+      "id": "A1",
+      "phase": "F1 foundations",
+      "title": "Engine: single fluorophore resolver + keep spectra note + export bounds",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/engine/spectra.js. (1) Add exported `resolveMeasurementFluorophores(view, kb) -> {source:'channels'|'markers', panelState, entries}` with semantics copied VERBATIM from web/src/engine/conformance.js:113-123: `normalizeChannels(view.panel?.channels)`; if non-empty, source='channels', entries = each non-empty `channelSpectralField(c).trim()` resolved via the same resolver conformance uses, each entry carrying `channelId: c.id`, panelState='has-entries'; else spread `resolvePanel(markersText, ...)` with source='markers'. First check `grep -n import web/src/engine/panelAssembly.js`: if panelAssembly imports spectra.js, put the resolver in a NEW file web/src/engine/measurementFluorophores.js instead (no import cycles — the build gate rejects them). Do NOT switch any caller yet (A3/C1 do that). (2) `normalizeFluorophoreEntry` (spectra.js ~:172-173 and ~:239-241, family level ~:214) must keep `note` (string or undefined) in the returned object and `resolveMarkerToken` (~:410-424) must carry it through — run web/tests/spectra.test.js FIRST to see whether any deep-equal fixture pins the shape (lesson 40) and update that fixture. (3) Export `MIN_PLAUSIBLE_PEAK_NM` / `MAX_PLAUSIBLE_PEAK_NM` from spectra.js (the existing plausibility constants) and `FILTER_BANDWIDTH_BOUNDS_NM` from web/src/engine/panelAssembly.js (~:208-223) so panel.js can stop using literals later (V3-N5). Findings: R4-01 (foundation), R3-04, V3-N5.",
+      "verification": "web/tests/spectra.test.js gains: (a) resolver with channels [ALEXA488, FITC] and markers '' returns source 'channels' and 2 entries; with channels [] and markers 'ALEXA488-FITC' returns source 'markers' and 2 entries; both entry lists fed to flagPanelOverlaps yield exactly one emission 'error'; (b) a spectra.json entry that has a note (e.g. DCFDA) comes out of loadSpectraKb/resolveMarkerToken with `note` equal to the JSON string (assert the literal text, generated by reading web/kb/spectra.json in the test, not retyped); (c) the three exported constants are numbers/arrays. Full suites green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/spectra.js",
+        "web/src/engine/panelAssembly.js",
+        "web/tests/spectra.test.js"
+      ]
+    },
+    {
+      "id": "A2",
+      "phase": "F1 foundations",
+      "title": "Schema/assay: spillover acknowledgement model (no version bump)",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/core/assay.js `emptyAssay` (~:81) gains `panel.spillover = { acknowledged: [] }`. web/src/engine/panelAssembly.js gains exported `normalizeSpilloverAcks(raw)` (returns [] for non-arrays; keeps only entries with `pair` = two non-empty strings, sorts the pair, `reason` in {'sequential-acquisition','filter-separated','other'}, optional `notes` string, `at` ISO string or now) and `pruneSpilloverAcks(acks, entries)` (drops any ack whose two canonical ids — use the same dedupe key resolvePanel builds at spectra.js ~:508-510, canonical id plus '::variantKey' when present — are not BOTH present among `entries`). Confirm web/src/core/importValidate.js ~:82 spreads `{...base.panel, ...raw.panel}` so old saves and imports get the default; add a schema/importValidate test that a v6 export WITHOUT panel.spillover migrates/imports with `acknowledged: []`. NO schemaVersion bump (document why in a code comment: additive default, tolerant reader). Findings: V3-N1 foundation.",
+      "verification": "web/tests/panelAssembly.test.js: normalizeSpilloverAcks drops malformed entries and sorts pairs; pruneSpilloverAcks keeps an ack whose pair is present in either order and drops it when one dye is replaced. web/tests/schema.test.js or importValidate test: legacy assay without panel.spillover -> acknowledged []. Full suites green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/assay.js",
+        "web/src/engine/panelAssembly.js",
+        "web/tests/panelAssembly.test.js",
+        "web/tests/schema.test.js"
+      ]
+    },
+    {
+      "id": "B1",
+      "phase": "F1 foundations",
+      "title": "persist.js: bounded protected slots, truthful save return",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/core/persist.js. Invariant to implement and state in the docstring: after every non-null saveExperiment, the ring holds at most RING_SIZE (5) ids, at most PROTECTED_CAP = RING_SIZE - 2 = 3 of them protected, and the returned id is one of them. Rework ~:120-149 in this order: push id; if protectFromAutomaticEviction add to protectedIds; drop protected ids not present in ids (stale-marker hygiene); while count(ids ∩ protected) > PROTECTED_CAP evict the OLDEST protected id !== id (splice + remove from protectedIds + removeKey); while ids.length > RING_SIZE evict the first id that is unprotected AND !== id; belt-and-braces: if !ids.includes(id) then removeKey(slot) and return null; always write PROTECTED_SLOTS_KEY when it changed (not only when protecting), keeping the existing rollback at ~:140-147. Rewrite the ~:105-110 docstring and the ~:127-129 comment (which currently promises unbounded protection). deleteExperiment (~:223-230) unchanged. D4 is already closed at ~:273-285 (ok:false on any failed removal) — do not touch clearAll here (B3 does). Findings: R5-01 (blocking), V5-NEW-02.",
+      "verification": "web/tests/persist.test.js: (a) 8 consecutive protected saves -> ring length <= 5, protected count <= 3, and EVERY returned id is loadable immediately after its own save; (b) after those 8, three plain autosaves all survive loadExperiment and appear in listSaved; (c) the existing tests at ~:109 and ~:126 still pass (retitle :109 if its title promises 'never evicted'); (d) reviewer scenario in-process: save 6 protected then 1 plain, assert the plain id is loadable (this FAILS before the change — record the failing output). Full suites green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/persist.js",
+        "web/tests/persist.test.js"
+      ]
+    },
+    {
+      "id": "B3",
+      "phase": "F2 core consumers",
+      "title": "Scope-aware clearAll (owned key families), theme kept",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/core/storageScope.js: export `ownedScopedKeys(scope)` returning the scoped forms of ['micronaut.guidedProgress.v1','micronaut.onboarding.stage','micronaut.onboarding.experience','micronaut.onboarding.completed','micronaut.navCollapsed','micronaut.advisorDebug'] via the existing makeNsKey/nsKey helpers, plus named constants for NAV_COLLAPSED_KEY and ADVISOR_DEBUG_KEY; make web/src/ui/shell.js:~37, web/src/ui/advice.js:~58, web/src/core/guidedProgress.js:~15 and web/src/core/onboarding.js:~20-22 import their key strings from storageScope.js (one source, lesson 40). THEME IS NOT SWEPT — it is deliberately shared across scopes (storageScope.js SHARED_KEYS); leave it. web/src/core/persist.js clearAll gains optional `scope` (default STORAGE_SCOPE) and dooms prefix matches ∪ ownedScopedKeys(scope) that exist, with the same removed/failed accounting (~:273-285). web/src/core/appController.js clearAllStoredData (~:308-327): after ok, reset in-memory guided state (`guidedProgressState = guided.load(...)` or equivalent — check web/src/ui/walkthrough.js for a cached copy first) and change the toast to scope-aware text: sandbox -> \"Cleared this practice tab's stored data (saved versions, walkthrough progress, onboarding answers). Theme is kept.\"; main -> same with \"this tab's\". Update web/src/ui/steps/settings.js:~75-76 note to match and web/manual/saving-privacy.html:~107 wording ('actually clears everything' -> what it clears and that theme is kept). Findings: V2-NEW-03 (major), R2-15.",
+      "verification": "web/tests/persist.test.js: clearAll with scope '' and scope 'demo' removes that scope's guidedProgress/onboarding/navCollapsed keys, leaves the OTHER scope's, leaves micronaut.theme and a foreign key 'other.app' intact; a throwing removeItem on a non-prefixed key yields ok:false. A drift test: read the key literals from storageScope.js and assert each importing module has no other 'micronaut.' literal for those families (grep-style test over source text). web/tests/appController.test.js: after clearAllStoredData, getGuidedState() (or the equivalent accessor) reports not-started. Live: start the walkthrough in dist, clear all, reload -> Home no longer offers 'Continue walkthrough'.",
+      "depends_on": [
+        "B1"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/storageScope.js",
+        "web/src/core/persist.js",
+        "web/src/core/appController.js",
+        "web/src/ui/shell.js",
+        "web/src/ui/advice.js",
+        "web/src/core/guidedProgress.js",
+        "web/src/core/onboarding.js",
+        "web/src/ui/steps/settings.js",
+        "web/manual/saving-privacy.html",
+        "web/tests/persist.test.js",
+        "web/tests/appController.test.js"
+      ]
+    },
+    {
+      "id": "E1",
+      "phase": "F1 foundations",
+      "title": "naming.js: non-Latin names raise a named error instead of silent UNSPECIFIED; path-length contract",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/engine/naming.js ~:49-52: when sanitizing a group/factor-level/user-provided token empties the string (safeCharPattern in web/src/engine/namingConfig.js:~42 is ASCII-only), do NOT silently substitute 'UNSPECIFIED'; instead keep the existing placeholder for the filename BUT emit a validation issue (through whatever issue channel design/conformance already consume — find how 'identical name segment' issues are produced and add a sibling) that names the field and the original value: e.g. \"Group name '对照组' has no characters that can be used in a filename — add a Latin label (letters, digits, - or _).\" Also cover partial loss: a token like 'Contrôle-α' that becomes 'CONTRLE--' must produce a warning naming the dropped characters. Separately (V2-NEW-04): web/src/engine/validation.js validateTargetPath documents a FULL-path contract but all three callers (web/src/ui/steps/naming.js:~469, web/src/ui/steps/design.js:~505, web/src/engine/conformance.js:~107) pass a bare filename — fix the contract in the smaller direction: rename/document it as a filename check with MAX_FILENAME guidance and make the user-facing message say 'filename' (it already does per V2's R2-10 refutation) OR compute the full path where a directory template exists; pick the one that keeps all tests honest and say which. Findings: V4-N1 (major), V2-NEW-04.",
+      "verification": "web/tests/naming.test.js: (a) group level '对照组' -> planned filename still renders but the issues list contains an error naming '对照组' and the word 'Latin' (or equivalent); (b) 'Contrôle-α' -> warning naming the dropped characters; (c) ASCII names produce no new issue (regression). web/tests/validation.test.js: the contract test matches the chosen direction. Full suites green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/naming.js",
+        "web/src/engine/validation.js",
+        "web/tests/naming.test.js",
+        "web/tests/validation.test.js"
+      ]
+    },
+    {
+      "id": "E2",
+      "phase": "F1 foundations",
+      "title": "workflowProgress: export the walkthrough step count for copy to consume",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/engine/workflowProgress.js (or web/src/engine/guidedExample.js, whichever owns the walkthrough step list — read both; guidedExample.js ~:209 maps PRIMARY_WORKFLOW): export `WALKTHROUGH_STEP_COUNT = PRIMARY_WORKFLOW.length` (frozen) and a helper `describeWalkthroughLength()` returning the English word ('five-step') from a small number->word map with a numeric fallback. No consumer changes here (D3 does them). Findings: R2-01/R5-03 foundation.",
+      "verification": "web/tests/workflowProgress.test.js: WALKTHROUGH_STEP_COUNT === PRIMARY_WORKFLOW.length === 5 and describeWalkthroughLength() === 'five-step'. Full suites green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/workflowProgress.js",
+        "web/tests/workflowProgress.test.js"
+      ]
+    },
+    {
+      "id": "A3",
+      "phase": "F2 core consumers",
+      "title": "conformance.js: use the resolver, honour acknowledgements, tag blocking issues with measurement + step",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/engine/conformance.js. (1) Replace the inline logic at ~:113-123 with `resolveMeasurementFluorophores` from A1 (behaviour-identical; existing conformance tests must stay green unchanged). (2) Pass `view.panel?.spillover?.acknowledged` (normalized via normalizeSpilloverAcks) into `flagPanelOverlaps(entries, overlapRules, { acknowledged })` — implement that third parameter in web/src/engine/spectra.js flagPanelOverlaps (~:537-580): after building a flag, if its pairKey (~:552; keep `pairKey` on the returned records instead of stripping it at ~:581) is in the ack set and severity is 'error', set severity 'warning', append ' — acknowledged: <reason label>' to message and `acknowledged: true`; excitation warnings untouched. Because the flag becomes 'warning', summarizeReadiness (~:24-35) yields 'needs-review' not 'blocked'. (3) Export `isBlockingSeverity(sev)` built on BLOCKING_SEVERITIES (:17) and make every issue record carry `assayId`, `assayLabel` (the measurement's display name as the registry shows it) and `stepId`/`routeId` (reuse whatever classifyConformanceIssue in overview.js/decisionTriage uses — if that classifier lives in the UI, move the pure part into engine so both share it). Findings: R4-01, V3-N1, R4-04, R4-07 foundations.",
+      "verification": "web/tests/conformance.test.js: (a) channels-only ALEXA488+FITC and markers-only 'ALEXA488-FITC' studies are BOTH readiness 'blocked' with one issue whose text names both dyes; (b) same study + ack pair ['FITC','ALEXA488'] (reverse order on purpose) -> the flag is severity 'warning' with 'acknowledged' in its message and readiness 'needs-review'; the un-acked control in the same test is still 'blocked' (non-vacuous); (c) every issue in a two-measurement study carries assayLabel and a stepId. Full suites green.",
+      "depends_on": [
+        "A1",
+        "A2"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/engine/conformance.js",
+        "web/src/engine/spectra.js",
+        "web/tests/conformance.test.js",
+        "web/tests/spectra.test.js"
+      ]
+    },
+    {
+      "id": "B2",
+      "phase": "F2 core consumers",
+      "title": "appController.js: one preserveOpenStudy() helper for restore/import/blank/example",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/core/appController.js. Add `preserveOpenStudy(abortMessage)`: `flushAutosave()` -> `persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure, protectFromAutomaticEviction: true })` -> on null call `reportPersistentLifecycleFailure(abortMessage)` and return null; else return the id. Replace the two inline flush+protected-save pairs in openExampleStudy (~:365-385) and startBlankStudy (~:416-426) with it (behaviour-identical). Add it to restoreRecoverySlot AFTER the loadRecoverableSlot check (~:269-274) and BEFORE store.replace (~:275): on abort return false with the store untouched and message 'Could not preserve your current study, so that version was not restored. Nothing was changed.'; add it to importProjectBackup AFTER `await importFromFile` resolves (~:238; parse first so a bad file never snapshots) and BEFORE store.replace (~:239): on abort return without replacing, same message shape for import. Both then call notifyRecoveryEntries(). Update the restore/import success toasts to say the displaced study was kept in Restore. Also (R5-09): the import failure path writes the raw JSON.parse message into the save indicator — replace with 'Could not import that file: it is not a valid Micronaut project backup.' in the toast and do NOT touch the save-state surface (leave save state as it was). Findings: R6-04, R6-05, V6-NEW-01 (blocking), R5-09.",
+      "verification": "web/tests/appController.test.js: adopt <scratch>/findings/r6/restoreImportFlush.test.js (R6-04, R6-05, control R6-04b) with the fake persist, and <scratch>/verify/v6/ringEviction.test.js (V6-NEW-01, 01b, control 01c) with REAL persist over a Map storage — scratch root /tmp/claude-0/-home-user-micronaut-explorer/a80dbc89-fcb8-5bfc-9e3d-7cbdbc363be2/scratchpad/review; all must FAIL before and PASS after. Add: restore/import abort when the snapshot returns null -> store unchanged and status failed; a malformed import leaves getSaveState() unchanged and the toast text contains no 'position' / 'JSON at'. Full suites green.",
+      "depends_on": [
+        "B1"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/appController.js",
+        "web/tests/appController.test.js"
+      ]
+    },
+    {
+      "id": "B4",
+      "phase": "F2 core consumers",
+      "title": "Empty groups is a clear, not a lock; copy-groups counts and tooltip honest",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/core/store.js: the clearing exception in setValueAtPath treats ''/null/undefined as a clear; extend it so an EMPTY ARRAY is also a clear (a WEAK write may later fill it). Check provenance.js:~53-61 canOverwrite semantics and web/tests/store.test.js/provenance.test.js for a test that pins the old behaviour — update it with a comment. web/src/ui/steps/study.js copy-groups (~:176-200): exclude the SOURCE measurement from the applied/skipped loop (R6-09) and make the tooltip/toast describe what core/assay.js groupSeedLevels (~:279-290) actually does: it prefers the active measurement but falls back to the first measurement that has groups — either change groupSeedLevels to use ONLY the active measurement (and disable the button when it has none) or make the copy say so; prefer the former (smaller surface, matches the tooltip). Findings: V6-NEW-03 (major), R6-09, V6-NEW-02.",
+      "verification": "Adopt <scratch>/verify/v6/emptyGroupsLock.test.js into web/tests/studyStep.test.js (drives the REAL design Remove button then the REAL study copy button): must FAIL before and PASS after. Add: a one-measurement study's copy button is disabled or its toast reports 0 applied / 0 skipped (not 'skipped 1'); with an active measurement lacking groups the button is disabled and no other measurement's groups are copied. Full suites green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/store.js",
+        "web/src/ui/steps/study.js",
+        "web/src/core/assay.js",
+        "web/tests/store.test.js",
+        "web/tests/studyStep.test.js"
+      ]
+    },
+    {
+      "id": "A4",
+      "phase": "F3 UI wiring",
+      "title": "measurement.js: section-changed hook, derived-only refresh, live header badges",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/ui/steps/measurement.js. Implement the refresh authority designed for this run (NOT a store.subscribe — see docs/cma-lessons.md 46/49/50 and the plan): pass `onSectionChanged(sourceId)` in embeddedOptions; collect `handles[step.id] = step.render(...)` where each section's render() returns `{ id, refresh() }` (A2a/A2b/A2c make them return that; until they land, treat a section that returns undefined as having no refresh). The hook coalesces source ids in a Set behind ONE trailing `window.setTimeout(..., 150)` (domStub exposes window.advance(ms)); on fire, under a `refreshing` re-entrancy flag, call refresh() on every handle whose id is NOT in the source set, then refreshHeader(). refreshHeader() keeps the existing statusGroup element (~:129) and rebuilds ONLY its children from `options.getWorkflowProgress?.() ?? options.workflowProgress` (the thunk at main.js:~305; the snapshot at ~:300 is stale by design). Rewrite the false header comment at ~:20-24. Loop-freedom by construction: refresh paths never write the store — add a test that greps the refresh functions' source for store.setPath|patch|replace. Findings: R6-01, R6-02, R6-08, R4-03 (mechanism).",
+      "verification": "web/tests/measurementRefresh.test.js (new; mount like <scratch>/findings/r6/crossSectionStale.test.js mount() but pass a REAL `getWorkflowProgress` thunk built from deriveWorkflowProgress(store.get(), checkConformance(...), kb.questions) — without it the badge assertion can never pass): (c) seed groups.levels [] -> click 'Add group', type 'CT', advance(150) -> the .measurement-status-badge texts differ from before. The (a)/(b) sibling assertions live in A2a/A2b/A2c and are re-run there. Also adopt crossSectionStale.test.js into web/tests/ with two edits (advance(150) after each dispatch; the real thunk) — it may still fail until A2a-c land; state which cases pass after this task alone. Full suites green.",
+      "depends_on": [
+        "A3",
+        "B4"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/measurement.js",
+        "web/tests/measurementRefresh.test.js"
+      ]
+    },
+    {
+      "id": "A2a",
+      "phase": "F3 UI wiring",
+      "title": "design.js: notify on commit, refresh derived only, invalid replicates stop the preview",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/ui/steps/design.js. Destructure `onSectionChanged` from options; call `onSectionChanged('design')` from the write funnels: writeFactorsData/Structure (~:124-135), writeGroups (~:143-147), organism input (~:174-178), replicate inputs (~:242-247), idScheme (~:539-543). render() returns `{ id:'design', refresh }` where refresh = () => { syncScalarInputs(); renderConditions(); } — syncScalarInputs assigns organism/bioRep/techRep/idScheme input values ONLY under the pristine rule (input is not document.activeElement AND its value equals the last value this section painted); NEVER call renderGroups/renderFactors from refresh (they rebuild inputs). Also: when biologicalReplicates/technicalReplicates is invalid (<=0 / non-integer, the validator already errors), renderConditions must render the error and NOT the previews built from 1 (V4-N4); and 'Add group' on an empty row must not emit the identical-name-segment errors until the row has a value (R4-12: suppress duplicate-segment issues for rows whose level is still empty; keep the 'invalid level' one but phrase it as a prompt). Findings: R6-02, R4-03 (design half), V4-N4, R4-12.",
+      "verification": "web/tests/measurementRefresh.test.js (extend) or designStep test: dispatching input on a naming markers box then advance(150) updates the design base name/condition filenames; focus + selectionStart + same element instance of a design group input survive a naming-driven refresh; replicates -5 -> no 'bio=B01' preview rows; two empty 'Add group' rows -> no 'identical name segment' error text. Adopted crossSectionStale R6-02 case passes. Full suites green; rebuild dist and check live that typing in a group box keeps caret.",
+      "depends_on": [
+        "A4"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/design.js",
+        "web/tests/measurementRefresh.test.js"
+      ]
+    },
+    {
+      "id": "A2b",
+      "phase": "F3 UI wiring",
+      "title": "naming.js: notify on input, sync boxes from store under the pristine rule",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/ui/steps/naming.js. Call `onSectionChanged('naming')` after update() in the input handler (~:190-203). render() returns `{ id:'naming', refresh }` with refresh = () => { syncInputsFromStore(); update(); }; syncInputsFromStore reads `effectiveNamingFields(assayView(store.get(), assayId))` (web/src/engine/plan.js:~43-51) per FIELD_DEFS key and assigns each input under the pristine rule; leave `date` alone when the store value is empty (preserves the localDateInputValue() default at ~:187-189). Also (R4-02): where the filename preview and the registry/issue text render a missing acquisition date as '1970-01-01' (find the Date(0)/epoch source — likely a null date formatted in plan.js or naming.js), render the explicit placeholder token the rest of the app uses ('UNKNOWN' or 'DATE-TBD'; pick the one the exported CSV/Markdown already use for other unset fields, and make it consistent across preview, registry row, issue text and exports). Findings: R6-01/R4-03 (naming half), R4-02 (major).",
+      "verification": "web/tests/measurementRefresh.test.js (extend): after a panel Confirm of modality (dispatch through the real handler) + advance(150), naming's Modality box shows the new value; a naming box being edited (activeElement) is NOT overwritten by a sibling refresh. web/tests/naming.test.js or plan.test.js: a measurement with no date renders the placeholder token, and '1970' appears nowhere in preview, registry row text, CSV manifest or Markdown. Adopted crossSectionStale R6-01 case passes after A2c. Full suites green.",
+      "depends_on": [
+        "A4"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/naming.js",
+        "web/src/engine/plan.js",
+        "web/tests/measurementRefresh.test.js",
+        "web/tests/naming.test.js"
+      ]
+    },
+    {
+      "id": "A2c",
+      "phase": "F3 UI wiring",
+      "title": "panel.js: derived-only repaint, resolver-fed spillover block, acknowledgements, focus, aria, badge, note",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/ui/steps/panel.js (largest task; keep the diff surgical). (1) Split paint() into paintShell() (headings, sections, interview grid, assembly editor — once per render) and paintDerived() (recompute view/markersText/entries/panelState ~:237-240 as `let`, repaint fluorophoresSection, spectralSection via refreshSpectralView ~:388-419, the Seed button ~:734, advicePanel.update). onCommit (~:221-227) keeps paint() and adds onSectionChanged('panel'); writeChannels (~:349-352) also notifies. render() returns `{ id:'panel', refresh: paintDerived }`; sync `#field-interview-<id>` inputs under the pristine rule; NEVER re-run renderFieldInterview from refresh (it wipes unconfirmed text). (2) Feed entries/panelState/spectral view from `resolveMeasurementFluorophores` (A1) instead of naming.fields.markers only (~:236-240); the 'unanswered'/'no-markers-declared' branches (~:265-279) render only when source==='markers'; copy at ~:268 mentions Panel assembly; ~:310 'recognized fluorophore(s)' gets a suffix '(from Panel assembly)' / '(from the Markers field)'. (3) Acknowledgement UI in the flags list (~:294-303): each error flag li gets a <details> 'Acknowledge this pair' with a <select> of the three reasons and a 'Record acknowledgement' button writing to panel.spillover.acknowledged via scopeWrite with tag 'user'; an acknowledged (warning) flag shows 'Acknowledged — <reason> (<date>) · Withdraw'; after writeChannels and markers onCommit call pruneSpilloverAcks and write the pruned list (tag user_edited). (4) Focus restore: move buttons get data-focus-key=`${channel.id}:${delta}` (~:597-607); writeChannelsStructure captures document.activeElement?.dataset?.focusKey before renderChannelsList() and re-focuses it after (if disabled, focus the sibling); remove focuses the next row's remove or '+ Add channel'. (5) aria: conjugation select aria-label `Conjugation for ${name}` (~:545), remove button aria-label `Remove channel ${name}` keeping the × text (~:614), name = channelSpectralField(channel).trim() || channel.target || 'unnamed channel'. (6) Badge label map: 'source-cited' -> 'cited source', 'claude-drafted' -> 'unreviewed' (~:115). (7) row.title = entry.note in appendRow (~:82-119). (8) Replace literals at ~:664-665 and ~:677-682 with the constants exported in A1. (9) Field-interview boxes (V4-N2): pressing Enter in a text box triggers the same commit as its confirmation control, and an unconfirmed non-empty box shows a visible 'Unsaved — press Enter or Confirm' cue (a small status span; no new dependencies). Findings: R4-01 (blocking), R6-01, V3-N1, R4-06, R4-10, V4-N3, R2-12, R3-04, V3-N5, V4-N2.",
+      "verification": "New web/tests/panelStep.test.js (model on web/tests/namingStep.test.js mount; real kb from fixtures): (a) channels ALEXA488+FITC and markers 'PI' -> Fluorophores section text contains 'emission peaks 1 nm apart' and NOT 'No spectral-proximity' (FAILS before); (b) record an acknowledgement through the real control -> the flag text contains 'acknowledged' and the study's panel.spillover.acknowledged has the sorted pair; change channel 2 to ALEXA647 -> the ack is gone; (c) click the ↓ button of channel 1 -> document.activeElement.dataset.focusKey equals the same key; (d) the conjugation select and remove button have accessible names containing the fluorophore; (e) typing in the instrument box then a naming-driven refresh (advance(150)) leaves the typed text; Enter in the markers box commits it. Adopted crossSectionStale R6-01 case passes. Live in dist: the panel block and Review agree for ALEXA488+FITC; acknowledging makes Review 'Needs review' and exports run. Full suites green.",
+      "depends_on": [
+        "A4"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/panel.js",
+        "web/src/ui/questionControl.js",
+        "web/tests/panelStep.test.js"
+      ]
+    },
+    {
+      "id": "A5",
+      "phase": "F3 UI wiring",
+      "title": "questions.json: one editor per replicate path",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/kb/questions.json: delete the microscopy-phase `biologicalReplicates` (~:149-160) and `technicalReplicates` (~:161-172) questions; design.js's rows are the single editor (replicates are design axes and their consequence is painted beside them). Check consumers: web/src/engine/workflowProgress.js:~41-56 microscopy total drops by 2 (its tests use a local bank), web/src/engine/decisionTriage.js:~34 and web/src/engine/freetext.js:~81 reference the FIELD not the question id (confirm by grep), web/kb/markers.README.md/manual pages that list the Acquisition questions (grep 'Technical replicates' in web/manual and fix the sentence). Run interview/kb/copyConsistency/manual tests. Findings: R6-07 (major).",
+      "verification": "web/tests/questionsSingleEditor.test.js (new): no question `field` starts with 'design.'; rendering the Acquisition section (panel step) with the real kb produces no 'Biological replicates' cell. Do NOT adopt <scratch>/findings/r6/duplicateEditors.test.js (its precondition becomes false); replace with the negative assertion. Full suites green (expect count to change by the deleted-question tests if any pinned 19 questions — update the count fixture with a comment).",
+      "depends_on": [
+        "A2c"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/kb/questions.json",
+        "web/tests/questionsSingleEditor.test.js",
+        "web/manual/acquisition.html"
+      ]
+    },
+    {
+      "id": "C2",
+      "phase": "F3 UI wiring",
+      "title": "overview.js: name every blocker, label it, dedupe decisions, safe export filename, honest copy fallback",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/ui/steps/overview.js. (1) reportIssues (~:308-314) adds `blocking: isBlockingSeverity(severity)`. (2) EXPORT CHECKS block (~:698-720): when readiness==='blocked', render after the verdict a <ul class=\"issues-list\"> of ONLY blocking issues, each `<li class=\"issue issue-error\"><span class=\"issue-blocks-label\">Blocks export</span> <button class=\"conformance-issue-link\">{assayLabel}: {text}</button></li>` wired to navigateDecision({ routeId, measurementId }) using the stepId/routeId A3 attached. (3) permitFinalExport toast (~:565): 'Export blocked: {assayLabel}: {first issue text}' plus '(+N more)' when applicable. (4) Decisions list (~:262-275): prefix conformance-sourced items with `${assayLabel}: ` and prepend the same visible 'Blocks export' span when blocking; dedupe in web/src/engine/decisionTriage.js conformanceItems (~:117-130) by `${assayId}|${section}|${field}|${message}` — first log where the duplicates come from (likely experimentMap({conformance}) at overview.js ~:543) and dedupe at triage, not in the UI. (5) Export filename (R6-03): the `(title || fallback).replace(/[^A-Za-z0-9_-]+/g,'-')` pattern must fall back when the sanitized result is empty or only '-'. (6) LLM-prompt copy fallback (~:634-647) must offer the prompt itself (e.g. reveal it in a <textarea readonly> for manual copy) rather than pointing at the JSON export. (7) Study diagram label 'Assay N' -> the measurement's display name/'Measurement N' (R4-09) — the diagram lives in engine/render/svgDiagram.js or studydoc.js; change the label source, not the renderer. Findings: R4-04, R4-07, R6-03, R4-14, R4-09.",
+      "verification": "web/tests/projectReview.test.js or a new overviewStep.test.js (domStub, real kb): a two-measurement study where measurement 2 has channels ALEXA488+FITC -> the Export checks section contains 'Blocks export' and both dye names and the measurement label; the Decisions list names that measurement exactly once for that flag; the export toast text names the dyes. Title '   ' or '研究' -> export filename is the fallback, not '-.md'. Diagram label text has no 'Assay'. Full suites green; live check in dist for the blocked state.",
+      "depends_on": [
+        "A3"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/overview.js",
+        "web/src/engine/decisionTriage.js",
+        "web/src/engine/studydoc.js",
+        "web/tests/projectReview.test.js"
+      ]
+    },
+    {
+      "id": "C3",
+      "phase": "F3 UI wiring",
+      "title": "CSS: 400px panel rows reachable; light-theme chart labels readable",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/styles/app.css. Keep `.microscopy-section { overflow: clip }` (~:3190). Add `.panel-channel-card { overflow-x: auto; }` and `@media (max-width: 560px) { .panel-channel-main { flex-wrap: wrap; align-items: center; } }` (verify the actual class names in web/src/ui/steps/panel.js first — lesson 40). Add `.spectral-view-peak-name, .spectral-view-peak-value { fill: var(--ink); }` (~:2040) so labels stop inheriting the fluorophore colour from the group `fill` set in web/src/ui/spectralView.js ~:67-72/~:263-274 (curves/swatches keep colour); confirm the label class names in spectralView.js. Findings: R4-05 (major), R4-11.",
+      "verification": "CDP against dist over http (script under your scratch, output attached to the report): viewport 400 and 360 px, open a measurement with 2 channels, assert for the channel card `scrollWidth <= clientWidth` OR every row control's getBoundingClientRect().right <= viewport width; light theme: computed fill of a peak label vs the plot background contrast >= 4.5 (compute WCAG ratio in the script). Screenshot both. tests/test_single_file_build.py still green (CSS inlined). Full suites green.",
+      "depends_on": [
+        "A2c"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/styles/app.css",
+        "web/src/ui/spectralView.js"
+      ]
+    },
+    {
+      "id": "D1",
+      "phase": "F3 UI wiring",
+      "title": "shell.js: toast queue, ticking save label, distinguishable restore rows, cleared live region",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/ui/shell.js (+ web/src/core/appController.js recoveryEntries). (1) showToast (~:969-974) becomes a small queue: each message is shown for its duration; a new message while one is visible is queued (max 3, drop oldest), so main.js's KB-issue toast and the recovery toast at boot are BOTH seen (R6-06/R5-04); the live-region element's text is cleared after the fade so it stops being read minutes later (R4-15). (2) renderSaveState ticker: `setInterval(30000)` re-rendering the save label (and recovery rows) while status==='saved', torn down on `pagehide` and via a `destroy()` on the shell's returned object for tests (V6-NEW-04). (3) appController.recoveryEntries (~:204-218): title = meta.title || first 60 chars of researchQuestion || {blank:'Blank study', example/template:'Example study', imported:'Imported study'}[meta.origin] || 'Untitled study'; return `origin`; shell row aria-label `\"<title>, version <i> of <n>, saved <when>\"` (~:372-411) (V5-NEW-03). (4) Delete-measurement confirm copy 'This cannot be undone.' -> mention that earlier autosaves in Restore still contain it (R4-16). Findings: R6-06, R5-04, R4-15, V6-NEW-04, V5-NEW-03, R4-16.",
+      "verification": "web/tests/shell-utilities.test.js (+ a new shellToast.test.js if needed, using the REAL renderShell as <scratch>/findings/r6/toastCollision.test.js does — adopt it; it must FAIL before): two toasts in one synchronous block -> both texts observable in sequence via window.advance; live-region text is '' after the second fade; source-level assertion that setInterval(…30000) and pagehide teardown exist; two restore rows with identical times have different aria-labels. Full suites green; live in dist: boot with a seeded recoverable autosave shows the recovery toast, and after 35 s 'just now' becomes a minute label (screenshot both).",
+      "depends_on": [
+        "B2",
+        "B3"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/shell.js",
+        "web/src/core/appController.js",
+        "web/tests/shell-utilities.test.js",
+        "web/tests/appController.test.js"
+      ]
+    },
+    {
+      "id": "D2",
+      "phase": "F3 UI wiring",
+      "title": "feedbackHandoff.js: GitHub reachable when copy fails, channel-correct text, focus trap",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/ui/feedbackHandoff.js. (1) The proceed button must NOT be gated on `copied` (~:103-104): when the copy failed on the GitHub channel, render the proceed button anyway with text 'Open GitHub issue' and body 'The package could not be copied automatically — download it below and attach it to the issue, or paste it after you download.' plus a 'Download feedback package' button inside the modal. (2) Channel-correct outcomes: the download channel (handoffFeedback ~:130-135 runs download() then attempts copy) must report 'Feedback package downloaded' when the download succeeded even if the copy failed; never tell the download channel to 'use Download instead' (R2-11, V5-NEW-01). (3) Dialog a11y (~:77-81): with role=dialog aria-modal=true, trap Tab/Shift+Tab within the dialog, focus the first control on open, restore focus to the invoking button on close, close on Escape (R5-08). Also update the in-app copy in web/src/ui/steps/guide.js:~381-383 if it now misdescribes the flow. Findings: R5-02 (major), V2-NEW-02 (major), V5-NEW-01 (major), R2-11, R5-08.",
+      "verification": "web/tests/feedback.test.js (extend; stub navigator.clipboard to reject): GitHub channel with a rejected copy -> modal contains a button that opens the GitHub URL (assert the anchor/URL through the newTab helper) and a download button; download channel with a rejected copy -> title contains 'downloaded' and not 'Could not copy'; Tab from the last control wraps to the first; Escape closes and focus returns to the opener. Live in dist over file:// (Page.navigate to file URL, no clipboard): 'Open GitHub issue' shows the proceed button. Full suites green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/feedbackHandoff.js",
+        "web/src/ui/steps/guide.js",
+        "web/tests/feedback.test.js"
+      ]
+    },
+    {
+      "id": "D3",
+      "phase": "F3 UI wiring",
+      "title": "Guide/walkthrough copy: real step count, real nav list, plural, manual links",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/src/ui/steps/guide.js: replace every 'seven-step' (~:26, 162, 168, 174, 262) with `describeWalkthroughLength()` from E2 (import it; the file comment at :26 too); the 'what each step in the left nav means' list (~:261-279) must list the FIVE nav steps (Study map, Research brief, Measurements, the open measurement, Review) and describe Samples & design / Acquisition / Data plan as SECTIONS inside a measurement, not steps (R2-03, R5-10); manual links (~:390-396) point to 'manual/index.html' and 'release-notes/index.html' (directory hrefs break under file://, R5-07) — also fix the same hrefs in web/src/ui/shell.js nav if present. web/src/ui/featureWalkthrough.js:~13-18 'Three workspaces' wording reconciled with the same five-step vocabulary. web/src/engine/guidedExample.js:~120 plural verb ('1 measurement is' / 'N measurements are'). web/tests/guideStep.test.js:~201-207 asserted the false 'seven-step' string — change it to assert `describeWalkthroughLength()`'s value so the test can never defend a stale count again (V2-NEW-05). Findings: R2-01, R5-03, R2-03, R5-10, R5-11, R5-07, V2-NEW-05.",
+      "verification": "web/tests/guideStep.test.js: button titles contain the computed word ('five-step') and the string 'seven' appears nowhere in guide.js (grep-style assertion, lesson 41); the nav reference list renders exactly five <dt> for steps and names the three sections as sections; web/tests/guidedExample.test.js: '1 measurement is' and '2 measurements are'. web/tests/copyConsistency.test.js and manual.test.js still green (update manual text if the guide wording is mirrored there). Full suites green.",
+      "depends_on": [
+        "E2"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/src/ui/steps/guide.js",
+        "web/src/ui/featureWalkthrough.js",
+        "web/src/engine/guidedExample.js",
+        "web/src/ui/shell.js",
+        "web/tests/guideStep.test.js",
+        "web/tests/guidedExample.test.js"
+      ]
+    },
+    {
+      "id": "V1",
+      "phase": "F4 docs and release",
+      "title": "Cut 0.21.0: version, changelog, release-notes hero from one source, test guard",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || USER DECISION: cut 0.21.0. web/src/core/version.js APP_VERSION -> '0.21.0'. web/release-notes/CHANGELOG.md: move everything under '## [Unreleased]' to a new '## [0.21.0] - 2026-09-12' and add a concise 'Fixed' list for this run (data-loss fixes in restore/import/ring; measurement page live refresh; spillover check reads Panel assembly + acknowledgements; Review names blockers; feedback handoff; copy corrections); leave an empty [Unreleased]. web/release-notes/index.html: the hero eyebrow (~:112), lede (~:114), 'What X changes' (~:127) and footer fallback (~:192) must all derive from ONE constant at the top of the page's script (e.g. `const RELEASE = { version: '0.21.0', date: '12 Sep 2026' }`) that the existing footer-rewrite code (~:234-238) uses as its fallback; the hero text for 0.19.0's spectral story moves into a dated 'Previously in 0.19.0' section so it is no longer presented as current. Fix the arithmetic/lede errors in the hand-written half: 'Nine more' -> 'Ten more' (R3-01/R1-10); the lede's '16 nm' applies to DRAQ5 not Alexa 488 (R1-11); the Alexa list at ~:129-130 says 'among others' or lists all four missing (ALEXA405/514/532/647) (R3-11); the '-- see below' pointer under file:// dead-ends — link the phrase to the GitHub CHANGELOG URL as well (V3-N4/V1-N6). web/tests/version.test.js: assert APP_VERSION == newest non-Unreleased changelog heading == the RELEASE.version literal in index.html (regex over the file) == the footer fallback text. Findings: R1-04, R2-02, R5-05, V1-N1, R2-06, R1-17-adjacent, R3-01, R1-10, R1-11, R3-11, V3-N4.",
+      "verification": "web/tests/version.test.js passes and FAILS if any one of the four surfaces is edited alone (prove by a temporary local edit you revert — describe it). Render dist/release-notes/index.html over http and over file:// via CDP: hero, lede and footer all read 0.21.0 in both modes; 'Nine more' absent; Settings shows 'Version 0.21.0'. Full suites green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/src/core/version.js",
+        "web/release-notes/CHANGELOG.md",
+        "web/release-notes/index.html",
+        "web/tests/version.test.js"
+      ]
+    },
+    {
+      "id": "V2",
+      "phase": "F4 docs and release",
+      "title": "Release-notes renderer: join soft-wrapped lines, fix relative links",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/release-notes/index.html render() (~:216-231): pre-process the fetched markdown so soft-wrapped continuation lines (indented or plain lines following a bullet/paragraph without a blank line) are joined onto their logical line BEFORE the line loop (lesson 47: fold logical statements before matching); the intro-boilerplate filter (~:227-228) then matches whole logical paragraphs, so the intro is dropped cleanly; keep closeList() semantics. Relative links: rewrite hrefs starting with '../../' (and any repo-relative path) to `https://github.com/Daniel-Waiger/micronaut-explorer/blob/main/<path>` inside safeHref/inline (R2-05/R5-06) — deploy.yml publishes only index.html/manual/release-notes so they can never resolve on the site. Findings: R2-04 (major), V2-NEW-01 (major), R2-05, R5-06.",
+      "verification": "A node test (new web/tests/releaseNotesRender.test.js) that extracts render()/inline() from index.html (or move them into a tiny web/release-notes/render.js the page loads via a <script src> — check deploy.yml copies the whole release-notes dir) and renders web/release-notes/CHANGELOG.md: count of <li> equals the count of bullet lines in the file; zero <p> whose text starts with a lowercase continuation fragment; the rendered intro fragment 'retroactively' does not appear; every href in the output is absolute https or an in-page anchor. Live in dist over http: #cl-body first text is a version heading. Full suites green.",
+      "depends_on": [
+        "V1"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/release-notes/index.html",
+        "web/tests/releaseNotesRender.test.js"
+      ]
+    },
+    {
+      "id": "V3",
+      "phase": "F4 docs and release",
+      "title": "README.md: bring every claim in line with the code",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || README.md only. (R1-01) lines ~67-77: spectra provenance -> '143 of 157 entries cite a vendor or publication source; 14 remain Claude-drafted and are badged unreviewed in-app; none is specialist-reviewed'. (V1-N2) ~82-88: 'one pass/fail verdict composed from every validator the app already runs' -> describe the export checks and state what they do NOT check (mirror overview.js:711). (V1-N3) ~91-92: the walkthrough runs only in the practice tab (index.html?demo=1). (R1-12) ~221-224: CI also runs tests/test_browser_cdp.py and a separate browser e2e job (tests/test_e2e_flows.py) that fails without Chrome. (R1-13) ~193-208: add web/manual/, web/release-notes/, web/styles/, tests/. (R1-18) ~172-177: complete the build-gate list (top-level await, surviving static import, XMLHttpRequest/WebSocket/sendBeacon/EventSource). (R1-07) ~12-14: `_archive/...tar.gz` does not exist in this repo — refer to tag `classic-final` only. (R1-16) ~61-63: registry rows show the headline badge plus the other two axes as chips. (R1-06 adjacent) ~71-72: say the source URLs live in docs/references/planner-fluorophore-sources.json, not in the shipped pack. Keep the file's voice; no new claims you have not verified against the tree. Findings: R1-01, V1-N2, V1-N3, R1-12, R1-13, R1-18, R1-07, R1-16, R1-06.",
+      "verification": "A reviewer-style check you run and paste: for each edited sentence, the command or file:line that proves it (counts recomputed from web/kb/spectra.json; ls of the listed dirs; grep of ci.yml). web/tests/manual.test.js / copyConsistency.test.js still green. No other file changed.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "README.md"
+      ]
+    },
+    {
+      "id": "V4",
+      "phase": "F4 docs and release",
+      "title": "ROADMAP.md, TASKS.md, .github comments: retire stale claims",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || ROADMAP.md: (R1-09/A23) '16 rules' -> 17; (R1-01) ~132-140 'Every fluorophore ... Claude-drafted ... persistent banner' -> the 143/14 state and the three-variant banner; (R1-02) ~34-36 'the real ... oregano study is the app's default' -> it opens only in the practice tab, a first run starts blank; (R1-19) ~50-59 backticked `SYTO9`/`DCF` -> 'the SYTO family (syto9 alias)' / 'DCFDA (dcf alias)'; (R1-15) 'Last updated' -> today. TASKS.md: (R1-01) ~89-90 same provenance fix; (R1-14) ~93-97 favicon 404 known-issue is stale (web/index.html:23 ships an inline SVG favicon) — mark resolved; (R1-34-adjacent) onboarding `completed` key note stays; 'Last updated' -> today. .github/ISSUE_TEMPLATE/config.yml ~:1-13: delete the 'feedback MISSING / knowledge-pack MISSING (Checked 2026-09-11)' comment — verifier V1 confirmed both labels exist live via the GitHub API (V1-N4). .github/workflows/deploy.yml:~6 'The source repo (this one) stays private' -> the repo is public; keep the two-repo Pages rationale honest (V1-N5). Root CHANGELOG.md (~:5-12): add one line that it covers the archived Classic only and has never cut a version (R1-17). Findings: R1-09, R1-01, R1-02, R1-19, R1-15, R1-14, V1-N4, V1-N5, R1-17.",
+      "verification": "grep -n '16 rules\\|Every fluorophore\\|stays private\\|MISSING' across ROADMAP.md TASKS.md .github -> zero hits (paste the command output); `python3 -c` recount of advisor.json rules == the number written. No code files changed.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "ROADMAP.md",
+        "TASKS.md",
+        ".github/ISSUE_TEMPLATE/config.yml",
+        ".github/workflows/deploy.yml",
+        "CHANGELOG.md"
+      ]
+    },
+    {
+      "id": "V5",
+      "phase": "F4 docs and release",
+      "title": "Manual + dev server parity: labels, alt text, manual images",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || web/manual/*.html: (R2-07) the Settings button is labelled 'Project backup (.micronaut.json, importable)' — fix every 'Download project backup' reference outside the walkthrough context (grep); (R2-09) docs/images/04-measurement-acquisition.png alt/caption text in web/manual/acquisition.html and web/release-notes/index.html:~154 must describe source-cited badges, not 'unreviewed'; (R2-13) 'Copy feedback report' vs 'Copy feedback package' — use one name everywhere the manual and shell name the action (check web/src/ui/shell.js utilities menu and web/src/ui/steps/feedback.js; change the DOC to match the UI unless the UI is inconsistent with itself, then align the UI's two strings). tools/serve_dir.py: map '/manual/images/' onto docs/images/ exactly like '/release-notes/images/' (R2-08, R5-13). Do NOT regenerate screenshots in this task (the orchestrator does it at the end of the run). Findings: R2-07, R2-09, R2-13, R2-08, R5-13.",
+      "verification": "web/tests/manual.test.js and copyConsistency.test.js green; `PORT=<free> python3 tools/serve_dir.py web` then curl every manual/images/*.png referenced by the manual -> all 200 (paste the loop output); grep -rn 'Download project backup' web/manual -> zero hits outside walkthrough prose. Python suite green.",
+      "depends_on": [],
+      "parallel_safe": true,
+      "files": [
+        "web/manual/*.html",
+        "web/release-notes/index.html",
+        "tools/serve_dir.py",
+        "web/src/ui/steps/feedback.js"
+      ]
+    },
+    {
+      "id": "V6",
+      "phase": "F4 docs and release",
+      "title": "Knowledge packs: internally consistent notes and rule wording",
+      "scope": "INVARIANTS (every task): read docs/cma-lessons.md first. Never run git add/commit/push/checkout/stash/reset — the orchestrator owns git. Before reporting done: the task's named repro/new test must FAIL on the pre-change tree (prove it by stashing nothing: just run it before you edit and record the failure) and PASS after; run the FULL JS suite `node --test web/tests/*.test.js` (floor 879 passing, 0 failing; the number may rise, never fall) and `python3 -m pytest -q tests/` (floor 88); for UI-visible changes rebuild `python3 tools/build_single_file.py --web-dir web --out dist` and re-check live in headless Chromium against dist served over http (tools/browser_cdp.py; pick a free port above 9200; kill only PIDs you started, never pkill by name). Name every producer->consumer pair your change touches. If the literal spec is wrong, deviate minimally, say so explicitly in your report as the delivered contract (lesson 35). Report {task_id, outcome, files_changed, tests_added, suite_counts, deviations, live_check}. Keep the diff minimal to the task; do not refactor unrelated code. || Data-only edits, every one justified by another file in this repo (label anything else [Unverified] in your report and do NOT change it). web/kb/spectra.json overlapRules.note (V3-N3): reword so the note no longer implies the flag is wider than the thresholds — state plainly that 25/20 nm are conservative peak-distance heuristics below the typical filter/laser spacings the note cites, and that the plot's FWHM widths do not feed the flag; DCFDA note vs changelog reason (R3-10): make the spectra note and web/release-notes/CHANGELOG.md's 0.19.0 known-gaps sentence give the same reason and the same name (DCFDA / H2DCFDA alias stated once). web/kb/advisor.json: sequential-scan rule (R3-07) scoped to 'dyes that are separable by excitation; if excitation peaks are also close, the excitation-proximity warning applies'; the step-size rule (R3-14) uses 'pixel size' in the body to match its title/concept; (V3-N2) 'spinning-disk confocal' must receive the confocal rules — extend the `in` predicate lists of the confocal rules to include 'spinning-disk confocal' ONLY where the rule body applies to spinning-disk as well (say per rule why); leave 'two-photon' and 'TIRF' uncovered and list them as a follow-up unless a rule body literally covers them. web/kb/controls.json (R3-16): 'about three' rule prose -> 'three or more colours' to match the `gt 2` predicate. docs/references/planner-fluorophore-sources.json (R3-05): per-record `editedBy`/`retrievalDate` already exist for the 93 newer records — correct the TOP-LEVEL editedBy/retrievalDate to say 'multiple; see per-record fields' with both dates. Findings: V3-N3, R3-10, R3-07, R3-14, V3-N2, R3-16, R3-05.",
+      "verification": "python3 -m pytest -q tests/test_kb_json_valid.py green; web/tests/advisor.test.js, kb.test.js, spectra.test.js green; a one-off node script (attach output) showing selectAdvice for modality 'spinning-disk confocal' returns the confocal rules you extended and nothing for 'TIRF'; grep that the DCFDA reason string is identical in spectra.json and CHANGELOG.md. No src changes.",
+      "depends_on": [
+        "V1"
+      ],
+      "parallel_safe": true,
+      "files": [
+        "web/kb/spectra.json",
+        "web/kb/advisor.json",
+        "web/kb/controls.json",
+        "web/release-notes/CHANGELOG.md",
+        "docs/references/planner-fluorophore-sources.json"
+      ]
+    }
+  ]
+}
