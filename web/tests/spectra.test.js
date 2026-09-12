@@ -11,6 +11,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { loadKb, indexKb } from '../src/core/kb.js';
+import { realKb } from './fixtures.js';
 import {
   derivePanelFacts,
   flagPanelOverlaps,
@@ -981,4 +982,22 @@ test('MIN/MAX_PLAUSIBLE_PEAK_NM and FILTER_BANDWIDTH_BOUNDS_NM are exported with
   assert.equal(typeof FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm, 'number');
   assert.equal(typeof FILTER_BANDWIDTH_BOUNDS_NM.maxNm, 'number');
   assert.ok(FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm < FILTER_BANDWIDTH_BOUNDS_NM.maxNm);
+});
+
+test('resolveMeasurementFluorophores falls back to the Markers field when no channel names a dye (Copilot review, PR #20)', () => {
+  const kb = realKb();
+  const view = { panel: { channels: [{ id: 'c1', target: 'Nuclei', fluorophore: '', conjugation: 'direct-probe' }] }, naming: { fields: { markers: 'ALEXA488-FITC' } } };
+  const resolved = resolveMeasurementFluorophores(view, { index: kb.index, markersKb: kb.markersKb, spectra: kb.spectra });
+  assert.equal(resolved.source, 'markers');
+  assert.equal(resolved.entries.filter((e) => e.state === 'known').length, 2);
+});
+
+test('flagPanelOverlaps orders a family-variant pair deterministically regardless of input order (Copilot review, PR #20)', () => {
+  const kb = realKb();
+  const args = { index: kb.index, markersKb: kb.markersKb, spectra: kb.spectra };
+  const a = resolveMarkerToken('MitoTracker Green', args.index, args.markersKb, args.spectra);
+  const b = resolveMarkerToken('MitoTracker Deep Red', args.index, args.markersKb, args.spectra);
+  const one = flagPanelOverlaps([a, b], kb.overlapRules).map((f) => f.message);
+  const two = flagPanelOverlaps([b, a], kb.overlapRules).map((f) => f.message);
+  assert.deepEqual(one, two);
 });

@@ -100,13 +100,18 @@ function withUnsavedCue(element, initialValue, watchInputs) {
   cue.hidden = true;
   wrapper.appendChild(cue);
 
-  const baseline = initialValue === undefined || initialValue === null ? '' : String(initialValue);
+  // The baseline is the watched inputs' OWN joined representation, captured
+  // after they were pre-filled -- a scalar `initialValue` (90 minutes) never
+  // equals the joined '1\u000030' the inputs hold, so a prefilled control
+  // would read as Unsaved on first paint (Copilot review on PR #20).
+  const signature = () =>
+    watchInputs.map((input) => (input && input.value !== undefined ? String(input.value) : ''));
+  const baseline = signature().join('\u0000');
 
   function sync() {
-    const current = watchInputs
-      .map((input) => (input && input.value !== undefined ? String(input.value) : ''))
-      .join('\u0000');
-    cue.hidden = current === '' || current === baseline;
+    const parts = signature();
+    const allEmpty = parts.every((part) => part.trim() === '');
+    cue.hidden = allEmpty || parts.join('\u0000') === baseline;
   }
 
   for (const input of watchInputs) {
@@ -186,9 +191,8 @@ export function buildQuestionControl(question, initialValue, options = {}) {
     attachEnterCommit(hours.input);
     attachEnterCommit(minutes.input);
 
-    const baselineValue = Number.isFinite(total) ? String(total) : '';
     return {
-      element: withUnsavedCue(wrapper, baselineValue, [hours.input, minutes.input]),
+      element: withUnsavedCue(wrapper, undefined, [hours.input, minutes.input]),
       // Empty in BOTH boxes -> '' (an unanswered duration, so the commit
       // path's `if (!raw) return` treats it as "not filled in yet"); any
       // value in either box -> total minutes as a number.
@@ -196,7 +200,10 @@ export function buildQuestionControl(question, initialValue, options = {}) {
         const hv = hours.input.value.trim();
         const mv = minutes.input.value.trim();
         if (hv === '' && mv === '') return '';
-        return (Number(hv) || 0) * 60 + (Number(mv) || 0);
+        const totalMinutes = (Number(hv) || 0) * 60 + (Number(mv) || 0);
+        // Zero and negative totals are "not answered", never a schedulable
+        // duration; the commit gate treats '' as empty.
+        return totalMinutes > 0 ? totalMinutes : '';
       },
     };
   }
@@ -282,7 +289,7 @@ export function buildQuestionControl(question, initialValue, options = {}) {
 
     const getValue = () => (select.value === OTHER_OPTION_VALUE ? otherInput.value : select.value);
     return {
-      element: withUnsavedCue(compositeWrapper, getValue(), [select, otherInput]),
+      element: withUnsavedCue(compositeWrapper, undefined, [select, otherInput]),
       getValue,
     };
   }

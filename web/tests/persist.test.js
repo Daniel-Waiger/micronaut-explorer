@@ -821,3 +821,16 @@ test('GUIDED_PROGRESS_KEY still carries GUIDED_PROGRESS_VERSION (the base litera
   const gp = await import('../src/core/guidedProgress.js');
   assert.ok(gp.GUIDED_PROGRESS_KEY.endsWith('micronaut.guidedProgress.v' + gp.GUIDED_PROGRESS_VERSION), gp.GUIDED_PROGRESS_KEY);
 });
+
+test('a corrupt protectedSlots value (null / object / mixed) never throws and reads as nothing protected (Copilot review, PR #20)', async () => {
+  const { saveExperiment, deleteExperiment, listSaved } = await import('../src/core/persist.js');
+  for (const corrupt of ['null', '{"a":1}', '[1, null, "keep"]', '"str"']) {
+    const storage = new Map();
+    const backend = { getItem: (k) => (storage.has(k) ? storage.get(k) : null), setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k), get length() { return storage.size; }, key: (i) => [...storage.keys()][i] };
+    backend.setItem('micronaut.v1.protectedSlots', corrupt);
+    const id = saveExperiment({ meta: { title: 't' } }, { storage: backend });
+    assert.ok(id, `save survives ${corrupt}`);
+    assert.doesNotThrow(() => deleteExperiment(id, { storage: backend }));
+    assert.deepEqual(listSaved({ storage: backend }), []);
+  }
+});

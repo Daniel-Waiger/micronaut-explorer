@@ -527,7 +527,11 @@ function normalizeEmptySlotProvenance(experiment) {
   for (const [key, slot] of Object.entries(slots)) {
     if (!HEALABLE_SLOT_RE.test(key)) continue;
     if (!slot || typeof slot.tag !== 'string') continue;
-    if (tierOf(slot.tag) !== 'STRONG') continue; // already WEAK/PROVISIONAL: nothing to heal
+    // An unknown tag is the validator's to drop (importValidate runs AFTER
+    // migrate); it must not throw out of the heal.
+    let tier = null;
+    try { tier = tierOf(slot.tag); } catch { continue; }
+    if (tier !== 'STRONG') continue; // already WEAK/PROVISIONAL: nothing to heal
     if (!isEmptyValue(resolveSlotValue(experiment, key))) continue;
     changed = true;
     nextSlots[key] = { ...slot, tag: 'default' };

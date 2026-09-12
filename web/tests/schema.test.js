@@ -603,3 +603,12 @@ test('a v6 SAVE (not import) without panel.spillover gets acknowledged: [] at th
   assert.equal(out.assays[0].panel.channels, legacy.assays[0].panel.channels, 'other panel fields untouched');
   assert.strictEqual(migrate(base), base, 'identity preserved when nothing needs filling');
 });
+
+test('migrate() skips an unknown provenance tag on a design.groups slot instead of throwing (Copilot review, PR #20)', () => {
+  const base = emptyExperiment();
+  const key = `assay:${base.assays[0].id}.design.groups`;
+  const withBadTag = { ...base, provenance: { ...(base.provenance || {}), slots: { ...((base.provenance || {}).slots || {}), [key]: { tag: 'totally-made-up-tag' } } } };
+  let out;
+  assert.doesNotThrow(() => { out = migrate(withBadTag); });
+  assert.equal(out.provenance.slots[key].tag, 'totally-made-up-tag', 'left for the validator to drop');
+});

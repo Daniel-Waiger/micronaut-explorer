@@ -73,7 +73,7 @@ export const settingsStep = {
     }
     const storageNote = document.createElement('p');
     storageNote.className = 'proposals-empty supporting-description';
-    storageNote.textContent = 'Clearing stored data removes every locally saved version (Restore), walkthrough progress and onboarding answers for this tab, and frees up storage space if it is full or corrupted. Theme is kept. It does not affect the study currently open — download a project backup first if you want to keep it.';
+    storageNote.textContent = 'Clearing stored data removes the previously saved versions (Restore), walkthrough progress and onboarding answers for this tab, and frees up storage space if it is full or corrupted. Theme is kept. The study currently open is unaffected and is saved again as the first new version — download a project backup first if you want an off-browser copy.';
     const version = document.createElement('p');
     version.className = 'proposals-empty supporting-description';
     version.textContent = `Version ${APP_VERSION}`;

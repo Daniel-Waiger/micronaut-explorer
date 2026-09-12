@@ -315,7 +315,10 @@ export function createPanelStep(kb) {
       function writeChannelsData(channels) {
         writeChannels(channels);
         summary.textContent = summaryText(channels);
-        refreshSpectralView();
+        // A custom fluorophore name typed into a row changes which dyes are
+        // in the panel: the flags and acknowledgement controls must follow,
+        // not only the plot (Copilot review on PR #20).
+        paintDerived();
       }
 
       // R6-01/A2c item 4: restore focus across a structural channel-row
@@ -785,6 +788,9 @@ export function createPanelStep(kb) {
       function writeSpilloverAcks(nextAcks, tag) {
         const { path, slotKey } = scopeWrite(store.get(), 'panel.spillover.acknowledged', assayId);
         store.setPath(path, normalizeSpilloverAcks(nextAcks), tag, { slotKey });
+        // An acknowledgement changes the conformance result, so the composed
+        // page's header badges must re-derive (A4 hook).
+        if (typeof onSectionChanged === 'function') onSectionChanged('panel');
       }
 
       function appendFlagAckControls(li, flag) {

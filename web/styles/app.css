@@ -639,18 +639,32 @@ button:focus-visible {
 .nav-theme-toggle:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent); outline-offset: 2px; }
 
 .field-commit-row > .field-input,
-.field-commit-row > .duration-control {
+.field-commit-row > .duration-control,
+.field-commit-row > .question-control-wrapper {
   flex: 1 1 auto;
   min-width: 0;
 }
 
-.field-commit-row > .question-control-group {
+/* Every control now sits inside .question-control-wrapper (the Unsaved cue's
+   host), so the row's direct-child rules apply to the wrapper and the
+   wrapper's children take the full width the row used to give them. */
+.question-control-wrapper > .field-input,
+.question-control-wrapper > .duration-control,
+.question-control-wrapper > .question-control-group {
+  width: 100%;
+  min-width: 0;
+}
+
+.field-commit-row > .question-control-group,
+.question-control-wrapper > .question-control-group {
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .field-commit-row > .question-control-group .field-input,
-.field-commit-row > .question-control-group .question-other-input {
+.field-commit-row > .question-control-group .question-other-input,
+.question-control-wrapper .question-control-group .field-input,
+.question-control-wrapper .question-control-group .question-other-input {
   width: 100%;
   min-width: 0;
 }

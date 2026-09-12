@@ -144,8 +144,13 @@ export function saveExperiment(experiment, {
   // while the caller told the user "nothing was changed" (red-team B1-P1/B2-P1).
   const originalIds = [...ids];
   ids.push(id);
-  const protectedIds = new Set(readJSON(storage, PROTECTED_SLOTS_KEY, []));
-  let protectedChanged = false;
+  // Corrupt or hand-edited metadata must degrade, not throw: only an array
+  // of string ids counts, anything else reads as "nothing protected".
+  const rawProtected = readJSON(storage, PROTECTED_SLOTS_KEY, []);
+  const protectedIds = new Set(
+    Array.isArray(rawProtected) ? rawProtected.filter((slotId) => typeof slotId === 'string') : []
+  );
+  let protectedChanged = !Array.isArray(rawProtected) || rawProtected.length !== protectedIds.size;
   if (protectFromAutomaticEviction) {
     protectedIds.add(id);
     protectedChanged = true;
@@ -291,8 +296,9 @@ export function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceed
   removeKey(storage, slotKey(id), onQuotaExceeded);
   const ids = readRing(storage).filter((existingId) => existingId !== id);
   writeJSON(storage, RING_INDEX_KEY, ids, onQuotaExceeded);
-  const protectedIds = readJSON(storage, PROTECTED_SLOTS_KEY, [])
-    .filter((existingId) => existingId !== id);
+  const rawProtected = readJSON(storage, PROTECTED_SLOTS_KEY, []);
+  const protectedIds = (Array.isArray(rawProtected) ? rawProtected : [])
+    .filter((existingId) => typeof existingId === 'string' && existingId !== id);
   writeJSON(storage, PROTECTED_SLOTS_KEY, protectedIds, onQuotaExceeded);
 }
 

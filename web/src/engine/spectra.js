@@ -562,7 +562,10 @@ export function resolveMeasurementFluorophores(view, kb) {
         ...resolveMarkerToken(spectralField, markerIndex, markersKb, fluorophores),
         channelId: channel.id,
       }));
-    return { source: 'channels', panelState: 'has-entries', entries };
+    // Channels win only when at least one of them names a dye. A structured
+    // row whose fluorophore is still blank must not silence a populated
+    // Markers field (Copilot review on PR #20).
+    if (entries.length > 0) return { source: 'channels', panelState: 'has-entries', entries };
   }
 
   const markersText = (view && view.naming && view.naming.fields && view.naming.fields.markers) || '';
@@ -632,7 +635,9 @@ export function flagPanelOverlaps(entries, overlapRules, options) {
       const left = known[i];
       const right = known[j];
       const [a, b] =
-        (left.canonical || left.token) <= (right.canonical || right.token) ? [left, right] : [right, left];
+        (fluorophoreEntryId(left) || left.token) <= (fluorophoreEntryId(right) || right.token)
+          ? [left, right]
+          : [right, left];
       // Variant-aware (MITOTRACKER::mitotracker green), shared with the
       // acknowledgement model -- see panelAssembly.js fluorophoreEntryId.
       const pairKey = spilloverPairKey(fluorophoreEntryId(a), fluorophoreEntryId(b));

@@ -254,5 +254,9 @@
         "tools/cma-dashboard/index.html"
       ]
     }
-  ]
+  ],
+  "follow_on": {
+    "note": "This graph records the READ-ONLY review run. The code changes on this branch were made by the separate remediation run whose graph is docs/plans/app-review-remediation-task-graph.json; the review's report and its remediation addendum are docs/plans/app-review-2026-09-11.md.",
+    "remediation_graph": "docs/plans/app-review-remediation-task-graph.json"
+  }
 }
