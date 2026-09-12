@@ -637,11 +637,11 @@ Sorted blocking → nit. *Fix* names the remediation task in `docs/plans/app-rev
 ## Appendix B — follow-ups not turned into tasks
 
 - `[Unverified]` R3-03 (ECFP/EGFP/mRuby2 values absent from every repo file — needs FPbase records added), R3-15 (Nyquist anchoring across two co-firing advisor rules), R4-17 (Study map "question 3 of 5" vs footer "step 1 of 5" — state unreachable in the verifier's profile), R6-09 as originally stated (superseded by the verified version fixed in B4).
-- R3-13: advisor.json / controls.json carry no provenance model at all (29 rules with unsourced hard numbers) — a knowledge-pack design decision, not a text fix.
-- R3-12: "157 fluorophores" counts top-level entries; users pick among 190 leaf spectra — a wording choice for the release notes.
+- R3-13: advisor.json / controls.json carried no provenance model — batch F5 (W2) added a pack-level `reviewStatus`/`note` surfaced in the UI; per-rule sourcing of the 29 hard numbers remains open.
+- R3-12: "157 fluorophores" counts top-level entries; users pick among 190 leaf spectra — both counts now stated (W1).
 - V3-N2 partial: `two-photon` and `TIRF` match zero advisor rules; only spinning-disk is folded into confocal rules in V6.
-- R3-08/09/17, R4-18/19/20, R1-15: nits noted, not scheduled (R4-19 "no control sets the study title" is partly mitigated by D1's restore-row labelling).
-- R3-06: the flag ignores FWHM by documented design; the note wording is fixed in V6, the model is not changed.
+- R3-08/09/17, R4-18/19/20: fixed in batch F5 (W1–W3). R1-15: nit noted, not scheduled.
+- R3-06: the flag ignores FWHM by documented design; the note (V6) and the flag message (W2) now say so; the model is not changed.
 
 ## Method
 
@@ -743,24 +743,24 @@ User decision after the findings landed: fix the confirmed findings in the same 
 | R2-08 | minor | fixed | V5 |
 | R2-09 | minor | fixed | V5 |
 | R2-11 | minor | fixed | D2 |
-| R3-02 | minor | follow-up | — |
-| R3-03 | minor | follow-up | — |
+| R3-02 | minor | fixed | W1 |
+| R3-03 | minor | fixed | W1 |
 | R3-04 | minor | fixed | A1, A2c |
 | R3-05 | minor | fixed | V6 |
-| R3-06 | minor | follow-up | — |
+| R3-06 | minor | fixed | W2 |
 | R3-07 | minor | fixed | V6 |
 | R3-10 | minor | fixed | V6 |
 | R3-11 | minor | fixed | V1 |
-| R3-12 | minor | follow-up | — |
-| R3-13 | minor | follow-up | — |
+| R3-12 | minor | fixed | W1 |
+| R3-13 | minor | fixed | W2 |
 | R4-04 | minor | fixed | A3, C2 |
 | R4-07 | minor | fixed | A3, C2 |
-| R4-08 | minor | follow-up | — |
+| R4-08 | minor | fixed | W4 |
 | R4-09 | minor | fixed | C2 |
 | R4-10 | minor | fixed | A2c |
 | R4-11 | minor | fixed | C3 |
 | R4-12 | minor | fixed | A2a |
-| R4-13 | minor | follow-up | — |
+| R4-13 | minor | fixed | W3 |
 | R4-14 | minor | fixed | C2 |
 | R5-04 | minor | fixed | D1 |
 | R5-05 | minor | fixed | V1 |
@@ -791,29 +791,32 @@ User decision after the findings landed: fix the confirmed findings in the same 
 | R1-19 | nit | fixed | V4 |
 | R2-12 | nit | fixed | A2c |
 | R2-13 | nit | fixed | V5 |
-| R2-14 | nit | follow-up | — |
+| R2-14 | nit | fixed | W1 |
 | R2-15 | nit | fixed | B3 |
-| R3-08 | nit | follow-up | — |
-| R3-09 | nit | follow-up | — |
+| R3-08 | nit | fixed | W1 |
+| R3-09 | nit | fixed | W1 |
 | R3-14 | nit | fixed | V6 |
-| R3-15 | nit | follow-up | — |
+| R3-15 | nit | fixed | W2 |
 | R3-16 | nit | fixed | V6 |
-| R3-17 | nit | follow-up | — |
+| R3-17 | nit | fixed | W2 |
 | R4-15 | nit | fixed | D1 |
 | R4-16 | nit | fixed | D1 |
 | R4-17 | nit | follow-up | — |
-| R4-18 | nit | follow-up | — |
-| R4-19 | nit | follow-up | — |
-| R4-20 | nit | follow-up | — |
+| R4-18 | nit | fixed | W2 |
+| R4-19 | nit | fixed | W3 |
+| R4-20 | nit | fixed | W3 |
 | R5-11 | nit | fixed | D3 |
-| R5-12 | nit | follow-up | — |
+| R5-12 | nit | fixed | W3 |
 | R5-13 | nit | fixed | V5 |
 | R6-03 | nit | fixed | C2 |
-| V1-N6 | nit | follow-up | — |
+| V1-N6 | nit | fixed | W1 |
 | V3-N5 | nit | fixed | A1, A2c |
 | V4-N4 | nit | fixed | A2a |
 | V5-NEW-03 | nit | fixed | D1 |
-| V6-NEW-05 | nit | follow-up | — |
+| V6-NEW-05 | nit | fixed | W3 |
+
+### Batch F5 — follow-ups (W1–W4, after PR review)
+The 19 minor/nit findings left as follow-ups were fixed in a fifth batch (four Sonnet executors at high effort; the orchestrator verified each on disk, ran both suites, rebuilt `dist` and drove it over http, with no separate red-team). W1 (R3-02/03/08/09/12, V1-N6, R2-14): release-notes and manual wording — the "ambiguous names" card no longer asserts which variant CFP/GFP/mRuby store, counts are given at both the top-level (143/157) and selectable-spectrum (174/190) level, the 14 uncited entries are named inline, manual captions say the screenshots show the practice tab. W2 (R3-13/15/17, R3-06, R4-18): `advisor.json`/`controls.json` gain a pack-level `reviewStatus`/`note` that the loaders carry and the Guidance/Controls panels caption as unreviewed; the two Nyquist rules cross-reference each other; the 30 nm default filter band moves from a literal in `panelAssembly.js` to `spectra.json`'s `overlapRules.filterBandDefaultNm` (test pins engine default == pack value); overlap flag messages say "peak-to-peak distance … curve widths are not considered"; `pi` resolves to propidium iodide and the unrecognised-marker message is location-neutral. W3 (R4-13/19/20, R5-12, V6-NEW-05): selects start on a disabled "Choose…" placeholder; the Data plan date shows an ISO helper; a Study title field on the Study map writes `meta.title` so Restore rows are identifiable; a skip link targets the `<main>` shell.js renders (the orchestrator moved the id into shell.js and removed W3's MutationObserver workaround once W4 released that file); V6-NEW-05 was already true. W4 (R4-08): the nav entry for the active measurement reads the same `workflowProgress.assays[i].status` headline as the registry row and the switcher pill (verified live in Draft, Needs a decision and Blocked). R4-17 stays `[Unverified]` (unreachable). While driving the build the orchestrator also found and fixed a pre-existing defect: Review's "Readout:" line resolved its label from the stored `readout` id, which only the example study writes, so every user-typed readout rendered as "Readout: null" (`studydoc.js`, regression test added).
 
 ### Follow-ups surfaced by the red-teams (not fixed here)
 - persist.js: a save whose ring-index write fails after a *protected-slot* eviction now restores the pre-save ring, but a save that fails on the *protected-slots key* write still reports failure while the write succeeded elsewhere; and restoring the oldest unprotected slot can evict that very slot (B1/B2 red-teams).

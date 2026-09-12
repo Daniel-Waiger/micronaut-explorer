@@ -50,6 +50,38 @@ test('a raw.advisor pack reaches the returned advisor rules -- the exact wiring 
   assert.equal(advisor[0].id, 'sted-photobleaching');
 });
 
+// R3-13: shapeAppKb must expose the pack-level provenance loadAdvisorRules/
+// loadControlRules now carry through, not stop at the array of rules --
+// otherwise the loader-level fix has nowhere in the app to reach.
+test('shapeAppKb exposes advisorReviewStatus/advisorNote and controlsReviewStatus/controlsNote', () => {
+  const { advisorReviewStatus, advisorNote, controlsReviewStatus, controlsNote } = shapeAppKb({
+    markers: { version: 1, markers: {}, ambiguousInFreeText: [] },
+    questions: [],
+    advisor: {
+      version: 1,
+      reviewStatus: 'source-cited',
+      note: 'advisor note',
+      rules: [validAdvisorRule()],
+    },
+    readouts: { version: 1, readouts: {} },
+    controls: { version: 1, reviewStatus: 'source-cited', note: 'controls note', rules: [] },
+    stages: { version: 1, stages: [], rules: [] },
+    spectra: VALID_SPECTRA,
+  });
+  assert.equal(advisorReviewStatus, 'source-cited');
+  assert.equal(advisorNote, 'advisor note');
+  assert.equal(controlsReviewStatus, 'source-cited');
+  assert.equal(controlsNote, 'controls note');
+});
+
+test('shapeAppKb over the REAL committed KB reports claude-drafted for both advisor and controls (R3-13)', () => {
+  const { advisorReviewStatus, advisorNote, controlsReviewStatus, controlsNote } = realKb();
+  assert.equal(advisorReviewStatus, 'claude-drafted');
+  assert.equal(controlsReviewStatus, 'claude-drafted');
+  assert.ok(typeof advisorNote === 'string' && advisorNote.length > 0);
+  assert.ok(typeof controlsNote === 'string' && controlsNote.length > 0);
+});
+
 test('raw.questions passes through UNTOUCHED (createDescribeStep still owns loadQuestions itself)', () => {
   const rawQuestions = [{ id: 'q', field: 'a', type: 'text', priority: 1 }];
   const { questions } = shapeAppKb({ questions: rawQuestions });

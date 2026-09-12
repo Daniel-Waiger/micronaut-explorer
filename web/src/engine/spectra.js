@@ -88,6 +88,16 @@ const SPECTRAL_VIEW_DEFAULT_EMISSION_FWHM_NM = 50;
 const SPECTRAL_VIEW_MIN_FWHM_NM = 5;
 const SPECTRAL_VIEW_MAX_FWHM_NM = 300;
 
+// R3-17: the suggested detection-filter bandwidth (engine/panelAssembly.js's
+// defaultChannelFilterPair) used to be a private literal there, sourced only
+// in a code comment to this pack's own overlapRules note. It now has ONE
+// documented home -- overlapRules.filterBandDefaultNm in spectra.json --
+// and panelAssembly.js reads the value THIS loader returns rather than its
+// own copy, so the two can never drift (lesson 40). Bounds reuse the same
+// plausible-FWHM range as schematicEmissionFwhmNm: a detection-filter
+// bandwidth outside 5-300 nm is a data-entry error, not a real filter.
+const DEFAULT_FILTER_BAND_NM = 30;
+
 // Peak plausibility (Decision: content is hand-drafted and hand-edited, so a
 // type check alone lets a transposed digit through clean). The visible
 // spectrum plus a safety margin into near-UV/near-IR, where FACSI-relevant
@@ -325,12 +335,33 @@ export function loadSpectraKb(raw) {
     );
   }
 
+  const rawFilterBandDefaultNm = rawOverlapRules.filterBandDefaultNm;
+  const validFilterBandDefaultNm =
+    typeof rawFilterBandDefaultNm === 'number' &&
+    Number.isFinite(rawFilterBandDefaultNm) &&
+    rawFilterBandDefaultNm >= SPECTRAL_VIEW_MIN_FWHM_NM &&
+    rawFilterBandDefaultNm <= SPECTRAL_VIEW_MAX_FWHM_NM;
+  const filterBandDefaultNm = validFilterBandDefaultNm ? rawFilterBandDefaultNm : DEFAULT_FILTER_BAND_NM;
+  // Optional for old/synthetic packs, same posture as schematicEmissionFwhmNm
+  // just above: absence is a backwards-compatible default, a present-but-
+  // invalid value is reported because silently accepting it would reshape
+  // every channel's suggested filter band.
+  if (rawFilterBandDefaultNm !== undefined && !validFilterBandDefaultNm) {
+    issues.push(
+      spectraIssue(
+        'overlapRules',
+        `overlapRules.filterBandDefaultNm must be ${SPECTRAL_VIEW_MIN_FWHM_NM}-${SPECTRAL_VIEW_MAX_FWHM_NM} nm -- defaulting to ${filterBandDefaultNm}`
+      )
+    );
+  }
+
   return {
     fluorophores,
     overlapRules: {
       emissionProximityNm,
       excitationProximityNm,
       schematicEmissionFwhmNm,
+      filterBandDefaultNm,
       reviewStatus: overlapReviewStatus,
     },
     issues,
@@ -646,7 +677,7 @@ export function flagPanelOverlaps(entries, overlapRules, options) {
       if (emissionGapNm < rules.emissionProximityNm) {
         const flag = {
           field: 'panel',
-          message: `${a.token} and ${b.token}: emission peaks ${emissionGapNm} nm apart (under the ${rules.emissionProximityNm} nm proximity threshold) -- likely to co-register in each other's detection window.`,
+          message: `${a.token} and ${b.token}: emission peaks ${emissionGapNm} nm apart (peak-to-peak distance under the ${rules.emissionProximityNm} nm threshold; curve widths are not considered) -- likely to co-register in each other's detection window.`,
           severity: 'error',
           gap: emissionGapNm,
           pairKey,
@@ -665,7 +696,7 @@ export function flagPanelOverlaps(entries, overlapRules, options) {
       if (excitationGapNm < rules.excitationProximityNm) {
         flags.push({
           field: 'panel',
-          message: `${a.token} and ${b.token}: excitation peaks ${excitationGapNm} nm apart (under the ${rules.excitationProximityNm} nm proximity threshold) -- likely both excited by a single laser line.`,
+          message: `${a.token} and ${b.token}: excitation peaks ${excitationGapNm} nm apart (peak-to-peak distance under the ${rules.excitationProximityNm} nm threshold; curve widths are not considered) -- likely both excited by a single laser line.`,
           severity: 'warning',
           gap: excitationGapNm,
           pairKey,

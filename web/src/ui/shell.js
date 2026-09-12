@@ -780,6 +780,12 @@ export function renderShell(root, store, router, options = {}) {
   nav.appendChild(sticky);
   const main = document.createElement('main');
   main.className = 'shell-main';
+  // Target of the "Skip to content" link in index.html (R5-12). A <main>
+  // is not focusable on its own, so tabindex=-1 lets the link's fragment
+  // jump / focus() land here instead of silently falling back to <body>;
+  // -1 keeps it out of the normal Tab order.
+  main.id = 'main-content';
+  main.tabIndex = -1;
   // One stable, non-modal host for both guided progress and explanation-only
   // content. Main/controller code owns what appears here; the shell only owns
   // its semantic placement and visibility.
@@ -879,34 +885,52 @@ export function renderShell(root, store, router, options = {}) {
     const utilityButtons = new Map();
     router.steps.forEach((step) => {
       const current = workflowStep(step.id);
+      // The per-measurement entry ("Measurement") names the ACTIVE
+      // measurement, so unlike every other nav step it must show THAT
+      // measurement's own badge -- the same headline the registry row and
+      // the switcher pill read off workflowProgress.assays[i].status -- not
+      // the 'measurement' primary step's aggregate across every assay
+      // (design/microscopy/naming, OR'd over all measurements). Reading the
+      // same status record here is what R4-08 asked for: one vocabulary, not
+      // a fourth mapping. See docs/plans/status-scopes.md.
+      const isMeasurementStep = step.id === 'measurement';
+      const activeStatus = isMeasurementStep ? measurementStatusFor(store.get().activeAssayId) : null;
+      const badge = activeStatus
+        ? {
+            state: (MEASUREMENT_TONE_CLASS[activeStatus.tone] || MEASUREMENT_TONE_CLASS.neutral).replace(/^is-/, ''),
+            text: measurementStatusLabel(activeStatus.headline.scope, activeStatus.headline.status),
+          }
+        : current
+          ? { state: current.state, text: stateLabel(current.state) }
+          : null;
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `nav-step${step.id === activeId ? ' active' : ''}${current ? ` workflow-state-${current.state}` : ''}`;
+      button.className = `nav-step${step.id === activeId ? ' active' : ''}${badge ? ` workflow-state-${badge.state}` : ''}`;
       button.dataset.stepId = step.id;
       // "Measurements" (the registry) and "Measurement" (the one you opened)
       // truncate to the same thing in the collapsed rail and read as a
       // duplicate when expanded. The detail route names the measurement it is
       // actually showing instead, which is both distinguishable and more
       // useful -- it says where you are, not what kind of page this is.
-      const label = step.id === 'measurement' ? activeMeasurementNavLabel() : (step.title || step.id);
-      const accessibleLabel = current ? `${label} — ${stateLabel(current.state)}` : label;
+      const label = isMeasurementStep ? activeMeasurementNavLabel() : (step.title || step.id);
+      const accessibleLabel = badge ? `${label} — ${badge.text}` : label;
       button.setAttribute('aria-label', accessibleLabel);
       // Native hover text cannot be clipped by the narrow collapsed rail.
-      // Set unconditionally -- not just when `current` (a workflow-progress
+      // Set unconditionally -- not just when `badge` (a workflow-progress
       // state) exists -- because utility steps like Settings and Feedback
       // have no workflow state at all, and the icon-only rail at <=900px
-      // width is otherwise their only label. When `current` does exist, the
+      // width is otherwise their only label. When `badge` does exist, the
       // expanded badge remains the visible status authority; the title just
       // mirrors it for the collapsed/narrow states.
       button.title = accessibleLabel;
       button.appendChild(createIcon(step.id === 'panel' ? 'microscope' : step.id, 'nav-step-icon'));
       const copy = document.createElement('span'); copy.className = 'nav-step-label'; copy.textContent = label;
       button.appendChild(copy);
-      if (current) {
-        const badge = document.createElement('span');
-        badge.className = `nav-step-badge is-${current.state}`;
-        badge.textContent = stateLabel(current.state);
-        button.appendChild(badge);
+      if (badge) {
+        const badgeEl = document.createElement('span');
+        badgeEl.className = `nav-step-badge is-${badge.state}`;
+        badgeEl.textContent = badge.text;
+        button.appendChild(badgeEl);
       }
       button.addEventListener('click', () => router.navigate(step.id));
       if (step.utility) utilityButtons.set(step.id, button); else navSteps.appendChild(button);

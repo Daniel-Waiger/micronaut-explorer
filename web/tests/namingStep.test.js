@@ -89,6 +89,10 @@ function findDownloadButton(main) {
   );
 }
 
+function findDateInput(main) {
+  return [...main.querySelectorAll('input')].find((input) => input.type === 'date');
+}
+
 test('the .ics schedule scales mounting by physical samples and acquisition by planned files -- NOT the same count', async () => {
   const dom = createDomStub();
   dom.install();
@@ -145,6 +149,38 @@ test('the .ics schedule scales mounting by physical samples and acquisition by p
     assert.match(icsText, /SUMMARY:Bench assay: Microscope acquisition \(6 runs\)/);
     assert.match(icsText, /DESCRIPTION:Acquisition\\, 8 min\/run × 6 run\(s\)\./);
     assert.doesNotMatch(icsText, /Microscope acquisition \(2 run/);
+  } finally {
+    dom.restore();
+  }
+});
+
+// R4-20: the Data plan DATE control is a native <input type=date>, which
+// renders in the browser's LOCALE order (e.g. '03/14/2026') while every
+// other date-shaped surface in the app is ISO. The picker itself is kept
+// (researchers already know it), but the ISO value the filename will
+// actually use is now shown beside it, and it must track every edit.
+test('the DATE field shows an ISO helper text beside the native picker, updated on input', () => {
+  const dom = createDomStub();
+  dom.install();
+  try {
+    const experiment = experimentWithTechnicalReplicates();
+    experiment.assays[0].naming.fields.date = '2026-03-14';
+    const store = createStore(experiment);
+    const main = dom.document.createElement('div');
+    const step = createNamingStep({ questions: [] });
+    step.render(main, store, { advisor: [], experience: 'expert', embedded: false, showToast: () => {} });
+
+    const dateInput = findDateInput(main);
+    assert.ok(dateInput, 'expected to find the native date input');
+    assert.equal(dateInput.value, '2026-03-14');
+
+    const helper = main.querySelector('.naming-date-iso');
+    assert.ok(helper, 'expected an ISO helper text element beside the date field');
+    assert.equal(helper.textContent, 'Used in filenames as 2026-03-14');
+
+    dateInput.value = '2027-01-05';
+    dateInput.dispatch('input');
+    assert.equal(helper.textContent, 'Used in filenames as 2027-01-05');
   } finally {
     dom.restore();
   }

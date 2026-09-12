@@ -111,7 +111,7 @@ const SPILLOVER_ACK_REASON_OPTIONS = [
 function stateSentence(entry) {
   switch (entry.state) {
     case 'unrecognized':
-      return `"${entry.token}" isn't a marker this app recognizes yet -- check the spelling on the Data plan step.`;
+      return `"${entry.token}" isn't a marker this app recognizes yet -- check the spelling.`;
     case 'ambiguous-family':
       return `"${entry.token}" names a multi-color family -- specify which variant (e.g. "${entry.token} Red") to check it for spillover.`;
     case 'no-intrinsic-spectrum':
@@ -377,7 +377,8 @@ export function createPanelStep(kb) {
           : { token: 'Unnamed channel', canonical: null, state: 'unrecognized' };
         const effectiveFilter = effectiveChannelFilterPair(
           channel,
-          resolved.state === 'known' ? resolved.emissionPeakNm : null
+          resolved.state === 'known' ? resolved.emissionPeakNm : null,
+          kb.overlapRules
         );
         // Same effective-color computation as the channel row's own swatch
         // (appendColorControls) -- the spectral view and the row it came
@@ -402,7 +403,7 @@ export function createPanelStep(kb) {
             ? channels.map(resolvedChannelEntry)
             : entries.map((entry) => {
                 const defaultFilter =
-                  entry.state === 'known' ? defaultChannelFilterPair(entry.emissionPeakNm) : null;
+                  entry.state === 'known' ? defaultChannelFilterPair(entry.emissionPeakNm, kb.overlapRules) : null;
                 return {
                   ...entry,
                   color: entry.state === 'known' ? wavelengthToColor(entry.emissionPeakNm) : null,
@@ -657,7 +658,7 @@ export function createPanelStep(kb) {
         const hasSavedFilterPair = typeof channel.filterCenterNm === 'number' && typeof channel.filterBandwidthNm === 'number';
         const computedFilterDefault =
           !hasSavedFilterPair && channelResolved && channelResolved.state === 'known'
-            ? defaultChannelFilterPair(channelResolved.emissionPeakNm)
+            ? defaultChannelFilterPair(channelResolved.emissionPeakNm, kb.overlapRules)
             : null;
         const displayedCenterNm = hasSavedFilterPair ? channel.filterCenterNm : computedFilterDefault ? computedFilterDefault.filterCenterNm : null;
         const displayedBandwidthNm = hasSavedFilterPair

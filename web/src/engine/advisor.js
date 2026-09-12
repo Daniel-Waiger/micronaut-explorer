@@ -27,6 +27,14 @@ export const ADVICE_KINDS = ['pitfall', 'tip'];
 const ADVICE_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const MIN_ADVICE_BODY_LENGTH = 40;
 
+// Pack-level provenance (R3-13): mirrors spectra.js's overlapRules.reviewStatus
+// default -- an absent pack-level reviewStatus degrades to the same
+// 'claude-drafted' assumption spectra.js makes, rather than silently reading
+// as reviewed. Every rule in this pack is in fact claude-drafted today, so
+// this default is also simply true; it exists so a future pack that DOES add
+// the field explicitly is read correctly rather than by coincidence.
+const DEFAULT_ADVISOR_REVIEW_STATUS = 'claude-drafted';
+
 // The complete set of keys a rule entry may carry. Checked against
 // Object.keys(entry) so an unrecognized key (a typo like 'surface' for
 // 'surfaces', or a leftover 'text' from copy-pasting a question-bank entry)
@@ -184,11 +192,11 @@ export function loadAdvisorRules(raw) {
           'For dev, serve web/ via tools/serve_dir.py (it generates web/kb.dev.js).',
       ),
     );
-    return { rules: [], issues };
+    return { rules: [], reviewStatus: DEFAULT_ADVISOR_REVIEW_STATUS, note: undefined, issues };
   }
   if (typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray(raw.rules)) {
     issues.push(advisorIssue('advisor', "advisor pack must be an object with a 'rules' array"));
-    return { rules: [], issues };
+    return { rules: [], reviewStatus: DEFAULT_ADVISOR_REVIEW_STATUS, note: undefined, issues };
   }
 
   const seenIds = new Set();
@@ -198,7 +206,17 @@ export function loadAdvisorRules(raw) {
     if (rule) rules.push(rule);
   });
 
-  return { rules, issues };
+  // Pack-level provenance (R3-13): carried through rather than dropped, so a
+  // consumer (ui/advice.js) can tell the user this whole pack -- not just
+  // spectra.json -- is claude-drafted and unreviewed by a microscopy
+  // specialist. Whitelisted explicitly, same discipline as every per-rule
+  // field above: an unrecognized top-level key is simply not read here, not
+  // silently trusted.
+  const reviewStatus =
+    typeof raw.reviewStatus === 'string' && raw.reviewStatus.trim() ? raw.reviewStatus.trim() : DEFAULT_ADVISOR_REVIEW_STATUS;
+  const note = typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim() : undefined;
+
+  return { rules, reviewStatus, note, issues };
 }
 
 /**

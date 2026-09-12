@@ -25,7 +25,7 @@
 import { assayView } from '../core/assay.js';
 import { conditionIssues, expandConditions } from './conditions.js';
 import { effectiveNamingFields, planFilenames, studyNameIssues } from './plan.js';
-import { readoutState, selectControls } from './controls.js';
+import { readoutState, resolveReadoutCanonical, selectControls } from './controls.js';
 import { buildLadder } from './stages.js';
 import { derivePanelFacts, resolveMarkerToken, resolvePanel } from './spectra.js';
 import { ANTIBODY_CONJUGATION_MODES, channelSpectralField, normalizeChannels } from './panelAssembly.js';
@@ -148,7 +148,13 @@ export function buildStudyDocument(experiment, kb, config, baseTemplate) {
     const filenamePlan = planFilenames(view, config);
 
     const rState = readoutState(view.readoutText, readouts);
-    const canonical = rState === 'known' ? view.readout : null;
+    // Resolve the canonical id from the TEXT `readoutState` just matched.
+    // The stored `readout` id is only ever written by the example study;
+    // the interview writes `readoutText` alone, so reading `view.readout`
+    // here left every user-typed readout labelled `null` on Review.
+    const canonical = rState === 'known'
+      ? (resolveReadoutCanonical(view.readoutText, readouts) || view.readout || null)
+      : null;
     const readoutLabel = canonical && readouts[canonical] ? readouts[canonical].label : null;
 
     // engine/controls.js's predicate DSL only reads plain paths off the

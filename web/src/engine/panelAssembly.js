@@ -54,24 +54,34 @@ export const ANTIBODY_CONJUGATION_MODES = new Set(['antibody-direct', 'antibody-
 // Color-panel patch: a qualitative default detection-filter suggestion, shown
 // pre-filled in the filter inputs (ui/steps/panel.js) the moment a channel's
 // fluorophore resolves, rather than an empty pair waiting on the user to look
-// up their own numbers first. WIDTH_NM=30 is the midpoint of the "20-40 nm
-// wide" range spectra.json's own overlapRules note already documents for
-// typical bandpass emission filters -- same domain-judgment posture as that
-// note and spectra.js's peak-proximity thresholds, not a claim about any real
-// vendor part. Centered on the EMISSION peak: `filterCenterNm`/
-// `filterBandwidthNm` describe the detection filter the user's camera/PMT
-// actually looks through, which observes emitted light, not excitation.
-const DEFAULT_FILTER_BANDWIDTH_NM = 30;
+// up their own numbers first. The width is spectra.json's own
+// overlapRules.filterBandDefaultNm (R3-17) -- ONE documented home for that
+// constant, read here rather than re-declared as a private literal, so this
+// module and the pack's own note can never drift (lesson 40; see
+// spectra.js's loadSpectraKb for the parsing/bounds/default). Falling back to
+// FALLBACK_FILTER_BANDWIDTH_NM only covers a caller that (against every
+// production path) hands in no overlapRules at all -- loadSpectraKb() itself
+// already defaults a missing/invalid pack value to the same number. Centered
+// on the EMISSION peak: `filterCenterNm`/`filterBandwidthNm` describe the
+// detection filter the user's camera/PMT actually looks through, which
+// observes emitted light, not excitation.
+const FALLBACK_FILTER_BANDWIDTH_NM = 30;
+
+function filterBandwidthNm(overlapRules) {
+  const value = overlapRules && overlapRules.filterBandDefaultNm;
+  return typeof value === 'number' && Number.isFinite(value) ? value : FALLBACK_FILTER_BANDWIDTH_NM;
+}
 
 /**
  * The default (unedited) filter suggestion for a channel whose fluorophore
  * resolved to a known emission peak -- `null` when it didn't, so a caller
  * never renders a fabricated center wavelength for a fluorophore this app
- * has no spectral data for.
+ * has no spectral data for. `overlapRules` is engine/spectra.js's
+ * loadSpectraKb() `overlapRules` shape (optional -- see FALLBACK above).
  */
-export function defaultChannelFilterPair(emissionPeakNm) {
+export function defaultChannelFilterPair(emissionPeakNm, overlapRules) {
   if (typeof emissionPeakNm !== 'number' || !Number.isFinite(emissionPeakNm)) return null;
-  return { filterCenterNm: Math.round(emissionPeakNm), filterBandwidthNm: DEFAULT_FILTER_BANDWIDTH_NM };
+  return { filterCenterNm: Math.round(emissionPeakNm), filterBandwidthNm: filterBandwidthNm(overlapRules) };
 }
 
 /**
@@ -81,10 +91,10 @@ export function defaultChannelFilterPair(emissionPeakNm) {
  * decision here prevents the form from showing a suggested filter that the
  * spectrum silently omits.
  */
-export function effectiveChannelFilterPair(channel, emissionPeakNm) {
+export function effectiveChannelFilterPair(channel, emissionPeakNm, overlapRules) {
   const saved = normalizePanelFilterPair(channel || {});
   if (saved.filterCenterNm !== null) return saved;
-  return defaultChannelFilterPair(emissionPeakNm);
+  return defaultChannelFilterPair(emissionPeakNm, overlapRules);
 }
 
 /**

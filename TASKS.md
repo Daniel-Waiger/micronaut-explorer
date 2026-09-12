@@ -116,10 +116,13 @@ UNSPECIFIED; feedback handoff works when the clipboard is blocked; Guide copy,
 release notes (0.21.0), README/ROADMAP/manual claims and knowledge-pack wording
 corrected; shell toasts queue, the save label ticks, Restore rows are
 distinguishable.
-Deferred to a later pass
-(see the review doc's Appendix B): ECFP/EGFP/mRuby2 spectra records (R3-03),
-Nyquist anchoring across two advisor rules (R3-15), a Study-map step-count
-mismatch reachable only in one profile (R4-17), advisor/controls' unsourced
-hard numbers (R3-13), the 157-vs-190 fluorophore counting level (R3-12), advisor
-coverage for two-photon and TIRF (V3-N2, partial), the overlap flag ignoring FWHM by
-design (R3-06), and a handful of noted-but-unscheduled nits (R3-08/09/17, R4-18/19/20).
+A fifth batch (W1–W4, after PR review) fixed the 19 minor/nit follow-ups:
+release-notes/manual wording and counts (R3-02/03/08/09/12, V1-N6, R2-14),
+pack-level provenance for advisor/controls plus wording and the `pi` alias
+(R3-13/15/17, R3-06, R4-18), select placeholders, an ISO date helper, a Study
+title field and a skip link (R4-13/19/20, R5-12), one status vocabulary for
+nav entry, pill and registry (R4-08), and a pre-existing "Readout: null" on
+Review. Still deferred (see the review doc's Appendix B): ECFP/EGFP/mRuby2
+spectra records (R3-03 data), per-rule sourcing of advisor/controls numbers
+(R3-13), a Study-map step-count mismatch reachable only in one profile
+(R4-17), advisor coverage for two-photon and TIRF (V3-N2, partial), and R1-15.

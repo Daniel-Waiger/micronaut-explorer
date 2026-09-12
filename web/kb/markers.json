@@ -6,6 +6,7 @@
     "dir",
     "emerald",
     "halo",
+    "pi",
     "snap",
     "tomato",
     "venus"
@@ -2089,6 +2090,7 @@
     },
     "PROPIDIUMIODIDE": {
       "aliases": [
+        "pi",
         "propidium iodide",
         "propidiumiodide"
       ],

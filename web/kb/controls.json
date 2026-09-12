@@ -1,5 +1,7 @@
 {
   "version": 1,
+  "reviewStatus": "claude-drafted",
+  "note": "Every rule in this pack (which controls are suggested, and why) was drafted by Claude from general microscopy/cell-biology practice, not sourced from a specific citation, and has not been reviewed by a microscopy specialist. Treat it as a starting point to check against your own protocol, the same posture web/kb/spectra.json's overlapRules note takes toward its own thresholds.",
   "rules": [
     {
       "id": "panel-unstained-control",

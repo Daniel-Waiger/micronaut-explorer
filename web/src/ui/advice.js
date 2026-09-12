@@ -166,6 +166,17 @@ export function createAdvicePanel(advisor, surface, { defaultExpanded = true } =
   heading.textContent = 'Guidance';
   section.appendChild(heading);
 
+  // R3-13: advisor.json carries no per-rule provenance (only spectra.json
+  // does), yet every rule here is claude-drafted content just the same. One
+  // static caption, not a per-note badge -- surfaced ONCE per panel, reusing
+  // the same 'unreviewed' vocabulary ui/steps/panel.js's spectral badges use
+  // (REVIEW_STATUS_LABELS['claude-drafted']) so a reader sees one message
+  // about this app's guidance, not two independently-worded ones.
+  const caption = document.createElement('p');
+  caption.className = 'advice-caption';
+  caption.textContent = 'This guidance is unreviewed: drafted by Claude from general microscopy practice, not yet checked by a microscopy specialist.';
+  section.appendChild(caption);
+
   const list = document.createElement('div');
   list.className = 'advice-list';
   section.appendChild(list);

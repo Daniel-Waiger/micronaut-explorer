@@ -25,6 +25,11 @@ export const CONTROL_KINDS = ['panel', 'readout'];
 const CONTROL_ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 const MIN_WHY_LENGTH = 40;
 
+// Pack-level provenance (R3-13), mirroring advisor.js's own default -- see
+// that module's comment for why an absent field defaults to 'claude-drafted'
+// rather than reading as reviewed.
+const DEFAULT_CONTROLS_REVIEW_STATUS = 'claude-drafted';
+
 const KNOWN_CONTROL_RULE_KEYS = new Set(['id', 'kind', 'title', 'why', 'when', 'priority']);
 
 function controlIssue(field, message) {
@@ -119,11 +124,11 @@ export function loadControlRules(raw) {
           'For dev, serve web/ via tools/serve_dir.py (it generates web/kb.dev.js).',
       ),
     );
-    return { rules: [], issues };
+    return { rules: [], reviewStatus: DEFAULT_CONTROLS_REVIEW_STATUS, note: undefined, issues };
   }
   if (typeof raw !== 'object' || Array.isArray(raw) || !Array.isArray(raw.rules)) {
     issues.push(controlIssue('controls', "controls pack must be an object with a 'rules' array"));
-    return { rules: [], issues };
+    return { rules: [], reviewStatus: DEFAULT_CONTROLS_REVIEW_STATUS, note: undefined, issues };
   }
 
   const seenIds = new Set();
@@ -133,7 +138,13 @@ export function loadControlRules(raw) {
     if (rule) rules.push(rule);
   });
 
-  return { rules, issues };
+  // Pack-level provenance (R3-13), carried through rather than dropped --
+  // see advisor.js's loadAdvisorRules for the identical discipline.
+  const reviewStatus =
+    typeof raw.reviewStatus === 'string' && raw.reviewStatus.trim() ? raw.reviewStatus.trim() : DEFAULT_CONTROLS_REVIEW_STATUS;
+  const note = typeof raw.note === 'string' && raw.note.trim() ? raw.note.trim() : undefined;
+
+  return { rules, reviewStatus, note, issues };
 }
 
 /**

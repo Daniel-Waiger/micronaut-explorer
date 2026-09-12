@@ -48,3 +48,41 @@ test('a prefilled choice with allowOther does not show the Unsaved cue on first 
     assert.equal(custom.getValue(), 'lattice light-sheet');
   } finally { stub.restore(); }
 });
+
+// R4-13: a brand-new question with allowOther and an EMPTY stored value used
+// to preselect 'Other...' (with an empty free-text box beside it), because
+// '' is falsy but not undefined/null and fell into the "unknown option ->
+// reopen as Other" branch. An untouched field must instead show a neutral,
+// disabled placeholder and getValue() must still read as unanswered.
+test('a fresh choice+allowOther question with an empty stored value shows a disabled placeholder, not Other', () => {
+  const stub = createDomStub();
+  stub.install();
+  try {
+    const q = { id: 'modality', type: 'choice', label: 'Modality', options: ['confocal', 'widefield'], allowOther: true };
+    const control = buildQuestionControl(q, '');
+    const select = control.element.querySelector('select');
+    assert.equal(select.value, '', 'the placeholder option is selected, not __other__');
+    const placeholderOption = select.children.find((opt) => opt.value === '');
+    assert.equal(placeholderOption.disabled, true, 'the placeholder option cannot be reselected as a real answer');
+    assert.equal(control.getValue(), '', 'an untouched field reads as unanswered');
+    const otherInput = control.element.querySelector('.question-other-input');
+    assert.equal(otherInput.hidden, true, 'the free-text box stays hidden for an untouched field');
+  } finally { stub.restore(); }
+});
+
+// Same defect, non-allowOther path and the plain 'undefined'/'null' cases:
+// the placeholder must be selected and disabled whenever there is truly no
+// answer yet, regardless of which of the three "empty" spellings arrives.
+test('a fresh plain choice question (no allowOther) also shows the disabled placeholder for every empty spelling', () => {
+  const stub = createDomStub();
+  stub.install();
+  try {
+    for (const initial of ['', undefined, null]) {
+      const q = { id: 'system', type: 'choice', label: 'System', options: ['confocal', 'widefield'] };
+      const control = buildQuestionControl(q, initial);
+      const select = control.element.querySelector('select');
+      assert.equal(select.value, '');
+      assert.equal(control.getValue(), '');
+    }
+  } finally { stub.restore(); }
+});

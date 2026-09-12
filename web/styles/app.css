@@ -133,6 +133,27 @@ body {
   font: 15px/1.55 var(--sans);
 }
 
+/* R5-12: the skip link is the FIRST focusable element on every route
+   (index.html, before #app) -- offscreen until it receives keyboard focus,
+   then pinned above everything else (the feature-tour dialog included) so
+   it is never obscured. */
+.skip-link {
+  position: absolute;
+  top: -999px;
+  left: 8px;
+  z-index: 1300;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: 8px;
+}
+
 #app {
   display: flex;
   flex-direction: column;
@@ -497,6 +518,15 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
+/* R4-20: the ISO value a native <input type=date> will actually contribute
+   to the filename -- shown beside the DATE field on the Data plan because
+   the picker itself renders in the browser's locale order (e.g.
+   '03/14/2026') while every other date-shaped surface in the app is ISO. */
+.naming-date-iso {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 /* The name-builder-style field interview (ui/fieldInterview.js, zen-planner
    Phase 1 feedback): a box with its labelled confirmation action directly
    beneath it, replacing the earlier full-sentence question + Answer/Skip
@@ -820,6 +850,17 @@ button:focus-visible {
   text-transform: uppercase;
   color: var(--muted);
   margin: 0 0 8px;
+}
+
+/* R3-13: one static caption per panel, not a per-note badge -- see
+   ui/advice.js's own comment. Sized like spectral-view-caption/overview-
+   controls-empty (both `13px`/`var(--muted)`), the app's existing small-print
+   convention, not a new visual weight. */
+.advice-caption {
+  max-width: 76ch;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 10px;
 }
 
 .advice-list {
@@ -1927,6 +1968,15 @@ button:focus-visible {
   font-size: 13px;
   color: var(--muted);
   font-style: italic;
+}
+
+/* R3-13: mirrors ui/advice.js's .advice-caption -- one static, plain (not
+   italic) caption for the whole Controls block. */
+.overview-controls-caption {
+  max-width: 76ch;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 8px;
 }
 
 .overview-controls-group-label {

@@ -376,6 +376,17 @@ function renderControlsNode(parent, controls) {
   heading.textContent = 'Controls';
   box.appendChild(heading);
 
+  // R3-13: controls.json carries no per-rule provenance either, and this is
+  // the one place its recommendations render. One static caption, reusing
+  // the same 'unreviewed' vocabulary ui/steps/panel.js's spectral badges use
+  // (REVIEW_STATUS_LABELS['claude-drafted']) and ui/advice.js's own caption,
+  // so a reader sees one message about drafted-not-specialist-reviewed
+  // guidance, not independently-worded ones on different screens.
+  const caption = document.createElement('p');
+  caption.className = 'overview-controls-caption';
+  caption.textContent = 'This guidance is unreviewed: drafted by Claude from general microscopy practice, not yet checked by a microscopy specialist.';
+  box.appendChild(caption);
+
   if (controls.panel.length > 0) {
     const groupLabel = document.createElement('div');
     groupLabel.className = 'overview-controls-group-label';

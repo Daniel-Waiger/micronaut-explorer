@@ -146,6 +146,17 @@ export function createNamingStep(kb) {
     // since. Populated here at initial paint and kept current by both the
     // initial loop and syncInputsFromStore.
     const lastPainted = {};
+    // R4-20: the DATE field stays a native <input type=date> (the platform
+    // picker researchers already know), but that picker RENDERS in the
+    // browser's locale order (e.g. '03/14/2026') while every other surface
+    // in this app -- the filename preview, suggestions, the Acquisition
+    // date -- shows ISO. input.value on a native date input is always the
+    // ISO 'YYYY-MM-DD' string regardless of how it is drawn (that is the
+    // one part of this control the HTML spec pins down), so this helper
+    // text needs no separate formatting logic -- it just surfaces the value
+    // the filename already uses, updated on every keystroke/pick and every
+    // programmatic repaint (syncInputsFromStore below).
+    let refreshDateHelp = () => {};
     // Pre-fill through effectiveNamingFields, not raw naming.fields, so a
     // value the user already gave elsewhere (modality, collected by the
     // interview as acquisition.modality) shows up in the box it feeds rather
@@ -221,6 +232,16 @@ export function createNamingStep(kb) {
       });
       inputs[field.key] = input;
       row.appendChild(input);
+      if (field.key === 'date') {
+        const dateHelp = document.createElement('span');
+        dateHelp.className = 'field-help-inline naming-date-iso';
+        row.appendChild(dateHelp);
+        refreshDateHelp = () => {
+          dateHelp.textContent = input.value ? `Used in filenames as ${input.value}` : '';
+        };
+        refreshDateHelp();
+        input.addEventListener('input', refreshDateHelp);
+      }
       grid.appendChild(row);
     }
 
@@ -535,6 +556,7 @@ export function createNamingStep(kb) {
         if (input.value !== nextValue) input.value = nextValue;
         lastPainted[field.key] = nextValue;
       }
+      refreshDateHelp();
     }
 
     update();

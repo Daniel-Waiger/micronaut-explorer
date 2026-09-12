@@ -179,20 +179,23 @@ const EMBEDDED = {
   "run": "app-review remediation 2026-09-12",
   "orchestrator": "Claude Fable 5.1",
   "active_model": "Claude Sonnet",
-  "active_status": "done",
-  "phase": "Run complete — 25/25 tasks (9 done, 16 resolved)",
+  "active_status": "running",
+  "phase": "Batch F5 — follow-ups (19 minor/nit findings)",
   "state_note": "",
-  "current_task": null,
+  "current_task": {
+    "id": "F5",
+    "title": "W1-W4 dispatched to Sonnet (high effort); orchestrator verifies"
+  },
   "crit_title": "Open defects",
   "stats": [
     {
       "k": "JS tests",
-      "v": "1011 passed",
+      "v": "1039",
       "tone": "ok"
     },
     {
       "k": "Python tests",
-      "v": "88 passed",
+      "v": "88",
       "tone": "ok"
     },
     {
@@ -463,6 +466,34 @@ const EMBEDDED = {
         "V1"
       ],
       "batch": 7
+    },
+    {
+      "id": "W1",
+      "phase": "F5 follow-ups",
+      "title": "Release notes and changelog wording (R3-02/03/08/09/12, V1-N6, R2-14)",
+      "status": "done",
+      "by": "Fable verified"
+    },
+    {
+      "id": "W2",
+      "phase": "F5 follow-ups",
+      "title": "Knowledge-pack provenance + wording, PI alias (R3-13/15/17/06, R4-18)",
+      "status": "done",
+      "by": "Fable verified"
+    },
+    {
+      "id": "W3",
+      "phase": "F5 follow-ups",
+      "title": "UI: select placeholder, ISO date hint, study title, skip link, comment (R4-13/19/20, R5-12, V6-NEW-05)",
+      "status": "done",
+      "by": "Fable verified (skip-link target moved into shell.js)"
+    },
+    {
+      "id": "W4",
+      "phase": "F5 follow-ups",
+      "title": "One status vocabulary for nav, pill and registry (R4-08)",
+      "status": "done",
+      "by": "Fable verified live: Draft/Needs a decision/Blocked"
     }
   ],
   "log": [
@@ -617,9 +648,17 @@ const EMBEDDED = {
     {
       "time": "11:07:50",
       "msg": "Report addendum + lessons 52-56 written; final commit next; push awaits user confirmation"
+    },
+    {
+      "time": "13:10:33",
+      "msg": "User: fix the 19 remaining findings with Sonnet high effort. R4-17 excluded (unreachable state). Verification by the orchestrator (suites + live CDP)"
+    },
+    {
+      "time": "13:25:45",
+      "msg": "Batch F5 done: 18 follow-ups fixed (R4-17 unreachable); orchestrator fixed pre-existing 'Readout: null' in studydoc.js"
     }
   ],
-  "snapshot_at": "2026-09-12 11:07"
+  "snapshot_at": "2026-09-12 13:25"
 };
 /* CMA:EMBEDDED:END */
 

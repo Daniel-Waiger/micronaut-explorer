@@ -99,6 +99,33 @@ that existing history, not a scheme that was tracked from day one.
   acquisition runs (acquisition) instead of reporting one count for both.
 
 ### Fixed
+- Review's **Readout:** line read `null` for any readout you typed yourself.
+  The label was looked up by the stored readout id, which only the shipped
+  example study ever sets; it is now resolved from the text the interview
+  actually recorded.
+- The nav entry for the measurement you have open now shows that
+  measurement's own status (Draft / Needs a decision / Blocked …), the same
+  headline the Measurements registry row and the switcher pill show, instead
+  of an aggregate across every measurement in a different vocabulary.
+- Drop-downs start on a disabled "Choose…" placeholder rather than a blank
+  row that could be re-selected; the Data plan's date picker shows the ISO
+  form that will actually appear in filenames; the Study map has a Study
+  title field, so entries in Utilities › Restore are no longer all
+  "Untitled study"; a "Skip to content" link is the first Tab stop on every
+  page.
+- Spillover flag messages now say what they measure: the peak-to-peak
+  distance under the threshold, with curve widths not considered. The 30 nm
+  default filter band the spectral view draws is now declared in the
+  spectra pack (`overlapRules.filterBandDefaultNm`) rather than hard-coded.
+- The advisor and controls packs carry a pack-level review status, and the
+  Guidance and Controls panels say so: this guidance is drafted, not yet
+  checked by a microscopy specialist. Typing `PI` in the markers field now
+  resolves to propidium iodide.
+- The 0.19.0 notes no longer claim which variant CFP, GFP and mRuby store
+  (no note or reference record exists for them), give the cited/drafted
+  counts both per top-level entry (143/157) and per selectable spectrum
+  (174/190), and name the 14 uncited entries on the page itself. Manual
+  captions say the screenshots show the practice tab.
 - The Measurement page now refreshes its sibling sections after an edit:
   renaming a group updates the Data plan's Group row and filename previews,
   typing markers updates the Acquisition colour panel and spectral view, and
@@ -227,31 +254,43 @@ that existing history, not a scheme that was tracked from day one.
   spillover flags and spectral-view curves will shift slightly.
 
 ### Changed
-- 143 of the pack's 157 fluorophore entries now cite a source, up from 72.
-  Every remaining drafted entry was checked against a vendor or curator
-  page, and each corrected or confirmed value is recorded in
+- 143 of the pack's 157 top-level fluorophore entries now cite a source, up
+  from 72. Counted at the level a user actually picks a fluorophore -- 8 of
+  those 157 entries are families that expand into 41 named variants, for
+  190 selectable spectra in total -- 174 are cited and 16 are still
+  drafted. Every remaining drafted entry was checked against a vendor or
+  curator page, and each corrected or confirmed value is recorded in
   docs/references/planner-fluorophore-sources.json with the URL it came
   from and the date it was read.
 - Seven probe families -- MitoTracker, LysoTracker, SYTOX, BODIPY,
   CellMask, LIVE/DEAD and SYTO -- had every one of their variants sourced,
   so the family is no longer marked as drafted. ER-Tracker still is: its
   Blue-White DPX variant has an emission range rather than a peak, and a
-  family is only as cited as its least-documented member.
+  family is only as cited as its least-documented member (its other two
+  variants, Green and Red, are individually cited).
 
 ### Known gaps
-- 14 entries are deliberately still marked as drafted rather than being
-  quietly upgraded. Cy2, Cy7 and TRITC had no primary source worth citing
-  (and TRITC is not one defined compound); DCFDA (H2DCFDA)'s stored peaks
-  are for the oxidized, fluorescent DCF product -- the non-fluorescent
-  loading form has no meaningful peak until intracellular oxidation
-  converts it.
-- The other ten are ambiguous names rather than wrong numbers. CFP stores
-  the values of ECFP, GFP stores EGFP's, IRFP stores iRFP713's, and mRuby
-  stores the original rather than the mRuby2 in wider use today; BFP,
-  YFP, GCaMP, miRFP and Hoechst are similarly generic, and ER-Tracker's
-  ambiguous variant is the eighth family's blocker. The keys are left as
-  they are for now, since renaming one would break studies that already
-  use it.
+- 14 top-level entries (16 once ER-Tracker's three variants are each
+  counted on their own) are deliberately still marked as drafted rather
+  than being quietly upgraded. Cy2, Cy7 and TRITC had no primary source
+  worth citing (and TRITC is not one defined compound); DCFDA (H2DCFDA)'s
+  stored peaks are for the oxidized, fluorescent DCF product -- the
+  non-fluorescent loading form has no meaningful peak until intracellular
+  oxidation converts it. ER-Tracker's Blue-White DPX variant has the same
+  problem as DCFDA: its source gives an emission range, not a peak.
+- The other nine store a single value under a key that could mean more
+  than one real variant. CFP, GFP and mRuby carry no note in the pack
+  saying which variant their numbers describe, and no reference record for
+  one exists in this repo yet; IRFP is the exception -- its note names it
+  as iRFP713, the most common near-infrared iRFP variant, and that value
+  is the one of the four backed by a citation in
+  docs/references/planner-fluorophore-sources.json. BFP, YFP and miRFP are
+  similarly generic keys. Hoechst and GCaMP are not ambiguous names --
+  the pack's own note for Hoechst names it specifically as Hoechst 33342,
+  and GCaMP's note says every named variant (6f/6s/7/...) shares
+  essentially one spectrum -- they simply haven't been checked against a
+  source yet. The keys are left as they are for now, since renaming one
+  would break studies that already use it.
 - A cited entry means its two peak values match a source that was fetched
   and recorded. It does not mean a microscopy specialist has reviewed it,
   and the Gaussian curve widths used by the spectral view are still

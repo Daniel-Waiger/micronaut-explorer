@@ -482,3 +482,20 @@ test('renderMermaid on a zero-assay-ish malformed document still produces a vali
   const doc = buildStudyDocument({}, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   assert.doesNotThrow(() => renderMermaid(doc));
 });
+
+test('a user-typed readout (readoutText only, no stored id) resolves to its label, never "null"', () => {
+  // The interview writes `readoutText` alone; the `readout` id is only set
+  // by the example study. Review's "Readout:" line must still name the
+  // recognised readout. Seen live on the built app as "Readout: null".
+  const kb = realKb();
+  const experiment = emptyExperiment();
+  const assay = experiment.assays[0];
+  assay.readout = '';
+  assay.readoutText = kb.readouts['bacterial-viability'].label;
+  const doc = buildStudyDocument(experiment, kb, NAMING_CONFIG, BASE_TEMPLATE);
+  const view = doc.assays[0];
+  assert.equal(view.readout.state, 'known');
+  assert.equal(view.readout.canonical, 'bacterial-viability');
+  assert.equal(view.readout.label, kb.readouts['bacterial-viability'].label);
+  assert.doesNotMatch(renderMarkdown(doc), /Readout: null/);
+});

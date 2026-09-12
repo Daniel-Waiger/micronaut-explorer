@@ -24,14 +24,26 @@ test('the switcher pill reads workflowProgress.assays[i].status, not the retired
   assert.match(shell, /MEASUREMENT_TONE_CLASS\[status\.tone\]/);
 });
 
-// The nav step badges (:641/:657 in the original spec numbering) are
-// stateLabel's only remaining consumer, and its subject is a ROUTE -- that
-// must not change as a side effect of the pill fix above.
-test('stateLabel and the nav step badge keep their original route vocabulary, unchanged', () => {
+// stateLabel keeps its route vocabulary for every STUDY-level nav step
+// (Study map, Research brief, Measurements, Review) -- those aren't the
+// R4-08 disagreement and must not change as a side effect of the fix below.
+test('stateLabel keeps its route vocabulary, unchanged', () => {
   assert.match(shell, /function stateLabel\(state\) \{\s*return \{\s*'not-started': 'Not started',\s*'in-progress': 'In progress',\s*'needs-attention': 'Decision needed',\s*complete: 'Ready for now',\s*\}\[state\] \|\| 'Not started';\s*\}/);
-  assert.match(shell, /badge\.className = `nav-step-badge is-\$\{current\.state\}`/);
-  assert.match(shell, /badge\.textContent = stateLabel\(current\.state\)/);
-  assert.match(shell, /const accessibleLabel = current \? `\$\{label\} — \$\{stateLabel\(current\.state\)\}` : label;/);
+});
+
+// R4-08: the same measurement read 'In progress' in the nav, 'Checks pass'
+// on the switcher pill, and 'Checks pass'/'Defined'/'Ready to acquire' in the
+// registry -- three vocabularies for one state. The per-measurement nav
+// entry must now read the ACTIVE measurement's own headline off
+// workflowProgress.assays[i].status, the same record the pill (AUD-09 above)
+// and the registry row already read -- not the 'measurement' primary step's
+// cross-assay aggregate, and not a fourth mapping invented for the nav.
+test('the per-measurement nav badge reads the active measurement\'s own headline, not the route aggregate', () => {
+  assert.match(shell, /const activeStatus = isMeasurementStep \? measurementStatusFor\(store\.get\(\)\.activeAssayId\) : null;/);
+  assert.match(shell, /measurementStatusLabel\(activeStatus\.headline\.scope,\s*activeStatus\.headline\.status\)/);
+  assert.match(shell, /MEASUREMENT_TONE_CLASS\[activeStatus\.tone\]/);
+  assert.match(shell, /badgeEl\.className = `nav-step-badge is-\$\{badge\.state\}`/);
+  assert.match(shell, /const accessibleLabel = badge \? `\$\{label\} — \$\{badge\.text\}` : label;/);
 });
 
 // footerPositionLabel(steps, activeId): a primary route gets its ordinal

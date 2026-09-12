@@ -228,9 +228,15 @@ export function buildQuestionControl(question, initialValue, options = {}) {
   if (question.type === 'choice' || question.type === 'multi') {
     const select = document.createElement('select');
     select.className = inputClass;
+    // R4-13: disabled so it can never be RE-selected once a real option is
+    // picked (it is a placeholder, not a valid answer) -- but still the
+    // option that ends up selected whenever no real value has been chosen
+    // yet, so an untouched field reads as "nothing chosen", not as any
+    // particular answer.
     const blank = document.createElement('option');
     blank.value = '';
-    blank.textContent = '-- choose --';
+    blank.textContent = 'Choose…';
+    blank.disabled = true;
     select.appendChild(blank);
     for (const option of question.options || []) {
       const opt = document.createElement('option');
@@ -270,7 +276,14 @@ export function buildQuestionControl(question, initialValue, options = {}) {
     // the user already typed a custom answer -- reopen as Other with that
     // text prefilled, rather than silently failing to preselect anything
     // (a bare <select>.value = 'unknown option' just leaves it blank).
-    if (initialValue !== undefined && initialValue !== null) {
+    // R4-13: an empty string is NOT such a value -- it means "unanswered",
+    // the same as undefined/null -- so it must fall through to the blank
+    // placeholder above rather than into the 'unknown option' branch, which
+    // used to preselect 'Other...' (value !== '' is falsy but IS one of the
+    // two sentinels this check exists to exclude) with an empty free-text
+    // box beside it, making an untouched field look like a deliberate
+    // 'Other' answer.
+    if (initialValue !== undefined && initialValue !== null && initialValue !== '') {
       if ((question.options || []).includes(initialValue)) {
         select.value = initialValue;
       } else {

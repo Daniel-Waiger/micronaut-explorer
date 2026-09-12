@@ -456,7 +456,7 @@ export function renderSpectralView(container, entries, overlapRules, interaction
     spectralViewElement(
       'p',
       'spectral-view-caption',
-      'Normalized Gaussian curves are schematic from each fluorophore’s emission peak and drafted width -- not measured spectra or quantitative bleed-through. Filter bands use an emission-derived suggestion until you enter the microscope’s actual detection filter.'
+      'Normalized Gaussian curves are schematic from each fluorophore’s emission peak and drafted width -- not measured spectra or quantitative bleed-through. Filter bands show a 30 nm default band centred on the emission peak until you enter your microscope’s actual filter -- replace it with that.'
     )
   );
 
