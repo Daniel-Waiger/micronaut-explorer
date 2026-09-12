@@ -279,7 +279,7 @@ def test_clear_all_reports_truthfully(page, index_url):
     page.wait_for(
         "document.querySelector('.shell-status')"
         " && document.querySelector('.shell-status').textContent.includes("
-        "'Cleared all locally stored data. Your open study is unaffected, and saving has resumed.')"
+        "\"Cleared this tab's stored data\")"
     )
     rows_after = page.texts(".shell-restore-row")
     # clearAllStoredData wipes every ring slot, then re-saves the study
@@ -433,7 +433,8 @@ def test_the_practice_tab_cannot_touch_the_real_tabs_study(page, index_url):
     )
     page.wait_for(
         "document.querySelector('.shell-status')"
-        " && document.querySelector('.shell-status').textContent.includes('Cleared all locally stored data')"
+        " && document.querySelector('.shell-status').textContent.includes"
+        "(\"Cleared this practice tab's stored data\")"
     )
 
     # Compared from INSIDE the practice tab on purpose: navigating back to the

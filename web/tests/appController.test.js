@@ -387,6 +387,64 @@ test('startBlankStudy aborts and leaves the store unchanged when the protected s
   assert.equal(controller.getSaveState().status, 'failed');
 });
 
+// --- B2: restoreRecoverySlot/importProjectBackup preserve the displaced
+// study (R6-04, R6-05, V6-NEW-01) via the shared preserveOpenStudy() helper.
+// The scenario-level repros live in restoreImportFlush.test.js (fake persist,
+// timing) and ringEviction.test.js (real persist, eviction); these cover the
+// unit-level abort/no-op contracts those files don't.
+
+test('restoreRecoverySlot aborts and leaves the store unchanged when the protective snapshot fails', () => {
+  const original = withTitle(emptyExperiment(), 'my current work');
+  const store = createStore(original);
+  const persist = makeFakePersist({
+    saveExperiment: () => null,
+    loadRecoverableSlot: () => ({ id: 'slot-old', experiment: withTitle(emptyExperiment(), 'OLD'), error: null }),
+  });
+  const { controller } = makeController({ store, persist });
+
+  const result = controller.actions.onRestoreRecovery('slot-old');
+
+  assert.equal(result, false);
+  assert.equal(store.get(), original, 'the store must not have been replaced');
+  assert.equal(controller.getSaveState().status, 'failed');
+});
+
+test('importProjectBackup aborts and leaves the store unchanged when the protective snapshot fails', async () => {
+  const original = withTitle(emptyExperiment(), 'my current work');
+  const store = createStore(original);
+  const persist = makeFakePersist({
+    saveExperiment: () => null,
+    importFromFile: () => Promise.resolve({ experiment: withTitle(emptyExperiment(), 'IMPORTED'), issues: [] }),
+  });
+  const { controller } = makeController({ store, persist });
+
+  await controller.actions.onImportProject({ name: 'backup.micronaut.json' });
+
+  assert.equal(store.get(), original, 'the store must not have been replaced');
+  assert.equal(controller.getSaveState().status, 'failed');
+});
+
+test('a malformed import leaves getSaveState() unchanged and the toast names no JSON parser detail (R5-09)', async () => {
+  const store = createStore(withTitle(emptyExperiment(), 'my current work'));
+  const persist = makeFakePersist({
+    importFromFile: () => Promise.reject(new Error('Unexpected token o in JSON at position 1')),
+  });
+  const shell = makeRecordingShell();
+  const { controller } = makeController({ store, persist });
+  controller.attachShell(shell);
+  const before = controller.getSaveState();
+
+  await controller.actions.onImportProject({ name: 'backup.micronaut.json' });
+
+  assert.deepEqual(controller.getSaveState(), before, 'saveState must be untouched by a bad file');
+  assert.equal(store.get().meta.title, 'my current work', 'the open study must not have been replaced');
+  assert.ok(shell.toasts.length >= 1, 'a toast must still tell the user the import failed');
+  for (const message of shell.toasts) {
+    assert.ok(!/position/i.test(message), `toast leaked parser detail: ${message}`);
+    assert.ok(!/JSON at/i.test(message), `toast leaked parser detail: ${message}`);
+  }
+});
+
 // --- Fix 2: clearAllStoredData must not lie ----------------------------
 
 test('clearAllStoredData shows the success toast only when clear AND the re-save both succeed', () => {
@@ -399,7 +457,8 @@ test('clearAllStoredData shows the success toast only when clear AND the re-save
 
   assert.equal(result, true);
   assert.equal(controller.getSaveState().status, 'saved');
-  assert.ok(shell.toasts.some((m) => m.includes('Cleared all locally stored data')));
+  assert.ok(shell.toasts.some((m) => m.includes("Cleared this tab's stored data")));
+  assert.ok(shell.toasts.some((m) => m.includes('Theme is kept')));
 });
 
 test('clearAll returning a failure result produces a failure toast, never the success one (fails pre-fix)', () => {
@@ -415,7 +474,7 @@ test('clearAll returning a failure result produces a failure toast, never the su
   assert.equal(result, false);
   assert.equal(controller.getSaveState().status, 'failed');
   assert.ok(controller.getSaveState().error, 'the failure must remain visible, not be erased');
-  assert.ok(!shell.toasts.some((m) => m.includes('Cleared all locally stored data')), 'no success toast');
+  assert.ok(!shell.toasts.some((m) => m.includes("Cleared this tab's stored data")), 'no success toast');
   assert.ok(shell.toasts.some((m) => m.includes('Could not clear stored data')), 'a failure toast must fire');
 });
 
@@ -429,7 +488,7 @@ test('clearAllStoredData reports failure (not success) when clear succeeds but t
 
   assert.equal(result, false);
   assert.equal(controller.getSaveState().status, 'failed');
-  assert.ok(!shell.toasts.some((m) => m.includes('Cleared all locally stored data')));
+  assert.ok(!shell.toasts.some((m) => m.includes("Cleared this tab's stored data")));
   assert.ok(shell.toasts.some((m) => m.includes('could not be re-saved')));
 });
 
@@ -469,6 +528,76 @@ test('a storage whose length getter throws does not escape clearAllStoredData', 
   });
   assert.equal(result, false);
   assert.equal(controller.getSaveState().status, 'failed');
+});
+
+// --- B3 (V2-NEW-03): the in-memory guided-walkthrough copy must be reset,
+// not just its storage key -- persist.clearAll now sweeps
+// micronaut[.scope].guidedProgress.v1, but appController.js caches the
+// last-loaded state in `guidedProgressState` and getGuidedState() returns
+// that cache, not a fresh read. Without reloading it after a successful
+// clear, a reload-free UI (the aside panel, Home's "Continue walkthrough"
+// card) keeps showing the pre-clear progress until the next full page load.
+
+test('clearAllStoredData reloads the in-memory guided walkthrough state from (now-cleared) storage', () => {
+  let loadCalls = 0;
+  const activeState = { version: 1, status: 'active', currentStepId: 'step-b', completedStepIds: ['step-a'], completedAt: null };
+  const notStartedState = { version: 1, status: 'not-started', currentStepId: 'step-a', completedStepIds: [], completedAt: null };
+  const guided = makeFakeGuided({
+    // The first call is the construction-time load; a real storage backend
+    // would return `active` there and `not-started` on any later call made
+    // after persist.clearAll has removed the guidedProgress key -- modelled
+    // here by keying purely off call count rather than a real storage fake,
+    // which is enough to prove clearAllStoredData calls load() a SECOND time.
+    load: () => {
+      loadCalls += 1;
+      return loadCalls === 1 ? activeState : notStartedState;
+    },
+  });
+  const { controller } = makeController({ guided });
+  assert.equal(controller.getGuidedState().status, 'active', 'sanity: walkthrough looks in-progress before clearing');
+
+  const result = controller.actions.onClearAllStorage();
+
+  assert.equal(result, true);
+  assert.equal(
+    controller.getGuidedState().status,
+    'not-started',
+    'the cached in-memory copy must be reloaded after clearAll, not left as the stale pre-clear value'
+  );
+  assert.equal(loadCalls, 2, 'guided.load must run again after a successful clear (once at construction, once after clearing)');
+});
+
+test('clearAllStoredData does NOT reload guided state when the clear itself fails', () => {
+  let loadCalls = 0;
+  const guided = makeFakeGuided({
+    load: () => {
+      loadCalls += 1;
+      return { version: 1, status: 'active', currentStepId: 'step-b', completedStepIds: ['step-a'], completedAt: null };
+    },
+  });
+  const persist = makeFakePersist({
+    clearAll: () => ({ ok: false, removed: [], error: new Error('storage backend unavailable') }),
+  });
+  const { controller } = makeController({ guided, persist });
+  controller.attachShell(makeRecordingShell());
+
+  const result = controller.actions.onClearAllStorage();
+
+  assert.equal(result, false);
+  assert.equal(loadCalls, 1, 'a failed clear must not touch the in-memory guided state at all');
+  assert.equal(controller.getGuidedState().status, 'active');
+});
+
+test('clearAllStoredData toast is scope-aware: the practice tab says "this practice tab\'s", not "all locally stored data" (R2-15)', () => {
+  const shell = makeRecordingShell();
+  const { controller } = makeController({ isSandbox: true });
+  controller.attachShell(shell);
+
+  assert.equal(controller.actions.onClearAllStorage(), true);
+
+  assert.ok(shell.toasts.some((m) => m.includes("Cleared this practice tab's stored data")));
+  assert.ok(shell.toasts.some((m) => m.includes('Theme is kept')));
+  assert.ok(!shell.toasts.some((m) => m.includes('all locally stored data')), 'must not overclaim scope-blind wording (R2-15)');
 });
 
 // --- Fix 3: the example/template origin gate ---------------------------

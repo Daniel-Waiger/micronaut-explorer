@@ -23,7 +23,7 @@
 
 import { selectAdvice, summarizeTrigger } from '../engine/advisor.js';
 import { describePredicate } from '../engine/predicate.js';
-import { nsKey } from '../core/storageScope.js';
+import { ADVISOR_DEBUG_KEY } from '../core/storageScope.js';
 
 const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 
@@ -54,8 +54,9 @@ const ADVICE_KIND_LABELS = { pitfall: 'Pitfall', tip: 'Tip' };
 // developer convenience toggled by hand in DevTools, and without scoping,
 // turning it on in the practice tab (or vice versa) would silently turn on
 // raw-predicate debug output in the OTHER tab too, since both would otherwise
-// read the exact same localStorage key.
-const ADVISOR_DEBUG_KEY = nsKey('micronaut.advisorDebug');
+// read the exact same localStorage key. The key itself lives in
+// storageScope.js (imported above) so persist.js's clearAll sweep and this
+// module can never disagree about its spelling (lesson 40).
 
 function advisorDebugEnabled() {
   try {

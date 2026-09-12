@@ -80,3 +80,61 @@ export const IS_SANDBOX = STORAGE_SCOPE === 'demo';
 
 /** Namespace a key for THIS tab's scope. The only nsKey app code should use. */
 export const nsKey = makeNsKey(STORAGE_SCOPE);
+
+// Bare (pre-scope) key literals for every "app-owned but outside
+// persist.js's STORAGE_PREFIX sweep" key family, named here ONCE so
+// clearAll's ownedScopedKeys() below and the modules that actually read and
+// write these keys can never drift apart (lesson 40: a constant that must
+// mirror another producer's output has to come from ONE place, not be
+// retyped in a second file). guidedProgress.js, onboarding.js, shell.js and
+// advice.js all import their key(s) from here rather than building the
+// literal themselves.
+//
+// V2-NEW-03: these four families sit outside persist.js's STORAGE_PREFIX
+// ('micronaut.v1.'/'micronaut.demo.v1.') by design -- guided-walkthrough
+// progress, onboarding answers and nav/debug preferences are not ring slots
+// -- but "Clear all stored data" is documented (and, for guided progress,
+// user-observably expected) to remove them too. ownedScopedKeys() is the
+// list persist.js's clearAll sweeps IN ADDITION TO its prefix match.
+// Exported individually as `export const` (never a trailing bare
+// `export { ... }` statement) -- tools/build_single_file.py strips
+// `export const/function/class/default` declarations line-by-line when it
+// concatenates these ES modules into dist's single script, but a separate
+// `export { A, B };` statement survives that stripping and leaks a top-level
+// `export` keyword into the served, non-module artifact (a
+// SyntaxError/blank-page failure in a browser that isn't running this as a
+// module). tests/test_e2e_flows.py's
+// test_served_artifact_has_no_static_import_or_export_statements guards this.
+export const GUIDED_PROGRESS_KEY_BASE = 'micronaut.guidedProgress.v1';
+export const ONBOARDING_STAGE_KEY_BASE = 'micronaut.onboarding.stage';
+export const ONBOARDING_EXPERIENCE_KEY_BASE = 'micronaut.onboarding.experience';
+export const ONBOARDING_COMPLETED_KEY_BASE = 'micronaut.onboarding.completed';
+const NAV_COLLAPSED_KEY_BASE = 'micronaut.navCollapsed';
+const ADVISOR_DEBUG_KEY_BASE = 'micronaut.advisorDebug';
+
+/** Scoped for THIS tab -- shell.js's own per-tab layout preference. */
+export const NAV_COLLAPSED_KEY = nsKey(NAV_COLLAPSED_KEY_BASE);
+
+/** Scoped for THIS tab -- advice.js's own per-tab developer toggle. */
+export const ADVISOR_DEBUG_KEY = nsKey(ADVISOR_DEBUG_KEY_BASE);
+
+const OWNED_KEY_BASES = [
+  GUIDED_PROGRESS_KEY_BASE,
+  ONBOARDING_STAGE_KEY_BASE,
+  ONBOARDING_EXPERIENCE_KEY_BASE,
+  ONBOARDING_COMPLETED_KEY_BASE,
+  NAV_COLLAPSED_KEY_BASE,
+  ADVISOR_DEBUG_KEY_BASE,
+];
+
+/**
+ * The scoped forms of every key family this app owns OUTSIDE persist.js's
+ * STORAGE_PREFIX sweep, for the given scope (not necessarily the CURRENT
+ * tab's scope -- persist.js's clearAll takes an explicit scope so a caller
+ * can target either scope deliberately). Built with makeNsKey(scope) rather
+ * than the module-level nsKey so it stays correct for a non-default scope.
+ */
+export function ownedScopedKeys(scope) {
+  const scopedNsKey = makeNsKey(scope);
+  return OWNED_KEY_BASES.map(scopedNsKey);
+}

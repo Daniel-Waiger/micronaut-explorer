@@ -104,10 +104,10 @@
 
       <section>
         <h2 id="clear-all">Clear all stored data</h2>
-        <p>Settings also has <strong>Clear all stored data</strong> — the one destructive action in the app, and the only one guarded by a two-click "arm" instead of a single confirmation dialog: the first click changes the button's own label to "Click again to permanently clear all stored data" and arms it for a few seconds; a second click within that window actually clears everything, while letting the arming time out on its own disarms it again with no effect.</p>
+        <p>Settings also has <strong>Clear all stored data</strong> — the one destructive action in the app, and the only one guarded by a two-click "arm" instead of a single confirmation dialog: the first click changes the button's own label to "Click again to permanently clear all stored data" and arms it for a few seconds; a second click within that window clears every key this tab's scope owns, while letting the arming time out on its own disarms it again with no effect.</p>
         <ul>
-          <li>In the tab you run it from, it removes every locally saved version (the entire Restore history) — freeing up storage space if it's full or corrupted. Run it from the practice tab and only the practice tab's saved versions are cleared; your own study's history, in your own tab, is untouched.</li>
-          <li>It does <strong>not</strong> touch the study currently open in your browser tab. Your open work is safe, and Micronaut immediately writes it into the now-empty history as a fresh save, so autosaving resumes right away.</li>
+          <li>In the tab you run it from, it removes every locally saved version (the entire Restore history), walkthrough progress and onboarding answers for that scope — freeing up storage space if it's full or corrupted. Run it from the practice tab and only the practice tab's data is cleared; your own study's history, progress and answers, in your own tab, are untouched.</li>
+          <li>It does <strong>not</strong> touch the study currently open in your browser tab, and it does not touch your color theme — theme is shared across tabs on purpose and is kept either way. Your open work is safe, and Micronaut immediately writes it into the now-empty history as a fresh save, so autosaving resumes right away.</li>
         </ul>
         <div class="callout tip"><p><strong>💡 Tip.</strong> If you want to keep anything from your Restore history, download a project backup of it first — clearing removes that history for good, with no undo.</p></div>
         <h3 id="storage-full">If storage fails</h3>

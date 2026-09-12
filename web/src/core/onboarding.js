@@ -11,15 +11,23 @@
 //
 // Core module: pure logic only, no DOM, no engine/ui imports, no network.
 
-import { nsKey } from './storageScope.js';
+import {
+  nsKey,
+  ONBOARDING_STAGE_KEY_BASE,
+  ONBOARDING_EXPERIENCE_KEY_BASE,
+  ONBOARDING_COMPLETED_KEY_BASE,
+} from './storageScope.js';
 
 // Namespaced so the practice tab's walkthrough answers (stage/experience) and
 // its completed-gate flag never leak into the user's own tab: without this, a
 // visitor poking at the example would either permanently dismiss their own
 // onboarding gate or overwrite their real stage/experience choices.
-const STAGE_KEY = nsKey('micronaut.onboarding.stage');
-const EXPERIENCE_KEY = nsKey('micronaut.onboarding.experience');
-const COMPLETED_KEY = nsKey('micronaut.onboarding.completed');
+//
+// The bare key literals live in storageScope.js so persist.js's clearAll can
+// sweep them without importing this module (lesson 40).
+const STAGE_KEY = nsKey(ONBOARDING_STAGE_KEY_BASE);
+const EXPERIENCE_KEY = nsKey(ONBOARDING_EXPERIENCE_KEY_BASE);
+const COMPLETED_KEY = nsKey(ONBOARDING_COMPLETED_KEY_BASE);
 
 export const ONBOARDING_STAGES = ['idea', 'designing', 'acquiring'];
 export const ONBOARDING_LEVELS = ['novice', 'occasional', 'frequent'];

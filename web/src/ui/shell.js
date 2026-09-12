@@ -8,7 +8,7 @@ import { buildFeedbackReport } from '../core/feedbackReport.js';
 import { handoffFeedback } from './feedbackHandoff.js';
 import { createIcon } from './icons.js';
 import { measurementStatus, measurementStatusLabel } from '../engine/measurementStatus.js';
-import { IS_SANDBOX, nsKey } from '../core/storageScope.js';
+import { IS_SANDBOX, NAV_COLLAPSED_KEY } from '../core/storageScope.js';
 import { openInNewTab, SANDBOX_URL } from './newTab.js';
 
 // Maps a measurement status record's `tone` onto the switcher pill's existing
@@ -33,8 +33,9 @@ const THEME_KEY = 'micronaut.theme';
 // SCOPED, unlike THEME_KEY above: nav-collapsed is ordinary per-tab layout
 // state, not a preference worth sharing on purpose, so it gets the default
 // treatment -- namespaced so collapsing the rail in one tab can never
-// silently flip it in the other.
-const NAV_COLLAPSED_KEY = nsKey('micronaut.navCollapsed');
+// silently flip it in the other. The key itself lives in storageScope.js
+// (imported above) so persist.js's clearAll sweep and this module can never
+// disagree about its spelling (lesson 40).
 
 function readPreference(key) {
   try { return localStorage.getItem(key); } catch { return null; }

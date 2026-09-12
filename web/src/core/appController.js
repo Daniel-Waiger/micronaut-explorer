@@ -235,12 +235,25 @@ export function createAppController({
   async function importProjectBackup(file) {
     if (!file) return;
     try {
+      // Parse first -- a bad file must never displace or snapshot the open
+      // study. Only once we have a real imported experiment in hand do we
+      // preserve the study that is about to be replaced (same read-then-
+      // replace-across-the-debounce-window hazard restoreRecoverySlot and
+      // startBlankStudy guard below).
       const { experiment: imported, issues } = await persist.importFromFile(file);
+      if (
+        !preserveOpenStudy(
+          'Could not preserve your current study, so that import was not applied. Nothing was changed.'
+        )
+      ) {
+        return;
+      }
       store.replace(withOrigin(imported, 'imported'));
       // replace() schedules the ordinary autosave subscriber. Clear any
       // earlier lifecycle failure immediately; that subscriber will keep the
       // status at saving, then replace it with saved or a storage failure.
       setSaveState({ status: 'saving', error: null });
+      notifyRecoveryEntries();
       // core/importValidate.js sanitizes rather than rejects most shape
       // problems (a malformed provenance slot, an assay reset to defaults)
       // so the rest of a real backup is never thrown away over one bad
@@ -250,15 +263,19 @@ export function createAppController({
       if (Array.isArray(issues) && issues.length > 0) {
         issues.forEach((issue) => logger.warn('Project import:', issue.message));
         notifyToast(
-          `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details.`
+          `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details. The study you had open was kept in Restore.`
         );
       } else {
-        notifyToast('Project imported. It is now the study being autosaved.');
+        notifyToast('Project imported. It is now the study being autosaved. The study you had open was kept in Restore.');
       }
-    } catch (err) {
-      reportPersistentLifecycleFailure(
-        `Could not import that project: ${err && err.message ? err.message : 'invalid file'}`
-      );
+    } catch {
+      // R5-09: the raw JSON.parse message ("Unexpected token ... in JSON at
+      // position N") used to leak into the save indicator via
+      // reportPersistentLifecycleFailure. A bad file never touched the open
+      // study, so it must not read as a persistent lifecycle failure of it --
+      // report a fixed, user-facing message as a toast only, and leave
+      // saveState exactly as it was.
+      notifyToast('Could not import that file: it is not a valid Micronaut project backup.');
     }
   }
 
@@ -272,9 +289,22 @@ export function createAppController({
       );
       return false;
     }
+    // Same read-then-replace-across-the-debounce-window hazard startBlankStudy
+    // and openExampleStudy guard against: a pending autosave timer still holds
+    // a closure over the study open BEFORE this restore, and would otherwise
+    // fire after store.replace() below and persist the RESTORED study over the
+    // ring slot that should hold the displaced study.
+    if (
+      !preserveOpenStudy(
+        'Could not preserve your current study, so that version was not restored. Nothing was changed.'
+      )
+    ) {
+      return false;
+    }
     store.replace(experiment);
     setSaveState({ status: 'saving', error: null });
-    notifyToast('Restored the selected previous version.');
+    notifyRecoveryEntries();
+    notifyToast('Restored the selected previous version. The study you had open was kept in Restore.');
     return true;
   }
 
@@ -304,6 +334,18 @@ export function createAppController({
    * old version fired the success toast unconditionally, and downgraded a
    * failed re-save to `{ status: 'unsaved', error: null }` -- silently
    * discarding the very error it should have surfaced).
+   *
+   * V2-NEW-03: persist.js's clearAll now also sweeps this scope's
+   * guided-walkthrough progress, onboarding answers, nav-collapsed and
+   * advisor-debug keys (theme is deliberately excluded -- it is shared
+   * across scopes on purpose). Clearing storage out from under
+   * guidedProgressState without also resetting the IN-MEMORY copy this
+   * module holds (see getGuidedState() above) would leave the walkthrough
+   * looking mid-progress until the next reload even though its storage key
+   * is gone -- so reload it from the now-empty storage the same way
+   * construction time does. The toast is scope-aware: this is no longer a
+   * blanket "all locally stored data" claim in the practice tab, where only
+   * that tab's keys are touched.
    */
   function clearAllStoredData() {
     const clearResult = persist.clearAll({ onQuotaExceeded: reportStorageFailure });
@@ -313,6 +355,7 @@ export function createAppController({
       );
       return false;
     }
+    guidedProgressState = guided.load(primaryWorkflow, { onError: reportGuidedStorageFailure });
     const savedId = persist.saveExperiment(withSaveStamp(store.get()), { onQuotaExceeded: reportStorageFailure });
     notifyRecoveryEntries();
     if (!savedId) {
@@ -322,8 +365,52 @@ export function createAppController({
       return false;
     }
     setSaveState({ status: 'saved', savedAt: now(), error: null });
-    notifyToast('Cleared all locally stored data. Your open study is unaffected, and saving has resumed.');
+    notifyToast(
+      isSandbox
+        ? "Cleared this practice tab's stored data (saved versions, walkthrough progress, onboarding answers). Theme is kept."
+        : "Cleared this tab's stored data (saved versions, walkthrough progress, onboarding answers). Theme is kept."
+    );
     return true;
+  }
+
+  /**
+   * Shared by every lifecycle action that replaces the in-memory study
+   * (openExampleStudy, startBlankStudy, restoreRecoverySlot,
+   * importProjectBackup): flush any pending debounced autosave -- so the
+   * study about to be displaced, not whatever replaces it, is what the timer
+   * persists -- then take a snapshot of it protected from ordinary ring
+   * eviction.
+   *
+   * "Protected" is a priority, not a permanent hold: persist.js caps
+   * protected slots at PROTECTED_CAP (3 of the ring's 5 slots), so this
+   * snapshot stays available until three MORE protected saves push it out,
+   * not forever. Callers whose copy promises "kept in Restore" must phrase
+   * that as describing the next few actions, not an unlimited guarantee.
+   *
+   * Returns the new slot id, or null (having already reported the failure
+   * via reportPersistentLifecycleFailure(abortMessage)) when the snapshot
+   * could not be taken -- callers must abort without replacing the study.
+   */
+  function preserveOpenStudy(abortMessage) {
+    // The protected save IS the flush: cancel a pending debounced autosave
+    // instead of running it, then write the current study once as a
+    // protected slot. Flushing first and THEN saving wrote the same study
+    // into two of the five ring slots on every displacement (red-team B2-P2).
+    if (saveTimer !== null) {
+      timers.clearTimeout(saveTimer);
+      saveTimer = null;
+    }
+    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
+      onQuotaExceeded: reportStorageFailure,
+      protectFromAutomaticEviction: true,
+    });
+    if (!protectedId) {
+      reportPersistentLifecycleFailure(abortMessage);
+      return null;
+    }
+    setSaveState({ status: 'saved', savedAt: now(), error: null });
+    notifyRecoveryEntries();
+    return protectedId;
   }
 
   // Opening the example is an explicit request, so it arrives as ordinary
@@ -350,37 +437,19 @@ export function createAppController({
       return false;
     }
 
-    // A pending debounced autosave timer holds a closure over store.get()
-    // that fires 500ms after the *last* edit, whenever that lands relative to
-    // this call. Without flushing it first, store.replace() below runs while
-    // that timer is still pending, and it then fires AFTER the replace, reads
-    // store.get() fresh (now the example), and persists the example over the
-    // ring slot that should hold the practice edit the user made just before
-    // clicking reset -- the exact bug documented on startBlankStudy above,
-    // reproduced here because this function has the identical shape
-    // (read-then-replace across a debounce window). startBlankStudy already
-    // calls flushAutosave() for this reason; this was the same latent bug,
-    // just not yet triggered because nothing had exercised this path with a
-    // pending timer.
-    flushAutosave();
-
-    // Preserve the exact current state synchronously, before replace() can
-    // expose example data to the autosave subscriber. This snapshot is
-    // protected from normal ring eviction: since this function is now only
-    // reachable from the sandbox tab, "the current state" here is always the
-    // sandbox's own prior practice activity, never the user's real study --
-    // but the protection is the same one openExampleStudy always used, so
-    // browsing or editing the example still can never delete whatever
-    // practice work came before it. If durable preservation is unavailable,
-    // do not switch workspaces at all.
-    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
-      onQuotaExceeded: reportStorageFailure,
-      protectFromAutomaticEviction: true,
-    });
-    if (!protectedId) {
-      reportPersistentLifecycleFailure(
+    // preserveOpenStudy flushes any pending debounced autosave (so its
+    // closure persists the study about to be displaced, not the example that
+    // replaces it) and takes a snapshot protected from ordinary ring
+    // eviction, capped at PROTECTED_CAP -- see preserveOpenStudy's docstring.
+    // Since this function is now only reachable from the sandbox tab, "the
+    // current state" here is always the sandbox's own prior practice
+    // activity, never the user's real study. If durable preservation is
+    // unavailable, do not switch workspaces at all.
+    if (
+      !preserveOpenStudy(
         'Could not preserve your current practice state, so the example was not reopened. Download a project backup or free storage, then try again.'
-      );
+      )
+    ) {
       return false;
     }
     const example = createExampleStudy();
@@ -403,30 +472,29 @@ export function createAppController({
    * store.get() fresh, and persisted the new BLANK study into the ring
    * instead of the edit the user had just made -- while
    * ui/steps/settings.js's confirm dialog promises "Your current work
-   * remains available in Restore." Two changes close the window:
-   *   1. flushAutosave() cancels that pending timer and runs its save
-   *      synchronously, against the CURRENT (still edited) study, before
-   *      anything else happens.
-   *   2. The same protected-snapshot pattern openExampleStudy already uses
-   *      guarantees that edited study a slot immune to ring eviction, and
-   *      aborts the whole operation (never replaces the live study) if that
-   *      snapshot can't be taken.
+   * remains available in Restore." preserveOpenStudy closes the window in
+   * one call:
+   *   1. It cancels that pending timer and runs its save synchronously,
+   *      against the CURRENT (still edited) study, before anything else
+   *      happens.
+   *   2. It gives that edited study a slot protected from ORDINARY ring
+   *      eviction -- but protected slots are capped at PROTECTED_CAP (3 of
+   *      the ring's 5 slots, see persist.js), so this snapshot stays
+   *      available only until three MORE protected saves push it out, not
+   *      forever. It aborts the whole operation (never replaces the live
+   *      study) if the snapshot can't be taken at all.
    */
   function startBlankStudy() {
-    flushAutosave();
-    const protectedId = persist.saveExperiment(withSaveStamp(store.get()), {
-      onQuotaExceeded: reportStorageFailure,
-      protectFromAutomaticEviction: true,
-    });
-    if (!protectedId) {
-      reportPersistentLifecycleFailure(
+    if (
+      !preserveOpenStudy(
         'Could not preserve your current study, so a blank study was not started. Download a project backup or free storage, then try again.'
-      );
+      )
+    ) {
       return false;
     }
     store.replace(createEmptyStudy());
     notifyRecoveryEntries();
-    notifyToast('Started a blank study. Your previous versions remain available in Restore.');
+    notifyToast('Started a blank study. Your previous version was kept in Restore.');
     return true;
   }
 

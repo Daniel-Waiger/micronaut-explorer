@@ -1,7 +1,7 @@
 import { uuid } from './ids.js';
 import { migrate } from './schema.js';
 import { validateImportedExperiment } from './importValidate.js';
-import { nsKey } from './storageScope.js';
+import { nsKey, STORAGE_SCOPE, makeNsKey, ownedScopedKeys } from './storageScope.js';
 
 // localStorage is a CONVENIENCE, never the record of truth: two users on a
 // shared-scope PC share one storage bucket under file://, IT can clear
@@ -95,8 +95,9 @@ function writeJSON(storage, key, value, onQuotaExceeded) {
 }
 
 // Returns whether the key is actually gone. Callers that report success to a
-// user (clearAll -> main's "Cleared all locally stored data" toast) cannot
-// tell a real deletion from a suppressed failure otherwise -- removeItem can
+// user (clearAll -> appController's scope-aware "Cleared this tab's stored
+// data" toast) cannot tell a real deletion from a suppressed failure otherwise
+// -- removeItem can
 // throw on a backend this module does not control, and a silently swallowed
 // throw is how "all your data is cleared" gets said over data that is still
 // there.
@@ -137,6 +138,11 @@ export function saveExperiment(experiment, {
   if (!ok) return null;
 
   const ids = readRing(storage);
+  // Kept verbatim so a failed index write can put the ring back EXACTLY as it
+  // was -- including any slot the loops below decided to evict. Rolling back
+  // to the post-eviction list instead orphaned a (possibly protected) slot
+  // while the caller told the user "nothing was changed" (red-team B1-P1/B2-P1).
+  const originalIds = [...ids];
   ids.push(id);
   const protectedIds = new Set(readJSON(storage, PROTECTED_SLOTS_KEY, []));
   let protectedChanged = false;
@@ -201,7 +207,9 @@ export function saveExperiment(experiment, {
     // the slot store and ring and report failure so callers can leave the
     // user's current workspace untouched.
     removeKey(storage, slotKey(id), onQuotaExceeded);
-    writeJSON(storage, RING_INDEX_KEY, ids.filter((candidate) => candidate !== id), onQuotaExceeded);
+    // Restore the PRE-save ring (evicted ids included): their slot keys were
+    // never removed, so the previous state is fully intact.
+    writeJSON(storage, RING_INDEX_KEY, originalIds, onQuotaExceeded);
     return null;
   }
   for (const oldId of evicted) removeKey(storage, slotKey(oldId), onQuotaExceeded);
@@ -289,33 +297,49 @@ export function deleteExperiment(id, { storage = defaultBackend(), onQuotaExceed
 }
 
 /**
- * Delete EVERY key this app owns -- all ring slots, the ring index, and the
- * change counter -- so the next load genuinely starts from emptyExperiment().
+ * Delete EVERY key this app owns for one scope -- all ring slots, the ring
+ * index, the change counter, AND the key families that live outside
+ * STORAGE_PREFIX (guided-walkthrough progress, onboarding answers,
+ * nav-collapsed, the advisor debug toggle -- see storageScope.js's
+ * ownedScopedKeys) -- so the next load genuinely starts fresh in every way
+ * the app's own "Clear all stored data" copy promises (V2-NEW-03: those four
+ * families used to survive silently, and the guided-progress one is
+ * user-observable -- a reload kept offering "Continue walkthrough").
+ * THEME IS DELIBERATELY NOT SWEPT: storageScope.js's SHARED_KEYS treats
+ * micronaut.theme as shared across scopes on purpose (a remembered
+ * light/dark choice carries no study data), and clearing one scope must
+ * never flip the other scope's theme.
  *
- * Keys are matched by STORAGE_PREFIX rather than reconstructed from the ring
- * index, because a slot orphaned by an earlier interrupted write would survive
- * an index-driven sweep and then be picked up by the next listSaved() -- a
+ * `scope` defaults to STORAGE_SCOPE (this tab's own scope) but a caller may
+ * target a specific scope explicitly. Ring/prefix keys are matched by
+ * STORAGE_PREFIX rather than reconstructed from the ring index, because a
+ * slot orphaned by an earlier interrupted write would survive an
+ * index-driven sweep and then be picked up by the next listSaved() -- a
  * "start over" that silently restores the old experiment is worse than none.
- * Foreign keys sharing the same storage are left untouched.
+ * The owned-but-unprefixed keys are matched by exact membership, not prefix,
+ * so this can never accidentally widen into a foreign key. Foreign keys
+ * sharing the same storage are left untouched either way.
  *
  * Returns an explicit result -- { ok, removed, error } -- instead of
  * undefined: storage.length/storage.key(i) below are unguarded reads into a
  * backend this module does not control (a privacy-mode browser, a hostile or
  * incomplete Storage shim), and a caller that cannot tell "actually cleared"
  * from "silently did nothing" has no honest way to report success to the
- * user. `removed` lists the STORAGE_PREFIX keys this call attempted to
- * delete (empty on failure); `error` is the caught exception on failure,
- * otherwise null.
+ * user. `removed` lists the keys this call attempted to delete (empty on
+ * failure); `error` is the caught exception on failure, otherwise null.
  */
-export function clearAll({ storage = defaultBackend(), onQuotaExceeded } = {}) {
+export function clearAll({ storage = defaultBackend(), onQuotaExceeded, scope = STORAGE_SCOPE } = {}) {
   if (!storage) {
     return { ok: false, removed: [], error: new Error('No storage backend is available.') };
   }
+  const scopedPrefix = makeNsKey(scope)(`micronaut.v${STORAGE_SCHEMA_VERSION}.`);
+  const ownedUnprefixed = new Set(ownedScopedKeys(scope));
   const doomed = [];
   try {
     for (let i = 0; i < storage.length; i += 1) {
       const key = storage.key(i);
-      if (typeof key === 'string' && key.startsWith(STORAGE_PREFIX)) {
+      if (typeof key !== 'string') continue;
+      if (key.startsWith(scopedPrefix) || ownedUnprefixed.has(key)) {
         doomed.push(key);
       }
     }

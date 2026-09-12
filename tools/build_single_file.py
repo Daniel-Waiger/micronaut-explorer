@@ -74,6 +74,16 @@ FORBIDDEN_IN_OUTPUT = [
         re.compile(r"""(?m)^\s*import\s+[{*'"A-Za-z_$]"""),
         "a static import statement",
     ),
+    # The export half of the same class of bug: a Prettier-wrapped
+    # `export {\n  a,\n  b,\n};` list is not matched by the single-line
+    # EXPORT_LIST_RE and would reach the browser as a syntax error in a classic
+    # script. Every legitimate `export const/function/class` keyword is
+    # stripped by the flattening step, so ANY line-initial `export` in the
+    # output is a build failure.
+    (
+        re.compile(r"""(?m)^\s*export\s+[{*'"A-Za-z_$]"""),
+        "a static export statement",
+    ),
     # No-network-promise gates (README's "the build gates fetch()" claim):
     # these five are the network primitives available to plain JS in a
     # browser. Each pattern requires the callable ones' opening "(" (or, for
