@@ -180,7 +180,7 @@ const EMBEDDED = {
   "orchestrator": "Claude Fable 5.1",
   "active_model": "Claude Opus",
   "active_status": "running",
-  "phase": "Batch 1 of 3 — reviews",
+  "phase": "Batch 2 of 3 — verification (resumed)",
   "state_note": "",
   "current_task": {
     "id": "R1-R6",
@@ -199,14 +199,29 @@ const EMBEDDED = {
       "tone": "ok"
     }
   ],
-  "defects": [],
+  "defects": [
+    {
+      "id": "D5",
+      "location": "web/src/core/appController.js",
+      "title": "restore/import take no eviction-protection snapshot; displaced study lost after 5 autosaves",
+      "body": "",
+      "repro": ""
+    },
+    {
+      "id": "D6",
+      "location": "web/src/ui/steps/panel.js",
+      "title": "spillover block reads free-text markers, not panel channels (R4-01, pending V4)",
+      "body": "",
+      "repro": ""
+    }
+  ],
   "tasks": [
     {
       "id": "R1",
       "phase": "Batch 1",
       "title": "Docs claims vs reality",
-      "status": "running",
-      "by": "Opus",
+      "status": "done",
+      "by": "Opus verified",
       "depends_on": [],
       "batch": 1
     },
@@ -214,7 +229,7 @@ const EMBEDDED = {
       "id": "R2",
       "phase": "Batch 1",
       "title": "In-app copy, manual and privacy claims vs behaviour",
-      "status": "running",
+      "status": "verifying",
       "by": "Opus",
       "depends_on": [],
       "batch": 1
@@ -223,8 +238,8 @@ const EMBEDDED = {
       "id": "R3",
       "phase": "Batch 1",
       "title": "Scientific-data claims: spectra, references, advisor",
-      "status": "running",
-      "by": "Opus",
+      "status": "done",
+      "by": "Opus verified",
       "depends_on": [],
       "batch": 1
     },
@@ -232,7 +247,7 @@ const EMBEDDED = {
       "id": "R4",
       "phase": "Batch 1",
       "title": "Live UX/UI: primary workflow in the built app",
-      "status": "running",
+      "status": "verifying",
       "by": "Opus",
       "depends_on": [],
       "batch": 1
@@ -241,8 +256,8 @@ const EMBEDDED = {
       "id": "R5",
       "phase": "Batch 1",
       "title": "Live UX/UI: utilities, edges and secondary pages",
-      "status": "running",
-      "by": "Opus",
+      "status": "done",
+      "by": "delivered; agent cut off by Opus session limit after writing R5.json",
       "depends_on": [],
       "batch": 1
     },
@@ -250,8 +265,8 @@ const EMBEDDED = {
       "id": "R6",
       "phase": "Batch 1",
       "title": "Adversarial code read of untested UI wiring",
-      "status": "running",
-      "by": "Opus",
+      "status": "done",
+      "by": "Opus verified",
       "depends_on": [],
       "batch": 1
     },
@@ -259,8 +274,8 @@ const EMBEDDED = {
       "id": "V1",
       "phase": "Batch 2",
       "title": "Adversarial verification of R1",
-      "status": "pending",
-      "by": "queued",
+      "status": "done",
+      "by": "Opus",
       "depends_on": [
         "R1"
       ],
@@ -281,8 +296,8 @@ const EMBEDDED = {
       "id": "V3",
       "phase": "Batch 2",
       "title": "Adversarial verification of R3",
-      "status": "pending",
-      "by": "queued",
+      "status": "done",
+      "by": "Opus",
       "depends_on": [
         "R3"
       ],
@@ -314,8 +329,8 @@ const EMBEDDED = {
       "id": "V6",
       "phase": "Batch 2",
       "title": "Adversarial verification of R6",
-      "status": "pending",
-      "by": "queued",
+      "status": "done",
+      "by": "Opus",
       "depends_on": [
         "R6"
       ],
@@ -350,9 +365,45 @@ const EMBEDDED = {
     {
       "time": "20:47:32",
       "msg": "pytest installed; Python 88/88 baseline"
+    },
+    {
+      "time": "20:58:28",
+      "msg": "R6 done: 2 blocking/4 major/1 minor/2 nit, 10 repro tests failing; V6 dispatched"
+    },
+    {
+      "time": "20:59:54",
+      "msg": "R1 done: 0 blocking/8 major/8 minor/3 nit, 38 checked_ok; V1 dispatched"
+    },
+    {
+      "time": "21:02:23",
+      "msg": "R3 done: 0 blocking/6 major/7 minor/4 nit, 23 checked_ok; V3 dispatched"
+    },
+    {
+      "time": "21:07:53",
+      "msg": "R2 done: 2 blocking/4 major/5 minor/4 nit, 27 checked_ok; privacy claims hold at runtime. V2 dispatched. NOTE R2 killed+restarted a sibling dist server on :8811 mid-run"
+    },
+    {
+      "time": "21:10:47",
+      "msg": "V1 pass: 16 confirmed / 4 refuted (feedback label EXISTS live; 14 uncited are named via fetched changelog; repo is public; classic-final tag exists), 6 new findings"
+    },
+    {
+      "time": "21:13:58",
+      "msg": "R4 done: 1 blocking/6 major/8 minor/5 nit, 16 checked_ok, 58 screenshots, 0 console errors; V4 dispatched"
+    },
+    {
+      "time": "21:14:34",
+      "msg": "V6 pass: 9/9 confirmed, R6-04/05 upheld at blocking on a stronger mechanism (no protectFromAutomaticEviction), 5 new findings, 1 checked_ok falsified. NOTE V6 pkill'd sibling servers :8000/:8811 mid-run"
+    },
+    {
+      "time": "21:16:40",
+      "msg": "V3 pass: 17/17 confirmed (5 downgraded to minor, 2 to nit); R1-05 vs R3-01 settled: 14/14 named over http, 8/14 over file://; V3-N1 major: overlap flag is an export GATE that only deleting a channel clears"
+    },
+    {
+      "time": "04:51:39",
+      "msg": "OUTAGE 2026-09-12 00:50Z: Opus session limit killed R5 (after deliverables), V2, V4 (no output). Reset; V2/V4 re-dispatched, V5 dispatched, all Opus. Scope change: confirmed findings will be FIXED this run (Sonnet high executes, Opus red-teams, Fable final passes)"
     }
   ],
-  "snapshot_at": "2026-09-11 20:47"
+  "snapshot_at": "2026-09-12 04:51"
 };
 /* CMA:EMBEDDED:END */
 
