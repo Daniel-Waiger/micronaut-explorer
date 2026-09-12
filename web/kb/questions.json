@@ -91,7 +91,9 @@
     "why": "Fixation and mounting method affects which controls and settings make sense, and is easy to forget by the time you write the paper.",
     "field": "specimen.preparation",
     "type": "text",
-    "askWhen": { "exists": "specimen.organism" },
+    "askWhen": {
+      "exists": "specimen.organism"
+    },
     "priority": 80,
     "tag": "user",
     "phase": "project"
@@ -115,7 +117,18 @@
     "why": "Confocal, widefield, and STED each have different pitfalls worth flagging here. Not every modality is optical: SEM/TEM/Raman samples typically have no biological or technical replicates in the usual sense, which is why those are separate, independently-optional questions.",
     "field": "acquisition.modality",
     "type": "choice",
-    "options": ["confocal", "widefield", "spinning-disk confocal", "two-photon", "TIRF", "STED", "light-sheet", "SEM", "TEM", "Raman"],
+    "options": [
+      "confocal",
+      "widefield",
+      "spinning-disk confocal",
+      "two-photon",
+      "TIRF",
+      "STED",
+      "light-sheet",
+      "SEM",
+      "TEM",
+      "Raman"
+    ],
     "allowOther": true,
     "priority": 100,
     "tag": "user",
@@ -140,35 +153,16 @@
     "why": "What you are actually measuring -- a viability assay, a ROS assay, and a migration assay each need a different reference control, and the app can only suggest the right ones once it knows which you're running.",
     "field": "readoutText",
     "type": "choice",
-    "options": ["Bacterial viability", "Macrophage cytoskeleton", "Intracellular ROS", "Scratch / migration"],
+    "options": [
+      "Bacterial viability",
+      "Macrophage cytoskeleton",
+      "Intracellular ROS",
+      "Scratch / migration"
+    ],
     "allowOther": true,
     "priority": 15,
     "tag": "user",
     "phase": "project"
-  },
-  {
-    "id": "biologicalReplicates",
-    "prompt": "How many biological replicates?",
-    "label": "Biological replicates",
-    "placeholder": "count",
-    "why": "A biological replicate is a repeat done with a different animal, dish, or sample. Determines how many condition rows the design expands into and whether the sample size is worth flagging as low.",
-    "field": "design.biologicalReplicates",
-    "type": "number",
-    "priority": 110,
-    "tag": "user",
-    "phase": "microscopy"
-  },
-  {
-    "id": "technicalReplicates",
-    "prompt": "How many technical replicates per biological replicate?",
-    "label": "Technical replicates",
-    "placeholder": "count, if any",
-    "why": "A technical replicate is a repeat measurement of the SAME biological sample, separate from biological replicates -- leave this blank if you don't have any.",
-    "field": "design.technicalReplicates",
-    "type": "number",
-    "priority": 111,
-    "tag": "user",
-    "phase": "microscopy"
   },
   {
     "id": "notes",

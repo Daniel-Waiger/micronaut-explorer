@@ -205,13 +205,9 @@ test('the committed modality question offers Other and covers non-optical modali
   }
 });
 
-test('the committed bank asks biologicalReplicates and technicalReplicates as separate, independent questions', () => {
+test('the committed bank no longer asks replicate counts -- design.* paths have one editor (Samples & design), review R6-07', () => {
   const { questions } = loadQuestions(realQuestionsRaw);
-  const bio = questions.find((q) => q.field === 'design.biologicalReplicates');
-  const tech = questions.find((q) => q.field === 'design.technicalReplicates');
-  assert.ok(bio, 'expected a question targeting design.biologicalReplicates');
-  assert.ok(tech, 'expected a question targeting design.technicalReplicates');
-  assert.notEqual(bio.id, tech.id);
+  assert.equal(questions.find((q) => String(q.field || '').startsWith('design.')), undefined);
 });
 
 test('an empty Experiment: nextQuestions(limit=8) returns at most 8, covering the naming-critical fields', () => {

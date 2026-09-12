@@ -29,12 +29,106 @@ export function localDateInputValue(now = new Date()) {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
+// A2c/V4-N2: Enter in a field-interview box commits it, exactly like
+// clicking the box's own "Confirm"/"Update & reconfirm" button. This module
+// builds the raw input(s) but never the commit button -- that lives one
+// level up, in ui/fieldInterview.js, one button per question -- so rather
+// than hand fieldInterview.js a new callback (which every phase's interview
+// surface would then have to thread through unchanged), Enter walks the DOM
+// upward from the control looking for the nearest '.field-commit' button and
+// clicks it. That button already knows what "commit" means for this
+// question (reads getValue(), no-ops on empty, calls the real onCommit) --
+// clicking it is the SAME action a mouse click already takes, not a second
+// implementation of it. A control used somewhere with no such ancestor
+// (there is none today; every caller is a field-interview surface) simply
+// finds nothing and no-ops.
+function findDescendantByClass(root, className) {
+  if (!root || !root.children) return null;
+  for (const child of root.children) {
+    if (child.classList && typeof child.classList.contains === 'function' && child.classList.contains(className)) {
+      return child;
+    }
+    const found = findDescendantByClass(child, className);
+    if (found) return found;
+  }
+  return null;
+}
+
+function triggerFieldCommit(el) {
+  let node = el.parentNode;
+  let depth = 0;
+  // A handful of ancestor levels only -- the commit button is always a
+  // near sibling (ui/fieldInterview.js's one '.field-row' per question),
+  // never a page-wide search that could click an unrelated field's button.
+  while (node && depth < 6) {
+    const button = findDescendantByClass(node, 'field-commit');
+    if (button && typeof button.click === 'function') {
+      button.click();
+      return true;
+    }
+    node = node.parentNode;
+    depth += 1;
+  }
+  return false;
+}
+
+function attachEnterCommit(el) {
+  el.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    triggerFieldCommit(el);
+  });
+}
+
+// A2c/V4-N2: "Unsaved -- press Enter or Confirm" -- a small status span next
+// to the control, visible only while the box holds a non-empty value that
+// differs from the value last painted into it (i.e. not yet committed by
+// either Enter or the Confirm button). Wraps the control's own element(s) in
+// a plain div; ui/fieldInterview.js already falls back to
+// `control.element.querySelector('input, select')` whenever `.matches` says
+// the returned element is not itself an input/select (true for the
+// choice+allowOther composite below, and now true for every control), so no
+// caller needs to change to find the real input inside the wrapper.
+function withUnsavedCue(element, initialValue, watchInputs) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'question-control-wrapper';
+  wrapper.appendChild(element);
+
+  const cue = document.createElement('span');
+  cue.className = 'field-unsaved-cue';
+  cue.textContent = 'Unsaved — press Enter or Confirm';
+  cue.hidden = true;
+  wrapper.appendChild(cue);
+
+  const baseline = initialValue === undefined || initialValue === null ? '' : String(initialValue);
+
+  function sync() {
+    const current = watchInputs
+      .map((input) => (input && input.value !== undefined ? String(input.value) : ''))
+      .join('\u0000');
+    cue.hidden = current === '' || current === baseline;
+  }
+
+  for (const input of watchInputs) {
+    if (!input || typeof input.addEventListener !== 'function') continue;
+    input.addEventListener('input', sync);
+    input.addEventListener('change', sync);
+  }
+  sync();
+
+  return wrapper;
+}
+
 /**
  * Build the control for a question, pre-filled with `initialValue`. Returns
  * `{element, getValue()}` rather than a bare element: a choice question with
  * `allowOther` composes a <select> + a free-text fallback, and a 'duration'
  * question composes two number inputs -- neither can be expressed through a
- * plain element's native `.value`.
+ * plain element's native `.value`. Every control's returned `element` is now
+ * a small wrapper div (see withUnsavedCue above) around the actual
+ * control(s) plus the "Unsaved" cue span -- callers that need the real
+ * input/select still find it the same way they already do (see the comment
+ * on withUnsavedCue).
  *
  * Shared by every phase's interview surface so none can drift apart -- an
  * editable answer must offer exactly the same choices (and the same Other
@@ -60,7 +154,7 @@ export function buildQuestionControl(question, initialValue, options = {}) {
     const wrapper = document.createElement('div');
     wrapper.className = 'duration-control';
 
-    function durationPart(unitLabel, value, max) {
+    function durationPart(unitLabel, value, max, ariaUnit) {
       const part = document.createElement('span');
       part.className = 'duration-part';
       const input = document.createElement('input');
@@ -71,6 +165,12 @@ export function buildQuestionControl(question, initialValue, options = {}) {
       input.placeholder = '0';
       input.inputMode = 'numeric';
       if (Number.isFinite(value)) input.value = String(value);
+      // V4-N2 (schedule spinbutton aria): the unit ("h"/"min") is a visible
+      // sibling <span>, not a <label for=...> -- a screen reader announcing
+      // this spinbutton on its own would otherwise say nothing but a bare
+      // number. question.label ties it back to which duration this is (a
+      // form can have more than one duration question).
+      input.setAttribute('aria-label', question.label ? `${question.label} (${ariaUnit})` : ariaUnit);
       const unit = document.createElement('span');
       unit.className = 'duration-unit';
       unit.textContent = unitLabel;
@@ -79,13 +179,16 @@ export function buildQuestionControl(question, initialValue, options = {}) {
       return { part, input };
     }
 
-    const hours = durationPart('h', Number.isFinite(total) ? Math.floor(total / 60) : NaN);
-    const minutes = durationPart('min', Number.isFinite(total) ? total % 60 : NaN, 59);
+    const hours = durationPart('h', Number.isFinite(total) ? Math.floor(total / 60) : NaN, undefined, 'hours');
+    const minutes = durationPart('min', Number.isFinite(total) ? total % 60 : NaN, 59, 'minutes');
     wrapper.appendChild(hours.part);
     wrapper.appendChild(minutes.part);
+    attachEnterCommit(hours.input);
+    attachEnterCommit(minutes.input);
 
+    const baselineValue = Number.isFinite(total) ? String(total) : '';
     return {
-      element: wrapper,
+      element: withUnsavedCue(wrapper, baselineValue, [hours.input, minutes.input]),
       // Empty in BOTH boxes -> '' (an unanswered duration, so the commit
       // path's `if (!raw) return` treats it as "not filled in yet"); any
       // value in either box -> total minutes as a number.
@@ -111,7 +214,8 @@ export function buildQuestionControl(question, initialValue, options = {}) {
     input.value = initialValue === undefined || initialValue === null || initialValue === ''
       ? localDateInputValue()
       : initialValue;
-    return { element: input, getValue: () => input.value };
+    attachEnterCommit(input);
+    return { element: withUnsavedCue(input, input.value, [input]), getValue: () => input.value };
   }
 
   if (question.type === 'choice' || question.type === 'multi') {
@@ -130,7 +234,8 @@ export function buildQuestionControl(question, initialValue, options = {}) {
 
     if (!question.allowOther) {
       if (initialValue !== undefined && initialValue !== null) select.value = initialValue;
-      return { element: select, getValue: () => select.value };
+      attachEnterCommit(select);
+      return { element: withUnsavedCue(select, select.value, [select]), getValue: () => select.value };
     }
 
     // allowOther: a generic escape hatch for ANY choice question, not
@@ -168,14 +273,17 @@ export function buildQuestionControl(question, initialValue, options = {}) {
     }
     syncOtherVisibility();
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'question-control-group';
-    wrapper.appendChild(select);
-    wrapper.appendChild(otherInput);
+    const compositeWrapper = document.createElement('div');
+    compositeWrapper.className = 'question-control-group';
+    compositeWrapper.appendChild(select);
+    compositeWrapper.appendChild(otherInput);
+    attachEnterCommit(select);
+    attachEnterCommit(otherInput);
 
+    const getValue = () => (select.value === OTHER_OPTION_VALUE ? otherInput.value : select.value);
     return {
-      element: wrapper,
-      getValue: () => (select.value === OTHER_OPTION_VALUE ? otherInput.value : select.value),
+      element: withUnsavedCue(compositeWrapper, getValue(), [select, otherInput]),
+      getValue,
     };
   }
 
@@ -186,7 +294,8 @@ export function buildQuestionControl(question, initialValue, options = {}) {
   if (initialValue !== undefined && initialValue !== null) {
     input.value = initialValue;
   }
-  return { element: input, getValue: () => input.value };
+  attachEnterCommit(input);
+  return { element: withUnsavedCue(input, input.value, [input]), getValue: () => input.value };
 }
 
 /** Coerce a control's raw string back to the question's declared type. */

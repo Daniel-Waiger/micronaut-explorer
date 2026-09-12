@@ -31,7 +31,18 @@ export const NAMING_CONFIG = {
   template:
     '{date}_{modality}_{exptype}_{markers}_{magnification}_{group}_{sample}_{biorep}_{techrep}_{notes}{ext}',
   defaults: {
-    date: '1970-01-01',
+    // R4-02: an unanswered date used to default to the Unix epoch
+    // ('1970-01-01'), which rendered into every preview/filename/export as
+    // a plausible-looking but entirely fabricated date -- indistinguishable
+    // from a real acquisition date typed by a person. 'UNKNOWN' is the same
+    // sentinel every other unset field here already uses (modality/exptype/
+    // markers/magnification/sample below), so a missing date now reads the
+    // same, honest way everywhere this config's output is shown: the
+    // filename preview, the measurement registry row (ui/steps/study.js's
+    // studyAssayBaseName), issue/conformance text, and every export (CSV/
+    // Markdown/JSON), all of which render through finalizeFields/renderName
+    // fed by this one object -- see docs/plans/app-review-2026-09-11.md R4-02.
+    date: 'UNKNOWN',
     modality: 'UNKNOWN',
     exptype: 'UNKNOWN',
     markers: 'UNKNOWN',

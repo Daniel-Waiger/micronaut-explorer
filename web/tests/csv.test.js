@@ -23,20 +23,20 @@ test('renderCsv never throws on the empty-experiment document', () => {
   // expandConditions yields exactly one row (see engine/plan.js) -- one
   // data row, not zero, but never a blank string either way.
   const lines = renderCsv(doc).split('\r\n').filter((l) => l.length > 0);
-  assert.equal(lines[0], 'assay,modality,group,factors,biological_replicate,technical_replicate,planned_filename,error');
+  assert.equal(lines[0], 'measurement,modality,group,factors,biological_replicate,technical_replicate,planned_filename,error');
   assert.equal(lines.length, 2);
 });
 
 test('renderCsv on a truly empty document (zero assays) is header-only', () => {
   const doc = buildStudyDocument({ assays: [] }, realKb(), NAMING_CONFIG, BASE_TEMPLATE);
-  assert.equal(renderCsv(doc), 'assay,modality,group,factors,biological_replicate,technical_replicate,planned_filename,error\r\n');
+  assert.equal(renderCsv(doc), 'measurement,modality,group,factors,biological_replicate,technical_replicate,planned_filename,error\r\n');
 });
 
 test('renderCsv emits one data row per planned filename across every assay, and the header first', () => {
   const doc = buildStudyDocument(createDefaultStudy(), realKb(), NAMING_CONFIG, BASE_TEMPLATE);
   const csv = renderCsv(doc);
   const lines = csv.split('\r\n').filter((l) => l.length > 0);
-  assert.equal(lines[0], 'assay,modality,group,factors,biological_replicate,technical_replicate,planned_filename,error');
+  assert.equal(lines[0], 'measurement,modality,group,factors,biological_replicate,technical_replicate,planned_filename,error');
   const totalPlanned = doc.assays.reduce((sum, a) => sum + a.filenames.length, 0);
   assert.equal(lines.length - 1, totalPlanned);
 });

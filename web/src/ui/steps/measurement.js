@@ -17,11 +17,36 @@
 // The steps stay independently renderable, which is what keeps this a
 // composition: any of them can still be mounted alone.
 //
-// The header (including its status badges) is a render-time snapshot: it is
-// built once from `options.workflowProgress` when this page renders and does
-// not update itself afterward. The embedded sub-steps below it re-render
-// themselves on their own store subscriptions, so the header can go stale
-// relative to them -- pre-existing behaviour, not introduced by this module.
+// The header (including its status badges) and the three embedded sections
+// stay in sync through one small hook, NOT a store.subscribe (see
+// docs/cma-lessons.md lessons 46/49/50 -- a plain subscription re-renders
+// everything on every keystroke, which is exactly the "rebuild the DOM every
+// time" failure mode those lessons warn against, and it would fire for the
+// writer too, undoing whatever focus/caret care that section's own writer
+// took).
+//
+// Each embedded step's render() returns `{ id, refresh() }` (a step that
+// hasn't been updated to do so yet -- i.e. returns undefined -- is simply
+// treated as having no refresh; the page still works, it just stays stale
+// for that one section until it is updated). This page hands each section
+// `onSectionChanged(sourceId)` via embeddedOptions; a section calls it,
+// naming itself, right after it writes to the store. Multiple calls in
+// quick succession (e.g. several keystrokes) coalesce behind a single
+// trailing `window.setTimeout(..., 150)` (bounded by a 600 ms max wait so a
+// continuous typist still sees siblings repaint). When that timer fires,
+// this page calls `refresh()` on every section's handle EXCEPT the most
+// recent writer (it already repainted itself synchronously; an earlier
+// writer inside the same window is refreshed, because the later write may
+// have changed what it shows) and then `refreshHeader()`. A notify raised
+// while a refresh runs is dropped, so a misbehaving refresh cannot loop.
+// `refreshHeader()` keeps the existing statusGroup element and rebuilds only
+// its children from `options.getWorkflowProgress?.() ?? options.workflowProgress`
+// (main.js's post-write thunk; the plain snapshot is stale by design, kept
+// only as a fallback for a caller that has none).
+//
+// Refresh paths never write the store -- see measurementRefresh.test.js's
+// source-grep test -- so there is no path back into onSectionChanged from a
+// refresh, and the mechanism cannot loop.
 
 import { designStep } from './design.js';
 import { assayView } from '../../core/assay.js';
@@ -121,17 +146,27 @@ export function createMeasurementStep({ panelStep, namingStep }) {
         return;
       }
 
-      const progressAssays = Array.isArray(options.workflowProgress?.assays)
-        ? options.workflowProgress.assays
-        : [];
-      const status = progressAssays.find((entry) => entry && entry.id === assay.id)?.status
-        || measurementStatus(null);
       const statusGroup = document.createElement('div');
       statusGroup.className = 'measurement-status-group';
-      for (const scope of MEASUREMENT_STATUS_SCOPES) {
-        appendStatusBadge(statusGroup, scope, status[scope]);
-      }
       header.appendChild(statusGroup);
+
+      // Rebuilds ONLY statusGroup's children -- the element itself (and its
+      // place in `header`) never changes -- from whichever workflow-progress
+      // source options offers: the thunk if the caller supplies one (so this
+      // reads the state AFTER whatever just changed it), else the one-shot
+      // snapshot every render already had, so the page keeps rendering
+      // correctly before every caller passes the thunk.
+      function refreshHeader() {
+        const progress = options.getWorkflowProgress?.() ?? options.workflowProgress;
+        const progressAssays = Array.isArray(progress?.assays) ? progress.assays : [];
+        const status = progressAssays.find((entry) => entry && entry.id === assay.id)?.status
+          || measurementStatus(null);
+        statusGroup.textContent = '';
+        for (const scope of MEASUREMENT_STATUS_SCOPES) {
+          appendStatusBadge(statusGroup, scope, status[scope]);
+        }
+      }
+      refreshHeader();
 
       const view = assayView(experiment, assay.id);
       const readout = typeof view.readoutText === 'string' && view.readoutText.trim()
@@ -150,16 +185,90 @@ export function createMeasurementStep({ panelStep, namingStep }) {
       body.className = 'measurement-body';
       main.appendChild(body);
 
+      // Cross-section refresh state for this one render of the page. A
+      // second render() call (a route change and back) builds an entirely
+      // new closure over a new `header`/`handles`/etc, so a timer left
+      // pending from a PRIOR render is harmless: isPageLive() below checks
+      // against the `header` captured in ITS OWN closure, which stops being
+      // one of `main`'s current children the moment this page is torn down
+      // (main.textContent = '' on the next render, see designStep/panelStep/
+      // namingStep and this function's own top line) -- so a stale timer
+      // firing late finds isPageLive() false and does nothing.
+      const handles = {};
+      let timerId = null;
+      let refreshing = false;
+
+      // `main.children` is a live HTMLCollection in a real browser (no
+      // `.includes`) but a plain Array in the test domStub; Array.prototype
+      // .includes works on both since it only needs `.length` and indices.
+      function isPageLive() {
+        return Array.prototype.includes.call(main.children, header);
+      }
+
+      // Red-team A4: exclude only the MOST RECENT writer, never the union of
+      // everything that wrote inside the window -- two sections edited within
+      // 150 ms of each other would otherwise both be skipped and the earlier
+      // one (which repainted itself BEFORE the later write) would stay stale.
+      // A notify raised while a refresh is running is dropped, not queued:
+      // refresh() bodies are derived-only and never write the store, so a
+      // notify from inside one is a bug, and honouring it would ping-pong
+      // every 150 ms forever. A max wait bounds a continuous typist so the
+      // siblings repaint at least every MAX_WAIT_MS.
+      const DEBOUNCE_MS = 150;
+      const MAX_WAIT_MS = 600;
+      let lastSource = null;
+      let firstPendingAt = null;
+
+      function runRefresh() {
+        timerId = null;
+        if (!isPageLive()) return;
+        const source = lastSource;
+        lastSource = null;
+        firstPendingAt = null;
+        refreshing = true;
+        try {
+          for (const [id, handle] of Object.entries(handles)) {
+            if (id === source) continue;
+            if (!handle || typeof handle.refresh !== 'function') continue;
+            try {
+              handle.refresh();
+            } catch (err) {
+              // One section's failure must not re-freeze the others or the
+              // header badges (red-team A4).
+              console.error(`measurement: refresh of section "${id}" failed`, err);
+            }
+          }
+          try {
+            refreshHeader();
+          } catch (err) {
+            console.error('measurement: header refresh failed', err);
+          }
+        } finally {
+          refreshing = false;
+        }
+      }
+
+      function onSectionChanged(sourceId) {
+        if (refreshing) return;
+        lastSource = sourceId;
+        const now = Date.now();
+        if (firstPendingAt === null) firstPendingAt = now;
+        if (timerId !== null) window.clearTimeout(timerId);
+        const waited = now - firstPendingAt;
+        const delay = Math.max(0, Math.min(DEBOUNCE_MS, MAX_WAIT_MS - waited));
+        timerId = window.setTimeout(runRefresh, delay);
+      }
+
       // Each step owns its section outright. Options pass through untouched so
       // advisor, experience level and routing behave exactly as they did when
-      // these were separate routes.
-      const embeddedOptions = { ...options, embedded: true };
+      // these were separate routes; onSectionChanged is new and additive.
+      const embeddedOptions = { ...options, embedded: true, onSectionChanged };
       for (const step of [designStep, panelStep, namingStep]) {
         const section = document.createElement('section');
         section.className = 'measurement-section';
         section.dataset.measurementSection = step.id;
         body.appendChild(section);
-        step.render(section, store, embeddedOptions);
+        handles[step.id] = step.render(section, store, embeddedOptions);
       }
     },
   };

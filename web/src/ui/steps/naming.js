@@ -109,7 +109,7 @@ export function createNamingStep(kb) {
   return {
   id: 'naming',
   title: 'Data plan',
-  render(main, store, { advisor, experience, embedded = false, showToast } = {}) {
+  render(main, store, { advisor, experience, embedded = false, showToast, onSectionChanged } = {}) {
     main.textContent = '';
 
     // Commit 1 of the assay tier (schema v3): every experiment has exactly
@@ -138,6 +138,14 @@ export function createNamingStep(kb) {
     main.appendChild(grid);
 
     const inputs = {};
+    // The value THIS section last painted into each input, keyed by
+    // FIELD_DEFS' key -- the pristine rule's other half (see
+    // syncInputsFromStore below): an input is safe to overwrite from the
+    // store only when it is not focused AND its current value still equals
+    // what was last painted into it, i.e. the person has not typed anything
+    // since. Populated here at initial paint and kept current by both the
+    // initial loop and syncInputsFromStore.
+    const lastPainted = {};
     // Pre-fill through effectiveNamingFields, not raw naming.fields, so a
     // value the user already gave elsewhere (modality, collected by the
     // interview as acquisition.modality) shows up in the box it feeds rather
@@ -187,6 +195,7 @@ export function createNamingStep(kb) {
       input.value = field.key === 'date' && !prefill[field.key]
         ? localDateInputValue()
         : prefill[field.key] ?? '';
+      lastPainted[field.key] = input.value;
       input.addEventListener('input', () => {
         // scopeWrite translates the flat v2-shaped path into this assay's
         // real (index-addressed) object path plus its stable (id-addressed)
@@ -199,7 +208,16 @@ export function createNamingStep(kb) {
         // core/provenance.js editTagFor.
         const existingTag = store.get().provenance?.slots?.[slotKey]?.tag ?? null;
         store.setPath(path, input.value, editTagFor(existingTag), { slotKey });
+        // This input is the one the person is actively typing in, so its own
+        // value already reflects what was just typed -- lastPainted tracks
+        // that too, or a later sibling refresh's pristine check would see
+        // this box's value having "drifted" from what it last painted (it
+        // never repainted itself, the person typed into it) and refuse to
+        // touch it forever, which happens to be harmless here (this field
+        // keeps its own typed value either way) but is the wrong reason.
+        lastPainted[field.key] = input.value;
         update();
+        onSectionChanged?.('naming');
       });
       inputs[field.key] = input;
       row.appendChild(input);
@@ -484,8 +502,51 @@ export function createNamingStep(kb) {
       }
     }
 
+    // Cross-section refresh (docs/cma-lessons.md 46/49/50): repaints this
+    // section's inputs from the CURRENT store state without ever rebuilding
+    // them, so a sibling section's write (e.g. confirming Modality on the
+    // Acquisition panel) shows up here without the keystroke-destroying
+    // full re-render lesson 46 warns against, and reads the store FRESH each
+    // time it runs rather than closing over a stale snapshot -- lesson 46's
+    // exact failure mode ("read current store state fresh inside the
+    // handler, not the render-time closure").
+    //
+    // The pristine rule: an input is only repainted when it is BOTH (a) not
+    // the element the person is currently focused in, and (b) still holding
+    // exactly the value this section itself last painted into it -- i.e.
+    // nothing has changed it since, whether that's a person mid-edit or a
+    // value this function already painted moments ago. Both conditions
+    // together are what let a naming box mid-edit survive a sibling's
+    // refresh (measurementRefresh.test.js) while an untouched box still
+    // picks up a fresh value from elsewhere.
+    //
+    // `date` is the one exception: an empty store value never overwrites the
+    // box, matching the initial-paint rule above (today's local date is a UI
+    // convenience, never something to stamp back in from an empty store).
+    function syncInputsFromStore() {
+      const fresh = effectiveNamingFields(assayView(store.get(), assayId));
+      for (const field of FIELD_DEFS) {
+        const input = inputs[field.key];
+        if (!input) continue;
+        if (field.key === 'date' && !fresh.date) continue;
+        const nextValue = fresh[field.key] ?? '';
+        const pristine = document.activeElement !== input && input.value === lastPainted[field.key];
+        if (!pristine) continue;
+        if (input.value !== nextValue) input.value = nextValue;
+        lastPainted[field.key] = nextValue;
+      }
+    }
+
     update();
     renderTimingGrid();
+
+    return {
+      id: 'naming',
+      refresh() {
+        syncInputsFromStore();
+        update();
+      },
+    };
   },
   };
 }

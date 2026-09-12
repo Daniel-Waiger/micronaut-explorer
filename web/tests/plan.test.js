@@ -12,6 +12,12 @@ import {
 } from '../src/engine/plan.js';
 import { emptyExperiment } from '../src/core/schema.js';
 import { assayView, emptyAssay } from '../src/core/assay.js';
+import { NAMING_CONFIG, BASE_TEMPLATE as REAL_BASE_TEMPLATE, realKb } from './fixtures.js';
+import { buildStudyDocument } from '../src/engine/studydoc.js';
+import { renderCsv } from '../src/engine/render/csv.js';
+import { renderMarkdown } from '../src/engine/render/markdown.js';
+import { renderJson } from '../src/engine/render/json.js';
+import { finalizeFields, renderName } from '../src/engine/naming.js';
 
 // Mirrors ui/steps/naming.js's BASE_TEMPLATE, same reason planConfig() below
 // mirrors NAMING_CONFIG as a local literal rather than an import.
@@ -336,4 +342,72 @@ test('studyNameIssues does not mutate the experiment it inspects', () => {
   const before = JSON.stringify(study);
   studyNameIssues(study, planConfig(), BASE_TEMPLATE);
   assert.equal(JSON.stringify(study), before);
+});
+
+// --- R4-02: a measurement with no date must never render the Unix epoch --
+// (was NAMING_CONFIG.defaults.date === '1970-01-01', which rendered into
+// every filename that never got an explicit date -- indistinguishable from a
+// real acquisition date typed by a person). Fixed at the source
+// (engine/namingConfig.js's own default, imported here as the REAL
+// NAMING_CONFIG rather than this file's local planConfig() literal, which is
+// a byte-for-byte pin of the Classic conformance suite and deliberately left
+// alone) rather than patched per render site, so every surface built from it
+// -- the filename preview, the measurement registry row (ui/steps/study.js's
+// studyAssayBaseName, which calls the identical finalizeFields/renderName
+// pair exercised directly below), issue text, and every export (CSV/
+// Markdown/JSON, all built from studydoc.js's doc.assays[].filenames, itself
+// planFilenames(view, NAMING_CONFIG)) -- picks up the fix for free.
+// docs/plans/app-review-remediation-task-graph.json task A2b;
+// docs/plans/app-review-2026-09-11.md finding R4-02.
+
+test("R4-02: the real NAMING_CONFIG's date default is the same 'UNKNOWN' sentinel every other unset field uses, not the Unix epoch", () => {
+  assert.equal(NAMING_CONFIG.defaults.date, 'UNKNOWN');
+  assert.notEqual(NAMING_CONFIG.defaults.date, '1970-01-01');
+});
+
+test('R4-02: planFilenames with no date supplied renders the UNKNOWN placeholder, never 1970', () => {
+  const exp = experimentWith({ fields: { sample: 'E02' } });
+  const planned = planFilenames(exp, NAMING_CONFIG);
+  assert.equal(planned.length, 1);
+  assert.ok(!planned[0].filename.includes('1970'), planned[0].filename);
+  assert.ok(planned[0].filename.startsWith('UNKNOWN_'), planned[0].filename);
+});
+
+test('R4-02: the registry-row base name (ui/steps/study.js\'s studyAssayBaseName path, exercised directly) never shows 1970 for an undated measurement', () => {
+  const exp = experimentWith({ fields: { sample: 'E02' } });
+  const finalized = finalizeFieldsForBaseName(exp);
+  const baseName = renderName(finalized, { ...NAMING_CONFIG, template: REAL_BASE_TEMPLATE });
+  assert.ok(!baseName.includes('1970'), baseName);
+  assert.ok(baseName.startsWith('UNKNOWN_'), baseName);
+});
+
+// Local, minimal re-implementation of ui/steps/study.js's studyAssayBaseName
+// (a UI module that touches `document` and cannot be imported here) -- calls
+// the identical two engine functions in the identical order, so this proves
+// the same code path that renders the registry row, not an approximation of
+// it.
+function finalizeFieldsForBaseName(exp) {
+  return finalizeFields('experiment.tif', effectiveNamingFields(exp), NAMING_CONFIG);
+}
+
+test('R4-02: a full study document (issue text/exports) with an undated measurement never prints 1970 in CSV, Markdown or JSON, and the filename reads UNKNOWN for the date', () => {
+  const study = emptyExperiment();
+  const assay = study.assays[0];
+  assay.label = 'Undated measurement';
+  assay.naming.fields = { sample: 'E02' }; // date deliberately left unset
+  const kb = realKb();
+
+  const doc = buildStudyDocument(study, kb, NAMING_CONFIG, REAL_BASE_TEMPLATE);
+  const filename = doc.assays[0].filenames[0].filename;
+  assert.ok(!filename.includes('1970'), filename);
+  assert.ok(filename.startsWith('UNKNOWN_'), filename);
+
+  const csv = renderCsv(doc);
+  const markdown = renderMarkdown(doc);
+  const json = renderJson(doc);
+  for (const [label, text] of [['CSV', csv], ['Markdown', markdown], ['JSON', json]]) {
+    assert.ok(!text.includes('1970'), `${label} export must never print the epoch date:\n${text}`);
+  }
+  assert.ok(csv.includes(filename), 'CSV manifest carries the same UNKNOWN-dated filename');
+  assert.ok(markdown.includes(filename), 'Markdown export carries the same UNKNOWN-dated filename');
 });

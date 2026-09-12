@@ -600,11 +600,13 @@ export function resolveMeasurementFluorophores(view, kb) {
  */
 const SEVERITY_RANK = { error: 0, warning: 1 };
 
-const SPILLOVER_ACK_REASON_LABELS = {
+// Exported so ui/steps/panel.js renders the same reason label the flag
+// message carries (one source; the build forbids a second private copy).
+export const SPILLOVER_ACK_REASON_LABELS = Object.freeze({
   'sequential-acquisition': 'sequential acquisition',
   'filter-separated': 'filter-separated',
   other: 'other',
-};
+});
 
 function findSpilloverAck(acknowledged, pairKey) {
   if (!Array.isArray(acknowledged)) return null;

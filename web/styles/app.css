@@ -2049,6 +2049,10 @@ button:focus-visible {
   pointer-events: none;
 }
 .spectral-view-peak-value { font-size: 10px; font-weight: 650; }
+/* C3 / review R4-11: peak labels inherited the fluorophore colour from the
+   curve group and fell to 1.5:1 contrast on the light plot background; the
+   swatch and curve keep the colour, the text uses the page ink. */
+.spectral-view-peak-name, .spectral-view-peak-value { fill: var(--ink); }
 .spectral-view-filter-label { font-size: 10.5px; }
 .spectral-view-data.spectral-view-active .spectral-view-curve {
   stroke-width: 5;
@@ -3195,6 +3199,14 @@ td, th { border-color: var(--line); }
 }
 
 .microscopy-section { margin: 12px 0; }
+/* C3 / review R4-05: at phone width the channel rows were wider than their
+   card and the section's overflow: clip hid the right-hand controls with no
+   way to scroll to them. The card scrolls horizontally and, under 560px, the
+   main row wraps instead of overflowing. */
+.panel-channel-card { overflow-x: auto; }
+@media (max-width: 560px) {
+  .panel-channel-main { flex-wrap: wrap; align-items: center; }
+}
 .microscopy-section-summary,
 .overview-assay-summary,
 .overview-export-summary {
