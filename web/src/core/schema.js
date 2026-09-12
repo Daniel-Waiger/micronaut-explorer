@@ -19,7 +19,8 @@
 
 import { emptyAssay, isAssayScopedPath } from './assay.js';
 import { shortId, uuid } from './ids.js';
-import { canOverwrite } from './provenance.js';
+import { canOverwrite, isEmptyValue, tierOf } from './provenance.js';
+import { getPath } from './paths.js';
 
 export const SCHEMA_VERSION = 6;
 
@@ -324,7 +325,13 @@ function migrateV4toV5(obj) {
  * lose them. canOverwrite mirrors the exact refuse-if-STRONG rule
  * core/store.js's setValueAtPath already applies to a live 'kb-default'
  * write -- see provenance.js -- so this migration can never clobber a real
- * user edit, including a deliberately-cleared (STRONG-tagged, empty) axis.
+ * user edit. A deliberately-cleared axis is no longer STRONG-tagged at all
+ * (isEmptyValue demotes a clear to 'default'/WEAK at write time -- see
+ * setValueAtPath -- and normalizeEmptySlotProvenance below heals any
+ * pre-existing save where it was), so this migration would in fact refill
+ * one from the legacy vocabulary; that is correct, not a clobber, since a
+ * WEAK-tagged empty axis was never a real user decision to record "no
+ * groups" in the first place.
  */
 function migrateV5toV6(obj) {
   const src = obj && typeof obj === 'object' ? obj : {};
@@ -451,6 +458,84 @@ function normalizePanelSpillover(experiment) {
   return changed ? { ...experiment, assays } : experiment;
 }
 
+// Resolve a provenance slot key to the value it currently tags. Most slot
+// keys are ordinary core/paths.js paths (`researchQuestion`,
+// `assays[0].design.groups`); assay-tier slots are id-addressed instead
+// (`assay:<id>.design.groups` -- see core/assay.js's scopeWrite/module
+// header) precisely so a slot stays pinned to WHICH assay after another one
+// is deleted, so those need the id resolved to the assay's current array
+// position before core/paths.js's getPath can walk the rest.
+function resolveSlotValue(experiment, slotKey) {
+  const match = /^assay:([^.]+)\.(.+)$/.exec(slotKey);
+  if (match) {
+    const [, assayId, subPath] = match;
+    const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
+    const assay = assays.find((a) => a && a.id === assayId);
+    return assay ? getPath(assay, subPath) : undefined;
+  }
+  return getPath(experiment, slotKey);
+}
+
+// Slot keys this heal applies to: only a `design.groups` slot (bare, or
+// assay-scoped as `assay:<id>.design.groups`). Scoped deliberately, NOT to
+// every provenance slot in the document: isEmptyValue's write-time clearing
+// exception (core/store.js's setValueAtPath) is domain-naive on purpose and
+// applies everywhere, but healing a LOAD-TIME STRONG-empty slot back to
+// WEAK also reopens it to every future WEAK write at that path -- correct
+// for design.groups, whose only WEAK writer is the explicit, user-clicked
+// "copy groups" button (ui/steps/study.js) with no live regression (see the
+// B4 red-team audit: no other WEAK writer exists for any other domain
+// today). Doing the same for, say, `narrative.text` or
+// `acquisition.modality` would retroactively change what a deliberately
+// blank field means there too, which V6-NEW-03 / lesson 37 never asked for
+// and this task does not own -- keep the diff minimal to the finding.
+const HEALABLE_SLOT_RE = /(^|\.)design\.groups$/;
+
+// Heal saves written before isEmptyValue's recursive definition existed (or
+// before it covered a given shape): a `design.groups` provenance slot
+// tagged STRONG ('user'/'user_edited'/'imported') whose CURRENT value is
+// empty by that same predicate is demoted to 'default' (WEAK), exactly the
+// tag core/store.js's setValueAtPath would have written had the value been
+// cleared under today's rule.
+//
+// Load-bearing for lesson 37: without this, a study saved before this fix
+// -- e.g. a measurement whose groups were cleared down to `{levels: ['']}`
+// by one "Add group" click, back when that shape was still tagged STRONG --
+// stays permanently locked out of the "copy groups" WEAK refill forever,
+// because migrate() only ever runs the numbered MIGRATIONS above on
+// schemaVersion, and a pre-fix v6 save never changes version at all. This
+// runs at the same load boundary as normalizePanelSpillover so every
+// persisted study crosses it exactly once, regardless of which
+// schemaVersion it was saved at.
+//
+// Uses the ONE isEmptyValue definition (core/provenance.js), the same one
+// setValueAtPath consults at write time, so a slot this heal considers
+// still-locked can never be a slot a live write would consider clear (or
+// the two rules could fight each other forever).
+//
+// Preserves the original object (and its `slots` map) when nothing needs
+// demoting, keeping the no-op identity contract the other normalizers here
+// already follow.
+function normalizeEmptySlotProvenance(experiment) {
+  const slots = experiment && experiment.provenance && typeof experiment.provenance.slots === 'object'
+    ? experiment.provenance.slots
+    : null;
+  if (!slots) return experiment;
+
+  let changed = false;
+  const nextSlots = { ...slots };
+  for (const [key, slot] of Object.entries(slots)) {
+    if (!HEALABLE_SLOT_RE.test(key)) continue;
+    if (!slot || typeof slot.tag !== 'string') continue;
+    if (tierOf(slot.tag) !== 'STRONG') continue; // already WEAK/PROVISIONAL: nothing to heal
+    if (!isEmptyValue(resolveSlotValue(experiment, key))) continue;
+    changed = true;
+    nextSlots[key] = { ...slot, tag: 'default' };
+  }
+  if (!changed) return experiment;
+  return { ...experiment, provenance: { ...experiment.provenance, slots: nextSlots } };
+}
+
 export function migrate(obj) {
   let current = obj;
   let version = obj && typeof obj.schemaVersion === 'number' ? obj.schemaVersion : 0;
@@ -490,6 +575,7 @@ export function migrate(obj) {
   current = normalizeStudyContext(current);
   current = normalizeStudyIdentity(current);
   current = normalizePanelSpillover(current);
+  current = normalizeEmptySlotProvenance(current);
   const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
   if (STUDY_ORIGINS.has(meta.origin)) return current;
   return { ...current, meta: { ...meta, origin: 'user' } };

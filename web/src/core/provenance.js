@@ -29,6 +29,51 @@ export function isProvisional(tag) {
 }
 
 /**
+ * True if `value` carries no information -- a deliberate clear, not a real
+ * value. Defined here (rather than duplicated in core/store.js and
+ * core/schema.js) so the write-time rule (setValueAtPath) and the load-time
+ * heal (schema.js's normalizeEmptySlotProvenance) can never drift apart: a
+ * value schema.js decides is "empty enough to demote" must be exactly the
+ * same set of values store.js decides is "empty enough to write as WEAK",
+ * or a legacy save could be healed by one rule and immediately re-locked by
+ * the other.
+ *
+ * The boundary, spelled out (this is deliberately domain-naive -- it knows
+ * nothing about "levels" or "groups", only whether a value carries no
+ * information):
+ *   - '' / null / undefined -> empty.
+ *   - an array is empty iff EVERY element is itself empty (recursively):
+ *     [] and [null] and [''] and [{}] are all empty; ['a'] and [0] and
+ *     [false] are not. This is what makes {levels: ['']} -- ONE "Add group"
+ *     click, or blanking the last row's text, on an otherwise-empty groups
+ *     list (see ui/steps/design.js) -- count as a clear exactly like
+ *     {levels: []} does: a lone blank row carries the same "nothing typed
+ *     here yet" information as no row at all, and treating it as STRONG
+ *     would reopen the exact permanent lock (lesson 37 / V6-NEW-03) this
+ *     rule exists to prevent, one keystroke over.
+ *   - a PLAIN object ({} or Object.create(null), never a Date or any other
+ *     class instance) is empty iff every own value is itself empty:
+ *     {} and {levels: []} and {a: {b: []}} are empty. The prototype check
+ *     is load-bearing: without it, `new Date()` -- which has no OWN
+ *     enumerable properties, so Object.values(...).every(...) is vacuously
+ *     true -- would be silently treated as "the user cleared this field",
+ *     which is never a real scenario a value like that could arise from.
+ *   - 0, false, NaN, and any other non-empty-string primitive are real
+ *     values, never empty -- a measurement recorded as 0 is data, not a
+ *     blank.
+ */
+export function isEmptyValue(value) {
+  if (value === '' || value === null || value === undefined) return true;
+  if (Array.isArray(value)) return value.every(isEmptyValue);
+  if (typeof value === 'object') {
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) return false;
+    return Object.values(value).every(isEmptyValue);
+  }
+  return false;
+}
+
+/**
  * The tag a UI hand-edit through a text field should write: 'user_edited'
  * when the slot already held a WEAK/PROVISIONAL value (the user is
  * correcting a machine-sourced guess -- a free-text proposal, a KB default,

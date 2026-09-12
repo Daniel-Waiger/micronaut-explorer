@@ -174,19 +174,47 @@ export const studyStep = {
     applyBtn.type = 'button';
     applyBtn.className = 'add-factor-button';
     applyBtn.textContent = 'Copy groups to measurements that have none';
-    applyBtn.title =
-      "Copies the active measurement's groups into every OTHER measurement that has not defined its own -- a measurement whose groups you already edited by hand is left alone.";
+    // groupSeedLevels (core/assay.js) reads ONLY the active measurement's own
+    // groups (V6-NEW-02: it used to fall back to the first OTHER measurement
+    // with groups, which could silently copy a measurement this tooltip
+    // never named). Disabling the button when the active measurement itself
+    // has no groups keeps the button's action exactly what its tooltip
+    // promises.
+    //
+    // Recomputed by updateApplyBtnState(), called from renderAssayList()
+    // rather than once here at initial render: the active measurement can
+    // change without a full re-render of this button (Delete reassigns
+    // activeAssayId via core/assay.js's removeAssay when the active,
+    // groupless measurement is the one removed), and leaving disabled/title
+    // stale would show "add some groups first" for a measurement that now
+    // has groups, or vice versa.
+    function updateApplyBtnState() {
+      const seedLevels = groupSeedLevels(store.get()).filter((level) => String(level ?? '').trim());
+      applyBtn.disabled = seedLevels.length === 0;
+      applyBtn.title = applyBtn.disabled
+        ? 'The active measurement has no groups of its own yet -- add some on its Samples & design page first.'
+        : "Copies the active measurement's groups into every OTHER measurement that has not defined its own -- a measurement with its own groups already on record (however they got there) is left alone.";
+    }
+    updateApplyBtnState();
     applyBtn.addEventListener('click', () => {
       const experiment = store.get();
-      const levels = groupSeedLevels(experiment);
+      // Blank rows (a just-clicked "Add group") are not groups to copy.
+      const levels = groupSeedLevels(experiment).filter((level) => String(level ?? '').trim());
       const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
+      const activeAssayId = experiment.activeAssayId;
       if (levels.length === 0) {
-        if (showToast) showToast('No measurement has groups defined yet -- add some on Samples & design first.');
+        if (showToast) showToast('The active measurement has no groups defined yet -- add some on Samples & design first.');
         return;
       }
       let applied = 0;
       let skipped = 0;
       for (const assay of assays) {
+        // R6-09: the SOURCE measurement (the active one groupSeedLevels reads
+        // from) must never be counted -- it already holds these exact
+        // levels, so writing them back and possibly refusing (STRONG over
+        // STRONG at a DIFFERENT tag) is not a "skip", it is a no-op the user
+        // never asked for and the toast must not report.
+        if (assay.id === activeAssayId) continue;
         const { path, slotKey } = scopeWrite(store.get(), 'design.groups', assay.id);
         // setPath refuses (returns false) when this assay's groups already
         // carry a STRONG ('user'/'user_edited') tag -- so this is naturally
@@ -337,6 +365,7 @@ export const studyStep = {
       const assays = Array.isArray(experiment.assays) ? experiment.assays : [];
       renderModalityOptions(assays);
       addBtn.disabled = assays.length >= MAX_STUDY_ROWS;
+      updateApplyBtnState();
 
       // Read off `currentProgress` (the render-time snapshot, refreshed only
       // on the copy-groups path -- see the closure notes above `let

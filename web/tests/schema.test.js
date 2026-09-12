@@ -530,7 +530,7 @@ test('migrate v5->v6 leaves an assay that already has its own groups untouched',
   assert.deepEqual(migrated.assays[0].design.groups, { levels: ['ALREADY-SET'] });
 });
 
-test('migrate v5->v6 never overwrites an assay whose empty groups are already a deliberate, STRONG-tagged user edit', () => {
+test('migrate v5->v6 never overwrites an assay whose empty groups are already a deliberate, STRONG-tagged user edit -- and heals the legacy STRONG-empty slot so it is no longer locked', () => {
   const base = emptyExperiment();
   const id = base.assays[0].id;
   const v5 = {
@@ -543,8 +543,18 @@ test('migrate v5->v6 never overwrites an assay whose empty groups are already a 
     },
   };
   const migrated = migrate(v5);
+  // migrateV5toV6 itself still refuses to seed from groupVocabulary while
+  // the slot reads STRONG (canOverwrite mirrors setValueAtPath's own rule):
+  // the empty levels are left exactly as the user's STRONG edit recorded
+  // them, not silently replaced by the legacy vocabulary.
   assert.deepEqual(migrated.assays[0].design.groups, { levels: [] });
-  assert.deepEqual(migrated.provenance.slots[`assay:${id}.design.groups`], { tag: 'user', detail: null });
+  // But schema.js's load-boundary normalizeEmptySlotProvenance (B4 /
+  // V6-NEW-03 / lesson 37) heals that STRONG-tagged EMPTY slot to 'default'
+  // (WEAK) in the same pass: a deliberately-cleared axis is never truly
+  // STRONG under isEmptyValue's rule, so a save made before that rule
+  // existed must not stay locked out of every future WEAK "copy groups"
+  // refill forever, with no user action able to clear it.
+  assert.deepEqual(migrated.provenance.slots[`assay:${id}.design.groups`], { tag: 'default', detail: null });
 });
 
 test('migrate v5->v6 drops groupVocabulary and its provenance slot entirely when there is nothing to seed', () => {

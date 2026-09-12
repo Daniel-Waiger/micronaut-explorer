@@ -14,10 +14,16 @@
 // each assay? Tried and rejected -- see docs/plans (Advisor... the assay
 // tier plan), Decision 1. A composed axis can never be MISSING from an
 // assay, which makes "flag an assay with no groups" uncomputable. Per-assay
-// data, seeded from an EXISTING assay's groups at creation time as a real,
-// weak-tagged write (see groupSeedLevels/seedAssayGroups below), keeps that
-// check possible while still making the common case (every assay uses the
-// same groups) a one-click "copy to measurements that have none".
+// data, seeded from the ACTIVE assay's groups (the one the user was just
+// looking at) at creation time as a real, weak-tagged write (see
+// groupSeedLevels/seedAssayGroups below), keeps that check possible while
+// still making the common case (every assay uses the same groups) a
+// one-click "copy to measurements that have none" (see ui/steps/study.js).
+// groupSeedLevels reads ONLY the active assay, never any other -- see its
+// own docstring (V6-NEW-02) -- so a brand-new measurement created via
+// ui/shell.js's or ui/studyMap.js's "+ Add/New measurement" seeds from
+// whichever measurement was active at that moment, or starts empty if that
+// one has none.
 //
 // Pure module: no DOM, no store, no imports at all -- a true leaf.
 
@@ -78,7 +84,15 @@ export function emptyAssay(id) {
       idScheme: '',
       conditions: [],
     },
-    panel: { targets: [], channels: [] },
+    // spillover.acknowledged: user acknowledgements of spectral-overlap flags
+    // (engine/spectra.js's flagPanelOverlaps / engine/panelAssembly.js's
+    // normalizeSpilloverAcks+pruneSpilloverAcks) -- an additive default with
+    // NO schemaVersion bump. Saves written before this field existed are
+    // defaulted at the boundary every persisted study crosses:
+    // core/schema.js migrate() -> normalizePanelSpillover (loads), and
+    // core/importValidate.js's `{...base.panel, ...raw.panel}` merge
+    // (imports). See V3-N1 / red-team A2-P2.
+    panel: { targets: [], channels: [], spillover: { acknowledged: [] } },
     acquisition: {
       instrument: '',
       objective: '',
@@ -272,21 +286,24 @@ export function seedAssayGroups(levels, id) {
  * The group levels a brand-new measurement should start from: there is no
  * study-level group vocabulary any more (Samples & design on each measurement
  * is the one place groups are typed -- see ui/steps/design.js), so a new
- * measurement seeds from whichever EXISTING measurement already has groups,
- * preferring the active one. Returns [] when nothing in the study has groups
- * yet, which is exactly what seedAssayGroups already treats as "no seed".
+ * measurement seeds from the ACTIVE measurement's own groups ONLY. Returns []
+ * when the active measurement has none, which is exactly what
+ * seedAssayGroups already treats as "no seed".
+ *
+ * Previously this fell back to the first OTHER assay in the study that had
+ * groups when the active one had none -- but ui/steps/study.js's "Copy
+ * groups to measurements that have none" button (the same seed function) is
+ * titled and described as copying the ACTIVE measurement's groups, so that
+ * fallback could silently copy a DIFFERENT measurement's groups than the one
+ * named in the button's own tooltip (V6-NEW-02). Restricting to the active
+ * measurement is the smaller-surface fix: the button now simply disables
+ * itself when the active measurement has no groups, rather than reaching
+ * for a fallback the copy-groups feature never advertised.
  */
 export function groupSeedLevels(experiment) {
-  const assays = experiment && Array.isArray(experiment.assays) ? experiment.assays : [];
   const active = assayById(experiment, experiment && experiment.activeAssayId);
   const activeLevels = active && active.design && active.design.groups && active.design.groups.levels;
-  if (Array.isArray(activeLevels) && activeLevels.length > 0) return activeLevels;
-
-  for (const assay of assays) {
-    const levels = assay && assay.design && assay.design.groups && assay.design.groups.levels;
-    if (Array.isArray(levels) && levels.length > 0) return levels;
-  }
-  return [];
+  return Array.isArray(activeLevels) ? activeLevels : [];
 }
 
 /**
