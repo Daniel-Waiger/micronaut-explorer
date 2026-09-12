@@ -11,7 +11,18 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { loadKb, indexKb } from '../src/core/kb.js';
-import { derivePanelFacts, flagPanelOverlaps, loadSpectraKb, resolveMarkerToken, resolvePanel, SPECTRAL_STATES } from '../src/engine/spectra.js';
+import {
+  derivePanelFacts,
+  flagPanelOverlaps,
+  loadSpectraKb,
+  MAX_PLAUSIBLE_PEAK_NM,
+  MIN_PLAUSIBLE_PEAK_NM,
+  resolveMarkerToken,
+  resolveMeasurementFluorophores,
+  resolvePanel,
+  SPECTRAL_STATES,
+} from '../src/engine/spectra.js';
+import { FILTER_BANDWIDTH_BOUNDS_NM } from '../src/engine/panelAssembly.js';
 
 // A small, self-consistent synthetic marker KB: one plain dye (ALEXA488-like),
 // one family with two variants (a MitoTracker-like), one tag (a HaloTag-
@@ -836,4 +847,89 @@ test('ledger-backed pairs respect the real overlap thresholds for error, warning
     overlapRules
   );
   assert.deepEqual(separatedFlags, []);
+});
+
+// --- resolveMeasurementFluorophores: one resolver for both sources (R4-01) --
+
+test('resolveMeasurementFluorophores prefers structured channels over the free-text markers field, and both routes flag the same overlap', () => {
+  const { kb: markersKb } = loadKb(realMarkersRaw);
+  const markerIndex = indexKb(markersKb);
+  const { fluorophores: spectra, overlapRules } = loadSpectraKb(realSpectraRaw);
+  const kb = { index: markerIndex, markersKb, spectra };
+
+  const withChannels = resolveMeasurementFluorophores(
+    {
+      panel: {
+        channels: [
+          { id: 'c1', fluorophore: 'ALEXA488', conjugation: 'direct-probe' },
+          { id: 'c2', fluorophore: 'FITC', conjugation: 'direct-probe' },
+        ],
+      },
+      naming: { fields: { markers: '' } },
+    },
+    kb
+  );
+  assert.equal(withChannels.source, 'channels');
+  assert.equal(withChannels.panelState, 'has-entries');
+  assert.equal(withChannels.entries.length, 2);
+  assert.deepEqual(withChannels.entries.map((e) => e.channelId), ['c1', 'c2']);
+  const channelFlags = flagPanelOverlaps(withChannels.entries, overlapRules);
+  assert.equal(channelFlags.filter((f) => f.severity === 'error').length, 1);
+
+  const withMarkers = resolveMeasurementFluorophores(
+    { panel: { channels: [] }, naming: { fields: { markers: 'ALEXA488-FITC' } } },
+    kb
+  );
+  assert.equal(withMarkers.source, 'markers');
+  assert.equal(withMarkers.entries.length, 2);
+  assert.ok(withMarkers.entries.every((e) => e.channelId === undefined));
+  const markerFlags = flagPanelOverlaps(withMarkers.entries, overlapRules);
+  assert.equal(markerFlags.filter((f) => f.severity === 'error').length, 1);
+});
+
+test('resolveMeasurementFluorophores never throws on malformed view/kb', () => {
+  assert.doesNotThrow(() => resolveMeasurementFluorophores(undefined, undefined));
+  assert.doesNotThrow(() => resolveMeasurementFluorophores({}, {}));
+  assert.doesNotThrow(() => resolveMeasurementFluorophores(null, null));
+});
+
+// --- note passthrough (R3-04): loadSpectraKb / resolveMarkerToken ----------
+
+test("a spectra.json entry's note (DCFDA) is carried through loadSpectraKb and resolveMarkerToken verbatim", () => {
+  const { kb: markersKb } = loadKb(realMarkersRaw);
+  const markerIndex = indexKb(markersKb);
+  const { fluorophores } = loadSpectraKb(realSpectraRaw);
+
+  // Read the literal text from the JSON itself (lesson 40) rather than
+  // retyping it, so a future edit to the note can't silently desync this test.
+  const jsonNote = realSpectraRaw.fluorophores.DCFDA.note;
+  assert.equal(typeof jsonNote, 'string');
+  assert.ok(jsonNote.length > 0);
+
+  assert.equal(fluorophores.DCFDA.note, jsonNote);
+  const resolved = resolveMarkerToken('DCFDA', markerIndex, markersKb, fluorophores);
+  assert.equal(resolved.state, 'known');
+  assert.equal(resolved.note, jsonNote);
+});
+
+test('an entry with no note has no `note` key on the normalized/resolved records', () => {
+  const { fluorophores } = loadSpectraKb({
+    version: 1,
+    fluorophores: { NONOTE: { excitationPeakNm: 490, emissionPeakNm: 525 } },
+  });
+  assert.equal('note' in fluorophores.NONOTE, false);
+  const { markerIndex, markersKb } = fixtures();
+  const resolved = resolveMarkerToken('DYEA', markerIndex, markersKb, fixtures().fluorophores);
+  assert.equal('note' in resolved, false);
+});
+
+// --- exported constants (V3-N5): numbers/arrays ----------------------------
+
+test('MIN/MAX_PLAUSIBLE_PEAK_NM and FILTER_BANDWIDTH_BOUNDS_NM are exported with sane shapes', () => {
+  assert.equal(typeof MIN_PLAUSIBLE_PEAK_NM, 'number');
+  assert.equal(typeof MAX_PLAUSIBLE_PEAK_NM, 'number');
+  assert.ok(MIN_PLAUSIBLE_PEAK_NM < MAX_PLAUSIBLE_PEAK_NM);
+  assert.equal(typeof FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm, 'number');
+  assert.equal(typeof FILTER_BANDWIDTH_BOUNDS_NM.maxNm, 'number');
+  assert.ok(FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm < FILTER_BANDWIDTH_BOUNDS_NM.maxNm);
 });

@@ -202,6 +202,16 @@ export function emptyChannel(id) {
   };
 }
 
+// The detection-filter BANDWIDTH rule `normalizePanelFilterPair` enforces
+// below, exported so ui/steps/panel.js validates/renders against this ONE
+// source instead of repeating literals (V3-N5). The lower bound is
+// EXCLUSIVE: any positive width is stored (0.5 nm is accepted, 0 is not);
+// the upper bound is inclusive. The normalizer reads these same fields, so
+// the constant cannot drift from the producer (red-team A1-P1). A filter
+// CENTER's plausible range is the 300-900 nm window engine/spectra.js
+// exports as MIN/MAX_PLAUSIBLE_PEAK_NM.
+export const FILTER_BANDWIDTH_BOUNDS_NM = Object.freeze({ minExclusiveNm: 0, maxNm: 300 });
+
 // Detection filters are deliberately an all-or-nothing user statement: a
 // center without a bandwidth (or vice versa) cannot honestly describe a band.
 // Keep this local so the serialized channel shape has one normalization rule.
@@ -215,8 +225,8 @@ function normalizePanelFilterPair(entry) {
     center <= 900 &&
     typeof bandwidth === 'number' &&
     Number.isFinite(bandwidth) &&
-    bandwidth > 0 &&
-    bandwidth <= 300
+    bandwidth > FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm &&
+    bandwidth <= FILTER_BANDWIDTH_BOUNDS_NM.maxNm
   ) {
     return { filterCenterNm: center, filterBandwidthNm: bandwidth };
   }
@@ -361,4 +371,111 @@ export function seedChannelsFromMarkers(resolvePanelResult, markersKb, kbMarker,
         conjugateDye: conjugation === 'tag-ligand' ? entry.token : '',
       };
     });
+}
+
+// --- Spillover acknowledgements (V3-N1): panel.spillover.acknowledged ----
+//
+// A spectral-overlap flag (spectra.js's flagPanelOverlaps) that a person has
+// reviewed and accepted -- e.g. two dyes with close emission peaks that are
+// actually fine because they're never imaged in the same acquisition, or are
+// separated by a hardware filter the tool has no way to know about. Recording
+// that decision downgrades the flag from a hard export block to a visible
+// warning (conformance.js/A3 wires this in); it must NOT silently make the
+// overlap disappear, and it must NOT survive a panel edit that changes which
+// two dyes are actually paired (pruneSpilloverAcks, below).
+
+const SPILLOVER_ACK_REASONS = new Set(['sequential-acquisition', 'filter-separated', 'other']);
+
+function isNonEmptySpilloverPairMember(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * Validate and normalize a raw `panel.spillover.acknowledged` array. TOTAL:
+ * never throws. A surviving entry has: `pair` (its two dye ids, SORTED so
+ * ['A','B'] and ['B','A'] are the same acknowledgement regardless of which
+ * order the flag or the user encountered them in), `reason` restricted to the
+ * app's three enumerated choices, an optional string `notes`, and `at` (an
+ * ISO timestamp -- the entry's own recorded time, or "now" when absent or the
+ * wrong type). A malformed entry (wrong pair shape/types, unrecognized or
+ * missing reason, or not an object at all) is dropped rather than repaired --
+ * this is reviewable user-entered state, not authored KB content, matching
+ * normalizeChannels' posture above.
+ */
+export function normalizeSpilloverAcks(raw) {
+  if (!Array.isArray(raw)) return [];
+  const acks = [];
+  const seenPairs = new Set();
+  for (const entry of raw) {
+    if (!entry || typeof entry !== 'object') continue;
+    const pair = entry.pair;
+    if (
+      !Array.isArray(pair) ||
+      pair.length !== 2 ||
+      !isNonEmptySpilloverPairMember(pair[0]) ||
+      !isNonEmptySpilloverPairMember(pair[1])
+    ) {
+      continue;
+    }
+    const sortedPair = [pair[0].trim(), pair[1].trim()].sort();
+    // A dye cannot be acknowledged against itself, and one pair is one
+    // acknowledgement (the first recorded wins).
+    if (sortedPair[0] === sortedPair[1]) continue;
+    const key = spilloverPairKey(sortedPair[0], sortedPair[1]);
+    if (seenPairs.has(key)) continue;
+    if (typeof entry.reason !== 'string' || !SPILLOVER_ACK_REASONS.has(entry.reason)) continue;
+
+    const at = typeof entry.at === 'string' && Number.isFinite(Date.parse(entry.at))
+      ? entry.at
+      : new Date().toISOString();
+    const ack = { pair: sortedPair, reason: entry.reason, at };
+    if (typeof entry.notes === 'string') ack.notes = entry.notes;
+    seenPairs.add(key);
+    acks.push(ack);
+  }
+  return acks;
+}
+
+/**
+ * The ONE pair-key convention shared by acknowledgements and
+ * engine/spectra.js's flagPanelOverlaps (which builds
+ * `[a.canonical, b.canonical].sort().join('|')`): sorted CANONICAL ids joined
+ * by '|'. Acknowledgements are keyed on canonicals -- not on the
+ * `canonical::variantKey` dedupe id resolvePanel uses -- because the flag the
+ * user acknowledges is itself keyed on canonicals; keying the two differently
+ * left every family dye's flag permanently unclearable (red-team A2-P1).
+ */
+export function spilloverPairKey(a, b) {
+  return [a, b].sort().join('|');
+}
+
+/**
+ * The id an acknowledgement refers to for a resolved entry: its CANONICAL
+ * name only (see spilloverPairKey). `null` for anything that isn't a
+ * resolved ('known') entry.
+ */
+function spilloverAckEntryId(entry) {
+  if (!entry || typeof entry.canonical !== 'string' || !entry.canonical) return null;
+  return entry.canonical;
+}
+
+/**
+ * Drop any acknowledgement whose two dye ids are not BOTH still present among
+ * the panel's current resolved `entries` -- editing a channel so it resolves
+ * to a different dye must make the old acknowledgement stop applying rather
+ * than silently keep suppressing a flag about a pair that no longer exists.
+ * TOTAL: never throws; malformed input degrades to "prune everything".
+ */
+export function pruneSpilloverAcks(acks, entries) {
+  const list = Array.isArray(acks) ? acks : [];
+  const validEntries = Array.isArray(entries) ? entries : [];
+  const liveIds = new Set(validEntries.map(spilloverAckEntryId).filter(Boolean));
+  return list.filter(
+    (ack) =>
+      ack &&
+      Array.isArray(ack.pair) &&
+      ack.pair.length === 2 &&
+      liveIds.has(ack.pair[0]) &&
+      liveIds.has(ack.pair[1])
+  );
 }

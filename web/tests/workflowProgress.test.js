@@ -6,7 +6,13 @@ import { checkConformance } from '../src/engine/conformance.js';
 import { decisionTriage } from '../src/engine/decisionTriage.js';
 import { buildExperimentMap } from '../src/engine/experimentMap.js';
 import { measurementStatus } from '../src/engine/measurementStatus.js';
-import { deriveWorkflowProgress, OPTIONAL_WORKFLOW, PRIMARY_WORKFLOW } from '../src/engine/workflowProgress.js';
+import {
+  deriveWorkflowProgress,
+  describeWalkthroughLength,
+  OPTIONAL_WORKFLOW,
+  PRIMARY_WORKFLOW,
+  WALKTHROUGH_STEP_COUNT,
+} from '../src/engine/workflowProgress.js';
 import { BASE_TEMPLATE, NAMING_CONFIG, realKb } from './fixtures.js';
 
 const QUESTIONS = [
@@ -314,4 +320,11 @@ test('regression-pin: adding assays[i].status leaves assays[i].state and summary
     assert.equal(typeof assay.state, 'string', 'state stays the pre-existing string vocabulary');
     assert.equal(typeof assay.status, 'object', 'status is the new, additive record');
   }
+});
+
+test('WALKTHROUGH_STEP_COUNT mirrors PRIMARY_WORKFLOW length and describeWalkthroughLength names it', () => {
+  assert.equal(WALKTHROUGH_STEP_COUNT, PRIMARY_WORKFLOW.length);
+  assert.equal(WALKTHROUGH_STEP_COUNT, 5);
+  assert.equal(describeWalkthroughLength(), 'five-step');
+  assert.ok(Object.isFrozen(PRIMARY_WORKFLOW));
 });

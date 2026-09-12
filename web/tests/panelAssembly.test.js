@@ -13,8 +13,12 @@ import {
   effectiveChannelFilterPair,
   emptyChannel,
   normalizeChannels,
+  normalizeSpilloverAcks,
   panelFluorophoreOptions,
   panelFluorophoreWriteValue,
+  pruneSpilloverAcks,
+  spilloverPairKey,
+  FILTER_BANDWIDTH_BOUNDS_NM,
   reorderPanelChannels,
   seedChannelsFromMarkers,
   shiftPanelChannel,
@@ -318,4 +322,102 @@ test('seedChannelsFromMarkers maps KB class to a best-guess conjugation, and exc
 test('seedChannelsFromMarkers never throws on a malformed resolvePanel result', () => {
   assert.doesNotThrow(() => seedChannelsFromMarkers(undefined, {}, () => undefined, () => 'x'));
   assert.doesNotThrow(() => seedChannelsFromMarkers({ entries: null }, {}, () => undefined, () => 'x'));
+});
+
+// --- normalizeSpilloverAcks / pruneSpilloverAcks (V3-N1) -----------------
+
+test('normalizeSpilloverAcks drops malformed entries and sorts pairs', () => {
+  const acks = normalizeSpilloverAcks([
+    { pair: ['FITC', 'ALEXA488'], reason: 'sequential-acquisition', notes: 'ran sequentially', at: '2024-01-01T00:00:00.000Z' },
+    { pair: ['A'], reason: 'other' }, // wrong pair length
+    { pair: ['A', ''], reason: 'other' }, // empty pair member
+    { pair: ['A', 'B'], reason: 'not-a-real-reason' }, // unrecognized reason
+    { pair: ['A', 'B'] }, // missing reason
+    { pair: [1, 2], reason: 'other' }, // non-string pair members
+    { pair: ['A', 'B'], reason: 42 }, // non-string reason
+    null,
+    'not an object',
+  ]);
+
+  assert.deepEqual(acks, [
+    {
+      pair: ['ALEXA488', 'FITC'],
+      reason: 'sequential-acquisition',
+      notes: 'ran sequentially',
+      at: '2024-01-01T00:00:00.000Z',
+    },
+  ]);
+  assert.deepEqual(normalizeSpilloverAcks(null), []);
+  assert.deepEqual(normalizeSpilloverAcks(undefined), []);
+  assert.deepEqual(normalizeSpilloverAcks('nope'), []);
+  assert.deepEqual(normalizeSpilloverAcks({}), []);
+});
+
+test('normalizeSpilloverAcks defaults a missing/invalid `at` to now and omits notes when absent/invalid', () => {
+  const before = Date.now();
+  const [ack] = normalizeSpilloverAcks([{ pair: ['X', 'Y'], reason: 'filter-separated' }]);
+  const after = Date.now();
+
+  assert.ok(!('notes' in ack), 'notes must be omitted, not set to undefined/null');
+  assert.ok(typeof ack.at === 'string' && ack.at.length > 0);
+  const parsed = Date.parse(ack.at);
+  assert.ok(parsed >= before && parsed <= after, 'at must default to "now" when absent');
+
+  const [withBadNotes] = normalizeSpilloverAcks([{ pair: ['X', 'Y'], reason: 'other', notes: 42 }]);
+  assert.ok(!('notes' in withBadNotes));
+
+  const [withBadAt] = normalizeSpilloverAcks([{ pair: ['X', 'Y'], reason: 'other', at: 12345 }]);
+  assert.ok(typeof withBadAt.at === 'string' && withBadAt.at.length > 0);
+});
+
+test('pruneSpilloverAcks keeps an ack whose pair is present in either order and drops it when one dye is replaced', () => {
+  const entries = [
+    { canonical: 'ALEXA488' },
+    { canonical: 'FITC' },
+    { canonical: 'MITOTRACKER', variantKey: 'mitotracker green' },
+  ];
+  const acks = [
+    { pair: ['ALEXA488', 'FITC'], reason: 'other', at: 'a' },
+    { pair: ['FITC', 'ALEXA488'], reason: 'other', at: 'b' }, // reverse order -- both still present
+    { pair: ['ALEXA488', 'MITOTRACKER::mitotracker green'], reason: 'other', at: 'c' }, // variant dedupe id -- NOT the ack key, absent
+    { pair: ['ALEXA488', 'MITOTRACKER'], reason: 'other', at: 'd' }, // canonical ids, same as flagPanelOverlaps' pairKey
+  ];
+
+  const pruned = pruneSpilloverAcks(acks, entries);
+  assert.deepEqual(pruned.map((a) => a.at), ['a', 'b', 'd']);
+
+  // Replacing one dye in the panel (FITC -> ALEXA647) drops the ack that named it.
+  const replaced = [{ canonical: 'ALEXA488' }, { canonical: 'ALEXA647' }];
+  assert.deepEqual(pruneSpilloverAcks(acks, replaced), []);
+
+  assert.deepEqual(pruneSpilloverAcks(null, entries), []);
+  assert.deepEqual(pruneSpilloverAcks(acks, null), []);
+  assert.deepEqual(pruneSpilloverAcks(undefined, undefined), []);
+});
+
+test('spillover acks are keyed on CANONICAL ids (same as flagPanelOverlaps pairKey), so a family variant pair is prunable and matchable', () => {
+  const entries = [
+    { canonical: 'MITOTRACKER', variantKey: 'mitotracker green', status: 'known' },
+    { canonical: 'SYTO', variantKey: 'syto9', status: 'known' },
+  ];
+  const acks = normalizeSpilloverAcks([{ pair: ['SYTO', 'MITOTRACKER'], reason: 'sequential-acquisition', at: '2026-09-12T00:00:00.000Z' }]);
+  assert.equal(acks.length, 1);
+  assert.deepEqual(acks[0].pair, ['MITOTRACKER', 'SYTO']);
+  assert.equal(spilloverPairKey('SYTO', 'MITOTRACKER'), 'MITOTRACKER|SYTO');
+  assert.equal(pruneSpilloverAcks(acks, entries).length, 1, 'a canonical-keyed ack must survive pruning against variant entries');
+  assert.deepEqual(normalizeSpilloverAcks([{ pair: ['X::v1', 'X::v1'], reason: 'other' }]), [], 'self-pairs are dropped');
+  assert.equal(normalizeSpilloverAcks([{ pair: [' A ', 'B'], reason: 'other' }, { pair: ['B', 'A'], reason: 'other' }]).length, 1, 'trimmed + deduped');
+  const [badAt] = normalizeSpilloverAcks([{ pair: ['A', 'B'], reason: 'other', at: 'not-a-date-at-all' }]);
+  assert.ok(Number.isFinite(Date.parse(badAt.at)), 'an unparseable at is replaced, not kept');
+});
+
+test('FILTER_BANDWIDTH_BOUNDS_NM mirrors normalizePanelFilterPair exactly (exclusive lower bound)', () => {
+  const at = (bandwidth) => normalizeChannels([{ id: 'c1', target: 't', filterCenterNm: 500, filterBandwidthNm: bandwidth }])[0].filterBandwidthNm;
+  assert.equal(FILTER_BANDWIDTH_BOUNDS_NM.minExclusiveNm, 0);
+  assert.equal(FILTER_BANDWIDTH_BOUNDS_NM.maxNm, 300);
+  assert.equal(at(0.5), 0.5, 'a sub-1 nm width is stored, matching the producer');
+  assert.equal(at(0), null);
+  assert.equal(at(300), 300);
+  assert.equal(at(300.5), null);
+  assert.ok(Object.isFrozen(FILTER_BANDWIDTH_BOUNDS_NM));
 });

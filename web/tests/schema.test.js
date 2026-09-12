@@ -6,6 +6,7 @@ import {
   emptyExperiment,
   migrate,
 } from '../src/core/schema.js';
+import { validateImportedExperiment } from '../src/core/importValidate.js';
 
 const EMPTY_STUDY_CONTEXT = {
   system: '',
@@ -560,4 +561,35 @@ test('migrate v5->v6 drops groupVocabulary and its provenance slot entirely when
   const migrated = migrate(v5);
   assert.ok(!('groupVocabulary' in migrated));
   assert.ok(!('groupVocabulary' in migrated.provenance.slots));
+});
+
+// --- panel.spillover: additive default, no schemaVersion bump (V3-N1) ----
+
+test('a v6 export without panel.spillover imports with acknowledged: [] (no schemaVersion bump needed)', () => {
+  const base = emptyExperiment();
+  const legacyAssay = { ...base.assays[0], panel: { targets: [], channels: [] } }; // pre-A2 shape: no spillover key at all
+  const legacyExport = { ...base, schemaVersion: SCHEMA_VERSION, assays: [legacyAssay] };
+
+  // migrate() is a no-op here since the file already claims the current
+  // version (the `while (version < SCHEMA_VERSION)` loop never runs) --
+  // validateImportedExperiment is what actually merges in the new default,
+  // via sanitizeAssay's `{...base[key], ...raw[key]}` spread per container.
+  const migrated = migrate(legacyExport);
+  const { experiment, issues } = validateImportedExperiment(migrated);
+
+  assert.deepEqual(
+    experiment.assays[0].panel.spillover,
+    { acknowledged: [] },
+    'a legacy assay with no panel.spillover key at all must import with the additive default'
+  );
+  assert.ok(!issues.some((i) => i.severity === 'fatal'));
+});
+
+test('a v6 SAVE (not import) without panel.spillover gets acknowledged: [] at the migrate() boundary', () => {
+  const base = emptyExperiment();
+  const legacy = { ...base, assays: [{ ...base.assays[0], panel: { targets: [], channels: [] } }] };
+  const out = migrate(legacy);
+  assert.deepEqual(out.assays[0].panel.spillover, { acknowledged: [] });
+  assert.equal(out.assays[0].panel.channels, legacy.assays[0].panel.channels, 'other panel fields untouched');
+  assert.strictEqual(migrate(base), base, 'identity preserved when nothing needs filling');
 });

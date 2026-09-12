@@ -431,6 +431,26 @@ function normalizeStudyIdentity(current) {
   return { ...current, meta: { ...meta, id: uuid() } };
 }
 
+// panel.spillover (acknowledged spectral-overlap pairs) was added without a
+// schemaVersion bump, so a v6 save written before it existed reaches this
+// boundary with `panel: {targets, channels}` and no spillover key at all
+// (red-team A2-P2: migrate() is a no-op at v6, and only the IMPORT path
+// merged the default). Default it here so every persisted study crosses one
+// boundary into the same shape; identity is preserved when nothing needs
+// filling.
+function normalizePanelSpillover(experiment) {
+  if (!experiment || !Array.isArray(experiment.assays)) return experiment;
+  let changed = false;
+  const assays = experiment.assays.map((assay) => {
+    if (!assay || typeof assay !== 'object' || !assay.panel || typeof assay.panel !== 'object') return assay;
+    const spillover = assay.panel.spillover;
+    if (spillover && typeof spillover === 'object' && Array.isArray(spillover.acknowledged)) return assay;
+    changed = true;
+    return { ...assay, panel: { ...assay.panel, spillover: { acknowledged: [] } } };
+  });
+  return changed ? { ...experiment, assays } : experiment;
+}
+
 export function migrate(obj) {
   let current = obj;
   let version = obj && typeof obj.schemaVersion === 'number' ? obj.schemaVersion : 0;
@@ -469,6 +489,7 @@ export function migrate(obj) {
   // silently skip the backfill for precisely the documents that need it.
   current = normalizeStudyContext(current);
   current = normalizeStudyIdentity(current);
+  current = normalizePanelSpillover(current);
   const meta = current && current.meta && typeof current.meta === 'object' ? current.meta : {};
   if (STUDY_ORIGINS.has(meta.origin)) return current;
   return { ...current, meta: { ...meta, origin: 'user' } };

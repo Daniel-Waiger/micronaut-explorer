@@ -48,6 +48,7 @@
 
 import { splitMarkers } from './validation.js';
 import { kbMarker } from '../core/kb.js';
+import { normalizeChannels, channelSpectralField } from './panelAssembly.js';
 
 export const SPECTRAL_STATES = [
   'unrecognized',
@@ -92,8 +93,8 @@ const SPECTRAL_VIEW_MAX_FWHM_NM = 300;
 // spectrum plus a safety margin into near-UV/near-IR, where FACSI-relevant
 // dyes/FPs/indicators actually live; anything outside it is far more likely
 // a typo than a real fluorophore this app should be advising on.
-const MIN_PLAUSIBLE_PEAK_NM = 300;
-const MAX_PLAUSIBLE_PEAK_NM = 900;
+export const MIN_PLAUSIBLE_PEAK_NM = 300;
+export const MAX_PLAUSIBLE_PEAK_NM = 900;
 
 /**
  * A Stokes shift is always positive (emission is always redder / lower-
@@ -197,6 +198,12 @@ function normalizeFluorophoreEntry(canonical, entry, issues) {
 
   const reviewStatus =
     typeof entry.reviewStatus === 'string' && entry.reviewStatus.trim() ? entry.reviewStatus.trim() : DEFAULT_REVIEW_STATUS;
+  // Free-text curatorial context (e.g. DCFDA's oxidized-product caveat) --
+  // absent, not a fabricated empty string, when the entry has none. Kept
+  // through both shapes below and threaded by resolveMarkerToken so a
+  // consumer (panel.js row title, R3-04) can show it without re-reading
+  // spectra.json itself.
+  const note = typeof entry.note === 'string' && entry.note.trim() ? entry.note.trim() : undefined;
 
   if (entry.isFamily === true) {
     const rawVariants = entry.variants;
@@ -211,7 +218,7 @@ function normalizeFluorophoreEntry(canonical, entry, issues) {
       if (normalized) variants[variantKey.toLowerCase()] = normalized;
     }
     if (Object.keys(variants).length === 0) return null;
-    return { isFamily: true, reviewStatus, variants };
+    return { isFamily: true, reviewStatus, ...(note !== undefined ? { note } : {}), variants };
   }
 
   const excitationPeakNm = entry.excitationPeakNm;
@@ -237,8 +244,8 @@ function normalizeFluorophoreEntry(canonical, entry, issues) {
     );
   }
   return fwhmIsPlausible(entry.emissionFwhmNm)
-    ? { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm, emissionFwhmNm: entry.emissionFwhmNm }
-    : { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm };
+    ? { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm, emissionFwhmNm: entry.emissionFwhmNm, ...(note !== undefined ? { note } : {}) }
+    : { isFamily: false, reviewStatus, excitationPeakNm, emissionPeakNm, ...(note !== undefined ? { note } : {}) };
 }
 
 /**
@@ -411,6 +418,10 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
       // schematic width instead.
       emissionFwhmNm: variant.emissionFwhmNm,
       reviewStatus: spectraEntry.reviewStatus,
+      // The note lives on the whole family entry, not per variant (spectra.json
+      // has no per-variant note field) -- so every variant of a noted family
+      // carries the same family-level note through.
+      ...(spectraEntry.note !== undefined ? { note: spectraEntry.note } : {}),
     };
   }
 
@@ -422,6 +433,7 @@ export function resolveMarkerToken(token, markerIndex, markersKb, fluorophores) 
     emissionPeakNm: spectraEntry.emissionPeakNm,
     emissionFwhmNm: spectraEntry.emissionFwhmNm,
     reviewStatus: spectraEntry.reviewStatus,
+    ...(spectraEntry.note !== undefined ? { note: spectraEntry.note } : {}),
   };
 }
 
@@ -513,6 +525,48 @@ export function resolvePanel(markersFieldText, markerIndex, markersKb, fluoropho
     entries.push(resolved);
   }
   return { panelState: 'has-entries', entries };
+}
+
+/**
+ * Resolve ONE measurement's fluorophores from whichever source is
+ * authoritative for it: the structured `panel.channels` (engine/panelAssembly.js)
+ * when at least one channel has a spectral field filled in, else the
+ * free-text `naming.fields.markers` field via resolvePanel above. This is the
+ * SAME choice engine/conformance.js's spillover check made inline (its own
+ * producer of the gate); moving it here gives every consumer -- conformance,
+ * and later the panel-step UI itself -- one shared answer to "what
+ * fluorophores does this measurement actually have" instead of two paths
+ * that can silently disagree (docs/cma-lessons.md lesson 49/R4-01).
+ *
+ * `kb` is the same shape checkConformance receives: `{index, markersKb,
+ * spectra}` (`index` is core/kb.js's indexKb() alias table, `spectra` is this
+ * module's loadSpectraKb() fluorophores map).
+ *
+ * Returns `{source: 'channels'|'markers', panelState, entries}`.
+ * `source: 'channels'` entries additionally carry `channelId` (the owning
+ * channel's stable id) so a UI consumer can attribute a flag back to the row
+ * that caused it; `source: 'markers'` entries have no such id (the free-text
+ * field has no per-entry identity to attribute to).
+ */
+export function resolveMeasurementFluorophores(view, kb) {
+  const markerIndex = kb && kb.index;
+  const markersKb = kb && kb.markersKb;
+  const fluorophores = kb && kb.spectra;
+
+  const channels = normalizeChannels(view && view.panel && view.panel.channels);
+  if (channels.length > 0) {
+    const entries = channels
+      .map((channel) => ({ channel, spectralField: channelSpectralField(channel).trim() }))
+      .filter(({ spectralField }) => Boolean(spectralField))
+      .map(({ channel, spectralField }) => ({
+        ...resolveMarkerToken(spectralField, markerIndex, markersKb, fluorophores),
+        channelId: channel.id,
+      }));
+    return { source: 'channels', panelState: 'has-entries', entries };
+  }
+
+  const markersText = (view && view.naming && view.naming.fields && view.naming.fields.markers) || '';
+  return { source: 'markers', ...resolvePanel(markersText, markerIndex, markersKb, fluorophores) };
 }
 
 /**
