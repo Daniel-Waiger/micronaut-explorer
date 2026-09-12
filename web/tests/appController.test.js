@@ -445,6 +445,82 @@ test('a malformed import leaves getSaveState() unchanged and the toast names no 
   }
 });
 
+// --- D1 additions (B2 red-team problems 3 & 4) --------------------------
+
+test('a shell error AFTER a successful import is reported as a shell error, not a bad file, and the indicator does not stick on "saving" (B2 red-team #3)', async () => {
+  const store = createStore(withTitle(emptyExperiment(), 'my current work'));
+  const persist = makeFakePersist({
+    importFromFile: () => Promise.resolve({ experiment: withTitle(emptyExperiment(), 'IMPORTED'), issues: [] }),
+  });
+  const shell = makeRecordingShell();
+  // setSaveState throws only on the post-replace 'saving' call, not on the
+  // earlier 'saved' calls preserveOpenStudy makes while snapshotting the
+  // displaced study -- this is exactly the widened `catch {}` B2's red team
+  // found: the import already succeeded and is live in the store by the
+  // time this throws.
+  shell.setSaveState = (state) => {
+    if (state?.status === 'saving') throw new Error('boom from the shell');
+    shell.saveStates.push(state);
+  };
+  const { controller, store: liveStore } = makeController({ store, persist });
+  controller.attachShell(shell);
+
+  await assert.rejects(
+    () => controller.actions.onImportProject({ name: 'backup.micronaut.json' }),
+    /boom from the shell/,
+    'a post-replace throw must propagate, not be swallowed as a bad-file message'
+  );
+  assert.equal(liveStore.get().meta.title, 'IMPORTED', 'the import must still be live in the store');
+  assert.equal(shell.toasts.some((m) => /not a valid Micronaut project backup/.test(m)), false,
+    'the misattributed "invalid file" toast must not fire for a shell-side error');
+});
+
+test('restoreRecoverySlot on an unreadable slot reports a toast and leaves the healthy open study\'s save state untouched (B2 red-team #4)', () => {
+  const store = createStore(withTitle(emptyExperiment(), 'my current work'));
+  const persist = makeFakePersist({
+    loadRecoverableSlot: () => ({ id: null, experiment: null, error: new Error('That saved version is no longer available.') }),
+  });
+  const shell = makeRecordingShell();
+  const { controller } = makeController({ store, persist });
+  controller.attachShell(shell);
+  controller.getSaveState(); // seed nothing; just read the baseline below
+  const before = controller.getSaveState();
+
+  const result = controller.actions.onRestoreRecovery('slot-gone');
+
+  assert.equal(result, false);
+  assert.deepEqual(controller.getSaveState(), before, "the OPEN study's save state must not be touched by a restore-slot failure");
+  assert.ok(
+    shell.toasts.some((m) => /Could not restore that version/.test(m)),
+    'the failure must be reported as a toast'
+  );
+  assert.equal(shell.saveStates.length, 0, 'setSaveState must never be called for this branch');
+});
+
+test("recoveryEntries names a title from meta.title, then researchQuestion, then the study's origin, then 'Untitled study', and returns origin", () => {
+  const persist = makeFakePersist({
+    listSaved: () => ['titled', 'rq', 'blank-origin', 'imported-origin', 'nothing'],
+    loadExperiment: (id) => ({
+      titled: { ...emptyExperiment(), meta: { title: 'My Study', origin: 'user' } },
+      rq: { ...emptyExperiment(), researchQuestion: 'Does X affect Y in a very very very very long research question that runs well past sixty characters total', meta: { origin: 'user' } },
+      'blank-origin': { ...emptyExperiment(), meta: { origin: 'blank' } },
+      'imported-origin': { ...emptyExperiment(), meta: { origin: 'imported' } },
+      nothing: { ...emptyExperiment(), meta: { origin: 'draft' } },
+    }[id]),
+  });
+  const { controller } = makeController({ persist });
+
+  const entries = controller.recoveryEntries();
+
+  assert.equal(entries.find((e) => e.id === 'titled').title, 'My Study');
+  assert.equal(entries.find((e) => e.id === 'titled').origin, 'user');
+  const rqEntry = entries.find((e) => e.id === 'rq');
+  assert.equal(rqEntry.title.length, 60, 'the researchQuestion fallback is truncated to 60 chars');
+  assert.equal(entries.find((e) => e.id === 'blank-origin').title, 'Blank study');
+  assert.equal(entries.find((e) => e.id === 'imported-origin').title, 'Imported study');
+  assert.equal(entries.find((e) => e.id === 'nothing').title, 'Untitled study');
+});
+
 // --- Fix 2: clearAllStoredData must not lie ----------------------------
 
 test('clearAllStoredData shows the success toast only when clear AND the re-save both succeed', () => {

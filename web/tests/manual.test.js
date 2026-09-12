@@ -72,8 +72,8 @@ test("shell.js's THEME_KEY literal is 'micronaut.theme'", () => {
   assert.equal(match[1], 'micronaut.theme');
 });
 
-test("shell.js's nav renders a relative 'manual/' link", () => {
-  assert.match(shellText, /href\s*=\s*'manual\/'/);
+test("shell.js's nav renders a relative 'manual/index.html' link (not a directory href, R5-07)", () => {
+  assert.match(shellText, /href\s*=\s*'manual\/index\.html'/);
 });
 
 function allManualPages() {

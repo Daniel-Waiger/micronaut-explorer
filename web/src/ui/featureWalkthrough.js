@@ -10,7 +10,7 @@ export const FEATURE_TOUR = Object.freeze([
   // started itself; a tour long enough to need its own endurance is a sign the
   // interface is not explaining itself. These name the few places whose
   // purpose is not obvious from looking at them.
-  stop(null, '.shell-nav', 'Navigation', 'Three workspaces: the shape of your study, its measurements, and a review of both. There is no required order.'),
+  stop(null, '.shell-nav', 'Navigation', 'The nav’s five steps cover the shape of your study, its measurements, and a review of both. There is no required order.'),
   stop('home', '.study-map-editor', 'Study map', 'The shape of the study: question, system, comparison structure, and what counts as one independent unit. Everything else follows from these.'),
   stop('study', '.measurement-registry-controls', 'Finding a measurement', 'Search and filter the list. Each measurement is one observation or analysis used to answer the study question.'),
   stop('study', '.measurement-registry-row', 'One row per measurement', 'Its status says whether it is a draft, waiting on a decision, or ready to acquire. Open it to plan it.'),

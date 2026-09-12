@@ -117,7 +117,7 @@ function templateFor(stepId, facts) {
         when: 'Use it when opening the app, returning from another route, or restarting the walkthrough.',
         how: 'Review the study at a glance, then move to the workspace that owns your next question.',
         tryThis: 'Notice the study title and how many measurements are currently included.',
-        exampleSummary: `${plural(facts.assayCount, 'measurement')} are currently included${facts.study.title ? ` in “${facts.study.title}”` : ''}.`,
+        exampleSummary: `${plural(facts.assayCount, 'measurement')} ${facts.assayCount === 1 ? 'is' : 'are'} currently included${facts.study.title ? ` in “${facts.study.title}”` : ''}.`,
       };
     case 'describe':
       return {

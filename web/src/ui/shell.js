@@ -265,7 +265,7 @@ export function renderShell(root, store, router, options = {}) {
     newStudy.appendChild(newStudyLabel);
     newStudy.title = 'Start a blank study. Previous versions remain available in Restore.';
     newStudy.addEventListener('click', () => {
-      if (window.confirm('Start a blank study? Your current work remains available in Restore.')) onNewBlank();
+      if (window.confirm('Start a blank study? Your current work is kept as a protected snapshot in Restore (Restore keeps five versions; the most recent snapshots are protected first).')) onNewBlank();
     });
   }
 
@@ -305,7 +305,19 @@ export function renderShell(root, store, router, options = {}) {
     button.className = `shell-utility-action ${className}`.trim();
     button.setAttribute('role', role);
     button.textContent = label;
-    button.addEventListener('click', () => { closeMenu(); callback(); });
+    button.addEventListener('click', () => {
+      // closeMenu() hides utilityMenu, and this button is IN utilityMenu --
+      // once hidden it is no longer focusable at all, so a later
+      // previouslyFocused.focus() on it would silently no-op (same failure
+      // mode as D2-P1, one level up: the "opener" a callback restores focus
+      // to must stay focusable after this click handler returns). utilityToggle
+      // is the one control here guaranteed to still be visible and focusable,
+      // and is already where Escape-driven closeMenu(true) sends focus, so a
+      // callback that itself opens a further modal (the feedback handoff
+      // modal) gets it as the opener to restore to on close.
+      closeMenu();
+      callback(utilityToggle);
+    });
     return button;
   }
   utilityToggle.addEventListener('click', () => {
@@ -348,7 +360,16 @@ export function renderShell(root, store, router, options = {}) {
     input.addEventListener('change', async () => {
       const file = input.files?.[0];
       input.value = '';
-      if (file) await onImportProject(file);
+      if (!file) return;
+      try {
+        await onImportProject(file);
+      } catch (err) {
+        // The import itself reports its own failures; a throw here means the
+        // shell failed AFTER a successful import. Say so instead of dropping
+        // the rejection silently (red-team D1).
+        console.error('Import completed but the page failed to refresh:', err);
+        showToast('The project was imported, but the page could not refresh -- reload to see it.');
+      }
     });
     utilityMenu.append(action('Import project backup', () => input.click()), input);
   }
@@ -370,13 +391,21 @@ export function renderShell(root, store, router, options = {}) {
       restoreList.appendChild(none);
       return;
     }
+    const total = recoveryEntries.length;
     recoveryEntries.forEach((entry, index) => {
       const entryTitle = entry.title || 'Untitled study';
+      // V5-NEW-03: distinct rows can share both title ('Untitled study') and
+      // even the same rendered relative time, making them indistinguishable
+      // to a screen-reader user in particular. Position among the ring's own
+      // entries (`version i of n`) is always unique even when title and time
+      // are not, so it goes into the accessible name below regardless of
+      // whether a when-label exists.
+      const version = index + 1;
       const row = document.createElement('div');
       row.className = 'shell-restore-row';
       const titleLine = `${index === 0 ? 'Latest: ' : ''}${entryTitle}`;
       const restore = action(titleLine, () => {
-        if (window.confirm('Restore this saved version? Your current work remains available in Restore.')) {
+        if (window.confirm('Restore this saved version? Your current work is kept as a protected snapshot in Restore (Restore keeps five versions; the most recent snapshots are protected first).')) {
           onRestoreRecovery(entry.id);
         }
       }, 'shell-restore-action');
@@ -408,15 +437,15 @@ export function renderShell(root, store, router, options = {}) {
         // users get the same information, just assembled differently.
         when.setAttribute('aria-hidden', 'true');
         restore.appendChild(when);
-        restore.setAttribute('aria-label', `${titleLine}, saved ${whenLabel}`);
       }
+      restore.setAttribute('aria-label', `${entryTitle}, version ${version} of ${total}, saved ${whenLabel || 'an unknown time'}`);
       row.appendChild(restore);
       if (onDeleteRecovery) {
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'shell-restore-delete';
         remove.setAttribute('role', 'menuitem');
-        remove.setAttribute('aria-label', `Permanently delete the saved version "${entryTitle}"`);
+        remove.setAttribute('aria-label', `Permanently delete the saved version "${entryTitle}", version ${version} of ${total}`);
         remove.title = 'Permanently delete this saved version';
         remove.appendChild(createIcon('close', 'button-icon'));
         remove.addEventListener('click', (event) => {
@@ -432,13 +461,13 @@ export function renderShell(root, store, router, options = {}) {
     });
   }
   renderRecoveryEntries();
-  utilityMenu.appendChild(action('Copy feedback report', () => {
+  utilityMenu.appendChild(action('Copy feedback report', (opener) => {
     const report = buildFeedbackReport({ currentStepId: router.current(), kbIssueCount, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined, experiment: store.get() });
-    handoffFeedback({ report, channel: 'copy' });
+    handoffFeedback({ report, channel: 'copy', opener });
   }));
-  utilityMenu.appendChild(action('Open GitHub issue', () => {
+  utilityMenu.appendChild(action('Open GitHub issue', (opener) => {
     const report = buildFeedbackReport({ currentStepId: router.current(), kbIssueCount, userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined, experiment: store.get() });
-    handoffFeedback({ report, channel: 'github' });
+    handoffFeedback({ report, channel: 'github', opener });
   }));
   // A persisted theme is an explicit preference. With System selected, do
   // not set a data-theme attribute so the stylesheet's media query can track
@@ -673,7 +702,15 @@ export function renderShell(root, store, router, options = {}) {
         remove.addEventListener('click', (event) => {
           event.stopPropagation();
           const deletedLabel = assay.label || `Measurement ${index + 1}`;
-          if (!window.confirm(`Delete measurement "${deletedLabel}"?`)) return;
+          // R4-16: the old text ('Delete measurement "X"?') promised nothing
+          // either way about recoverability, which read as a flat, unqualified
+          // "This cannot be undone." once a caller added that phrase elsewhere
+          // for the same action -- while every earlier autosave of this study
+          // (including this measurement) still survives in Restore for as
+          // long as persist.js's ring keeps that slot. Naming that honestly
+          // matches the same "kept in Restore" wording the other lifecycle
+          // confirms in this file use.
+          if (!window.confirm(`Delete measurement "${deletedLabel}" and all its design, panel, and naming data? An earlier saved version of this study, including this measurement, may still be available in Restore.`)) return;
           const next = removeAssay(store.get(), assay.id);
           if (next) {
             store.patch(next);
@@ -886,7 +923,7 @@ export function renderShell(root, store, router, options = {}) {
     const manualLink = document.createElement('a');
     manualLink.className = 'nav-step';
     manualLink.dataset.stepId = 'manual';
-    manualLink.href = 'manual/';
+    manualLink.href = 'manual/index.html';
     manualLink.target = '_blank';
     manualLink.rel = 'noopener noreferrer';
     manualLink.setAttribute('aria-label', 'User manual (opens in a new tab)');
@@ -900,7 +937,7 @@ export function renderShell(root, store, router, options = {}) {
     const releaseNotesLink = document.createElement('a');
     releaseNotesLink.className = 'nav-step';
     releaseNotesLink.dataset.stepId = 'release-notes';
-    releaseNotesLink.href = 'release-notes/';
+    releaseNotesLink.href = 'release-notes/index.html';
     releaseNotesLink.target = '_blank';
     releaseNotesLink.rel = 'noopener noreferrer';
     releaseNotesLink.setAttribute('aria-label', 'Release notes (opens in a new tab)');
@@ -966,13 +1003,73 @@ export function renderShell(root, store, router, options = {}) {
   renderNav(router.current());
   renderFooter(router.current());
 
+  // R6-06/R5-04: a toast used to be ONE mutable slot -- a second showToast()
+  // call in the same synchronous tick (main.js fires the KB-issue warning and
+  // the recovery notice back to back at boot) overwrote the first before a
+  // single frame painted, so the earlier message was never merely
+  // deprioritised, it was destroyed. Each message now gets its own full
+  // TOAST_DURATION_MS on screen; a message that arrives while one is showing
+  // is queued instead of clobbering it. TOAST_QUEUE_MAX bounds the queue (not
+  // the one currently visible) so a caller that fires many toasts in a burst
+  // cannot pile up an unbounded backlog the user has to sit through -- the
+  // OLDEST still-queued (not-yet-shown) message is dropped to make room.
+  const TOAST_DURATION_MS = 3000;
+  const TOAST_QUEUE_MAX = 3;
   let toastTimer = null;
-  function showToast(message) {
+  let toastQueue = [];
+  function advanceToastQueue() {
+    if (toastQueue.length === 0) return;
+    const message = toastQueue.shift();
     status.textContent = message;
     status.classList.add('visible');
-    if (toastTimer) window.clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => status.classList.remove('visible'), 3000);
+    toastTimer = window.setTimeout(() => {
+      status.classList.remove('visible');
+      // R4-15: clear the live region's text once the fade completes, not just
+      // its visibility class -- otherwise an assistive-tech user who visits
+      // #app's accessible text minutes later (or a route change that reads
+      // the DOM) still finds a stale toast sitting there, looking current.
+      status.textContent = '';
+      toastTimer = null;
+      advanceToastQueue();
+    }, TOAST_DURATION_MS);
   }
+  function showToast(message) {
+    toastQueue.push(message);
+    while (toastQueue.length > TOAST_QUEUE_MAX) toastQueue.shift();
+    if (toastTimer === null) advanceToastQueue();
+  }
+
+  // V6-NEW-04: the save indicator's relative time ("Saved locally · 3s ago")
+  // and each Restore row's relative "Nm ago" were only ever re-rendered from
+  // an explicit setSaveState/setRecoveryEntries call -- with no timer
+  // anywhere, both froze at whatever they said at the last write and kept
+  // asserting a stale "just now" indefinitely while the user sat idle. This
+  // ticks the labels forward every 30s, but only while there is a settled
+  // save to describe (status 'saving'/'failed'/'unsaved' already update
+  // synchronously and would only be confused by a periodic re-render).
+  // Torn down on 'pagehide' (a page about to be discarded needs no more
+  // ticks) and via the returned destroy(), which test code — and any future
+  // caller that unmounts the shell — must call to avoid leaking the interval.
+  let saveTickInterval = null;
+  function tickSaveState() {
+    if (saveState?.status !== 'saved') return;
+    renderSaveState();
+    // Rebuilding the Restore list while the Utilities menu is open would
+    // destroy keyboard focus on a restore row twice a minute (red-team D1,
+    // lesson 46). Relative times there refresh on the next open instead.
+    if (utilityMenu.hidden) renderRecoveryEntries();
+  }
+  function startSaveTicker() {
+    if (saveTickInterval !== null) return;
+    saveTickInterval = window.setInterval(tickSaveState, 30000);
+  }
+  function stopSaveTicker() {
+    if (saveTickInterval !== null) { window.clearInterval(saveTickInterval); saveTickInterval = null; }
+  }
+  startSaveTicker();
+  function handlePagehide() { stopSaveTicker(); }
+  window.addEventListener('pagehide', handlePagehide);
+
   return {
     main,
     showToast,
@@ -995,6 +1092,13 @@ export function renderShell(root, store, router, options = {}) {
       const isVisible = Boolean(visible);
       guidedAsideHost.hidden = !isVisible;
       body.classList.toggle('has-guided-aside', isVisible);
+    },
+    // Tears down the save-state ticker's interval and its pagehide listener.
+    // main.js never remounts the shell today, but test code that renders it
+    // repeatedly must call this to avoid leaking a live setInterval per test.
+    destroy() {
+      stopSaveTicker();
+      window.removeEventListener('pagehide', handlePagehide);
     },
   };
 }

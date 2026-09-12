@@ -480,7 +480,7 @@ export const studyStep = {
           removeBtn.addEventListener('click', () => {
             const deletedLabel = assay.label || `Measurement ${index + 1}`;
             const ok = window.confirm(
-              `Delete "${deletedLabel}" and all its design, panel, and naming data?\n\nThis cannot be undone.`
+              `Delete "${deletedLabel}" and all its design, panel, and naming data?\n\nEarlier autosaves in Restore may still contain it for a while; the study as it is now will not.`
             );
             if (!ok) return;
             const result = removeAssay(store.get(), assay.id);

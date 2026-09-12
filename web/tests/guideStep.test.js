@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { guideStep } from '../src/ui/steps/guide.js';
+import { describeWalkthroughLength } from '../src/engine/workflowProgress.js';
 import { createDomStub } from './domStub.js';
 
 // domStub.js's FakeElement.append(...nodes) mirrors real DOM Node.append()
@@ -197,14 +198,19 @@ test('guide step: an example study is NOT offered the practice-tab escape hatch'
 
 test('guide step: the title attribute matches the branch', () => {
   withGuidePage((document) => {
+    // Asserts describeWalkthroughLength()'s CURRENT value rather than a
+    // literal word, so this test can never lock in a stale step count again
+    // (V2-NEW-05): it was the 'seven-step' regex here that defended the
+    // wrong string through the five-step restructure.
+    const walkthroughLength = describeWalkthroughLength();
     const start = renderGuide(document, fakeStore('example'), { guidedStatus: { status: 'not-started' } }).button;
-    assert.match(start.title, /open the optional seven-step example walkthrough/i);
+    assert.match(start.title, new RegExp(`open the optional ${walkthroughLength} example walkthrough`, 'i'));
 
     const resume = renderGuide(document, fakeStore('template'), { guidedStatus: { status: 'paused' } }).button;
-    assert.match(resume.title, /resume the optional seven-step example walkthrough/i);
+    assert.match(resume.title, new RegExp(`resume the optional ${walkthroughLength} example walkthrough`, 'i'));
 
     const restart = renderGuide(document, fakeStore('template'), { guidedStatus: { status: 'completed' } }).button;
-    assert.match(restart.title, /restart the optional seven-step example walkthrough/i);
+    assert.match(restart.title, new RegExp(`restart the optional ${walkthroughLength} example walkthrough`, 'i'));
 
     const explain = renderGuide(document, fakeStore('blank'), { guidedStatus: { status: 'not-started' } }).button;
     assert.match(explain.title, /open a contextual explanation/i);
@@ -244,4 +250,46 @@ test('guide step source: no surviving claim that the GitHub link carries the rep
   const source = readFileSync(path, 'utf8');
   assert.doesNotMatch(source, /same report already in the body/i);
   assert.doesNotMatch(source, /prefilled issue with the same report/i);
+});
+
+test('guide step source: no surviving "seven" anywhere (R2-01/R5-03, lesson 41)', () => {
+  // The grep IS the acceptance test here: a semantically-correct rewrite that
+  // still contains the literal stale word must fail this, not just the
+  // regex-match tests above.
+  const path = fileURLToPath(new URL('../src/ui/steps/guide.js', import.meta.url));
+  const source = readFileSync(path, 'utf8');
+  assert.doesNotMatch(source, /seven/i);
+});
+
+test('guide step: "The steps" reference lists exactly the five nav steps, not the per-measurement sections', () => {
+  withGuidePage((document) => {
+    const { main } = renderGuide(document, fakeStore('example'), { guidedStatus: { status: 'not-started' } });
+    // domStub's querySelectorAll has no descendant-combinator support, so
+    // query within "The steps" section specifically -- there is a second,
+    // unrelated <dl> further down ("Key ideas") whose terms must not leak in.
+    const stepsSection = [...main.querySelectorAll('.guide-section')].find(
+      (section) => section.querySelector('h2')?.textContent === 'The steps'
+    );
+    const terms = [...stepsSection.querySelectorAll('dt')].map((dt) => dt.textContent);
+    assert.deepEqual(terms, ['Study map', 'Research brief', 'Measurements', 'The open measurement', 'Review']);
+
+    // Samples & design / Acquisition / Data plan must be described as
+    // sections INSIDE a measurement (R2-03/R5-10), not as their own nav
+    // steps -- so they must not appear as their own <dt> terms.
+    for (const stale of ['Samples & design', 'Acquisition', 'Data plan']) {
+      assert.ok(!terms.includes(stale), `${stale} must not be its own nav-step term`);
+    }
+    const openMeasurementDesc = [...stepsSection.querySelectorAll('dd')][3].textContent;
+    assert.match(openMeasurementDesc, /Samples & design/);
+    assert.match(openMeasurementDesc, /Acquisition/);
+    assert.match(openMeasurementDesc, /Data plan/);
+  });
+});
+
+test('guide step: manual link is a file, not a directory (R5-07)', () => {
+  withGuidePage((document) => {
+    const { main } = renderGuide(document, fakeStore('example'), { guidedStatus: { status: 'not-started' } });
+    const link = [...main.querySelectorAll('a')].find((a) => /full user manual/i.test(a.textContent));
+    assert.equal(link.href, 'manual/index.html');
+  });
 });

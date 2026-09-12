@@ -147,16 +147,23 @@ test('the restore row appends a second-line span for the save time instead of ch
 // button puts the same two facts back in as one properly punctuated phrase.
 test('the appended time span is hidden from the accessible name, which is instead set explicitly on the button', () => {
   assert.match(shell, /when\.setAttribute\('aria-hidden', 'true'\)/);
-  assert.match(shell, /restore\.setAttribute\('aria-label', `\$\{titleLine\}, saved \$\{whenLabel\}`\)/);
+  // D1/V5-NEW-03: the accessible name now always names the entry's position
+  // (`version i of n`) so rows sharing a title and a rendered time are still
+  // distinguishable to a screen reader -- it is set unconditionally, not only
+  // when a when-label exists.
+  assert.match(shell, /restore\.setAttribute\('aria-label', `\$\{entryTitle\}, version \$\{version\} of \$\{total\}, saved \$\{whenLabel \|\| 'an unknown time'\}`\)/);
 });
 
 // Everything renderRecoveryEntries already did must survive untouched: the
-// "Latest: " prefix on index 0, the delete button's stopPropagation and its
-// aria-label, and both window.confirm strings.
+// "Latest: " prefix on index 0, the delete button's stopPropagation, and its
+// version-qualified aria-label (D1/V5-NEW-03) and confirm string.
 test('the restore row keeps its existing Latest prefix, delete control, and confirm strings intact', () => {
   assert.match(shell, /const titleLine = `\$\{index === 0 \? 'Latest: ' : ''\}\$\{entryTitle\}`;/);
-  assert.match(shell, /window\.confirm\('Restore this saved version\? Your current work remains available in Restore\.'\)/);
-  assert.match(shell, /remove\.setAttribute\('aria-label', `Permanently delete the saved version "\$\{entryTitle\}"`\)/);
+  // D1: the confirm dialog states the ring's real bound (persist.js's
+  // PROTECTED_CAP = 3) instead of the old unqualified "remains available"
+  // promise (V6-NEW-01/B2 red-team problem 6).
+  assert.match(shell, /window\.confirm\('Restore this saved version\? Your current work is kept as a protected snapshot in Restore \(Restore keeps five versions; the most recent snapshots are protected first\)\.'\)/);
+  assert.match(shell, /remove\.setAttribute\('aria-label', `Permanently delete the saved version "\$\{entryTitle\}", version \$\{version\} of \$\{total\}`\)/);
   assert.match(shell, /event\.stopPropagation\(\);/);
   assert.match(shell, /window\.confirm\(`Permanently delete the saved version "\$\{entryTitle\}"\? This cannot be undone\.`\)/);
 });

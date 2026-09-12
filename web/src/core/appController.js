@@ -196,6 +196,21 @@ export function createAppController({
     notifyToast(message);
   }
 
+  // The word this app uses for a saved study's own origin -- see
+  // withOrigin/isExampleOrigin above -- for the ONE case a title still has to
+  // be manufactured (V5-NEW-03: identical 'Untitled study' rows are otherwise
+  // indistinguishable). Both 'example' and 'template' describe the shipped
+  // example -- see isExampleOrigin's own comment on why both values exist --
+  // so they share one label here too. 'draft'/'user'/anything else falls
+  // through to the final 'Untitled study' default below, same as before this
+  // change: those origins carry no more identity than a blank study does.
+  const ORIGIN_TITLE = Object.freeze({
+    blank: 'Blank study',
+    example: 'Example study',
+    template: 'Example study',
+    imported: 'Imported study',
+  });
+
   function recoveryEntries() {
     // The shell receives display-only data, never a persistence backend. It
     // therefore cannot accidentally load, mutate, or clear localStorage on
@@ -203,9 +218,24 @@ export function createAppController({
     // below.
     return persist.listSaved().map((id) => {
       const raw = persist.loadExperiment(id);
-      const title = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
+      const explicitTitle = typeof raw?.meta?.title === 'string' && raw.meta.title.trim()
         ? raw.meta.title.trim()
-        : 'Untitled study';
+        : '';
+      // meta.title is the one place a user can name a study; researchQuestion
+      // is the next-best identifying fact anyone has actually typed, so a
+      // slot with no title still gets something recognizable rather than
+      // jumping straight to a generic label. Truncated at 60 chars -- a menu
+      // row, not a full-text surface.
+      const researchQuestionTitle = !explicitTitle
+        && typeof raw?.researchQuestion === 'string'
+        && raw.researchQuestion.trim()
+        ? raw.researchQuestion.trim().slice(0, 60)
+        : '';
+      const origin = raw?.meta?.origin;
+      const title = explicitTitle
+        || researchQuestionTitle
+        || ORIGIN_TITLE[origin]
+        || 'Untitled study';
       // Read raw, un-migrated meta.updatedAt directly (this function never
       // calls migrate()) rather than fabricating one: every slot saved
       // before this change genuinely has no updatedAt, and reporting `null`
@@ -214,7 +244,7 @@ export function createAppController({
       // type (a number, an object) is normalized to `null` the same way,
       // since it is not a value anything downstream should render as a date.
       const savedAt = typeof raw?.meta?.updatedAt === 'string' ? raw.meta.updatedAt : null;
-      return { id, title, savedAt };
+      return { id, title, savedAt, origin };
     });
   }
 
@@ -234,40 +264,23 @@ export function createAppController({
 
   async function importProjectBackup(file) {
     if (!file) return;
+    // B2 red-team (problem 3): the try used to wrap everything through the
+    // success toast, so a throw from store.replace/setSaveState/
+    // notifyRecoveryEntries -- a SHELL error, after the import already
+    // succeeded and is live in the store -- was caught here and reported as
+    // "it is not a valid Micronaut project backup," while the indicator was
+    // left stuck on 'saving' (setSaveState never ran). Narrowed to cover only
+    // the parse/validate step: a bad FILE is the one thing this catch may
+    // still legitimately explain, and it does so before the open study is
+    // touched at all. Anything that throws after that point is a bug in this
+    // module or its collaborators, not a bad file, and must propagate as
+    // such rather than being misattributed.
+    let imported;
+    let issues;
     try {
-      // Parse first -- a bad file must never displace or snapshot the open
-      // study. Only once we have a real imported experiment in hand do we
-      // preserve the study that is about to be replaced (same read-then-
-      // replace-across-the-debounce-window hazard restoreRecoverySlot and
-      // startBlankStudy guard below).
-      const { experiment: imported, issues } = await persist.importFromFile(file);
-      if (
-        !preserveOpenStudy(
-          'Could not preserve your current study, so that import was not applied. Nothing was changed.'
-        )
-      ) {
-        return;
-      }
-      store.replace(withOrigin(imported, 'imported'));
-      // replace() schedules the ordinary autosave subscriber. Clear any
-      // earlier lifecycle failure immediately; that subscriber will keep the
-      // status at saving, then replace it with saved or a storage failure.
-      setSaveState({ status: 'saving', error: null });
-      notifyRecoveryEntries();
-      // core/importValidate.js sanitizes rather than rejects most shape
-      // problems (a malformed provenance slot, an assay reset to defaults)
-      // so the rest of a real backup is never thrown away over one bad
-      // corner -- but a sanitized field is exactly the kind of change a
-      // project owner needs to notice, not one that should vanish into the
-      // console alone.
-      if (Array.isArray(issues) && issues.length > 0) {
-        issues.forEach((issue) => logger.warn('Project import:', issue.message));
-        notifyToast(
-          `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details. The study you had open was kept in Restore.`
-        );
-      } else {
-        notifyToast('Project imported. It is now the study being autosaved. The study you had open was kept in Restore.');
-      }
+      const result = await persist.importFromFile(file);
+      imported = result.experiment;
+      issues = result.issues;
     } catch {
       // R5-09: the raw JSON.parse message ("Unexpected token ... in JSON at
       // position N") used to leak into the save indicator via
@@ -276,6 +289,39 @@ export function createAppController({
       // report a fixed, user-facing message as a toast only, and leave
       // saveState exactly as it was.
       notifyToast('Could not import that file: it is not a valid Micronaut project backup.');
+      return;
+    }
+    // Parse succeeded -- a bad file must never displace or snapshot the open
+    // study, which is why preserveOpenStudy only runs once we have a real
+    // imported experiment in hand (same read-then-replace-across-the-
+    // debounce-window hazard restoreRecoverySlot and startBlankStudy guard
+    // below).
+    if (
+      !preserveOpenStudy(
+        'Could not preserve your current study, so that import was not applied. Nothing was changed.'
+      )
+    ) {
+      return;
+    }
+    store.replace(withOrigin(imported, 'imported'));
+    // replace() schedules the ordinary autosave subscriber. Clear any
+    // earlier lifecycle failure immediately; that subscriber will keep the
+    // status at saving, then replace it with saved or a storage failure.
+    setSaveState({ status: 'saving', error: null });
+    notifyRecoveryEntries();
+    // core/importValidate.js sanitizes rather than rejects most shape
+    // problems (a malformed provenance slot, an assay reset to defaults)
+    // so the rest of a real backup is never thrown away over one bad
+    // corner -- but a sanitized field is exactly the kind of change a
+    // project owner needs to notice, not one that should vanish into the
+    // console alone.
+    if (Array.isArray(issues) && issues.length > 0) {
+      issues.forEach((issue) => logger.warn('Project import:', issue.message));
+      notifyToast(
+        `Project imported, but ${issues.length} part(s) of the file were invalid and reset to defaults. See the browser console for details. The study you had open was kept in Restore.`
+      );
+    } else {
+      notifyToast('Project imported. It is now the study being autosaved. The study you had open was kept in Restore.');
     }
   }
 
@@ -284,9 +330,16 @@ export function createAppController({
       onUnreadable: (slotId, err) => logger.error(`Could not restore autosave ${slotId}:`, err),
     });
     if (!experiment) {
-      reportPersistentLifecycleFailure(
-        `Could not restore that version: ${error ? error.message : 'it is unavailable'}`
-      );
+      // B2 red-team (problem 4), R5-09's sibling one call site over: the
+      // study currently open is perfectly healthy -- only the RESTORE SLOT
+      // being requested is unreadable/gone. Routing that through
+      // reportPersistentLifecycleFailure flips the save indicator of the
+      // healthy open study to 'failed', exactly the "a non-save event
+      // written onto the save-state surface" complaint R5-09 was filed
+      // against. A toast is the right (and only) surface for this: it says
+      // nothing about whether the OPEN study is safely saved, because
+      // nothing about that has changed.
+      notifyToast(`Could not restore that version: ${error ? error.message : 'it is unavailable'}`);
       return false;
     }
     // Same read-then-replace-across-the-debounce-window hazard startBlankStudy
